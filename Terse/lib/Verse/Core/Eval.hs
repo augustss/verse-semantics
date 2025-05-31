@@ -137,12 +137,14 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     fork' $ do
       readChoiceFree s1
+      readStoreFree s1
       unifyVar var =<< eval' s1 s2 e1 <|> eval' s1 s2 e2
     pure var
   e1 :.. e2 -> do
     var <- freshVar
     fork' $ do
       readChoiceFree s1
+      readStoreFree s1
       s3 <- freshS
       var1 <- eval' s1 s3 e1
       var2 <- eval' s3 s2 e2
@@ -244,12 +246,13 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
   Val.Lam env x e ->
     localEnv (const $ Env.insert x var2 env) $ eval' s1 s2 e
   Val.Tup xs -> do
-    unifyStoreFree s1 s2
     readChoiceFree s1
+    readStoreFree s1
     var <- asum $ zip [0 ..] xs <&> \ (i, var1) -> do
       unifyVar var2 <=< newVar $ Val.Int i
       pure var1
     unifyChoiceFree s1 s2
+    unifyStoreFree s1 s2
     pure var
   Val.Fun f ->
     evalAppFun s1 s2 f var2
@@ -258,7 +261,7 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
   Val.Map xs -> readVar var2 >>= \ case
     Val.Int k
       | toInteger minInt <= k && k <= toInteger maxInt ->
-          evalAppMap (fromInteger k) xs
+          evalAppMap s1 s2 (fromInteger k) xs
       | otherwise ->
           empty
     _ -> stuck
@@ -366,10 +369,16 @@ evalLess s1 s2 var1 var2 = do
   guard $ x1 < x2
   pure var1
 
-evalAppMap :: MonadRef m => Int -> IntMap [Var m] -> EvalT m (Var m)
-evalAppMap k = IntMap.lookup k >>> \ case
-  Nothing -> empty
-  Just xs -> asum $ pure <$> xs
+evalAppMap :: MonadRef m => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)
+evalAppMap s1 s2 k xs = do
+  readChoiceFree s1
+  readStoreFree s1
+  var <- case IntMap.lookup k xs of
+    Nothing -> empty
+    Just xs -> asum $ pure <$> xs
+  unifyChoiceFree s1 s2
+  unifyStoreFree s1 s2
+  pure var
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))
 
