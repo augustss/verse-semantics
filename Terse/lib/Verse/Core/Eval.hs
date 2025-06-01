@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -119,10 +118,10 @@ eval' s1 s2 = wrap $ \ case
     s3 <- freshS
     eval' s1 s3 e1 *> eval' s3 s2 e2
   Tup xs -> do
-    (s1, reverse -> xs) <- foldlM (\ (s1, xs) x -> do
-      s3 <- freshS
-      x <- eval' s1 s3 x
-      pure (s3, x:xs)) (s1, []) xs
+    (s1, xs) <- fmap reverse <$> foldlM (\ (s1, xs) x -> do
+      s2 <- freshS
+      x <- eval' s1 s2 x
+      pure (s2, x:xs)) (s1, []) xs
     unifyS s1 s2
     newTup xs
   e1 := e2 -> do
@@ -149,8 +148,7 @@ eval' s1 s2 = wrap $ \ case
       (,) <$> readVar var1 <*> readVar var2 >>= \ case
         (Val.Int x1, Val.Int x2) ->
           unifyVar var <=< asum $ newVar . Val.Int <$> [x1 .. x2]
-        _ ->
-          stuck
+        _ -> stuck
     pure var
   e1 :+ e2 -> do
     s3 <- freshS
@@ -176,8 +174,7 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     fork' $ unifyVar var =<< evalLess s4 s2 var1 var2
     pure var
-  Fail ->
-    empty
+  Fail -> empty
   All e -> do
     var <- freshVar
     heap <- newHeap s1
@@ -200,9 +197,7 @@ eval' s1 s2 = wrap $ \ case
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1
       loop s1 = \ case
-        Done -> do
-          unifyS s1 s2
-          pure []
+        Done -> unifyS s1 s2 $> []
         Step var1 m -> do
           s2 <- freshS
           var2 <- localEnv (Env.insert x var1) $ eval' s1 s2 e2
@@ -239,10 +234,8 @@ evalApp
   :: (MonadIO m, MonadRef m, MonadState Mem m)
   => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
-  Val.Int _ ->
-    stuck
-  Val.Lam env x e ->
-    localEnv (const $ Env.insert x var2 env) $ eval' s1 s2 e
+  Val.Int _ -> stuck
+  Val.Lam env x e -> localEnv (const $ Env.insert x var2 env) $ eval' s1 s2 e
   Val.Tup xs -> do
     readChoiceFree s1
     var <- asum $ zip [0 ..] xs <&> \ (i, var1) -> do
@@ -251,16 +244,13 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
     unifyChoiceFree s1 s2
     unifyStoreFree s1 s2
     pure var
-  Val.Fun f ->
-    evalAppFun s1 s2 f var2
-  Val.Ptr _ ->
-    stuck
+  Val.Fun f -> evalAppFun s1 s2 f var2
+  Val.Ptr _ -> stuck
   Val.Map xs -> readVar var2 >>= \ case
     Val.Int k
       | toInteger minInt <= k && k <= toInteger maxInt ->
           evalAppMap s1 s2 (fromInteger k) xs
-      | otherwise ->
-          empty
+      | otherwise -> empty
     _ -> stuck
 
 evalAppFun
@@ -327,14 +317,12 @@ evalAppFun s1 s2 f x = case f of
     heap <- newHeap s1
     let
       loop !xs = \ case
-        Done ->
-          newVar $ Val.Map xs
+        Done -> newVar $ Val.Map xs
         Step (k, v) m -> readVar k >>= \ case
           Val.Int k | toInteger minInt <= k && k <= toInteger maxInt ->
             loop (insert (fromInteger k) v xs) <=<
             lift $ local (const heap) m
-          _ ->
-            stuck
+          _ -> stuck
     var <- loop mempty <=< split $ do
       s1 <- newS
       s2 <- freshS
