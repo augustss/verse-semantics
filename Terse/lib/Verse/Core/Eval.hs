@@ -38,7 +38,7 @@ import Verse.Core.Val (Val)
 import Verse.Core.Val qualified as Val
 import Verse.Fun (Fun)
 import Verse.Fun qualified as Fun
-import Verse.Monad (VerseT, runVerseT)
+import Verse.Monad (Stream (..), VerseT, runVerseT)
 import Verse.Monad qualified as Monad
 import Verse.Name
 
@@ -200,10 +200,10 @@ eval' s1 s2 = wrap $ \ case
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1
       loop s1 = \ case
-        Monad.Done -> do
+        Done -> do
           unifyS s1 s2
           pure []
-        Monad.Step var1 m -> do
+        Step var1 m -> do
           s2 <- freshS
           var2 <- localEnv (Env.insert x var1) $ eval' s1 s2 e2
           heap <- newHeap s2
@@ -327,9 +327,9 @@ evalAppFun s1 s2 f x = case f of
     heap <- newHeap s1
     let
       loop !xs = \ case
-        Monad.Done ->
+        Done ->
           newVar $ Val.Map xs
-        Monad.Step (k, v) m -> readVar k >>= \ case
+        Step (k, v) m -> readVar k >>= \ case
           Val.Int k | toInteger minInt <= k && k <= toInteger maxInt ->
             loop (insert (fromInteger k) v xs) <=<
             lift $ local (const heap) m
