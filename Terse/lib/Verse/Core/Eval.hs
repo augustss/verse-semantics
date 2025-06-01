@@ -97,7 +97,7 @@ eval'
 eval' s1 s2 = wrap $ \ case
   Var x -> unifyS s1 s2 >> asks (Env.lookup x . (.env)) >>= \ case
     Just var -> pure var
-    Nothing -> fork' stuck *> freshVar
+    Nothing -> fork (addStack *> stuck) *> freshVar
   Abs x e -> unifyS s1 s2 >> asks (.env) >>= \ env ->
     newVar $ Val.Lam env x e
   App e1 e2 -> do
@@ -179,12 +179,10 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     heap <- newHeap s1
     fork $ do
-      i <- addStack
-      unifyVar var <=< newTup <=< all' $ do
+      bracketStack $ unifyVar var <=< newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      removeStack i
       unifyChoiceFree s1 s2
       unifyStoreFree s1 s2
     pure var
@@ -210,12 +208,10 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     heap <- newHeap s1
     fork $ do
-      i <- addStack
-      unifyVar var <=< one $ do
+      bracketStack . unifyVar var <=< one $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      removeStack i
       unifyChoiceFree s1 s2
       unifyStoreFree s1 s2
     pure var
@@ -440,10 +436,7 @@ localHeap :: (Heap m -> Heap m) -> EvalT m a -> EvalT m a
 localHeap f m = ReaderT $ local f . runReaderT m
 
 fork' :: (MonadRef m, MonadState Mem m) => EvalT m () -> EvalT m ()
-fork' m = fork $ do
-  i <- addStack
-  m
-  removeStack i
+fork' = fork . bracketStack
 
 fork :: MonadRef m => EvalT m () -> EvalT m ()
 fork m = ReaderT $ Monad.fork . runReaderT m
@@ -524,6 +517,13 @@ freshHeap = lift Monad.freshVar
 
 unifyHeap :: MonadRef m => Heap m -> Heap m -> EvalT m ()
 unifyHeap = (lift .) . Monad.unifyVar
+
+bracketStack :: MonadState Mem m => EvalT m a -> EvalT m a
+bracketStack m = do
+  i <- addStack
+  x <- m
+  removeStack i
+  pure x
 
 addStack :: MonadState Mem m => EvalT m Int
 addStack = asks (.stack) >>= \ stack -> lift $ do
