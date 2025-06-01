@@ -137,14 +137,12 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     fork' $ do
       readChoiceFree s1
-      readStoreFree s1
       unifyVar var =<< eval' s1 s2 e1 <|> eval' s1 s2 e2
     pure var
   e1 :.. e2 -> do
     var <- freshVar
     fork' $ do
       readChoiceFree s1
-      readStoreFree s1
       s3 <- freshS
       var1 <- eval' s1 s3 e1
       var2 <- eval' s3 s2 e2
@@ -181,7 +179,6 @@ eval' s1 s2 = wrap $ \ case
   Fail ->
     empty
   All e -> do
-    unifyChoiceFree s1 s2
     var <- freshVar
     heap <- newHeap s1
     fork $ do
@@ -191,6 +188,7 @@ eval' s1 s2 = wrap $ \ case
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
       removeStack i
+      unifyChoiceFree s1 s2
       unifyStoreFree s1 s2
     pure var
   For e1 x e2 -> do
@@ -206,15 +204,14 @@ eval' s1 s2 = wrap $ \ case
           unifyS s1 s2
           pure []
         Monad.Step var1 m -> do
-          s3 <- freshS
-          var2 <- localEnv (Env.insert x var1) $ eval' s1 s3 e2
-          heap <- newHeap s3
-          fmap (var2:) . loop s3 <=< lift $ local (const heap) m
+          s2 <- freshS
+          var2 <- localEnv (Env.insert x var1) $ eval' s1 s2 e2
+          heap <- newHeap s2
+          fmap (var2:) . loop s2 <=< lift $ local (const heap) m
     var <- freshVar
     fork' $ unifyVar var =<< newTup =<< loop s1 =<< init s1
     pure var
   One e -> do
-    unifyChoiceFree s1 s2
     var <- freshVar
     heap <- newHeap s1
     fork $ do
@@ -224,6 +221,7 @@ eval' s1 s2 = wrap $ \ case
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
       removeStack i
+      unifyChoiceFree s1 s2
       unifyStoreFree s1 s2
     pure var
   If e1 x e2 e3 -> do
@@ -247,7 +245,6 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
     localEnv (const $ Env.insert x var2 env) $ eval' s1 s2 e
   Val.Tup xs -> do
     readChoiceFree s1
-    readStoreFree s1
     var <- asum $ zip [0 ..] xs <&> \ (i, var1) -> do
       unifyVar var2 <=< newVar $ Val.Int i
       pure var1
@@ -372,7 +369,6 @@ evalLess s1 s2 var1 var2 = do
 evalAppMap :: MonadRef m => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)
 evalAppMap s1 s2 k xs = do
   readChoiceFree s1
-  readStoreFree s1
   var <- case IntMap.lookup k xs of
     Nothing -> empty
     Just xs -> asum $ pure <$> xs
