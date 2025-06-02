@@ -123,12 +123,13 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         {-squash $ -} unionSetOfSeqs [ squash $ dB e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
-dE e@(CLam Closed i b1 b2@(CBlk [CDef _y (CApp (CVar _h) (CVar _x))]) b3) rho =
+dE e@(CLam Closed i b1 b2@(CBlk [CDef _y _hx@(CApp (CVar _h) (CVar _x))]) b3) rho =
   -- Find a VFcn that is compatible with the lambda
   [ [ f
     | f <- allWs
     , forAll allWs $ \ v ->
         let b23 = CBlk [COne $ appCBlk b2 b3]
+                  -- CBlk [CDef _y $ COne $ CBlk [_hx] ] `appCBlk` b3
         in  applyo f v =~= dB (b1 `appCBlk` b23) (extendEnv rho i v)
     ]
   | validFcn e rho
