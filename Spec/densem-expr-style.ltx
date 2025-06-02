@@ -18,6 +18,7 @@
 \subsection{Denotional semantics of Mini Verse with choice}
 
 \newcommand{\EE}[2]{\semappsub{E}{e}{#1}{#2}}
+\newcommand{\CC}[2]{\semapp{C}{#1}{#2}}
 \newcommand{\applyo}{\textbf{applyo}}
 \newcommand{\applyf}{\textbf{applyf}}
 \newcommand{\applys}{\textbf{applys}}
@@ -92,7 +93,10 @@ $$
   & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
   \\[1mm]
 
-  \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ {\color{red} \text{Working on this!}} ] \\
+  \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \{ f \, || \, f \inb \Value,
+    \forall v \inb \Value . \; \applyo(f,v) \approx \EE{|e_1; e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
+    & & || \; \CC{|lamOC q x e_1 e_2|}{\rho} \\
+    & & ] \\
   \\
 
 %  \textit{succeeds function:} \\
@@ -168,14 +172,10 @@ $$
 
   \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
   \squash(xs) & = & [ x \, || \, x |<-| xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
-  \once([x]) & = & x \\
-  \once(\_) & = & \mempty & \text{or WRONG} \\
-  \trunc(x,[\mempty, \mydots, s, \mydots]) & = & [\mempty, \mydots, x] & s \neq \mempty, \text{replace first non-empty} \\
-\\
 
-\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
-\semopen{|open|}{(G)} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
-\semopen{|closed|}{(G)} & = & G \\[1mm]
+%%\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
+%%\semopen{|open|}{(G)} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
+%%\semopen{|closed|}{(G)} & = & G \\[1mm]
 
 % \succeeds & : & \myset{[\myset{\Value}]} \rightarrow Bool \\
 % \succeeds(s) & = & \multicolumn{2}{l}{\text{if all sequences in $s$ have a non-empty element}} \\[1mm]
@@ -183,13 +183,11 @@ $$
 \bigcap[] & = & \mempty \\
 \bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
 
-\seqcompat & : & (\seq{\VAL} \times \seq{\VAL}) \rightarrow |Bool| \\
-\seqcompat([s_1,\mydots,s_n], [t_1,\mydots,t_m]) & = & n = m \land \setcompat(s_1,t_1) \land \mydots \land \setcompat(s_n,t_n) \\
-\setcompat & : & (\myset{\Value} \times \myset{\Value}) \rightarrow Bool \\
-\setcompat(\{\},\{\}) & = & |true| \\
-\setcompat(\{\},\{\mydots\}) & = & |false| \\
-\setcompat(\{\mydots\},\{\}) & = & |false| \\
-\setcompat(s, t) & = & s \subseteq t \\[1mm]
+[] \approx [] & = & True \\
+(x : xs) \approx (y : ys) & = & x=y \land xs \approx ys \\
+(\{\} : xs) \approx [] & = & xs \approx [] \\ %
+\mbox{[]} \approx (\{\} : ys) & = & [] \approx ys \\
+xs \approx ys & = & False \\[1mm]
 
 \end{array} \\ \\
 
