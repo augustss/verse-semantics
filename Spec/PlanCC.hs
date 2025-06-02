@@ -5,7 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE ViewPatterns #-}
-module PlanCC(den, dene, ds, main) where
+module PlanCC(den, dene, ds, main, allExps, dP, edenSem, edenSemDS, CExp) where
 --import Control.Arrow(second)
 --import Control.Monad hiding (ap)
 import Data.Maybe
@@ -18,9 +18,8 @@ import SetX
 import EnvC
 import CExp
 import Examples hiding ((===))
-import Debug.Trace
+--import Debug.Trace
 --import SExpC
-import ExpSugar
 
 --implies :: Bool -> Bool -> Bool
 --implies x y = not x || y
@@ -41,7 +40,7 @@ redef | ()/=() = id
     red vs (CUChoice b1 b2) = CUChoice (redb vs b1) (redb vs b2)
     --red vs (CTup ...)
     red vs (CIf b1 b2 b3) = CIf (redb vs b1) (redb (allVarsB b1 ++ vs) b2) (redb vs b3)
-    red vs (CLam oc i b1 b2 b3 me) = CLam oc i (redb vs b1) (redb (allVarsB b1 ++ vs) b2) (redb (allVarsB b1 ++ allVarsB b2 ++ vs) b3) me
+    red vs (CLam oc i b1 b2 b3) = CLam oc i (redb vs b1) (redb (allVarsB b1 ++ vs) b2) (redb (allVarsB b1 ++ allVarsB b2 ++ vs) b3)
     red _vs (CFor _ _) = undefined
     red vs (CAll b) = CAll (redb vs b)
     red _vs e = e
@@ -67,13 +66,15 @@ allVarsB = allVars . cexpb
 
 -------------------------------------------
 
+{-
 aap :: W -> (Integer, W) -> Maybe W
 aap (VInt k) (i, w) | i == k = Just w
 aap _ _ = Nothing
+-}
 
 applyf :: W -> Ws -> WS
-applyf (VTup ws) as = unionSetOfSeqs [ map (maybeToSet . aap  a) (zip [0..] ws) | a <- as ]
 applyf (VFcn fs) as = unionSetOfSeqs [ map (maybeToSet . appM a) fs | a <- as ]
+--applyf (VTup ws) as = unionSetOfSeqs [ map (maybeToSet . aap  a) (zip [0..] ws) | a <- as ]
 applyf _ _ = []
 
 applys :: Ws -> Ws -> WS
@@ -81,12 +82,12 @@ applys fs as | isEmpty fs || isEmpty as = []                  -- avoid empty set
 applys fs as = unionSetOfSeqs [ applyf f as | f <- fs ]
 
 applyo :: W -> W -> WS
-applyo (VTup ws) a = map (maybeToSet . aap  a) (zip [0..] ws)
 applyo (VFcn fs) a = map (maybeToSet . appM a) fs
+--applyo (VTup ws) a = map (maybeToSet . aap  a) (zip [0..] ws)
 applyo _ _ = []
 
 dE :: CExp -> Env -> WS
-dE (CVar "_")          _rho  = [xallWs]
+dE (CVar "_")          _rho  = [allWs]
 dE (CVar x)             rho  = [sing $ lookupEnv x rho]
 dE (CInt k)            _rho  = [sing $ VInt k]
 dE (CPrim p)           _rho  = [sing $ dO p]
@@ -122,34 +123,21 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         {-squash $ -} unionSetOfSeqs [ squash $ dB e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
-dE e@(CLam Closed i b1 b2@(CBlk [CDef _y (CApp (CVar _h) (CVar _x))]) b3 _me3) rho =
+dE e@(CLam Closed i b1 b2@(CBlk [CDef _y (CApp (CVar _h) (CVar _x))]) b3) rho =
   -- Find a VFcn that is compatible with the lambda
-  -- trace ("valid h=" ++ show (lookupEnv h rho)) [sing $ VInt 777]
-  [ [ trace ("OK " ++ show (f, lookupEnv _h rho))
-      f
-    | f <- xallWs
-      -- f <- mkSetUnsafe [VFcn [nameFcn "f012"], VFcn [noFcn 2]]
-    , forAll {-allWs-} yallWs $ \ v ->
+  [ [ f
+    | f <- allWs
+    , forAll allWs $ \ v ->
         let b23 = CBlk [COne $ appCBlk b2 b3]
-        in
-{-
-          (if show f == "F[f012]" || True then
-            trace ("testing f=" ++ show f ++ " with v=" ++ show v ++ " body=" ++ show b3 ++ " h=" ++ show (lookupEnv _h rho) ++ " res=" ++ show (applyo f v,dB (b1 `appCBlk` b23) (extendEnv rho i v)))
-            else id) $
--}
-          applyo f v =~= dB (b1 `appCBlk` b23) (extendEnv rho i v)
+        in  applyo f v =~= dB (b1 `appCBlk` b23) (extendEnv rho i v)
     ]
   | validFcn e rho
   ]
 dE e _ = error $ "dE: not covered: " ++ show e
 
-xallWs = mkSetUnsafe xallWsL
-xallWsL = allWsL -- [VFcn [nameFcn "f012"], VFcn [noFcn 2], VInt 0, VInt 1]
-yallWs = mkSetUnsafe $ xallWsL -- ++ allWsL -- (drop (l `div` 16) $ drop (l `div` 8) $ take (l `div` 4) allWsL)
-  where l = length allWsL
-
 dseq :: WS -> WS -> WS
 dseq ws1 ws2 = concat [ if isEmpty s1 then [] else ws2 | s1 <- ws1 ]
+
 
 (=~=) :: WS -> WS -> Bool
 (s1:ss1) =~= (s2:ss2) = s1 == s2 && ss1 =~= ss2
@@ -163,7 +151,13 @@ appCBlk :: CBlk -> CBlk -> CBlk
 appCBlk (CBlk es) (CBlk es') = CBlk (es ++ es')
 
 validFcn :: CExp -> Env -> Bool
-validFcn (CLam _ i e1 (CBlk [CDef y (CApp (CVar h) (CVar x))]) e2 _) rho =
+validFcn e@(CLam _ _i _e1 (CBlk [CDef _y (CApp (CVar _h) (CVar _x))]) _e2) rho =
+  let r = validFcn' e rho
+  in  r
+validFcn _ _ = undefined
+
+validFcn' :: CExp -> Env -> Bool
+validFcn' (CLam _ i e1 (CBlk [CDef y (CApp (CVar h) (CVar x))]) e2) rho =
   forAll allWs $ \ vi ->
     let rhoss = dBEnv e1 (extendEnv rho i vi)  -- all the possible ways that e1 can succeed
     in  -- Condition (A), at most one domain match
@@ -187,7 +181,7 @@ validFcn (CLam _ i e1 (CBlk [CDef y (CApp (CVar h) (CVar x))]) e2 _) rho =
             Just [s]  -> isJust $ getSing s
             _ -> False
         r -> error $ "validB: impossible: " ++ show (vh, vx, r)
-validFcn _ _ = error "validFcn"
+validFcn' _ _ = error "validFcn"
 
 unVEnv :: Val -> Env
 unVEnv (VEnv e) = fromListEnv e
@@ -242,7 +236,7 @@ dD e rho = unionSetOfSeqs [ dE e rho' | rho' <- dX e rho ]
 
 dXL :: CExp -> Env -> [Env]
 dXL e rho = 
-  let exts = sequence $ map (\ x -> map (x,) xallWsL) (dI e)
+  let exts = sequence $ map (\ x -> map (x,) allWsL) (dI e)
   in  map (foldr (\ (i,v) r -> extendEnv r i v) rho) exts
 
 unionSetOfSeqs' :: SetX WS -> WS
@@ -264,7 +258,7 @@ den e = dD (redef $ syntax "_" e) rho0
 dene :: Exp -> WS
 dene e = dD (redef $ syntax "_" e) emptyEnv
 
-{-
+
 dP :: Exp -> RVal
 dP e =
   case squash $ den e of
@@ -274,7 +268,7 @@ dP e =
 
 allExps :: [Example]
 allExps = [exp01, exp02, exp03, exp04,
-           exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
+           exp1, exp2, {- Open exp3,-} exp4, exp5, {- Open exp6,-} exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
            exp20, exp21, {- BUG (:=) exp22,-}
            exp23, exp24, exp25, exp26, exp27, exp28, exp29,{-WRONG exp30,exp31,-}exp32,
@@ -288,20 +282,19 @@ allExps = [exp01, exp02, exp03, exp04,
            exp61, exp62, exp63, exp64, exp65, exp66, exp67, exp68, exp69,
            exp70, exp71
           ]
--}
+
 
 main :: IO ()
 main = do
   putStrLn "Start"
 --  runExamples dP allExps
-  print $ dene fid01c
+--  print $ dene $ fun_c cint cint
 
 {-
 eint :: Exp
 eint = --fun_c ("x" := 0:|||1) "x"
        fun_c ("x" := cint) "x"
 f1 = fun_c ("f" := fun_c cint cint) ("f" :@ 1)
--}
 
 fsucc0 = fun_c 0 1
 hfsucc0 = fun_c fsucc0 2
@@ -319,18 +312,13 @@ fid01c = fun_c ("x" := 0 :| 1) "x"
 
 hfid01 :: Exp
 hfid01 = fun_c ("f" := fid01) ("f" :@ 1)
+-}
 
 ds :: Exp -> CExp
 ds = redef . syntax "_"
 
-
-
-------------
-
-{-
---edenSemDesugar
-edenSemDesugar e = return . ds . srcExprToExp $ e
-
 edenSem :: CExp -> IO WS
 edenSem e = return (dD e rho0)
--}
+
+edenSemDS :: Exp -> CExp
+edenSemDS = redef . syntax "_"

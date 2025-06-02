@@ -35,7 +35,8 @@ import Text.Printf
 import Text.Read(readMaybe)
 import qualified Options.Applicative as OA
 
-import PlanCC(edenSem, edenSemDesugar)
+import PlanCC(edenSem, edenSemDS, CExp)
+import SExpC(srcExprToExp)
 
 
 --------------------------------------------------------
@@ -425,6 +426,9 @@ cEDensem
            text $ show res
 
        ; return () }
+
+edenSemDesugar :: SrcExpr -> IO CExp
+edenSemDesugar e = return . edenSemDS . srcExprToExp $ e
 
 --------------------------------------------------------
 --         Displaying the last expression

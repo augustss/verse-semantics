@@ -81,4 +81,7 @@ keys (Map m) = map fst m
 isSubmapOf :: (Ord a, Ord b) => Map a b -> Map a b -> Bool
 isSubmapOf (Map xs) (Map ys) = all (`elem` ys) xs
 
+unions :: (Ord a) => [Map a b] -> Map a b
+unions = fromList . concatMap toList
+
 #endif

@@ -23,7 +23,7 @@ data CExp
   | CTup [CExp]
 --  | CWhere CExp CExp
   | CIf CBlk CBlk CBlk
-  | CLam OC Ident CBlk CBlk CBlk (Maybe (Ident, CExp))
+  | CLam OC Ident CBlk CBlk CBlk
   | COfType CExp CExp
   | CFor CBlk CBlk
   | CAll CBlk
@@ -53,13 +53,12 @@ instance Show CExp where
   showsPrec _ (CExi i) = showString "exi " . showString i
   showsPrec _ CFail = showString "fail"
   showsPrec _ (CIf e1 e2 e3) = showString "if " . showParen True (showsPrec 0 $ cexpb e1) . showsPrec 0 e2 . showsPrec 0 e3
-  showsPrec _ (CLam q i e1 e2 e3 me4) =
+  showsPrec _ (CLam q i e1 e2 e3) =
     showString ("lam" ++ [show q !! 0]) .
     showParen True (showString i) .
     showParen True (showsPrec 0 $ cexpb e1) .
     showParen True (showsPrec 0 $ cexpb e2) .
-    showsPrec 0 e3 .
-    maybe (showString "") (\ e4 -> showString " M=" . showsPrec 11 e4) me4
+    showsPrec 0 e3
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " | " . showsPrec 5 (cexpb e2)
   showsPrec p (CUChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " ||| " . showsPrec 5 (cexpb e2)
@@ -176,7 +175,7 @@ syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxNB "_" e)
 syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
   c0 <- syntaxN i e0
-  CLam q i (cblocks [c0, CLHS]) <$> syntaxNB "_" e1 <*> pure Nothing
+  CLam q i (cblocks [c0, CLHS]) <$> syntaxNB "_" e1
 #else
 syntaxN "_" f@Fun{} = do
   u <- newVar "h"
@@ -188,11 +187,9 @@ syntaxN u (Fun q e0 e1) = do
   k <- newVar "k"
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
-  cq <- checkQ q u e0
   pure $ CLam q i (cblocks [CDef x c0, CLHS])
                   (cblocks [CDef k $ CApp (CVar u) (CVar x)])
                   (cblocks [c1])
-                  cq
 syntaxN u (Block e) = CBlock <$> syntaxNB u e
 
 checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))

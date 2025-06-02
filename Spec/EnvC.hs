@@ -24,6 +24,14 @@ import GHC.Stack
 import SetX
 import ValC
 
+partitions :: [a] -> [([a],[a])]
+partitions =
+   foldr
+      (\x -> concatMap (\(lxs,rxs) -> [(x:lxs,rxs), (lxs,x:rxs)]))
+      [([],[])]
+
+--------------------
+
 type W = Val
 type Ws = SetX W
 type WS = [Ws]
@@ -126,7 +134,7 @@ intFcns =
   in  fs
 
 pairFcns :: [Mapping]
-pairFcns = [] -- intToPairFcns ++ pairToIntFcns
+pairFcns = intToPairFcns ++ pairToIntFcns
 
 pairToIntFcns :: [Mapping]
 pairToIntFcns = -- [ mkMapping [(VTup [x,y], z) | x <- allInts, y <- allInts ] | z <- allInts ]
@@ -160,6 +168,7 @@ knownFcns =
     , ([(VInt 0, VInt 0)], "id0")
     , ([(VInt 1, VInt 1)], "id1")
     , ([(VInt 2, VInt 2)], "id2")
+    , ([(VInt 0, VInt 0), (VInt 1, VInt 1)], "id01")
     , ([(VInt 0, VTup [VInt 1, VInt 2])], "f0t12")
     , ([(x, VInt 0) | x <- allInts], "const0")
     , ([(VInt 0, VInt 1)], "succ0")
@@ -325,7 +334,7 @@ mfcon =
 
 -- fun_c(fun_c(:int){:int}){f[1]}
 mho1 :: MappingV
-mho1 =
+mho1 = concatMap fpad
    [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 0
    , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 0
    , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 0
@@ -354,6 +363,16 @@ mho1 =
    , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 2
    , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
    ]
+ where fpad :: (Val, Val) -> [(Val, Val)]
+       fpad arg@(F [af], r) =
+         let xys :: MappingV
+             xys = M.toList $ fcnMapping af
+             ps :: [(MappingV, MappingV)]
+             ps  = filter (not . null . snd) $ partitions xys
+             fss :: [(Fcn, Fcn)]
+             fss = map (\ (p1, p2) -> (mkIntFcn p1, mkIntFcn p2)) ps
+         in  arg : [ (F [f1, f2], r) | (f1, f2) <- fss ]
+       fpad _ = undefined
 
 -- XXX check if this is correct
 -- fun_c(fun_c(:succ){:int}){f[1]}
