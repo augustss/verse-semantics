@@ -19,11 +19,11 @@ import qualified Map as M
 import SetX
 import {-# SOURCE #-} EnvC(mkIntFcn)
 
-data FunctionShow = JustNumber | NumberAndDefinition | HsSyntax
+data FunctionShow = JustNumber | JustDefinition | NameNumberAndDefinition | HsSyntax
   deriving (Eq)
 
 showFcnNo :: FunctionShow
-showFcnNo = NumberAndDefinition
+showFcnNo = JustDefinition -- NameNumberAndDefinition
 
 --------------------
 ---- Values
@@ -63,8 +63,8 @@ data RVal = RVal Val | Wrong String
 
 instance Show Val where
   showsPrec p (VInt i) = showsPrec p i
-  showsPrec _ (VFcn fs) = showString "F" . showsPrec 0 fs
   showsPrec p (VTup vs) = showString "<" . foldr (.) id (intersperse (showString ",") (map (showsPrec p) vs)) . showString ">"
+  showsPrec _ (VFcn fs) = showString "F" . showsPrec 0 fs
   showsPrec p (VEnv r) = showsPrec p r
 
 instance Show RVal where
@@ -113,12 +113,14 @@ instance Ord Fcn where
 
 instance Show Fcn where
   show (Fcn f ms m) =
-    case showFcnNo of
-      HsSyntax -> "noFcn " ++ show f ++ "{-=" ++ showMapping m ++ "-}"
-      _ -> case ms of
-             Just s -> s
-             _ | showFcnNo == JustNumber -> "f" ++ show f
-               | otherwise -> "f" ++ show f ++ "=" ++ showMapping m
+    let sfno = "f" ++ show f
+        sdef = showMapping m
+        sfn  = fromMaybe sfno ms
+    in  case showFcnNo of
+          HsSyntax -> "noFcn " ++ show f ++ "{-=" ++ sdef ++ "-}"
+          JustNumber -> sfno
+          JustDefinition -> sdef
+          NameNumberAndDefinition -> sfn ++ "=" ++ sdef
 
 -- is f a subset of g, when the functions are viewed as sets of pairs
 subFcn :: Fcn -> Fcn -> Bool
