@@ -93,45 +93,12 @@ $$
   & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
   \\[1mm]
 
+  \textit{succeeds function:} \\
   \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \{ f \, || \, f \inb \Value,
-    \forall v \inb \Value . \; \applyo(f,v) \approx \EE{|e_1; e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
+    \forall v \inb \Value . \; \applyo(f,v) \approx \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
     & & || \; \CC{|lamOC q x e_1 e_2|}{\rho} \\
     & & ] \\
   \\
-
-%  \textit{succeeds function:} \\
-%    \EE{|lamOC q x e_1 e_2|}{\rho} & = &
-%    \left\{
-%    \begin{array}{ll}
-%      [\semopen{q}(\combine(|fs|))] & \text{if } \succeeds(|fs|) \\
-%      \mbox{}[\mempty] & \text{otherwise}\\
-%    \end{array}
-%    \right. \\
-%    & & |where|
-%      \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-%        |fs| & = &
-%        \{ [ \dist(v, s) \,||\, s \inb r ] \\
-%        & & ||\, v \inb \Value, |let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v, r \neq [] \} \\
-%      \end{array}
-%     \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \semopen{q}{(fs)} ] \\
-%     & & |where|
-%       \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-%         |fs| & = & \{ f \,||\, f \inb [\semfcn], \\
-%         & & \forall v \inb \Value .\\
-%         & & \seqcompat(\applyo(Fun(f),v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}) \}
-%       \end{array}
-%   \\
-% \semap{F}{e} & : & \Env \rightarrow \Value \rightarrow [\myset{\Value}] \\
-% \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
-% & & |where|
-%     \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-%       |ws| & = & \hat{\bigcup} \{ & [ |if s=|\mempty\,| then|\,\mempty\,| else|\, |w|\,||\, s \inb ss ] \\
-%       & & & ||\, \rho' \inb \semapp{X}{|e_1|}{(\rho[x \fmapsto v])}, \\
-%       & & & |let ss| = \EE{|e_1|}{\rho'},\, \squash(|ss|) \neq [], \\
-%       & & & |let w| = \once(\semapp{D}{e_2}{\rho'}) \, \} \\
-%       |r| & = & \multicolumn{2}{l} { \bigcap [ w \, || \, w \inb ws, ws \neq \mempty ] }
-%     \end{array} \\
-% \\
 
 \semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
@@ -144,6 +111,19 @@ $$
 
 \semap{I}{|e|} & : & [\mathit{Ident}] \\
 \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
+
+\semap{C}{|e|} & : & Bool \\
+\semapp{C}{|lamOC q i (x:=e_1) (y:=apply1N h x; e_2)|}{\rho} & = &
+\forall vi \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto vi})} . \\
+& & |case|\; \squash(\EE{e_1}{\rho'}) \\
+& & \quad [] : \apply(\rho(h), vi) \approx [] \\
+& & \quad [ { vx } ] : \\
+& &    \quad \quad |case|\; \squash(\apply(\rho(h),vx)) \\
+& &    \quad \quad \quad [\{vy\}] : \squash(\semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto vy})}) = [\{w\}] \\
+& &    \quad \quad \quad |otherwise| : False  \\
+& & \quad |otherwise| : False
+  \\[1mm]
+
 \end{array}
 \\
 
