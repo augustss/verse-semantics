@@ -85,9 +85,11 @@ mkSet s = S (nub s)
 mkSetUnsafe :: [a] -> SetX a
 mkSetUnsafe = S
 
-getSing :: SetX a -> Maybe a
-getSing (S [a]) = Just a
-getSing _ = Nothing
+getSing :: (Ord a) => SetX a -> Maybe a
+getSing s =
+  case toList s of
+    [x] -> Just x
+    _ -> Nothing
 
 toList :: Ord a => SetX a -> [a]
 toList (S axs) = unDup $ sort axs
