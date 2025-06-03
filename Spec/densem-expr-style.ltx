@@ -94,7 +94,7 @@ $$
   \\[1mm]
 
   \textit{succeeds function:} \\
-  \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \{ f \, || \, f \inb \Value,
+  \EE{|lamOC c x e_1 e_2|}{\rho} & = & [ \{ f \, || \, f \inb \Value,
     \forall v \inb \Value . \; \apply(f,v) \approx \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
     & & || \; \CC{|lamOC q x e_1 e_2|}{\rho} \\
     & & ] \\
@@ -113,7 +113,7 @@ $$
 \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
 
 \semap{C}{|e|} & : & Bool \\
-\semapp{C}{|lamOC q i (x:=e_1) (y:=apply1N h x; e_2)|}{\rho} & = &
+\semapp{C}{|lamOC c i (x:=e_1) (y:=apply1N h x; e_2)|}{\rho} & = &
 \forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
 & & |case|\; \squash(\EE{e_1}{\rho'}) \\
 & & \quad [] : \squash(\apply(\rho(h), v)) = [] \\
