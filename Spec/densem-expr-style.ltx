@@ -95,7 +95,7 @@ $$
 
   \textit{succeeds function:} \\
   \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \{ f \, || \, f \inb \Value,
-    \forall v \inb \Value . \; \applyo(f,v) \approx \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
+    \forall v \inb \Value . \; \apply(f,v) \approx \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
     & & || \; \CC{|lamOC q x e_1 e_2|}{\rho} \\
     & & ] \\
   \\
@@ -114,14 +114,14 @@ $$
 
 \semap{C}{|e|} & : & Bool \\
 \semapp{C}{|lamOC q i (x:=e_1) (y:=apply1N h x; e_2)|}{\rho} & = &
-\forall vi \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto vi})} . \\
+\forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
 & & |case|\; \squash(\EE{e_1}{\rho'}) \\
-& & \quad [] : \apply(\rho(h), vi) \approx [] \\
-& & \quad [ { vx } ] : \\
-& &    \quad \quad |case|\; \squash(\apply(\rho(h),vx)) \\
-& &    \quad \quad \quad [\{vy\}] : \squash(\semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto vy})}) = [\{w\}] \\
-& &    \quad \quad \quad |otherwise| : False  \\
-& & \quad |otherwise| : False
+& & \quad [] : \squash(\apply(\rho(h), v)) = [] \\
+& & \quad [ \{ u \} ] : \\
+& &    \quad \quad |case|\; \squash(\apply(\rho(h),u)) \\
+& &    \quad \quad \quad [\{t\}] : \squash(\semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto t})}) = [\{w\}] \\
+& &    \quad \quad \quad \textbf{otherwise} : False  \\
+& & \quad \textbf{otherwise} : False
   \\[1mm]
 
 \end{array}
