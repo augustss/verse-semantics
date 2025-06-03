@@ -86,9 +86,18 @@ applyo (VFcn fs) a = map (maybeToSet . appM a) fs
 --applyo (VTup ws) a = map (maybeToSet . aap  a) (zip [0..] ws)
 applyo _ _ = []
 
+lookupVar :: Ident -> Env -> W
+lookupVar x rho =
+  case lookupEnvM x rho of
+    Just v -> v
+    Nothing ->
+      case nameFcnM x of
+        Just f -> VFcn [f]
+        Nothing -> error $ "undefined variable " ++ show x
+
 dE :: CExp -> Env -> WS
 dE (CVar "_")          _rho  = [allWs]
-dE (CVar x)             rho  = [sing $ lookupEnv x rho]
+dE (CVar x)             rho  = [sing $ lookupVar x rho]
 dE (CInt k)            _rho  = [sing $ VInt k]
 dE (CPrim p)           _rho  = [sing $ dO p]
 dE (CTup es)            rho  = map (fmap mkTup . sequence) $ mapM (\ e -> dE e rho) es
@@ -167,7 +176,7 @@ validFcn' (CLam _ i e1 (CBlk [CDef y (CApp (CVar h) (CVar x))]) e2) rho =
           [rhos] ->                         -- a single match is ok
             case getSing (fmap (lookupEnv x) rhos) of  -- all xs must have the same value
               Just vx -> validB vx rhos
-              Nothing -> error "validFcn: assumption failed"
+              Nothing -> error $ "validFcn: assumption failed: x=" ++ show (fmap (lookupEnv x) rhos)
           _      -> False
   where
     vh = lookupEnv h rho
@@ -319,7 +328,7 @@ ds :: Exp -> CExp
 ds = redef . syntax "_"
 
 edenSem :: CExp -> IO WS
-edenSem e = return (dD e rho0)
+edenSem e = return (dD e emptyEnv)
 
 edenSemDS :: Exp -> CExp
 edenSemDS = redef . syntax "_"

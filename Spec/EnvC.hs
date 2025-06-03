@@ -5,12 +5,12 @@
 #define HAS_CHOICE 1
 module EnvC(
   W, Ws, WS,
-  Env, lookupEnv, extendEnv, emptyEnv, toListEnv, fromListEnv,
+  Env, lookupEnv, lookupEnvM, extendEnv, emptyEnv, toListEnv, fromListEnv,
   rho0, allWs,
   allWsL, allInts, allFcns, allChoiceFcns, allFcnsL,
   dO,
   maxVInt, vadd,
-  mkFcn, mkVFcn, noFcn, nameFcn,
+  mkFcn, mkVFcn, noFcn, nameFcn, nameFcnM,
   mkIntFcn,
   MappingV,
   ) where
@@ -101,10 +101,13 @@ noFcn i | i >= numFcns = error "noFcn"
 noFcn i = allFcnsA ! i
 
 nameFcn :: String -> Fcn
-nameFcn s =
+nameFcn s = fromMaybe (error $ "no function: " ++ s) $ nameFcnM s
+
+nameFcnM :: String -> Maybe Fcn
+nameFcnM s =
   case [ f | f@(Fcn _ (Just n) _) <- allFcnsL, s == n ] of
-    [] -> error $ "no function: " ++ s
-    f : _ -> f
+    [] -> Nothing
+    f : _ -> Just f
 
 (↦) :: a -> b -> (a, b)
 (↦) = (,)
@@ -210,7 +213,10 @@ instance Show Env where
     where f (i,v) = i ++ "->" ++ show v
 
 lookupEnv :: Ident -> Env -> W
-lookupEnv x rho = fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x $ unEnv rho
+lookupEnv x rho = fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ lookupEnvM x rho
+
+lookupEnvM :: Ident -> Env -> Maybe W
+lookupEnvM x rho = M.lookup x $ unEnv rho
 
 extendEnv :: Env -> Ident -> W -> Env
 extendEnv rho i w = Env $ M.insert i w $ unEnv rho
