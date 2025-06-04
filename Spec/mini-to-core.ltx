@@ -72,15 +72,17 @@ $$
   & = & \multicolumn{2}{@@{}l}{|iter2 ifKW
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
         (DMe3 md si e_3)|}  \\
-\rulename{vcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
-\rulename{vcheck-} & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\
 \rulename{vcheckx} & |DMe3 mdx    si (check fx e)| & = & |check fx (DMe3 mdx si e)| \\
+\rulename{vcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
+\rulename{vcheck-} & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e|
 \end{array}
 \\ \\
 
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{voftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
+& = & |defintro r; r == check fx (DMe3 mdx si e_1); check succeeds (apply1N ((DMe3 mdx si e_2)) r))| \\
 \rulename{voftype+} & |DMe3 mdpos si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
   |defintro r; r == check fx (DMe3 mdpos si e_1);
@@ -88,9 +90,7 @@ $$
   |DMe3 mdneg si (oftypefx e_1 fx e_2|
   \end{array} \\
 \rulename{voftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
- & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
-\rulename{voftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
-& = & |defintro r; r == check fx (DMe3 mdx si e_1); check succeeds (apply1N ((DMe3 mdx si e_2)) r))|
+ & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))|
 \end{array}
 \\ \\
 % -------------- Function rules ----------------
