@@ -270,10 +270,6 @@ defn :: (HasCallStack) => SrcPat -> SrcExpr -> DsM SrcExpr
 defn (Parens p) e = defn p e
 defn (Tuple es) e = defn (Array es) e
 
-defn (Variable i) e
-  | isSrcUnderscore i = pure e
-  | otherwise         = pure $ eDefine i e
-
 defn xs@(InfixOp _ (Op "&") _) e
   = -- See Note [Desugaring ampersand]
     do { es <- mapM (\p -> defn p e) (get xs)
@@ -281,6 +277,11 @@ defn xs@(InfixOp _ (Op "&") _) e
   where
     get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
     get p                        = [p]
+
+-- DSWILD1:   _ := e  -->  _ := e
+defn (Variable i) e
+  | isSrcUnderscore i = pure e
+  | otherwise         = pure $ eDefine i e
 
 -- DSWILD1:   (:e2) := e  -->  (_:e2) := e
 defn (PrefixOp op@(Op ":") e2) e
