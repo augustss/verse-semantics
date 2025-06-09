@@ -464,7 +464,11 @@ data SideEff    -- Side effects
   deriving( Eq, Ord, Data, Bounded, Enum )
 
 effTop, effSucceeds, effDecides, effFails :: Eff
-effTop      = Eff { eff_card = CIterates, eff_side = STop }
+
+effTop      = Eff { eff_card = CDecides,  eff_side = STop }
+              -- <decides> is the "top" of the cardinality
+              -- lattice for now; at least in DSTY2
+
 effSucceeds = Eff { eff_card = CSucceeds, eff_side = STop }
 effDecides  = Eff { eff_card = CDecides,  eff_side = STop }
 effFails    = Eff { eff_card = CFails,    eff_side = STop }
@@ -501,23 +505,18 @@ instance Pretty SideEff where
 toEff :: Eff          -- Default effect: use this if the user specifies no explicit effects
       -> [EffString]  -- What the user specified
       -> Eff
-toEff (Eff {eff_card = default_card, eff_side = default_side })
-      effs
-  | Just ce <- get_card effs
-  , Just se <- get_side effs
-  = Eff { eff_card = ce, eff_side = se }
-  | otherwise
-  = error ("toEff: " ++ show effs)
+toEff (Eff {eff_card = default_card, eff_side = default_side }) effs
+  = Eff { eff_card = get_card effs, eff_side = get_side effs }
   where
-    get_card :: [EffString] -> Maybe CardEff
+    get_card :: [EffString] -> CardEff
     get_card fxs = case get fxs of
-                      []   -> Just default_card
-                      [ce] -> Just ce
+                      []   -> default_card
+                      [ce] -> ce
                       _    -> error ("toEff1: " ++ (show fxs))
-    get_side :: [EffString] -> Maybe SideEff
+    get_side :: [EffString] -> SideEff
     get_side fxs = case get fxs of
-                      []   -> Just default_side
-                      [se] -> Just se
+                      []   -> default_side
+                      [se] -> se
                       _    -> error ("toEff2: " ++ (show fxs))
 
     get :: (Enum a, Bounded a, Show a) => [EffString] -> [a]

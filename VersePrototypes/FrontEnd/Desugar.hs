@@ -270,33 +270,19 @@ defn :: (HasCallStack) => SrcPat -> SrcExpr -> DsM SrcExpr
 defn (Parens p) e = defn p e
 defn (Tuple es) e = defn (Array es) e
 
-defn xs@(InfixOp _ (Op "&") _) e
-  = -- See Note [Desugaring ampersand]
-    do { es <- mapM (\p -> defn p e) (get xs)
-       ; pure $ Splice $ Array es }
-  where
-    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
-    get p                        = [p]
-
--- DSWILD1:   _ := e  -->  _ := e
+-- DSWILD1:   _ := e  -->  e
 defn (Variable i) e
   | isSrcUnderscore i = pure e
   | otherwise         = pure $ eDefine i e
 
--- DSWILD1:   (:e2) := e  -->  (_:e2) := e
+-- DSWILD2:   (:e2) := e  -->  (_:e2) := e
 defn (PrefixOp op@(Op ":") e2) e
   = defn (InfixOp (Variable srcUnderscore) op e2) e
 
--- Rule: (f(a) := e)  -->  (f := function(a){e})
--- Rule: (p:ty := e)  -->  e |> ty
-defn (ApplyS p a)            e = defn_fun p a [] e      -- DSFUN2
-defn (InfixOp p (Op ":") e2) e = defn_ty p e2 [] e      -- DSTY2
-
--- Rule: (f(a)<fxs> := e)  -->  (f := function(a)<fxs>{e})
--- Rule: (p:ty<fxs> := e)  -->  e |><fxs> ty
-defn p@(EffAttr {}) e
-  | ApplyS p2 a <- p1            = defn_fun p2 a fxs e    -- DSFUN1
-  | InfixOp p2 (Op ":") e2 <- p1 = defn_ty  p2 e2 fxs e   -- DSTY1
+-- DSFUN1/2: (f(a)<fxs> := e)  -->  (f := function(a)<fxs>{e})
+-- DSTY1/2:  (p:ty<fxs> := e)  -->  e |><fxs> ty
+defn p rhs | ApplyS p2 a            <- p1 = defn_fun p2 a  fxs rhs   -- DSFUN1, DSFUN2
+           | InfixOp p2 (Op ":") e2 <- p1 = defn_ty  p2 e2 fxs rhs   -- DSTY1, DSTY2
   where
     (p1, fxs) = getEffs p
 
@@ -313,6 +299,14 @@ defn (InfixOp p1 (Op "->") p2) e = do
   r1 <- defn p1 (Variable x)
   r2 <- defn p2 (DefineIE x e)
   pure $ eSeq [DefineV x, r1, r2]
+
+defn xs@(InfixOp _ (Op "&") _) e
+  = -- See Note [Desugaring ampersand]
+    do { es <- mapM (\p -> defn p e) (get xs)
+       ; pure $ Splice $ Array es }
+  where
+    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
+    get p                        = [p]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
