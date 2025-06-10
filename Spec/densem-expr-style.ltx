@@ -95,13 +95,19 @@ $$
   \\[1mm]
 
   \textit{succeeds function:} \\
-  \EE{|lamOC c x e_1 e_2|}{\rho} & = & \trim\hspace{-0.5em}
-  \begin{array}[t]{l}
-     ( [ \{ f \, || \, f \inb \Value,
-    \forall v \inb \Value . \; \apply(f,v) = \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
-    \;\; || \; \CC{|lamOC c x e_1 e_2|}{\rho} \\
-    \;\; ] ) \\
-  \end{array} \\
+  \EE{|lamOC c x e_1 e_2|}{\rho} & = &
+  \left\{
+  \begin{array}{ll} \multicolumn{2}{l}{ \trim([
+    \{ f \hspace{-0.5em}
+    \begin{array}[t]{l@@{\;}l}
+    || & f \inb \Value, \forall v \inb \Value . \\
+    & \apply(f,v) = \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} ]) \\
+    \end{array}
+    }\\
+    & \text{if}\; \CC{|lamOC c x e_1 e_2|}{\rho} \\
+    {}[] & \text{otherwise} \\
+  \end{array}
+  \right. \\
   \\
 
 \semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
