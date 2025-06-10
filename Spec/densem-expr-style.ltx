@@ -23,6 +23,7 @@
 \newcommand{\applyf}{\textbf{applyf}}
 \newcommand{\applys}{\textbf{applys}}
 \newcommand{\squash}{\textbf{squash}}
+\newcommand{\trim}{\textbf{trim}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
 \newcommand{\combine}{\textbf{comb}}
@@ -64,7 +65,7 @@ $$
   \semappsub{A}{e}{|x|}\rho & = & \rho(x) \\
   \semappsub{A}{e}{|k|}\rho & = & k \\
   \semappsub{A}{e}{|o|}\rho & = & \semap{O}{o} \\[1mm]
-  \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \\
+  \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \quad\quad \text{\textbf{invariant}: no trailing \{\}}\\
   \EE{|a|}{\rho} & = & [\msing{\semappsub{A}{e}{a}\rho}] \\
   \EE{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
   \EE{|arr (a_0, xdots, a_n)|}{\rho} & = &
@@ -74,8 +75,8 @@ $$
   \EE{|fail|}{\rho} & = & [] \\
   \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
   \EE{|e_1 = e_2|}{\rho}      & = &
-      [ s_1 \cap s_2\, ||\,
-           |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
+      \trim([ s_1 \cap s_2\, ||\,
+           |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ]) \\
 
   \EE{|e_1 ; e_2|}{\rho}      & = &
     [ s_2 \vb
@@ -94,16 +95,19 @@ $$
   \\[1mm]
 
   \textit{succeeds function:} \\
-  \EE{|lamOC c x e_1 e_2|}{\rho} & = & [ \{ f \, || \, f \inb \Value,
-    \forall v \inb \Value . \; \apply(f,v) \approx \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
-    & & || \; \CC{|lamOC c x e_1 e_2|}{\rho} \\
-    & & ] \\
+  \EE{|lamOC c x e_1 e_2|}{\rho} & = & \trim\hspace{-0.5em}
+  \begin{array}[t]{l}
+     ( [ \{ f \, || \, f \inb \Value,
+    \forall v \inb \Value . \; \apply(f,v) = \EE{|e_1; one e_2|}{(\extendrho{\rho}{x \fmapsto v})} \} \\
+    \;\; || \; \CC{|lamOC c x e_1 e_2|}{\rho} \\
+    \;\; ] ) \\
+  \end{array} \\
   \\
 
 \semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
 \semap{R}{|e|}{} & : & \Env \rightarrow \ENV \\
-\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\EE{|e|}{\rho'}) \neq [] \} \\[2mm]
+\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \EE{|e|}{\rho'} \neq [] \} \\[2mm]
 \semap{X}{e} & : & \Env \rightarrow \ENV \\
 \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
                                   \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
@@ -116,7 +120,7 @@ $$
 \semapp{C}{|lamOC c i (x:=e_1) (y:=apply1N h x; e_2)|}{\rho} & = &
 \forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
 & & |case|\; \squash(\EE{e_1}{\rho'}) \\
-& & \quad [] : \squash(\apply(\rho(h), v)) = [] \\
+& & \quad [] : \apply(\rho(h), v) = [] \\
 & & \quad [ \{ u \} ] : \\
 & &    \quad \quad |case|\; \squash(\apply(\rho(h),u)) \\
 & &    \quad \quad \quad [\{t\}] : \squash(\semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto t})}) = [\{w\}] \\
@@ -142,7 +146,7 @@ $$
 %  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
 %  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
   \apply & : & (\Value \times \Value) \rightarrow [\VAL] \\
-  \apply(Fun(hs),v) & = & \multicolumn{2}{l}{[ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ] \hspace{5mm} \text{All elts will be singleton or empty}} \\
+  \apply(Fun(hs),v) & = & \trim([ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ]) & \text{All elts will be singleton or empty} \\
   \apply(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
 
   \tupE & : & [\Val] \rightarrow \Val \\
@@ -152,6 +156,9 @@ $$
 
   \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
   \squash(xs) & = & [ x \, || \, x |<-| xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
+
+  \trim & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \trim(xs) & = & xs \text{ with trailing \{\} removed} \\
 
 %%\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
 %%\semopen{|open|}{(G)} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
@@ -163,12 +170,6 @@ $$
 \bigcap[] & = & \mempty \\
 \bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
 
-[] \approx [] & = & True \\
-(x : xs) \approx (y : ys) & = & x=y \land xs \approx ys \\
-(\{\} : xs) \approx [] & = & xs \approx [] \\ %
-\mbox{[]} \approx (\{\} : ys) & = & [] \approx ys \\
-xs \approx ys & = & False \\[1mm]
-
 \end{array} \\ \\
 
 \textbf{Notation}\\
@@ -177,7 +178,7 @@ xs \approx ys & = & False \\[1mm]
 
   |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{sequence comprehension (order preserving)}, \\[2mm]
 
-  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \mtype & \text{sequence concatenation} \\
+  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{sequence concatenation} \\
   |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
 
   \hat{\cup} & : & \seq{\VAL} \rightarrow \seq{\VAL} \rightarrow \seq{\VAL} & \text{elementwise union of sequences,} \\
