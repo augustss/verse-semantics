@@ -95,16 +95,16 @@ $$
   \\[1mm]
 
   \textit{succeeds function:} \\
-  \EE{|lamH fx i e_1 (y :== apply1N h x) e_2|}{\rho} & = &
+  \EE{|lamH fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} & = &
   \left\{
   \begin{array}{ll} \multicolumn{2}{l}{ \trim([
     \{ f \hspace{-0.5em}
     \begin{array}[t]{l@@{\;}l}
     || & f \inb \Value, \forall v \inb \Value . \\
-    & \apply(f,v) = \EE{|e_1; one (y :== apply1N h x; e_2)|}{(\extendrho{\rho}{i \fmapsto v})} \} ]) \\
+    & \apply(f,v) = \EE{|x :== e_1; one (y :== apply1N h x; e_2)|}{(\extendrho{\rho}{i \fmapsto v})} \} ]) \\
     \end{array}
     }\\
-    & \text{if}\; \CC{|lamH fx i e_1 (y :== apply1N h x) e_2|}{\rho} \\
+    & \text{if}\; \CC{|lamH fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} \\
     {}[] & \text{otherwise} \\
   \end{array}
   \right. \\
@@ -123,7 +123,7 @@ $$
 \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
 
 \semap{C}{|e|} & : & Bool \\
-\semapp{C}{|lamH fx i e_1 (y :== apply1N h x) e_2|}{\rho} & = &
+\semapp{C}{|lamH fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} & = &
 \forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
 & & |case|\; \squash(\EE{e_1}{\rho'}) \\
 & & \quad [] : \apply(\rho(h), v) = [] \\
