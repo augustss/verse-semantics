@@ -216,6 +216,9 @@ verify("HO20-dec",fail,tim=U00)
                       g( h(:int):char ) := { 0 };
                       main()<decides> := { g[ inc ] }
                     }
+  # HO20-dec should be rejected because g should never be applied to
+  # an int-to-char function
+
 verify("FO20-suc", fail) { f(x:int):int := {x}; main() := { f[ 'm' ] } }
 verify("FO20-dec", pass) { f(x:int):int := {x}; main()<decides> := { f[ 'm' ] } }
 
