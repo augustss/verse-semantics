@@ -405,8 +405,8 @@
 %format lamOCv (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".\begin{array}[t]{@{}l} (" t1 ") \\ \{" t2 "\} \end{array}"
 
 %   \<fx>i.(e1)(y:=f[x]){e2}
-%format lamH (fx)(i)(e1)(hw)(e2) = "\lambda\langle" fx "\rangle" i ".(" e1 ")(" hw ")\{" e2 "\}"
-%format lamHv (fx)(i)(e1)(hw)(e2) = "\lambda\langle" fx "\rangle" i ".\begin{array}[t]{@{}l} (" e1 ") \\ (" hw ")\{" e2 "\} \end{array}"
+%format lamH q (fx)(i)(e1)(hw)(e2) = "\lambda_{" q "}\langle" fx "\rangle" i ".(" e1 ")(" hw ")\{" e2 "\}"
+%format lamHv q (fx)(i)(e1)(hw)(e2) = "\lambda_{" q "}\langle" fx "\rangle" i ".\begin{array}[t]{@{}l} (" e1 ") \\ (" hw ")\{" e2 "\} \end{array}"
 
 %% -------End of functions ---------------
 

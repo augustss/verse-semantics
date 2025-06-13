@@ -96,24 +96,24 @@ $$
 % -------------- Function rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
   \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
-\rulename{vfunb+} &  |DMe3 mdpos si (lamH fx i e_1 wrapemp e_2)|
+\rulename{vfunb+} &  |DMe3 mdpos si (lamH closed fx i e_1 wrapemp e_2)|
  & = & \multicolumn{2}{@@{}l}{
       |verifyKW (i;) { DMe3 mdneg ((si + i)) e_1; check fx (DMe3 mdpos ((si +i)) e_2)| \}}; \\
- & & &       |DMe3 mdneg si (lamH fx i e_1 wrapemp e_2)| \\ [1mm]
-\rulename{vfunb-} &  |DMe3 mdneg si (lamH fx i e_1 wrapemp e_2)|
+ & & &       |DMe3 mdneg si (lamH closed fx i e_1 wrapemp e_2)| \\ [1mm]
+\rulename{vfunb-} &  |DMe3 mdneg si (lamH closed fx i e_1 wrapemp e_2)|
 & = & |lam i (DMe3 mdpos ((si + i)) e_1; DMe3 mdneg ((si + i)) e_2)| \\[1mm]
-\rulename{vfunbx}& |DMe3 mdx si (lamH fx i e_1 wrapemp e_2)|
+\rulename{vfunbx}& |DMe3 mdx si (lamH closed fx i e_1 wrapemp e_2)|
 & = & |lam x (DMe3 mdx ((si + i)) e_1; DMe3 mdx ((si + i)) e_2)| \\[2mm]
-\rulename{vfun+} &  |DMe3 mdpos si (lamH fx i e_1 (y :== apply1N h x) e_2)|
+\rulename{vfun+} &  |DMe3 mdpos si (lamH closed fx i e_1 (y :== apply1N h x) e_2)|
  & = & |verifyKW| (i;) \left\{ \begin{array}[c]{@@{}l}
           |DMe3 mdneg ((si + x)) e_1|; \\
           |check fx (y:==apply1N h x; DMe3 mdpos ((si +i)) e_2)| \}
         \end{array} \right\} \\
- & & &       |DMe3 mdneg si (lamH fx i e_1 (y :== apply1N h x) e_2)| \\ [1mm]
-\rulename{vfun-} &  |DMe3 mdneg si (lamH fx i e_1 (y :== apply1N h x) e_2)|
+ & & &       |DMe3 mdneg si (lamH closed fx i e_1 (y :== apply1N h x) e_2)| \\ [1mm]
+\rulename{vfun-} &  |DMe3 mdneg si (lamH closed fx i e_1 (y :== apply1N h x) e_2)|
 % & = & |lam i (DMe3 mdpos ((si + x)) e_1; y := some (lam underscore (apply1N h x)); DMe3 mdneg ((si + x)) e_2)| \\[1mm]
 & = & |lam i (DMe3 mdpos ((si + x)) e_1; y := apply1N h x; DMe3 mdneg ((si + x)) e_2)| \\[1mm]
-\rulename{vfunx}& |DMe3 mdx si (lamH fx i e_1 (y :== apply1N h x) e_2)|
+\rulename{vfunx}& |DMe3 mdx si (lamH closed fx i e_1 (y :== apply1N h x) e_2)|
 & = & |lam x (DMe3 mdx ((si + x)) e_1; y := apply1N h x; DMe3 mdx ((si + x)) e_2)| \\[2mm]
 \end{array} \\
 % -------------- Auxiliary functions ----------------

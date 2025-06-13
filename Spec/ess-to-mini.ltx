@@ -77,12 +77,12 @@ $$
  &&&  |z_1 == SS (mkwu dr (wrape y_1)) t_1; xdots; z_n == SS (mkwu dr (wrape y_n)) t_n;| \\
  &&&  |arr( z_1, xdots, z_n)| \\
 \rulename{wfun1} \asktim   & |SS (mkwu dr wrapemp) (functionOCX closed t_1 fx t_2)|
-   & = & |lamH fx i (SS (mkwu drdom (wrape i)) t_1) wrapemp
+   & = & |lamH closed fx i (SS (mkwu drdom (wrape i)) t_1) wrapemp
                     (SS (mkwu (drrng fx) wrapemp) t_2)| & \text{|i| fresh} \\
 \rulename{wfun2}   & |SS (mkwu dr h) (functionOCX closed t_1 fx t_2)|
 & = & \begin{array}[t]{@@{}l}
   |apply1N isFun h;| \\
-  |lamHv fx i
+  |lamHv closed fx i
          (defintro x; x = SS (mkwu drdom i) t_1) (y :== apply1N h x)
          (SS (mkwu (drrng fx) y) t_2)|
   \end{array} & \text{|i,x| fresh}
