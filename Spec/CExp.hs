@@ -67,6 +67,7 @@ instance Show CExp where
   showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
   showsPrec p (CBlock e) = showsPrec p e
   showsPrec _ CLHS = showString "LHS"
+  showsPrec _ (COne e) = showString "one" .  (showsPrec 0 e)
 
 instance Show CBlk where
   showsPrec _ (CBlk es) = showBraces $ foldr (.) id (L.intersperse (showString "; ") (map (showsPrec 3) es))
