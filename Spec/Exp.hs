@@ -18,11 +18,23 @@ infixr 1 `Where`
 infix  5 `Equ`
 
 data Exp
-  = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
-  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
-  | If Exp Exp Exp | Fun OC Exp Exp
-  | Choice Exp Exp | All Exp | For Exp Exp
-  | Where Exp Exp | Def2 Ident Ident Exp
+  = Var Ident
+  | Int Integer
+  | Prim Op
+  | App Exp Exp
+  | Equ Exp Exp
+  | Seq Exp Exp
+  | Def Ident Exp
+  | Colon Exp
+  | Fail
+  | Tup [Exp]
+  | If Exp Exp Exp
+  | Fun OC Exp Exp
+  | Choice Exp Exp
+  | All Exp
+  | For Exp Exp
+  | Where Exp Exp
+  | Def2 Ident Ident Exp
   | OfType Exp Exp
   | UChoice Exp Exp
   | Block Exp
