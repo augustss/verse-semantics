@@ -14,10 +14,11 @@
 
 \subsection{A denotational semantics}
 
-\newcommand{\eapp}{\textbf{appss}}
-\newcommand{\eapps}{\textbf{apps}}
-\newcommand{\eequ}{\textbf{equ}}
-%\newcommand{\UNIV}{\textbf{UNIV}}
+\newcommand{\eapp}[2]{\textbf{appss}(#1,#2)}
+\newcommand{\eapps}[2]{\textbf{apps}(#1,#2)}
+\newcommand{\eequ}[2]{\textbf{equ}(#1,#2)}
+\newcommand{\eseq}[2]{\textbf{seq}(#1,#2)}
+\newcommand{\inseq}[2]{#1\,\bar{\in}\,#2}
 \newcommand{\eblock}[1]{\textbf{block}\{#1\}}
 
 \begin{figure}
@@ -44,13 +45,11 @@ $
   \semapp{E}{|a|}{\rho} & = & [\msing{\semapp{A}{a}\rho}] \\
 %%  \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
 
-  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & \eapp(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \eequ(\semapp{D}{|e_1|}{\rho}, \semapp{D}{|e_2|}{\rho}) \\
-  \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
-    [ s_2 \, || \,
-      |s_1 <-| \semapp{E}{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
-   \semapp{E}{|x := e|}{\rho} & = & \eequ([\msing{\semapp{A}{a}\rho}], \semapp{E}{e}{\rho}) \\
-   \semapp{E}{|:e|}{\rho} & = & \eapp(\semapp{E}{|e|}{\rho}, [\Val]) \\
+  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & \eapp{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \eequ{\semapp{D}{|e_1|}{\rho}}{\semapp{D}{|e_2|}{\rho}} \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}} \\
+   \semapp{E}{|x := e|}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{E}{e}{\rho}} \\
+   \semapp{E}{|:e|}{\rho} & = & \eapp{\semapp{E}{|e|}{\rho}}{[\Val]} \\
    \semapp{E}{|fail|}{\rho} & = & [ ] \\
    \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
    \left\{
@@ -67,25 +66,36 @@ $
             \,] \\
    \semapp{E}{\eblock{e}}{\rho} & = & \semapp{D}{e}{\rho} \\
 
-   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \mycdots \\
+   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f
 
-%%     \begin{array}[t]{ll}
-%%       || & f \inb \semfcn \\
+     \begin{array}[t]{@@{\;}l@@{\;}l}
+       || & f \inb \Fun \\
+       , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
+         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq []) \\
+         & \hspace{1em} \implies \inseq{\apply(f, x)}{\eseq{\semappp{M}{e_1}{x}{\rho'}}{\semapp{D}{e_2}{\rho'}}} \\
+       , & q=|closed| \implies \forall x \inb \dom(f). \\
+         & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq [] \\
+     \end{array} \\
+     & & \} \\
 
-%%       % Simon's version
-%%       , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
-%%         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
-%%         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
-%%       , & q=|closed| \implies \forall x \inb \dom(f). \\
-%%       & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+ %%   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f
+ %%     \begin{array}[t]{ll}
+ %%       || & f \inb \semfcn \\
 
-%% %%      \forall x \inb \Value. \\
-%% %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-%% %%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-%% %%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+ %%       % Simon's version
+ %%       , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
+ %%         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
+ %%         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
+ %%       , & q=|closed| \implies \forall x \inb \dom(f). \\
+ %%       & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
 
-%%     \end{array} \\
-%%     & & \} \\
+ %% %%      \forall x \inb \Value. \\
+ %% %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+ %% %%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+ %% %%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
+ %%     \end{array} \\
+ %%     & & \} \\
     \\[1mm]
 
   \semapp{D}{|e|}{} & : & \Env \rightarrow \seq{\VAL} \\
@@ -100,17 +110,16 @@ $
   \semappp{C}{|e|}{\rho} & = &
   \{ \rho' \, ||  \, \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{D}{e}{\rho'} \} \\[1mm]
 
-  \eapp & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eapp(w_1,w_2) & = & [ \eapps(s_1, s_2) \, || \, |s_1 <-|  w_1, |s_2 <-| w_2 ] \\
-  \eapps & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
-  \eapps(s_1, s_2) & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
-  \eequ & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eequ(w_1, w_2) & = & \trim([ s_1 \cap s_2\, ||\, |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
-%  \UNIV & : & \seq{\VAL} \quad\quad \text{one-element sequence of all possible values} \\
-%  \UNIV & = & [
-    %% \{ v \,||\, v \inb \Val \}
-%    \Val
-%  ] \\
+  \eapp{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eapp{w_1}{w_2} & = & [ \eapps{s_1}{s_2} \, || \, |s_1 <-|  w_1, |s_2 <-| w_2 ] \\
+  \eapps{\cdot}{\cdot} & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
+  \eapps{s_1}{s_2} & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
+  \eequ{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eequ{w_1}{w_2} & = & \trim([ s_1 \cap s_2\, ||\, |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
+  \eseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eseq{w_q}{w_2} & = & [ s_2 \, || \, |s_1 <-| w_1,\; s_1 \not= \{\},\; |s_2 <-| w_2 ] \\
+  \inseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow Bool \\
+  \inseq{[s_1,\mycdots,s_m]}{[t_1,\mycdots,t_n]} & = & m \leq n \land s_1 \subseteq t_1 \land \mycdots \land s_m \subseteq t_m \\
 
 \end{array} \\ \\
 
@@ -139,13 +148,13 @@ $
   \semappp{M}{|a|}{u}{\rho} & = & \isval{u}{[\msing{\semapp{A}{\rho}}]} \\
 %%  \semappp{M}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
 
-  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & \isval{u}{\eapp(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho})} \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ(\semappp{L}{|e_1|}{u}{\rho}, \semappp{L}{|e_2|}{u}{\rho}) \\
+  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & \isval{u}{\eapp{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}}} \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
     [ s_2 \, || \,
       |s_1 <-| \semapp{E}{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \semappp{M}{|e_2|}{u}{\rho} ] \\
-   \semappp{M}{|x := e|}{u}{\rho} & = & \eequ([\msing{\semapp{A}{a}\rho}], \semapp{M}{e}{u}{\rho}) \\
-   \semappp{M}{|:e|}{u}{\rho} & = & \eapp(\semappp{M}{|e|}{\rho}, [\{u\}]) \\
+   \semappp{M}{|x := e|}{u}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{M}{e}{u}{\rho}} \\
+   \semappp{M}{|:e|}{u}{\rho} & = & \eapp{\semappp{M}{|e|}{\rho}}{[\{u\}]} \\
    \semappp{M}{|fail|}{u}{\rho} & = & [ ] \\
    \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
    \left\{
@@ -159,17 +168,28 @@ $
    \semappp{M}{|arr (e_0, xdots, e_n)|}{u}{\rho} & = &
           [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} \\
             & & \,||\,
-            u = Fun[\{\fpr{0}{u_0}\}, \mycdots, \{\fpr{n}{u_n}\}\\
+            u = \tupE [u_0,\mycdots,u_n]\\
             & &, |s_0 <-| \semappp{M}{e_0}{u_0}{\rho}, \mycdots, |s_n <-| \semappp{M}{e_n}{u_n}{\rho}
             \,] \\
    \semapp{M}{\eblock{e}}{u}{\rho} & = & \semapp{L}{e}{u}{\rho} \\
 
-   \semappp{M}{|funk q e_1 e_2|}{u}{\rho} & = & \mycdots \\
+   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f
+
+     \begin{array}[t]{@@{\;}l@@{\;}l}
+       || & f \inb \Fun \\
+       , & g \in \Fun \\
+       , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
+         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq []) \\
+         & \hspace{1em} \implies \inseq{\apply(f, x)}{\eseq{\semappp{M}{y:=e_1}{x}{\rho'}}{\semappp{L}{e_2}{???}{\rho'}}} \\
+       , & q=|closed| \implies \forall x \inb \dom(f). \\
+         & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq [] \\
+     \end{array} \\
+     & & \}
    \\[2mm]
    \semapp{L}{|e|}{} & : & \Val \rightarrow \Env \rightarrow \seq{\VAL} \\
    \semappp{L}{|e|}{u}{\rho} & = & \hat{\bigcup} \{ \semapp{M}{|e|}{u}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
    \opisval & : & \Val \rightarrow \seq{\VAL} \rightarrow \seq{\VAL} \\
-   \isval{u}{s} & = & \eequ([\{u\}],s) \\
+   \isval{u}{s} & = & \eequ{[\{u\}]}{s} \\
 
 %% %\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
 %% \\
@@ -199,17 +219,17 @@ $
 %%   \{ \mkfcn{0 \fmapsto w_0,\mycdots, n \fmapsto w_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mycdots,n\}, \\
 %%   & & \hspace{0.5em} w_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mycdots,\, w_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
 
-%%   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f
-%%     \begin{array}[t]{l@@{\;}l}
-%%       || & f \inb \semfcn \\
-%%       ,  & g \in \semfcn  \\
-%%       ,  & \forall x \inb \Value, \forall \rho' \inb \semapp{X}{e_1}{\rho},
-%%            \forall y \inb \semapp{M}{e_1}{x}{\rho'}.  \\
-%%          & \hspace{0.5em} x \in \dom(f) \land y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{(g(y))}{\rho'} \\
-%%       , & q=|closed| \implies \forall x \inb \dom(f). \\
-%%         & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
-%%      \}
-%%     \end{array}
+   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f
+     \begin{array}[t]{l@@{\;}l}
+       || & f \inb \semfcn \\
+       ,  & g \in \semfcn  \\
+       ,  & \forall x \inb \Value, \forall \rho' \inb \semapp{X}{e_1}{\rho},
+            \forall y \inb \semapp{M}{e_1}{x}{\rho'}.  \\
+          & \hspace{0.5em} x \in \dom(f) \land y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{(g(y))}{\rho'} \\
+       , & q=|closed| \implies \forall x \inb \dom(f). \\
+         & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+      \}
+     \end{array}
 \\
 
   \end{array} \\ \\
