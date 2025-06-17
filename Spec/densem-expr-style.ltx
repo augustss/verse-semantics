@@ -23,7 +23,7 @@
 \newcommand{\applyf}{\textbf{applyf}}
 \newcommand{\applys}{\textbf{applys}}
 \newcommand{\squash}{\textbf{squash}}
-\newcommand{\trim}{\textbf{trim}}
+\newcommand{\trim}{\textbf{squashTail}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
 \newcommand{\combine}{\textbf{comb}}
@@ -48,8 +48,6 @@
 \begin{figure}
 $$
 \begin{array}{l}
-
-\textbf{Domains} \\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
   s \in & \VAL & = & \powerset{\Value} \\
@@ -59,7 +57,8 @@ $$
   \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
-\\
+\\[-2mm]
+
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
   \semappsub{A}{e}{|a|} & : & \Env \rightarrow \Val \\
   \semappsub{A}{e}{|x|}\rho & = & \rho(x) \\
@@ -94,21 +93,21 @@ $$
   & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
   \\[1mm]
 
-  \textit{succeeds function:} \\
-  \EE{|lamH fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} & = &
-  \left\{
+\multicolumn{3}{@@{}l}{\EE{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho}} \\
+\multicolumn{3}{l}{
+  = \left\{
   \begin{array}{ll} \multicolumn{2}{l}{ \trim([
     \{ f \hspace{-0.5em}
     \begin{array}[t]{l@@{\;}l}
     || & f \inb \Value, \forall v \inb \Value . \\
-    & \apply(f,v) = \EE{|x :== e_1; one (y :== apply1N h x; e_2)|}{(\extendrho{\rho}{i \fmapsto v})} \} ]) \\
+    & \apply(f,v) = \EE{|x :== e_1; y :== one (apply1N h x); e_2|}{(\extendrho{\rho}{i \fmapsto v})} \} ]) \\
     \end{array}
     }\\
-    & \text{if}\; \CC{|lamH fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} \\
+    & \text{if}\; \CC{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} \\
     {}[] & \text{otherwise} \\
   \end{array}
-  \right. \\
-  \\
+  \right. } \\
+
 
 \semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
@@ -119,24 +118,28 @@ $$
                                   \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & |where [x_1,xdots,x_n]| = \semap{I}{|e|} \\[1mm]
 
-\semap{I}{|e|} & : & [\mathit{Ident}] \\
-\semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
-
-\semap{C}{|e|} & : & Bool \\
-\semapp{C}{|lamH fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} & = &
-\forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
-& & |case|\; \squash(\EE{e_1}{\rho'}) \\
-& & \quad [] : \apply(\rho(h), v) = [] \\
-& & \quad [ \{ u \} ] : \\
-& &    \quad \quad |case|\; \squash(\apply(\rho(h),u)) \\
-& &    \quad \quad \quad [\{t\}] : \squash(\semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto t})}) = [\{w\}] \\
-& &    \quad \quad \quad \textbf{otherwise} : False  \\
-& & \quad \textbf{otherwise} : False
-  \\[1mm]
-
+\semap{I}{|e|} & : & [\mathit{Ident}] \quad = \text{the outer $\exists$-bound variables in |e|} \\[1mm]
 \end{array}
 \\
-
+% ---------------------------
+\semap{C}{|e|} :  Bool \\
+\semapp{C}{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} \\
+= \begin{array}[t]{l}
+\forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
+|case|\; \squash(\EE{e_1}{\rho'}) \\
+\quad [] : (q = |open|) \vee (\apply(\rho(h), v) = []) \\
+\quad [ \{ u \} ] : \begin{array}[t]{@@{}l}
+  |case|\; \squash(\apply(\rho(h),u)) \\
+  \quad \begin{array}[t]{l@@{\,}c@@{\,}l}
+    [] & : &|eff fx| = |eff decides| \\
+       &   & \wedge \forall vy \in \Value.\,
+                     \semapp{D}{e_2}{\extendrho{\rho'}{y \mapsto vy, mustSucceed=1}} = [] \\
+    {[]^{k}} \append [\{vy\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto vy})}) \; = \; []^k \append [\{w\}] \\
+    \textbf{otherwise} & : & False
+    \end{array}
+    \end{array} \\
+ \quad \textbf{otherwise} : False
+\end{array}
 \end{array}
 $$
 \caption{Denotational semantics of Mini Verse: expression style}
