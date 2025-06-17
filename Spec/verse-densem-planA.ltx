@@ -18,6 +18,7 @@
 \newcommand{\eapps}{\textbf{apps}}
 \newcommand{\eequ}{\textbf{equ}}
 %\newcommand{\UNIV}{\textbf{UNIV}}
+\newcommand{\eblock}[1]{\textbf{block}\{#1\}}
 
 \begin{figure}
 $
@@ -44,7 +45,7 @@ $
 %%  \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
 
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & \eapp(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \eequ(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \eequ(\semapp{D}{|e_1|}{\rho}, \semapp{D}{|e_2|}{\rho}) \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
     [ s_2 \, || \,
       |s_1 <-| \semapp{E}{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
@@ -64,6 +65,7 @@ $
           [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} \\
             & & \,||\,  |s_0 <-| \semapp{E}{e_0}{\rho}, \mycdots, |s_n <-| \semapp{E}{e_n}{\rho}
             \,] \\
+   \semapp{E}{\eblock{e}}{\rho} & = & \semapp{D}{e}{\rho} \\
 
    \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \mycdots \\
 
@@ -107,8 +109,8 @@ $
 %  \UNIV & : & \seq{\VAL} \quad\quad \text{one-element sequence of all possible values} \\
 %  \UNIV & = & [
     %% \{ v \,||\, v \inb \Val \}
-    \Val
-  ] \\
+%    \Val
+%  ] \\
 
 \end{array} \\ \\
 
@@ -138,12 +140,12 @@ $
 %%  \semappp{M}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
 
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & \isval{u}{\eapp(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho})} \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ(\semappp{M}{|e_1|}{u}{\rho}, \semappp{M}{|e_2|}{u}{\rho}) \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ(\semappp{L}{|e_1|}{u}{\rho}, \semappp{L}{|e_2|}{u}{\rho}) \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
     [ s_2 \, || \,
       |s_1 <-| \semapp{E}{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \semappp{M}{|e_2|}{u}{\rho} ] \\
    \semappp{M}{|x := e|}{u}{\rho} & = & \eequ([\msing{\semapp{A}{a}\rho}], \semapp{M}{e}{u}{\rho}) \\
-   \semappp{M}{|:e|}{u}{\rho} & = & \eapp(\semappp{M}{|e|}{\rho}, [{u}]) \\
+   \semappp{M}{|:e|}{u}{\rho} & = & \eapp(\semappp{M}{|e|}{\rho}, [\{u\}]) \\
    \semappp{M}{|fail|}{u}{\rho} & = & [ ] \\
    \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
    \left\{
@@ -160,6 +162,7 @@ $
             u = Fun[\{\fpr{0}{u_0}\}, \mycdots, \{\fpr{n}{u_n}\}\\
             & &, |s_0 <-| \semappp{M}{e_0}{u_0}{\rho}, \mycdots, |s_n <-| \semappp{M}{e_n}{u_n}{\rho}
             \,] \\
+   \semapp{M}{\eblock{e}}{u}{\rho} & = & \semapp{L}{e}{u}{\rho} \\
 
    \semappp{M}{|funk q e_1 e_2|}{u}{\rho} & = & \mycdots \\
    \\[2mm]
