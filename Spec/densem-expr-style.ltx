@@ -128,13 +128,13 @@ $$
 \forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
 |case|\; \squash(\EE{e_1}{\rho'}) \\
 \quad [] : (q = |open|) \vee (\apply(\rho(h), v) = []) \\
-\quad [ \{ u \} ] : \begin{array}[t]{@@{}l}
-  |case|\; \squash(\apply(\rho(h),u)) \\
+\quad [ \{ v_x \} ] : \begin{array}[t]{@@{}l}
+  |case|\; \squash(\apply(\rho(h),v_x)) \\
   \quad \begin{array}[t]{l@@{\,}c@@{\,}l}
     [] & : &|eff fx| = |eff decides| \\
-       &   & \wedge \forall vy \in \Value.\,
-                     \semapp{D}{e_2}{\extendrho{\rho'}{y \mapsto vy, mustSucceed=1}} = [] \\
-    {[]^{k}} \append [\{vy\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto vy})}) \; = \; []^k \append [\{w\}] \\
+       &   & \wedge \forall v_y \in \Value.\,
+                     \semapp{D}{e_2}{\extendrho{\rho'}{y \mapsto v_y, mustSucceed=1}} = [] \\
+    {[]^{k}} \append [\{v_y\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto v_y})}) \; = \; []^k \append [\{w\}] \\
     \textbf{otherwise} & : & False
     \end{array}
     \end{array} \\
