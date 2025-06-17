@@ -14,95 +14,107 @@
 
 \subsection{A denotational semantics}
 
+\newcommand{\eapp}{\textbf{appss}}
+\newcommand{\eapps}{\textbf{apps}}
+\newcommand{\eequ}{\textbf{equ}}
+%\newcommand{\UNIV}{\textbf{UNIV}}
 
 \begin{figure}
 $
 \begin{array}{l}
-\textbf{Domains (sets)} \\
-\begin{array}{rcll}
-\Value & = & \mathbb{Z} + (\semfcn) \\
-\Env & = & |Ident| \rightarrow \Value \\
-W^{*} & = & \text{set of } W \\
-Env^{*} & = & \text{set of } Env \\
-\end{array}
-\\ \\
+\textbf{Domains} \\
+\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
+  v \in & \Value & = & \Z + \Fun \\\
+  s \in & \VAL & = & \powerset{\Value} \\
+  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value for \emph{in-scope} identifiers} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \\
+  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+  & \text{Partial functions} \\
+\end{array} \\
+\\
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
+  \semapp{A}{|a|} & : & \Env \rightarrow \Val \\
+  \semapp{A}{|x|}\rho & = & \rho(x) \\
+  \semapp{A}{|k|}\rho & = & k \\
+  \semapp{A}{|o|}\rho & = & \semap{O}{o} \\[1mm]
 
+  \semapp{E}{|e|} & : & \Env \rightarrow \seq{ \VAL } \quad\quad \text{\textbf{invariant}: no trailing \{\}}\\
+  \semapp{E}{|a|}{\rho} & = & [\msing{\semapp{A}{a}\rho}] \\
+  \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
 
-  \begin{array}{rcll}
-%\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
-  \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
-  \semapp{P}{|e|}{} & = & \left\{
-  \begin{array}{ll}
-    w,       & \text{if} \{w\} = \semapp{D}{|e|}{\rho_0} \\
-    |Wrong|, & \text{otherwise}
-  \end{array}
-  \right.
-\\ \\
+  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & \eapp(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \eequ(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
+    [ s_2 \, || \,
+      |s_1 <-| \semapp{E}{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+   \semapp{E}{|x := e|}{\rho} & = & \eequ([\msing{\semapp{A}{a}\rho}], \semapp{E}{e}{\rho}) \\
+   \semapp{E}{|:e|}{\rho} & = & \eapp(\semapp{E}{|e|}{\rho}, [\Val]) \\
+   \semapp{E}{|fail|}{\rho} & = & [ ] \\
+   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
+   \left\{
+   \begin{array}{ll}
+     \semapp{D}{|e_3|}{\rho} & \text{if}\; \EV = \{\} \\
+     \hat{\bigcup}\{\semapp{D}{|e_2|}{\rho'} \,||\, \rho' \inb \EV \} & \text{otherwise} \\
+   \end{array}
+   \right. \\
+   & &  |where|\; \EV = \semappp{C}{e_1}{\rho} \\
 
-%\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
-  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
-  \semapp{E}{|k|}{\rho} & = & \msing{k} \\
-  \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
-  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
-    \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \\
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
-  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
-    \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho} \} \\
-  \semapp{E}{|x := e|}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
-  \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
-    \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} \\
-%FAIL  \semapp{E}{|fail|}{\rho} & = & \emptyset \\
-  \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
-  \left\{
-  \begin{array}{ll}
-    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
-    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
-  \end{array}
-  \right. \\
-  & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
-  \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
-    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
-  \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \;
-    \begin{array}[t]{ll}
-      || & f \inb \semfcn \\
+   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
+          [\,\{ \tupE [ w_0, \mydots, w_n ] \,||\, w_o \inb s_o,\mydots,w_n \inb s_n \} \\
+            & & \,||\,  |s_0 <-| \semapp{E}{e_0}{\rho}, \mydots, |s_n <-| \semapp{E}{e_n}{\rho}
+            \,] \\
 
-      % Simon's version
-      , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
-        & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
-        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
-      , & q=|closed| \implies \forall x \inb \dom(f). \\
-      & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \mydots \\
 
-%%      \forall x \inb \Value. \\
-%%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-%%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+%%     \begin{array}[t]{ll}
+%%       || & f \inb \semfcn \\
 
-    \end{array} \\
-    & & \} \\
-    \\ 
+%%       % Simon's version
+%%       , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
+%%         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
+%%         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
+%%       , & q=|closed| \implies \forall x \inb \dom(f). \\
+%%       & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+
+%% %%      \forall x \inb \Value. \\
+%% %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%% %%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%% %%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
+%%     \end{array} \\
+%%     & & \} \\
+    \\[1mm]
+
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \seq{\VAL} \\
+  \semapp{D}{|e|}{\rho} & = & \hat{\bigcup} \{ \semapp{E}{|e|}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
 
     %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
-  \semapp{X}{|e|} & : & \Env \rightarrow \Env^{*} \\
-  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n } \; || \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  \semapp{X}{|e|} & : & \Env \rightarrow \ENV \\
+  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n } \, || \,   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\[1mm]
 
-  \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
+  \semapp{C}{|e|} & : & \Env \rightarrow \ENV \\
   \semappp{C}{|e|}{\rho} & = &
-  \{ \rho' \; ||  \; \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{E}{e}{\rho'} \} \\[1mm]
+  \{ \rho' \, ||  \, \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{D}{e}{\rho'} \} \\[1mm]
 
-  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{D}{|e|}{\rho} & = & \{ r \; || \; \rho' \inb \semapp{X}{e}{\rho}, r \inb \semapp{E}{|e|}{\rho'} \} \\
+  \eapp & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eapp(w_1,w_2) & = & [ \eapps(s_1, s_2) \, || \, |s_1 <-|  w_1, |s_2 <-| w_2 ] \\
+  \eapps & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
+  \eapps(s_1, s_2) & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
+  \eequ & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eequ(w_1, w_2) & = & \trim([ s_1 \cap s_2\, ||\, |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
+%  \UNIV & : & \seq{\VAL} \quad\quad \text{one-element sequence of all possible values} \\
+%  \UNIV & = & [
+    %% \{ v \,||\, v \inb \Val \}
+    \Val
+  ] \\
 
-%\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
-%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
-
-  \end{array} \\ \\
+\end{array} \\ \\
 
 \textbf{Alternative definition of } \semapp{E}{} \\
 \begin{array}{rcll}
-\semapp{E}{|e|}{\rho} & = & \bigcup_{u \inb \Value}\semapp{M}{|e|}{u}{\rho} \\
+\semapp{E}{|e|}{\rho} & = & \hat{\bigcup}_{u \inb \Value}\semapp{M}{|e|}{u}{\rho} \\
 \end{array} \\
 
 \end{array}
