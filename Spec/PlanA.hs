@@ -22,7 +22,7 @@ dE (Colon e)           rho  = dE e rho `eapp` [allWs]
 dE Fail               _rho  = []
 dE (Tup es)            rho  = map (fmap VTup . sequence) $ mapM (\ e -> dE e rho) es
 dE (If e1 e2 e3)       rho  =
-  let rhos = oneE e1 rho
+  let rhos = dC e1 rho
   in  if isEmpty rhos then
         dD e3 rho
       else
@@ -53,8 +53,8 @@ dXL e rho =
 
 -- Evaluate e with all possible local environments.
 -- Return the environments that result in a non-empty sequence
-oneE :: Exp -> Env -> SetX Env
-oneE e rho = [ rho' | rho' <- dX e rho, not $ null $ squash $ dD e rho' ]
+dC :: Exp -> Env -> SetX Env
+dC e rho = [ rho' | rho' <- dX e rho, not $ null $ squash $ dD e rho' ]
 
 
 
