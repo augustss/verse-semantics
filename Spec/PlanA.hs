@@ -111,36 +111,122 @@ implies :: Bool -> Bool -> Bool
 implies True b = b
 implies _    _ = True
 
-trim :: WS -> WS
+trim :: [VAL] -> [VAL]
 trim = dropWhileEnd isEmpty
 
+(=<=) :: Val -> [VAL] -> [VAL]
+u =<= s = [sing u] `eequ` s
+
+notFail :: [VAL] -> Bool
+notFail = not . all isEmpty
+
 ------------------
 
+dM :: Exp -> Val -> Env -> [VAL]
+#if 1
 -- XXX temp
-dM :: Exp -> Val -> Env -> WS
-dM e u rho = [sing u] `eequ` dE e rho
+dM e u rho =
+  let r = u =<= dE e rho
+  in  if r == dM' e u rho then r else
+      error $ show (e, u, r, dM' e u rho)
+
+dM' :: Exp -> Val -> Env -> [VAL]
+dM' (Var "_")          u _rho  = [sing u]
+dM' e@Var{}            u  rho  = u =<= [sing $ dA e rho]
+dM' e@Int{}            u  rho  = u =<= [sing $ dA e rho]
+dM' e@Prim{}           u  rho  = u =<= [sing $ dA e rho]
+dM' (App e1 e2)        u  rho  = u =<= (dE e1 rho `eapp` dE e2 rho)
+dM' (Equ e1 e2)        u  rho  = dM' e1 u rho `eequ` dM' e2 u rho
+dM' (Seq e1 e2)        u  rho  = dE e1 rho `eseq` dM' e2 u rho
+dM' (Def x e)          u  rho  = [sing $ dA (Var x) rho] `eequ` dM' e u rho
+dM' (Colon e)          u  rho  = dE e rho `eapp` [sing u]
+dM' Fail               _ _rho  = []
+dM' (Tup es)           u  rho  =
+  case u of
+    VTup us | length us == length es ->
+      map (fmap VTup . sequence) $ zipWithM (\ e u -> dM' e u rho) es us
+    _ -> []
+dM' (If e1 e2 e3)      u  rho  =
+  let rhos = dC e1 rho
+  in  if isEmpty rhos then
+        dM' e3 u rho
+      else
+        unionsHat [ dL e2 u rho' | rho' <- rhos ]
+-- Fun
+dM' (Choice e1 e2)     u  rho  = dL e1 u rho ++ dL e2 u rho
+dM' (All e)            u  rho  = u =<= [ fmap mkTup $ sequence $ squash $ dD e rho ]
+-- For
+dM' (Where e1 e2)      u  rho  = [ if isEmpty s2 then empty else s1
+                                 | s1 <- dM e1 u rho, s2 <- dE e2 rho ]
+dM' (Def2 x y e)       u  rho | lookupVar x rho == u
+                              = [sing $ lookupVar y rho] `eequ` dM' e u rho
+                             | otherwise = []
+-- OfType
+dM' (UChoice e1 e2)    u  rho  = unionHat (dL e1 u rho) (dL e2 u rho)
+dM' (Block e)          u  rho  = dL e u rho
+dM' (DefI x e)         u  rho  = [sing $ lookupVar x rho] `eequ` dM' e u rho
+dM' (Exi _)            u _rho  = u =<= [sing $ VInt 99999]
+{-
+dM' (Fun q e1 e2)      u  rho  = trim [
+    [ f | f@VFcn{} <- allWs {-mkSetUnsafe [mkVFcn [(VInt 1,VInt 0),(VInt 2,VInt 0)]]-}
+        , let rhos = dX e1 rho
+        , forAll {-allInts-} allWs $ \ x ->
+            forAll rhos $ \ rho' ->
+              let d1 = dM' e1 x rho' in
+--              trace ("try f=" ++ show f ++ ", x=" ++ show x ++ ", d1=" ++ show d1) $
+              (not $ null d1) `implies`
+              (let fx = apply f x in
+               not (null fx) &&
+                ( -- trace ("fx=" ++ show fx ++ ", d2=" ++ show (d1 `eseq` dD e2 rho')) $
+                fx `elemSeq` (d1 `eseq` dD e2u  rho'))  )
+        , (q == Closed) `implies`
+          (forAll (domV f) $ \ x ->
+             exists rhos $ \ rho' ->
+               not $ null $ dM' e1 x rho')
+    ]
+  ]
+-}
+dM' e _ _ = error $ "dM': " ++ show e
+
+dL :: Exp -> Val -> Env -> [VAL]
+dL e u rho = unionsHat [ dM' e u rho' | rho' <- dX e rho ]
+#endif
 
 ------------------
 
-applyFsAs :: SetX Val -> SetX Val -> WS
-applyFsAs fs as = unionHat [ apply f a | f <- fs, a <- as ]
+applyFsAs :: SetX Val -> SetX Val -> [VAL]
+applyFsAs fs as = unionsHat [ apply f a | f <- fs, a <- as ]
 
-apply :: W -> W -> WS
+apply :: W -> W -> [VAL]
 apply (VFcn fs) a = trim $ map (maybeToSet . appM a) fs
 apply _ _ = []
 
-unionHat :: HasCallStack => SetX WS -> WS
-unionHat s | isEmpty s = []
-           | otherwise = foldSet unionSeqs s
+unionsHat :: HasCallStack => SetX [VAL] -> [VAL]
+unionsHat s | isEmpty s = []
+            | otherwise = foldSet unionHat s
 
 -- Pointwise union of sequences, padding the shorter
-unionSeqs :: WS -> WS -> WS
-unionSeqs [] ys = ys
-unionSeqs xs [] = xs
-unionSeqs (x:xs) (y:ys) = union x y : unionSeqs xs ys
+unionHat :: [VAL] -> [VAL] -> [VAL]
+unionHat [] ys = ys
+unionHat xs [] = xs
+unionHat (x:xs) (y:ys) = union x y : unionHat xs ys
 
 squash :: [SetX a] -> [SetX a]
 squash = filter (not . isEmpty)
 
-dene :: Exp -> WS
+dene :: Exp -> [VAL]
 dene e = dD e emptyEnv
+
+---- M[:e] needs E
+
+t1or2 :: Exp
+t1or2 = 1 :||| 2
+f1,f2,f3,f4 :: Exp
+f1 = fun_c ("x":=t1or2)       (1:|  2)   -- [{F[{},{1↦2,2↦2}], F[{1↦1},{2↦2}], F[{2↦1},{1↦2}], F[{1↦1,2↦1}]}]
+f2 = fun_c ("x":=t1or2)       (1:|||2)   -- [{F[{1↦1,2↦1}], F[{1↦1,2↦2}], F[{1↦2,2↦1}], F[{1↦2,2↦2}]}]
+f3 = fun_c ("x":=t1or2)("x"===(1:|  2))  -- [{F[{1↦1},{2↦2}]}]
+f4 = fun_c ("x":=t1or2)("x"===(1:|||2))  -- [{F[{1↦1,2↦2}]}]
+
+main :: IO ()
+main = do
+  mapM_ (print . dene) [f1,f2,f3,f4]
