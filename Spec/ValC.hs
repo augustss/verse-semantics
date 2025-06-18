@@ -146,8 +146,8 @@ appM :: Val -> Fcn -> Maybe Val
 appM x (Fcn _ _ xys) = M.lookup x xys
 
 domV :: Val -> SetX Val
-domV (VFcn fs) = mkSetUnsafe (concatMap (\ (Fcn _ _ m) -> M.keys m) fs)
-domV (VTup es) = mkSetUnsafe [ VInt (toInteger i) | i <- [0..length es-1] ]
+domV (VFcn fs) = mkSet (concatMap (\ (Fcn _ _ m) -> M.keys m) fs)
+--domV (VTup es) = mkSet [ VInt (toInteger i) | i <- [0..length es-1] ]
 domV v = error $ "domV: " ++ show v
 
 fcnMapping :: Fcn -> Mapping
