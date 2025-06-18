@@ -111,15 +111,15 @@ $
   \{ \rho' \, ||  \, \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{D}{e}{\rho'} \} \\[1mm]
 
   \eapp{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eapp{w_1}{w_2} & = & [ \eapps{s_1}{s_2} \, || \, |s_1 <-|  w_1, |s_2 <-| w_2 ] \\
+  \eapp{w_1}{w_2} & = & [ r \, || \, |s_1 <-|  w_1, |s_2 <-| w_2, |r <-| \eapps{s_1}{s_2} ] \\
   \eapps{\cdot}{\cdot} & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
   \eapps{s_1}{s_2} & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
   \eequ{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eequ{w_1}{w_2} & = & \trim([ s_1 \cap s_2\, ||\, |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
+  \eequ{w_1}{w_2} & = & \trim([ s_1 \cap s_2\; ||\; |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
   \eseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eseq{w_q}{w_2} & = & [ s_2 \, || \, |s_1 <-| w_1,\; s_1 \not= \{\},\; |s_2 <-| w_2 ] \\
+  \eseq{w_q}{w_2} & = & [ |if s_1 = {} then {} else s_2| \; || \; |s_1 <-| w_1,\; |s_2 <-| w_2 ] \\
   \inseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow Bool \\
-  \inseq{[s_1,\mycdots,s_m]}{[t_1,\mycdots,t_n]} & = & m \leq n \land s_1 \subseteq t_1 \land \mycdots \land s_m \subseteq t_m \\
+  \inseq{[s_1,\mycdots,s_m]}{[t_1,\mycdots,t_n]} & = & 0 < m \leq n \land s_1 \subseteq t_1 \land \mycdots \land s_m \subseteq t_m \\
 
 \end{array} \\ \\
 
@@ -150,9 +150,7 @@ $
 
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & \isval{u}{\eapp{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}}} \\
   \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
-  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
-    [ s_2 \, || \,
-      |s_1 <-| \semapp{E}{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \semappp{M}{|e_2|}{u}{\rho} ] \\
+  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semappp{M}{|e_2|}{u}{\rho}} \\
    \semappp{M}{|x := e|}{u}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{M}{e}{u}{\rho}} \\
    \semappp{M}{|:e|}{u}{\rho} & = & \eapp{\semappp{M}{|e|}{\rho}}{[\{u\}]} \\
    \semappp{M}{|fail|}{u}{\rho} & = & [ ] \\
@@ -180,6 +178,7 @@ $
        , & g \in \Fun \\
        , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
          & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq []) \\
+         & \text{INCOMPLETE} \\
          & \hspace{1em} \implies \inseq{\apply(f, x)}{\eseq{\semappp{M}{y:=e_1}{x}{\rho'}}{\semappp{L}{e_2}{???}{\rho'}}} \\
        , & q=|closed| \implies \forall x \inb \dom(f). \\
          & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq [] \\
@@ -219,6 +218,8 @@ $
 %%   \{ \mkfcn{0 \fmapsto w_0,\mycdots, n \fmapsto w_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mycdots,n\}, \\
 %%   & & \hspace{0.5em} w_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mycdots,\, w_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
 
+   \\ \\
+   \text{OLD:} \\
    \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f
      \begin{array}[t]{l@@{\;}l}
        || & f \inb \semfcn \\
