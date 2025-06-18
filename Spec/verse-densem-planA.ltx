@@ -152,7 +152,7 @@ $
   \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semappp{M}{|e_2|}{u}{\rho}} \\
    \semappp{M}{|x := e|}{u}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{M}{e}{u}{\rho}} \\
-   \semappp{M}{|:e|}{u}{\rho} & = & \eapp{\semappp{M}{|e|}{\rho}}{[\{u\}]} \\
+   \semappp{M}{|:e|}{u}{\rho} & = & \eapp{\semappp{E}{|e|}{\rho}}{[\{u\}]} \\
    \semappp{M}{|fail|}{u}{\rho} & = & [ ] \\
    \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
    \left\{
