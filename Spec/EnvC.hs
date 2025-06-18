@@ -7,7 +7,7 @@ module EnvC(
   W, Ws, WS,
   Env, lookupEnv, lookupEnvM, extendEnv, emptyEnv, toListEnv, fromListEnv,
   rho0, allWs,
-  allWsL, allInts, allFcns, allChoiceFcns, allFcnsL,
+  allWsL, allInts, allIntsL, allFcns, allChoiceFcns, allFcnsL,
   dO,
   maxVInt, vadd,
   mkFcn, mkVFcn, noFcn, nameFcn, nameFcnM,
@@ -50,10 +50,10 @@ vadd _ _ = undefined
 ---- Primitive functions
 
 dO :: Op -> W
-dO Oint = vFcn $ mkFcn [ (x, x) | x <- allInts ]
-dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y ]
+dO Oint = vFcn $ mkFcn [ (x, x) | x <- allIntsL ]
+dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allIntsL, y <- allIntsL, x > y ]
 -- add is a single function, not many as in the doc.
-dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
+dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allIntsL, y <- allIntsL]
 
 --------------------
 ---- Functions
@@ -132,22 +132,22 @@ mkDomRng fdom frng =
 
 intFcns :: [Mapping]
 intFcns =
-  let ss = subsequences allInts
-      fs = concat [ mkDomRng d allInts | d <- ss ]
+  let ss = subsequences allIntsL
+      fs = concat [ mkDomRng d allIntsL | d <- ss ]
   in  fs
 
 pairFcns :: [Mapping]
 pairFcns = intToPairFcns ++ pairToIntFcns
 
 pairToIntFcns :: [Mapping]
-pairToIntFcns = -- [ mkMapping [(VTup [x,y], z) | x <- allInts, y <- allInts ] | z <- allInts ]
+pairToIntFcns = -- [ mkMapping [(VTup [x,y], z) | x <- allIntsL, y <- allIntsL ] | z <- allIntsL ]
   [ mkMapping madd ]  -- just one for now
 
 madd :: MappingV
-madd = [ (VTup [x,y], vadd x y) | x <- allInts, y <- allInts ]
+madd = [ (VTup [x,y], vadd x y) | x <- allIntsL, y <- allIntsL ]
 
 intToPairFcns :: [Mapping]
-intToPairFcns = [] -- [ mkMapping [(z, VTup [x,y])] | x <- allInts, y <- allInts, z <- allInts ]
+intToPairFcns = [] -- [ mkMapping [(z, VTup [x,y])] | x <- allIntsL, y <- allIntsL, z <- allIntsL ]
 
 hoFcns :: [Mapping]
 hoFcns = hos
@@ -173,7 +173,7 @@ knownFcns =
     , ([(VInt 2, VInt 2)], "id2")
     , ([(VInt 0, VInt 0), (VInt 1, VInt 1)], "id01")
     , ([(VInt 0, VTup [VInt 1, VInt 2])], "f0t12")
-    , ([(x, VInt 0) | x <- allInts], "const0")
+    , ([(x, VInt 0) | x <- allIntsL], "const0")
     , ([(VInt 0, VInt 1)], "succ0")
     , ([(x, x) | x <- [VInt 1, VInt 2]], "id12")
 #if HAS_HO
@@ -191,16 +191,16 @@ emptym :: MappingV
 emptym = []
 
 mint :: MappingV
-mint = [ (x, x) | x <- allInts ]
+mint = [ (x, x) | x <- allIntsL ]
 
 msucc :: MappingV
-msucc = [ (x, vadd x (VInt 1)) | x <- allInts ]
+msucc = [ (x, vadd x (VInt 1)) | x <- allIntsL ]
 
 mpred :: MappingV
-mpred = [ (x, vadd x (last allInts)) | x <- allInts ]
+mpred = [ (x, vadd x (last allIntsL)) | x <- allIntsL ]
 
 mgt :: MappingV
-mgt = [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y ]
+mgt = [ (VTup [x, y], x) | x <- allIntsL, y <- allIntsL, x > y ]
 
 --------------------
 ---- Environment
@@ -242,11 +242,14 @@ fromListEnv = Env . M.fromList
 -- This is a carefully selected set of values to make
 -- the examples work.
 
-allInts :: [Val]
-allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
+allIntsL :: [Val]
+allIntsL = [ VInt i | i <- [0 .. maxVInt - 1] ]
+
+allInts :: SetX Val
+allInts = mkSetUnsafe allIntsL
 
 allTuples :: [Val]
-allTuples = [VTup [x, y] | x <- allInts, y <- allInts]
+allTuples = [VTup [x, y] | x <- allIntsL, y <- allIntsL]
 
 allChoice2IntFcns :: [Val]
 allChoice2IntFcns = map VFcn $ pick2 intVFcns
@@ -260,7 +263,7 @@ allChoice2IntFcns = map VFcn $ pick2 intVFcns
                    , isEmpty (d1 `intersect` d2)
                    ]
         intVFcns = filter intDom allFcnsL
-        intDom f = domFcn f `isSubsetOf` mkSet allInts
+        intDom f = domFcn f `isSubsetOf` mkSet allIntsL
 
 someChoice3IntFcns :: [Val]
 someChoice3IntFcns =
@@ -286,7 +289,7 @@ allWs :: Ws
 allWs = mkSetUnsafe allWsL
 
 allWsL :: [W]
-allWsL = allInts
+allWsL = allIntsL
 --          ++ allTuples
          ++ allChoiceFcnsL
 
@@ -297,7 +300,7 @@ extraFcns = map mkMapping [mcomparable, mgt]
 
 -- Some function to make 'int' less lonely
 mcomparable :: MappingV
-mcomparable = [ (x, x) | x <- allInts ++ allTuples ]
+mcomparable = [ (x, x) | x <- allIntsL ++ allTuples ]
 
 --------------
 
