@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 module Main {-PlanA-} where
 import Control.Monad(zipWithM)
 import Data.List(dropWhileEnd)
@@ -59,11 +60,11 @@ dE (Fun q e1 e2)       rho  = {-trim-} [
             forAll rhos $ \ rho' ->
               let d1 = dM e1 x rho' in
               --trace ("try f=" ++ show f ++ ", x=" ++ show x ++ ", d1=" ++ show d1) $
-              (notFail d1) `implies`
+              notFail d1 `implies`
               (let fx = apply f x in
-               not (null fx) &&
+               notFail fx &&
                 ( --trace ("fx=" ++ show fx ++ ", d2=" ++ show (d1 `eseq` dD e2 rho')) $
-                fx `elemSeq` (d1 `eseq` dD e2 rho'))  )
+                fx `elemSeq` (d1 `eseq` collapse (dD e2 rho')))  )
         , (q == Closed) `implies`
           (forAll (domV f) $ \ x ->
              exists rhos $ \ rho' ->
@@ -85,7 +86,7 @@ dXL e rho =
 -- Evaluate e with all possible local environments.
 -- Return the environments that result in a non-empty sequence
 dC :: Exp -> Env -> SetX Env
-dC e rho = [ rho' | rho' <- dX e rho, not $ null $ squash $ dD e rho' ]
+dC e rho = [ rho' | rho' <- dX e rho, notFail $ dD e rho' ]
 
 
 
@@ -125,15 +126,31 @@ u =<= s = [sing u] `eequ` s
 notFail :: [VAL] -> Bool
 notFail = not . all isEmpty
 
+collapse :: [VAL] -> [VAL]
+#if 0
+collapse ss = ss
+#else
+collapse [] = []
+collapse ss = [ foldr1 union ss ]
+#endif
+
+samePos :: [VAL] -> [VAL] -> Bool
+samePos []         [] = True
+samePos (x:xs) (y:ys) = isEmpty x == isEmpty y && samePos xs ys
+samePos _           _ = False
+
 ------------------
 
 dM :: Exp -> Val -> Env -> [VAL]
 #if 1
 -- XXX temp
 dM e u rho =
+  dM' e u rho
+{-
   let r = u =<= dE e rho
   in  if r == dM' e u rho then r else
       error $ show (e, u, r, dM' e u rho)
+-}
 
 dM' :: Exp -> Val -> Env -> [VAL]
 dM' (Var "_")          u _rho  = [sing u]
@@ -171,26 +188,33 @@ dM' (UChoice e1 e2)    u  rho  = unionHat (dL e1 u rho) (dL e2 u rho)
 dM' (Block e)          u  rho  = dL e u rho
 dM' (DefI x e)         u  rho  = [sing $ lookupVar x rho] `eequ` dM' e u rho
 dM' (Exi _)            u _rho  = u =<= [sing $ VInt 99999]
-{-
-dM' (Fun q e1 e2)      u  rho  = trim [
+dM' (Fun q e1 e2)      g  rho  = [
     [ f | f@VFcn{} <- allWs {-mkSetUnsafe [mkVFcn [(VInt 1,VInt 0),(VInt 2,VInt 0)]]-}
+        , VFcn{} <- sing g
         , let rhos = dX e1 rho
         , forAll {-allInts-} allWs $ \ x ->
             forAll rhos $ \ rho' ->
               let d1 = dM' e1 x rho' in
---              trace ("try f=" ++ show f ++ ", x=" ++ show x ++ ", d1=" ++ show d1) $
-              (not $ null d1) `implies`
-              (let fx = apply f x in
-               not (null fx) &&
-                ( -- trace ("fx=" ++ show fx ++ ", d2=" ++ show (d1 `eseq` dD e2 rho')) $
-                fx `elemSeq` (d1 `eseq` dD e2u  rho'))  )
+              trace ("try f=" ++ show f ++ ", x=" ++ show x ++ ", d1=" ++ show d1 ++ ", g=" ++ show g) $
+              notFail d1 `implies`
+                (flip all d1 $ \ xs1 ->
+                  forAll xs1 $ \ x1 ->
+                  let gx1 = apply g x1 in
+                  case squash gx1 of
+                    [getSing -> Just y] ->
+                      let fx = apply f x in
+                      fx `elemSeq` (d1 `eseq` collapse (dM e2 y rho'))  -- XXX?
+                      && samePos fx gx1
+                    _ -> False
+                )
+
         , (q == Closed) `implies`
           (forAll (domV f) $ \ x ->
              exists rhos $ \ rho' ->
-               not $ null $ dM' e1 x rho')
+               notFail $ dM' e1 x rho')
     ]
   ]
--}
+
 dM' e _ _ = error $ "dM': " ++ show e
 
 dL :: Exp -> Val -> Env -> [VAL]
@@ -222,16 +246,22 @@ squash = filter (not . isEmpty)
 dene :: Exp -> [VAL]
 dene e = dD e emptyEnv
 
----- M[:e] needs E
+---- Can't trim M[e1|e2]
+---- Get rid of trim?
 
 t1or2 :: Exp
 t1or2 = 1 :||| 2
 f1,f2,f3,f4 :: Exp
+-- f1 semantics withot and with collapse
 f1 = fun_c ("x":=t1or2)       (1:|  2)   -- [{F[{},{1↦2,2↦2}], F[{1↦1},{2↦2}], F[{2↦1},{1↦2}], F[{1↦1,2↦1}]}]
+                                         -- [{F[{1↦1,2↦1}], F[{1↦1,2↦2}], F[{1↦2,2↦1}], F[{1↦2,2↦2}]}]
 f2 = fun_c ("x":=t1or2)       (1:|||2)   -- [{F[{1↦1,2↦1}], F[{1↦1,2↦2}], F[{1↦2,2↦1}], F[{1↦2,2↦2}]}]
 f3 = fun_c ("x":=t1or2)("x"===(1:|  2))  -- [{F[{1↦1},{2↦2}]}]
 f4 = fun_c ("x":=t1or2)("x"===(1:|||2))  -- [{F[{1↦1,2↦2}]}]
 
 main :: IO ()
 main = do
-  mapM_ (print . dene) [f1,f2,f3,f4]
+  --mapM_ (print . dene) [f1,f2,f3,f4]
+  print $ dene $ fun_c (fun_c 0 1) 2
+
+
