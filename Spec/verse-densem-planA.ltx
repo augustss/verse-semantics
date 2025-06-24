@@ -18,6 +18,8 @@
 \newcommand{\eapps}[2]{\textbf{apps}(#1,#2)}
 \newcommand{\eequ}[2]{\textbf{equ}(#1,#2)}
 \newcommand{\eseq}[2]{\textbf{seq}(#1,#2)}
+\newcommand{\ech}[2]{#1 |++| #2}
+\newcommand{\euch}[2]{#1 \,\hat{\cup}\, #2}
 \newcommand{\inseq}[2]{#1\,\bar{\in}\,#2}
 \newcommand{\eblock}[1]{\textbf{block}\{#1\}}
 
@@ -48,6 +50,8 @@ $
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & \eapp{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \eequ{\semapp{D}{|e_1|}{\rho}}{\semapp{D}{|e_2|}{\rho}} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}} \\
+  \semapp{E}{|e_1 `choice` e_2|}{\rho}  & = & \ech{\semapp{D}{|e_1|}{\rho}}{\semapp{D}{|e_2|}{\rho}} \\
+  \semapp{E}{|e_1 |||||| e_2|}{\rho}  & = & \euch{\semapp{D}{|e_1|}{\rho}}{\semapp{D}{|e_2|}{\rho}} \\
    \semapp{E}{|x := e|}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{E}{e}{\rho}} \\
    \semapp{E}{|:e|}{\rho} & = & \eapp{\semapp{E}{|e|}{\rho}}{[\Val]} \\
    \semapp{E}{|fail|}{\rho} & = & [ ] \\
