@@ -52,7 +52,7 @@ $
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}} \\
   \semapp{E}{|e_1 `choice` e_2|}{\rho}  & = & \ech{\semapp{D}{|e_1|}{\rho}}{\semapp{D}{|e_2|}{\rho}} \\
   \semapp{E}{|e_1 |||||| e_2|}{\rho}  & = & \euch{\semapp{D}{|e_1|}{\rho}}{\semapp{D}{|e_2|}{\rho}} \\
-   \semapp{E}{|x := e|}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{E}{e}{\rho}} \\
+   \semapp{E}{|x := e|}{\rho} & = & \eequ{[\msing{\semapp{A}{x}\rho}]}{\semapp{E}{e}{\rho}} \\
    \semapp{E}{|:e|}{\rho} & = & \eapp{\semapp{E}{|e|}{\rho}}{[\Val]} \\
    \semapp{E}{|fail|}{\rho} & = & [ ] \\
    \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
@@ -119,17 +119,6 @@ $
   \semappp{C}{|e|}{\rho} & = &
   \{ \rho' \, ||  \, \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{D}{e}{\rho'} \} \\[1mm]
 
-  \eapp{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eapp{w_1}{w_2} & = & [ r \, || \, |s_1 <-|  w_1, |s_2 <-| w_2, |r <-| \eapps{s_1}{s_2} ] \\
-  \eapps{\cdot}{\cdot} & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
-  \eapps{s_1}{s_2} & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
-  \eequ{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eequ{w_1}{w_2} & = & \trim([ s_1 \cap s_2\; ||\; |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
-  \eseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eseq{w_q}{w_2} & = & [ |if s_1 = {} then {} else s_2| \; || \; |s_1 <-| w_1,\; |s_2 <-| w_2 ] \\
-  \inseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow Bool \\
-  \inseq{[s_1,\mycdots,s_m]}{[t_1,\mycdots,t_n]} & = & 0 < m \leq n \land s_1 \subseteq t_1 \land \mycdots \land s_m \subseteq t_m \\
-
 \end{array} \\ \\
 
 \textbf{Alternative definition of } \semapp{E}{} \\
@@ -141,6 +130,30 @@ $
 $
 \caption{Plan A: Expression semantics}
 \label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
+  
+  \eapp{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eapp{w_1}{w_2} & = & [ r \, || \, |s_1 <-|  w_1, |s_2 <-| w_2, |r <-| \eapps{s_1}{s_2} ] \\
+  \eapps{\cdot}{\cdot} & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
+  \eapps{s_1}{s_2} & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
+  \eequ{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eequ{w_1}{w_2} & = & \trim([ s_1 \cap s_2\; ||\; |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
+  \eseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \eseq{w_q}{w_2} & = & [ |if s_1 = {} then {} else s_2| \; || \; |s_1 <-| w_1,\; |s_2 <-| w_2 ] \\
+  \inseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow Bool \\
+  \inseq{[s_1,\mycdots,s_m]}{[t_1,\mycdots,t_n]} & = & 0 < m \leq n \land s_1 \subseteq t_1 \land \mycdots \land s_m \subseteq t_m \\
+
+\end{array}
+
+\end{array}
+$
+\caption{Plan A: Expression semantics, auxillary functions}
 \end{figure}
 
 \newcommand{\opisval}{\doteq}
@@ -162,7 +175,7 @@ $
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semappp{M}{|e_2|}{u}{\rho}} \\
   \semappp{M}{|e_1 `choice` e_2|}{u}{\rho}  & = & \ech{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
   \semappp{M}{|e_1 |||||| e_2|}{u}{\rho}  & = & \euch{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
-   \semappp{M}{|x := e|}{u}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{M}{e}{u}{\rho}} \\
+   \semappp{M}{|x := e|}{u}{\rho} & = & \eequ{[\msing{\semapp{A}{x}\rho}]}{\semapp{M}{e}{u}{\rho}} \\
    \semappp{M}{|:e|}{u}{\rho} & = & \eapp{\semappp{E}{|e|}{\rho}}{[\{u\}]} \\
    \semappp{M}{|fail|}{u}{\rho} & = & [ ] \\
    \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
