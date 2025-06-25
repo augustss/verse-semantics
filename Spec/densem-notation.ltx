@@ -1,0 +1,37 @@
+% ----------------------------------------------------
+%
+%          Denotational semantics: notation
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}[h]
+$$
+\begin{array}{l@@{\,}c@@{\,}ll}
+  |[e_1,xdots,e_n]| & : & \seq{A} & \text{Sequence of items} \\[2mm]
+
+  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension}, \\[2mm]
+
+  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\
+  |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
+
+  \dodgyunion & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}}
+            & \text{``Dodgy union''} \\
+  |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]|
+            & \text{Right-padding shorter sequence with \mempty} \\[2mm]
+
+  \hat{\bigcup} & : & \powerset{\seq{\powerset{A}}} \rightarrow \seq{\powerset{A}}
+                          & \hat{\cup} \text{ extended to sets}\\
+  \hat{\bigcup} & = & \cdots \\[2mm]
+
+%  |re| & : & \mtype \rightarrow \mtype & \text{remove all empty sets} \\
+%  |re(s)| & = & ... \\
+\end{array}
+$$
+\caption{General notation for sets and sequences}
+\end{figure}

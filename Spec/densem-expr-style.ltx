@@ -31,14 +31,10 @@
 \newcommand{\once}{\textbf{once}}
 \newcommand{\sequence}{\textbf{seq}}
 \newcommand{\maplist}{\textbf{map}}
-%% \newcommand{\maplist}{\textbf{map}_{[]}}
 \newcommand{\mapset}{\textbf{map}_{\{\}}}
 \newcommand{\cross}{\textbf{cross}}
 \newcommand{\dist}{\textbf{dist}}
 \newcommand{\group}{\textbf{group}}
-\newcommand{\myset}[1]{\text{Set}(#1)}
-%\newcommand{\fold}{\textbf{fold}}
-%\newcommand{\filter}{\textbf{filter}}
 \newcommand{\myenv}[1]{E\{ #1 \}}
 \newcommand{\mybind}[2]{#1 \mapsto #2}
 \newcommand{\succeeds}{\textbf{succeeds}}
@@ -129,12 +125,12 @@ $$
 |case|\; \squash(\EE{e_1}{\rho'}) \\
 \quad [] : (q = |open|) \vee (\apply(\rho(h), v) = []) \\
 \quad [ \{ v_x \} ] : \begin{array}[t]{@@{}l}
-  |case|\; \squash(\apply(\rho(h),v_x)) \\
+  |case|\; \apply(\rho(h),v_x) \\
   \quad \begin{array}[t]{l@@{\,}c@@{\,}l}
     [] & : &|eff fx| = |eff decides| \\
        &   & \wedge \forall v_y \in \Value.\,
                      \semapp{D}{e_2}{\extendrho{\rho'}{y \mapsto v_y, mustSucceed=1}} = [] \\
-    {[]^{k}} \append [\{v_y\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto v_y})}) \; = \; []^k \append [\{w\}] \\
+    {[\{\}]^{k}} \append [\{v_y\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto v_y})}) \; = \; [\{\}]^k \append [\{w\}] \\
     \textbf{otherwise} & : & False
     \end{array}
     \end{array} \\
@@ -148,9 +144,6 @@ $$
 
 \begin{figure}
 $$
-\begin{array}{l}
-
-\textbf{Auxiliary functions}\\
 \begin{array}{lcll}
 %  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
 %  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
@@ -179,30 +172,9 @@ $$
 \bigcap[] & = & \mempty \\
 \bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
 
-\end{array} \\ \\
-
-\textbf{Notation}\\
-\begin{array}{lcll}
-  |[e_1,xdots,e_n]| & : & \seq{A} & \text{sequence of items} \\[2mm]
-
-  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{sequence comprehension (order preserving)}, \\[2mm]
-
-  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{sequence concatenation} \\
-  |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
-
-  \hat{\cup} & : & \seq{\VAL} \rightarrow \seq{\VAL} \rightarrow \seq{\VAL} & \text{elementwise union of sequences,} \\
-  |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]| & \text{right-padding shorter sequence with \mempty} \\[2mm]
-
-  \hat{\bigcup} & : & \powerset{\seq{\VAL}} \rightarrow \mtype \\
-  \hat{\bigcup} & = & \cdots & \hat{\cup} \text{ extended to sets} \\[2mm]
-
-%  |re| & : & \mtype \rightarrow \mtype & \text{remove all empty sets} \\
-%  |re(s)| & = & ... \\
-\end{array}
-
 \end{array}
 $$
-\caption{Denotational semantics of Mini Verse with choice: notation}
+\caption{Auxiliary functions for expression-style denotational semantics}
 \end{figure}
 
 \newcommand{\newfcn}{\Value \hookrightarrow \Value}
