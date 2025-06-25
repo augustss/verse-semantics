@@ -64,6 +64,11 @@ $
    \right. \\
    & &  |where|\; \EV = \semappp{C}{e_1}{\rho} \\
 
+   \semapp{E}{|all e|}{\rho} & = &
+          [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} \\
+            & & \,||\,  |[s_0, xdots, s_n] =| \semapp{D}{e}{\rho}
+            \,] \\
+
    \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
           [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} \\
             & & \,||\,  |s_0 <-| \semapp{E}{e_0}{\rho}, \mycdots, |s_n <-| \semapp{E}{e_n}{\rho}
@@ -155,6 +160,8 @@ $
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & \isval{u}{\eapp{\semapp{E}{|e_1|}{\rho}}{\semapp{E}{|e_2|}{\rho}}} \\
   \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \eequ{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & \eseq{\semapp{E}{|e_1|}{\rho}}{\semappp{M}{|e_2|}{u}{\rho}} \\
+  \semappp{M}{|e_1 `choice` e_2|}{u}{\rho}  & = & \ech{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
+  \semappp{M}{|e_1 |||||| e_2|}{u}{\rho}  & = & \euch{\semappp{L}{|e_1|}{u}{\rho}}{\semappp{L}{|e_2|}{u}{\rho}} \\
    \semappp{M}{|x := e|}{u}{\rho} & = & \eequ{[\msing{\semapp{A}{a}\rho}]}{\semapp{M}{e}{u}{\rho}} \\
    \semappp{M}{|:e|}{u}{\rho} & = & \eapp{\semappp{E}{|e|}{\rho}}{[\{u\}]} \\
    \semappp{M}{|fail|}{u}{\rho} & = & [ ] \\
@@ -166,6 +173,11 @@ $
    \end{array}
    \right. \\
    & &  |where|\; \EV = \semappp{C}{e_1}{\rho} \\
+
+   \semappp{M}{|all e|}{u}{\rho} & = & \isval{u}{
+          [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} 
+            \;||\;  |[s_0, xdots, s_n] =| \semapp{D}{e}{\rho}
+            \,]} \\
 
    \semappp{M}{|arr (e_0, xdots, e_n)|}{u}{\rho} & = &
           [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} \\
