@@ -21,6 +21,8 @@ Arguments Inhabited {_}.
 
 Definition VAL := P Dom.Value.
 
+(* --------------- environments ----------- *)
+
 (* gives a value for in-scope identitfiers *)
 Definition env := Ident -> option Dom.Value.
 
@@ -36,6 +38,8 @@ End Env.
 
 Definition ENV := P env.
 
+(* -------------- primitives ------------ *)
+
 Definition evalPrim (p : PrimOp) : Dom.Value -> Prop := 
   match p with 
   | Add  => Dom.add1
@@ -46,6 +50,9 @@ Definition evalPrim (p : PrimOp) : Dom.Value -> Prop :=
   | _ => fun v => False    (* TODO: Lt, etc. *)
   end.
 
+(* -------------- atomic expressions ------------ *)
+
+(*
 (* Evaluation of atomic expressions. This is 
    partial because variables may be unbound. *)
 Inductive evalA (rho : env) : mini.Expr -> Dom.Value -> Prop := 
@@ -57,12 +64,11 @@ Inductive evalA (rho : env) : mini.Expr -> Dom.Value -> Prop :=
   | evalA_Prim p v :
     evalPrim p v ->
     evalA rho (mini.EPrim p) v
-.
+.*)
 
 Definition tups (VS : list VAL) : VAL := 
   fun v => 
-    exists vs, v = Dom.Value.mkTup vs 
-      /\ List.Forall2 Sets.In vs VS.
+    exists vs, v = Dom.Value.mkTup vs /\ List.Forall2 Sets.In vs VS.
 
 Definition retP (vo : option Dom.Value) : VAL := 
   match vo with 
@@ -89,24 +95,12 @@ Definition apply (f : Dom.Value)
   match f with 
   | Dom.Fun hs => 
       h <- hs ;;
-      match (Dom.PFun.apply_opt _ _ 
-              Dom.Value.eqb h v) with 
+      match (PFun.apply_opt _ _ Dom.Value.eqb h v) with 
       | Some w => [ ⌈ w ⌉ ]
       | None => [ ∅ ] 
       end
   | _ => []
   end.
-
-
-(*
-Fixpoint Squashed (VS : list VAL) : P (list VAL) := 
-  match VS with 
-  | nil => fun VS' => VS' = nil
-  | cons x xs => fun VS' => 
-                  (x <> ∅ -> exists y ys, VS' = cons y ys /\ Squashed xs ys) /\
-                  (x = ∅ -> Squashed xs VS')
-  end.
-*)
 
 Inductive Squashed : list VAL -> list VAL -> Prop := 
   | sq_nil : Squashed nil nil 
@@ -130,13 +124,6 @@ Definition TailSquashed : list VAL -> list VAL -> Prop :=
   fun VS1 VS2 => 
     (exists n, VS1 = VS2 ++ List.repeat ∅ n) /\ NonEmptyTail VS2.
 
-
-Lemma noEmptyInSquashed : forall xs ys, Squashed xs ys -> 
-                                   not (List.In ∅ ys).
-Proof.
-  induction 1; unfold not; intros. inversion H.
-  inversion H1. contradiction. contradiction. contradiction.
-Qed.
 
 Definition take1 {A} (xs : list A) : list A := 
   match xs with 
@@ -180,30 +167,46 @@ Definition UNIONS : P (list VAL) -> list VAL -> Prop :=
             (WS ∈ VVS) /\
             List.nth_error WS i = Some W /\
             (v ∈ W).
-(* Type of denotation function *)
-Definition D := forall (rho : env) (e : mini.Expr), P (list VAL).
 
-Definition check (eval:D) (rho:env) (q:Aperture) (eff:Effect) i e1 y h (x:Ident) e2 : Prop := 
+Lemma UNIONS_mem (ls : list (list VAL)) : (UNIONS (mem ls)) = ⌈ Unions ls ⌉.
+Proof.
+Admitted.
+
+                     
+
+(* Type of denotation relation *)
+Definition D := forall (rho : env) (e : mini.Expr), (list VAL) -> Prop.
+
+
+(* check that h does not fail on the input *)
+Definition check (eval:D) (rho:env) (q:Aperture) 
+  (eff:Effect) i e1 y h (x:Ident) e2 : Prop := 
     (exists vh, rho h = Some vh /\   (* h is in scope *)
-      forall v, forall rho', 
+      forall v, exists w, (* for every input, there is some result *)
+      forall rho', 
         rho' ∈ X e1 (Env.extend i v rho) ->
         exists V1, eval rho' e1 V1 /\
-            (Squashed V1 []) \/
+            (Squashed V1 [] /\ apply vh v = []) (* !! /\ or \/ ?? *)
+              \/
             (* evaluating e1 produces a value vx *)
             (exists vx, Squashed V1 [ ⌈ vx ⌉ ] /\
-             exists V2, apply vh vx = V2   /\
-                 (Squashed V2 []) \/
+             exists V2, apply vh vx = V2 /\
+                 (* apply h[x] fails, eff must be decides, and e2 must fail *)
+                 (Squashed V2 [] /\ eff = Decides
+                                 /\ forall vy, eval (Env.extend y vy rho') e2 []) 
+                 \/
                  (* apply h[x] produces a value vy *)
-                 exists vy, Squashed V2 [ ⌈ vy ⌉ ] /\
+                 exists vy k, TailSquashed V2 (List.repeat ∅ k ++ [ ⌈ vy ⌉ ]) /\
                    (* evaluating e2 doesn't fail *)
-                   exists w, eval (Env.extend y vy rho') e2 [⌈ w ⌉])).
+                    eval (Env.extend y vy rho') e2 (List.repeat ∅ k ++ [⌈ w ⌉]))).
 
-(*
-Fixpoint eval (n : nat) (rho : env) (e : mini.Expr) : list VAL := 
-  ...
-*)
 
 Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
+
+  | eval_Block e VV VS :
+    (forall rho', rho' ∈ X e rho -> exists VS', eval rho' e VS' /\ (VS' ∈ VV)) ->
+    UNIONS VV VS ->
+    eval rho (mini.Block e) VS
 
   | eval_Var : forall x v VS,
     rho x = Some v ->
@@ -271,35 +274,8 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
     Squashed VS1 VS2 -> 
     eval rho (mini.All e) [ tups VS2 ]
 
-  | eval_If3_false e1 e2 e3  VS :
-    (* if e1 fails on all extensions of rho *)
-    (forall rho', rho' ∈ X e1 rho ->
-        eval rho' e1 nil) ->
-    eval rho e3 VS ->
-    eval rho (mini.If3 e1 e2 e3) VS
-
-(*
-  | eval_If3_true e1 e2 e3 rho' V1 V2:
-    (* there is an extension of rho where e1 
-       doesn't fail. *)
-    rho' ∈ X e1 s rho ->
-    eval (mini.I e1) rho' e1 V1 ->
-    V1 <> nil ->
-    eval rho' e2 V2 ->
-    eval rho (mini.If3 e1 e2 e3) V2
-*)
-  
-  | eval_If3_true e1 e2 e3 (VV : P (list VAL)) VS :
-    (* union together the result of e2 
-       for all extensions of rho where e1 doesn't 
-       fail *)
-    (forall rho', 
-       rho' ∈ X e1 rho ->
-       exists V1 V2, 
-         eval rho' e1 V1 /\
-         eval rho' e2 V2 /\
-         V1 <> nil /\ (V2 ∈ VV)) ->
-    UNIONS VV VS ->
+  | eval_If3 e1 e2 e3  VS :
+    eval_if rho (mini.If3 e1 e2 e3) VS ->
     eval rho (mini.If3 e1 e2 e3) VS
 
   | eval_Fun q eff i e1 y h x e2 F FS:
@@ -315,42 +291,65 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
     (forall f, f ∈ F ->
        forall v W, apply f v = W ->
        eval (Env.extend i v rho)
-       ((mini.Var x :=: e1)
-         :>: mini.Var y :=: 
-           (mini.One (mini.Var h :@: mini.Var x))
-         :>: e2) W) ->
+            (mini.Block (mini.DefineV x :>: (x :=: e1)
+                         :>: y :=: (mini.One (h :@: x))
+                         :>: e2)) W) ->
     Squashed [ F ] FS ->  (* if F is emptyset, get rid of it *)
-    eval rho (mini.Fun q eff i e1 (Some (y,h,x)) e2) FS
+    eval rho (mini.Fun q eff i e1 (y,h,x) e2) FS
 
 
   | eval_FunFail q eff i e1 y h x e2 VS :
     (* check fails, but this is not strictly positive *)
     (* not (check eval rho q eff i e1 y h x e2) -> *)
     [] = VS ->
-    eval rho (mini.Fun q eff i e1 (Some (y,h,x)) e2) VS
+    eval rho (mini.Fun q eff i e1 (y,h,x) e2) VS
+
+with evalA (rho : env) : mini.Expr -> Dom.Value -> Prop := 
+ | evalA_one e v : 
+   eval rho e [ ⌈ v ⌉ ] -> 
+   evalA rho e v
+
+with eval_if (rho : env) : mini.Expr -> list VAL -> Prop := 
+ | eval_If3_false e1 e2 e3  VS :
+    (* if e1 fails on all extensions of rho *)
+    (forall rho', rho' ∈ X e1 rho ->
+        eval rho' e1 nil) ->
+    eval rho e3 VS ->
+    eval_if rho (mini.If3 e1 e2 e3) VS
+ | eval_if3_true e1 e2 e3 (VV : P (list VAL)) VS :
+    (* union together the result of e2 
+       for all extensions of rho where e1 doesn't 
+       fail *)
+    (forall rho', 
+       rho' ∈ X e1 rho ->
+       exists V1 V2, 
+         eval rho' e1 V1 /\
+         eval rho' e2 V2 /\
+         V1 <> nil /\ (V2 ∈ VV)) ->
+    UNIONS VV VS ->
+    eval_if rho (mini.If3 e1 e2 e3) VS
 .
 
 Definition eval_top t d := eval Env.empty t d.
 
 Create HintDb sets.
 
+
 Lemma singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. Admitted.
 Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  Admitted.
-Lemma Intersection_diff {A}{v1 v2:A} : 
-  v1 <> v2 ->
-  (⌈v1⌉ ∩ ⌈v2⌉) = ∅. 
-  Admitted.
-Lemma Intersection_comm {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1).
- Admitted.
+Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
+Lemma Intersection_commutes {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1). Admitted.
+Lemma notIn_singleton {A}{v : A} : ~ List.In ∅ [⌈ v ⌉]. 
+Proof.
+  intro h. inversion h.  apply singleton_not_empty in H. done. inversion H.
+Qed.
+
 
 
 Lemma NonEmptyTail_nil : NonEmptyTail [].
 cbv. eapply singleton_not_empty. Qed.
 Lemma NonEmptyTail_singleton {v}: NonEmptyTail [ ⌈v⌉ ].
 cbv. eapply singleton_not_empty. Qed.
-Lemma notIn_singleton {A}{v : A} : ~ List.In ∅ [⌈ v ⌉]. 
-intro h. inversion h.  apply singleton_not_empty in H. done. inversion H.
-Qed.
 
 Lemma TailSquashed_singleton v VS : 
   VS = [⌈ v ⌉] ->
@@ -369,6 +368,13 @@ Lemma TailSquashed_empty (VS : list VAL) :
   TailSquashed [∅] VS.
 Proof. intros ->. unfold TailSquashed. split. exists 1. cbn. auto.
 eapply NonEmptyTail_nil; eauto. Qed.
+
+Lemma noEmptyInSquashed : forall xs ys, Squashed xs ys -> 
+                                   not (List.In ∅ ys).
+Proof.
+  induction 1; unfold not; intros. inversion H.
+  inversion H1. contradiction. contradiction. contradiction.
+Qed.
 
 
 Lemma Squashed_singleton v VS : 
@@ -391,6 +397,7 @@ Hint Resolve
   TailSquashed_nil
   TailSquashed_empty
   Squashed_singleton
+  Squashed_nil
  :sets.
 
 Lemma Squashed_singleton_invert v VS : 
@@ -412,7 +419,7 @@ Ltac ego := eauto with sets ;
                  [ intros ? ; discriminate| eauto with sets]) ;
             eauto with sets.
 
-Ltac eval1 := match goal with 
+Ltac eeval1 := match goal with 
               | [ |- eval ?env ?e ?VS ] =>
                   econstructor ; eauto end.
 
@@ -431,47 +438,61 @@ Ltac eeval := match goal with
                   econstructor ; eauto end.
 
 
+
+(* ----------------------- examples --------------- *)
+
 Module Test.
-
-
 
 Lemma t1 : eval_top mini.Test.t1 [ ⌈ Dom.Int 2 ⌉ ].
 Proof. unfold mini.Test.t1, eval_top. repeat eeval. Qed.
 
+Lemma Value_dec ( v1 v2 : Dom.Value) : {v1 = v2} + { not (v1 = v2) }.
+Admitted.
 
-
-(* x:=1; x  *)
+(* { x:=1; x }  *)
 Lemma t2 : 
-  exists v, eval (Env.extend mini.Test.x v Env.empty) mini.Test.t2 [ ⌈ Dom.Int 1 ⌉ ].
-Proof. exists (Dom.Int 1).
-       unfold mini.Test.t2.
-       eeval.
+  eval Env.empty mini.Test.t2 [ ⌈ Dom.Int 1 ⌉ ].
+Proof. unfold mini.Test.t2.
+       (* set up the block. *)
+       eeval1.
+       intros rho' inX.
+       cbv in inX.
+       specialize (inX mini.Test.x) as [_ h2].
+       specialize (h2 ltac:(eauto)) as [v EQv].
+       (* need to do this case analysis here, before we instantiate 
+          the individual result. *)
+       destruct (Value_dec v (Dom.Int 1)).
+       - exists ([ ⌈ Dom.Int 1 ⌉ ]).
+         split; subst.
+         eeval.
+         ego.
+       - exists ([ ]).
+         split. 
+         eeval1.
+         + eeval.
+         + ego.
+         + eeval1.
+           ++ eeval1.
+              eeval.
+              eeval.
+              cbn.
+              rewrite Intersection_diff; auto.
+              ego.
+           ++ eapply Squashed_nil. eauto.
+           ++ eeval.
+           ++ ego.
+           ++ cbn. ego.
+         + ego.
+         + ego.
+         + eauto with sets.
+       - instantiate (1 := nil).
+         rewrite UNIONS_mem.
+         eapply in_singleton.
 Qed.
 
-(* version with no automation *)
-(*
-Lemma t2' : 
-  exists v, eval (Env.extend mini.Test.x v Env.empty) mini.Test.t2 [ ⌈ Dom.Int 1 ⌉ ].
-Proof. exists (Dom.Int 1).
-       unfold mini.Test.t2.
-       eapply eval_Seq.
-       - eapply eval_DefineV; eauto.
-       - eapply Squashed_singleton; eauto.
-       - eapply eval_Seq; eauto.
-         + eapply eval_Unify; eauto.
-           -- eapply eval_Var; cbn; eauto.
-           -- eapply eval_Lit; eauto.
-           -- cbn. rewrite Intersection_same. 
-              eapply TailSquashed_singleton. eauto.
-         + eapply Squashed_singleton. eauto.
-         + eapply eval_Var; cbn; eauto.
-         + eauto with sets.
-         + cbn. eapply TailSquashed_singleton. eauto.
-       - eauto with sets.
-       - cbn. eapply TailSquashed_singleton. eauto.
-Qed. *)
 
 
+(* No block here. *)
 (* x:=1; y:= if(x=2) then 0 else 3; y *)
 
 Lemma t7 : 
@@ -489,7 +510,8 @@ Proof.  exists (Dom.Int 1). exists (Dom.Int 3).
             -- ego.
             -- eapply eval_Unify.
                ++ eeval.
-               ++ eapply eval_If3_false.
+               ++ eeval1.
+                  +++ eapply eval_If3_false.
                   --- intros rho' rho'X.
                       unfold X, Ensembles.In in rho'X. 
                       move: (rho'X mini.Test.x) => [h _].
@@ -511,14 +533,23 @@ End Test.
 
 Module Theory.
 
+Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
+Admitted.
+
+
 Lemma NonEmptyTail_UNIONS : 
-  forall VS VV V, 
-    NonEmptyTail VS -> VS ∈ VV -> UNIONS VV V -> 
+  forall V VV, 
+    UNIONS VV V -> 
+    (forall VS, VS ∈ VV -> NonEmptyTail VS) -> 
     NonEmptyTail V.
 Proof.
-  intros.
-  unfold UNIONS in H1.
-  unfold NonEmptyTail.
+  intro V. induction V.
+  - intros.
+    unfold UNIONS in *.
+    unfold NonEmptyTail.
+    cbn. eauto with sets.
+  - intros VV VH U.
+    unfold UNIONS in *.
 Admitted.
 
 Lemma NonEmptyTail_app VS1 VS2 : 
@@ -526,6 +557,18 @@ Lemma NonEmptyTail_app VS1 VS2 :
   NonEmptyTail (VS1 ++ VS2).
 Admitted.
 
+Fixpoint evalNonEmptyTail {e}{rho}{VS} (ev : eval rho e VS) : NonEmptyTail VS.
+  destruct ev; subst; eauto.
+  all: try eapply NonEmptyTail_singleton.
+  all: try solve [match goal with 
+    | [ H : TailSquashed _ ?VS |- _ ] => move: H => [ _ h1 ] 
+    end; done].
+  - (* block *)
+    eapply NonEmptyTail_UNIONS; eauto.
+    intros V1 in1.
+Admitted.
+
+(*
 Lemma evalNonEmptyTail : 
   forall e rho VS, eval rho e VS -> NonEmptyTail VS.
 Proof.
@@ -538,6 +581,7 @@ Proof.
   all: try solve [match goal with 
     | [ H : TailSquashed _ ?VS |- _ ] => move: H => [ _ h1 ] 
     end; done].
+  - (* block *)
 
   - (* choice *)
     eapply NonEmptyTail_app; eauto.
@@ -546,6 +590,7 @@ Proof.
   - (* all *)
     admit.
 Admitted.
+*)
 
 End Theory.
 
@@ -574,12 +619,7 @@ Proof.
   invert_eval.
   cbn in H9.
   eapply eval_Seq.
-  - eeval. rewrite Intersection_comm. eauto.
-  - ego.
-  - ego.
-  - ego.
-  - ego.
-Qed.
+Admitted.
 
 
 
@@ -592,12 +632,9 @@ Proof.
   repeat invert_eval.
   clear H4.
   apply Squashed_singleton_invert in H2. subst.
-  eval1.
-  - eval1.
-    + eval1.
-      -- eval1.
 Admitted.
 
+(*
 Lemma AppLam rho (x y :Ident) v e : 
   eval rho 
     (mini.DefineV y :>:
@@ -611,6 +648,6 @@ Proof.
   invert_eval.
   invert_eval.
   inversion H3. subst. clear H3.
-Admitted.
+Admitted. *)
 
 End Rewrites.

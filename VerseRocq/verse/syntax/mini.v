@@ -20,15 +20,14 @@ Inductive Expr : Type :=
   | Truth : Expr -> Expr
   | ApplyD : Expr -> Expr -> Expr
 
-  (* binding / scope *)
-  (* | Exists : Ident -> Expr *) (* ??? *)
-  (* | Lam : Ident -> Expr -> Expr  *)
+  (* create a new scope *)
+  | Block : Expr -> Expr 
 
   | Fun : forall (q: Aperture)
             (omega: Effect)
             (i  : Ident)
             (e1 : Expr) 
-            (hw : option Wrapping) 
+            (hw : Wrapping) 
             (e2 : Expr), 
           Expr
 
@@ -85,11 +84,8 @@ Fixpoint mkSeq (e1 : Expr) (e2: Expr) : Expr :=
 
 
 Definition eUnit : Expr := Array nil.
-Definition eSeq (e : list Expr) := List.fold_right mkSeq eUnit e.
 
-(*
-Definition eThunk (e : Expr) : Expr := 
-  Fun srcUnderscore e. *)
+Definition eSeq (e : list Expr) := List.fold_right mkSeq eUnit e.
 
 
 (* Calculate outer ∃-bound variables in expression e *)
@@ -97,8 +93,9 @@ Definition eThunk (e : Expr) : Expr :=
 (* like getVisibleBinders in FrontEnv / Expr.hs *)
 Fixpoint I (e : Expr) : Scope.t := 
   match e with 
-  | DefineV i => Scope.singleton i
+  | Block e => Scope.empty
 
+  | DefineV i => Scope.singleton i
   | Array es => Scope_concatMap I es
   | Truth e => I e
   | ApplyD e1 e2 => Scope.union (I e1) (I e2)
@@ -108,7 +105,8 @@ Fixpoint I (e : Expr) : Scope.t :=
   (* | Range e => I e   TODO: disagrees with fvs below *)
 
                      
-  | _ => Scope.empty (* Lit / EPrim / Var / Fail / Fun
+  (* either doesn't bind any variables, or starts a new scope *)
+  | _ => Scope.empty (* Lit / EPrim / Var / Fail / Fun  
                        If3 / Choice / One / All /
                        Verify / Check / ESome  
                      *)
@@ -117,10 +115,10 @@ Fixpoint I (e : Expr) : Scope.t :=
 Fixpoint fvs (e : Expr) : Scope.t := 
   let fvs_blk e := Scope.diff (fvs e) (I e) in
   let fvs_wrp hw (s:Scope.t) : Scope.t := match hw with 
-                      | None => s
-                      | Some (h, x, y) => Scope.add h (Scope.remove y s)
+                      | (h, x, y) => Scope.add h (Scope.remove y s)
                       end in
   let fvs e := match e with 
+               | Block e => fvs_blk e
                | Var i => Scope.singleton i
                | Array es => Scope_concatMap fvs es
                | Truth e => fvs e
@@ -130,7 +128,6 @@ Fixpoint fvs (e : Expr) : Scope.t :=
                | Seq e1 e2 =>  Scope.union (fvs e1)(fvs e2)
                | One e => fvs_blk e 
                | All e => fvs_blk e 
-
                | If3 e1 e2 e3 => 
                    (* binders of e1 scope over e2 *)
                    Scope.union
@@ -158,6 +155,8 @@ Infix ":=:" := mini.Unify (at level 65, left associativity) : mini_expr_scope.
 Infix ":|:" := mini.Choice (at level 71, left associativity) : mini_expr_scope.
 Infix ":@:" := mini.ApplyD (at level 63, left associativity) : mini_expr_scope.
 Notation "e |>< eff >" := (mini.Check eff e) : mini_expr_scope.
+Notation "{ e }" := (mini.Block e) : mini_expr_scope.
+Notation "∃ x"   := (mini.DefineV x) (at level 25, only printing) : mini_expr_scope.
 
 Coercion Int : nat >-> LitType.
 Coercion Lit : LitType >-> Expr.
@@ -181,11 +180,11 @@ Definition i : Ident := 4.
 
 Definition t1 : Expr := 2.
 
-(* SRC: x:=1; x 
-   MINI: exists x; x = 1; x 
+(* SRC: {x:=1; x}
+   MINI: {exists x; x = 1; x}
    DEN: {1} 
 *) 
-Definition t2 := (DefineV x :>: (Var x :=: 1) :>: Var x).
+Definition t2 := { DefineV x :>: (Var x :=: 1) :>: Var x }.
 
 Definition t3 : Expr := Array [ Lit (Int 1) ; Lit (Int 2) ; Lit (Int 3) ].
 Definition t4 := Array [].
@@ -201,9 +200,9 @@ operator'+' =
 (\<succeeds>$i1.(exists x; x = int[$i1]) (){operator'+'[x, 1]})[2]
 DEN: 3
 *)
-Definition t5 := 
-  (Fun Closed Succeeds i (DefineV x :>: (x :=: (IsInt :@: i))) None
-       (Add :@: x)) :@: 2.
+Definition t5 :=
+  { DefineV t :>:  t :=: IsInt :>:
+    (Fun Closed Succeeds i (DefineV x :>: x) (x, t, i) (Add :@: x)) :@: 2 }.
 
 (* missing type test *)
 Definition t6 := 
