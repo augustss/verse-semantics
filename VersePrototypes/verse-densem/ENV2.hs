@@ -345,7 +345,7 @@ sem (If e1 e2 e3) r =
   ]
  where
   [env1] = map (hide z) (sem e1 z) -- this is a hack, should use FIRST instead
-  z  = fresh (vars (If e1 e2 e3))
+  z  = fresh (r : vars (If e1 e2 e3))
   ys = exis e1
 
 sem (Exi x) r =
