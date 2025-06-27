@@ -343,7 +343,7 @@ sem (If e1 e2 e3) r =
   , [ compl env1 /\ hides ys env3 | env3 <- sem e3 r ]
   ]
  where
-  [env1] = map (hide z) (sem e1 z) -- this is a hack, should use FIRST instead
+  env1 = first ys (map (hide z) $ sem e1 z)
   z  = fresh (r : vars (If e1 e2 e3))
   ys = exis e1
 
@@ -376,6 +376,10 @@ funs = [ [ funx .= 0 /\ funy .= 1
 
 squash :: [ENV] -> [ENV]
 squash envs = [ env | env <- envs, env /= empty ]
+
+first :: [Ident] -> [ENV] -> ENV
+first ys []         = empty
+first ys (env:envs) = env \/ (compl (hides ys env) /\ first ys envs)
 
 combine :: [(ENV,Ident)] -> [(ENV,[Ident])]
 combine []              = [(univ,[])]
