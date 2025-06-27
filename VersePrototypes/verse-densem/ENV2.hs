@@ -219,10 +219,7 @@ hides xs env = foldr hide env xs
 compl :: ENV -> ENV
 compl (OR as) =
   foldr (/\) univ
-  [ foldr (\/) empty $
-    [ OR [YES [neg c]]
-    | c <- cs
-    ]
+  [ OR [YES [neg c] | c <- cs]
   | YES cs <- as
   ]
 
@@ -278,9 +275,9 @@ vars (f :@: x)    = [f,x]
 vars _            = []
 
 exis :: Expr -> [Ident]
-exis (x := e)     = exis e
-exis (e1 :>: e2)  = exis e1 ++ exis e2
-exis (Exi x)      = [x]
+exis (x := e)    = exis e
+exis (e1 :>: e2) = exis e1 ++ exis e2
+exis (Exi x)     = [x]
 exis _           = []
 
 ----------------------------------------------------------------------------------------
