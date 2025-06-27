@@ -309,8 +309,8 @@ sem (All e) r =
   squash
   [ bigUnion
     [ foldr (/\) (r .= Fun fun)
-      [ hides (funx : funy : xs) $
-          h /\ funx .= Int i /\ funy .=. x
+      [ hides xs $ env /\ (hides [funx,funy] $
+                  h /\ funx .= Int i /\ funy .=. x)
       | (i,(h,x)) <- [0..] `zip` (fun `zip` xs)
       ]
     | (env,xs) <- combine [ (ren z zi env, zi) | (env,zi) <- sem (Scope e) z `zip` zs ]
@@ -369,6 +369,8 @@ funs :: [FUN]
 funs = [ [ funx .= 0 /\ funy .= 1
          , funx .= 1 /\ funy .= 0
          ]
+       , [ funx .= 0 /\ funy .= 7
+         ]
        , [ funx .= 0 /\ funy .= 1
          , funx .= 1 /\ funy .= 2
          , funx .= 2 /\ funy .= 3
@@ -417,6 +419,7 @@ r = Id "r"
 ex1 = Tup [x, y]
 ex2 = (z := ex1) :>: (z :@: x)
 ex3 = (y := If (x := 1) 5 7) :>: (y := 7)
+ex4 = All ((x := 1) :|: (y := 7))
 
 ----------------------------------------------------------------------------------------
 
