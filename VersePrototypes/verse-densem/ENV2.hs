@@ -260,6 +260,15 @@ data Expr
   | Ident :@: Ident
  deriving ( Eq, Ord, Show )
 
+instance Num Expr where
+  fromInteger k = Con k
+
+  abs    = error "abs on Expr"
+  signum = error "signum on Expr"
+  (*)    = error "(*) on Expr"
+  (+)    = error "(+) on Expr"
+  (-)    = error "(-) on Expr"
+
 vars :: Expr -> [Ident]
 vars (Var x)      = [x]
 vars (Tup xs)     = xs
