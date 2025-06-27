@@ -299,7 +299,7 @@ sem (Con k) r =
 sem (Tup xs) r =
   [ bigUnion
     [ foldr (/\) (r .= Fun fun)
-      [ hide funx $ hide funy $
+      [ hides [funx,funy] $
           h /\ funx .= Int i /\ funy .=. x
       | (i,(h,x)) <- [0..] `zip` (fun `zip` xs)
       ]
@@ -352,7 +352,7 @@ sem (Exi x) r =
   [ univ ]
 
 sem (Scope e) r =
-  [ foldr hide env (exis e)
+  [ hides (exis e) env
   | env <- sem e r
   ]
 
