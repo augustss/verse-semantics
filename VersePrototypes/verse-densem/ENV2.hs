@@ -25,6 +25,8 @@ data Value
   | Fun FUN
  deriving ( Eq, Ord )
 
+type FUN = [PartialFun]
+
 instance Show Value where
   show (Int k)   = show k
   show (Fun fun) = show fun
@@ -39,7 +41,10 @@ instance Num Value where
   (-)    = error "(-) on Value"
 
 type PartialFun = ENV -- with just two variables x and y!
-type FUN = [PartialFun]
+
+apply :: PartialFun -> Ident -> Ident -> ENV
+apply h x y =
+  ren tmp y $ ren funx x $ ren funy tmp $ h
 
 ----------------------------------------------------------------------------------------
 
@@ -223,15 +228,6 @@ compl (OR as) =
 
 ----------------------------------------------------------------------------------------
 
-apply :: FUN -> Ident -> Ident -> [ENV]
-apply hs x y =
-  [ ren tmp y
-  $ ren funx x 
-  $ ren funy tmp
-  $ h
-  | h <- hs
-  ]
-
 funx, funy :: Ident
 funx = Id "$x"
 funy = Id "$y"
@@ -297,6 +293,7 @@ sem (Con k) r =
   [ r .= Int k ]
 
 sem (Tup xs) r =
+  squash
   [ bigUnion
     [ foldr (/\) (r .= Fun fun)
       [ hides [funx,funy] $
@@ -308,26 +305,30 @@ sem (Tup xs) r =
     ]
   ]
 
-{-
 sem (All e) r =
+  squash
   [ bigUnion
     [ foldr (/\) (r .= Fun fun)
-      [ hide funx $ hide funy $
-            h /\ funx .= Int i /\ funy .=. x
+      [ hides (funx : funy : xs) $
+          h /\ funx .= Int i /\ funy .=. x
       | (i,(h,x)) <- [0..] `zip` (fun `zip` xs)
       ]
-    | fun <- funs
+    | (env,xs) <- combine [ (ren z zi env, zi) | (env,zi) <- sem (Scope e) z `zip` zs ]
+    , fun <- funs
     , length fun == length xs
     ]
   ]
--}
-
+ where
+  z:zs = freshList (r : vars e)
+ 
 sem (x := e) r =
+  squash
   [ x .=. r /\ env
   | env <- sem e r
   ]
   
 sem (e1 :>: e2) r =
+  squash
   [ hide u env1 /\ env2
   | env1 <- sem e1 u
   , env2 <- sem e2 r
@@ -339,6 +340,7 @@ sem (e1 :|: e2) r =
   sem e1 r ++ sem e2 r
 
 sem (If e1 e2 e3) r =
+  squash $
   dodgyUnion
   [ [ hides ys (env1 /\ env2) | env2 <- sem e2 r ]
   , [ compl env1 /\ hides ys env3 | env3 <- sem e3 r ]
@@ -357,29 +359,41 @@ sem (Scope e) r =
   ]
 
 sem (f :@: x) r =
+  squash $
   dodgyUnion
-  [ [ f .= Fun fun /\ env | env <- apply fun x r ]
+  [ [ f .= Fun fun /\ apply h x r | h <- fun ]
   | fun <- funs
   ]
 
 funs :: [FUN]
 funs = [ [ funx .= 0 /\ funy .= 1
          , funx .= 1 /\ funy .= 0
-         ] 
+         ]
+       , [ funx .= 0 /\ funy .= 1
+         , funx .= 1 /\ funy .= 2
+         , funx .= 2 /\ funy .= 3
+         ]
        ]
 
----
+squash :: [ENV] -> [ENV]
+squash envs = [ env | env <- envs, env /= empty ]
 
-x, y, z, r :: Ident
-x = Id "x"
-y = Id "y"
-z = Id "z"
-r = Id "r"
+combine :: [(ENV,Ident)] -> [(ENV,[Ident])]
+combine []              = [(univ,[])]
+combine ((env,x):envxs) =
+  squash' $
+  [ (env /\ env', x:xs)
+  | (env',xs) <- envxss
+  ] ++
+  [ (compl (hide x env) /\ env', xs)
+  | (env',xs) <- envxss
+  ]
+ where
+  envxss = combine envxs
 
-ex1 = Tup [x, y]
-ex2 = (z := ex1) :>: (z :@: x)
+squash' envxss = [ (env,xs) | (env,xs) <- envxss, env /= empty ]
 
----
+----------------------------------------------------------------------------------------
 
 bigUnion :: [ENV] -> ENV
 bigUnion = foldr (\/) empty
@@ -392,49 +406,17 @@ dodgyUnion []    = []
 dodgyUnion envss = bigUnion [ env | env:_ <- envss ]
                  : dodgyUnion [ envs | _:envs <- envss, not (null envs) ]
 
-{-
-extract :: Ident -> ENV -> ([(ENV,a)],[(ENV,a)])
-extract x (OR as) = OR [ | a@(YES ps ns x) <- as ]
--}
-
-{-
 ----------------------------------------------------------------------------------------
 
-extract :: Ident -> ENV -> [(Value, ENV)]
+x, y, z, r :: Ident
+x = Id "x"
+y = Id "y"
+z = Id "z"
+r = Id "r"
 
-extracts :: [Ident] -> ENV -> [([Value], ENV)]
-
-----------------------------------------------------------------------------------------
--- derived operators
-
-bigUnion :: [ENV] -> ENV
-bigUnion = foldr (%\/) failE
-
-bigIntersect :: [ENV] -> ENV
-bigIntersect = foldr (%/\) univE
-
-bigUnique :: [ENV] -> ENV
-bigUnique envs = go envs cenvs (tail nenvs)
- where
-  cenvs = map compl envs
-  nenvs = scanr (%/\) univE cenvs
-
-  go [] _ _ = failE
-  go (env:envs) (cenv:cenvs) (nenv:nenvs) =
-    (env %/\ nenv) %\/ (cenv %/\ go envs cenvs nenvs)
-  go _ _ _ = error "bigUnique"
-
-quant :: Ident -> ([ENV] -> ENV) -> ENV -> ENV
-quant x bigOp env = bigOp [ env' | (_,env') <- extract x env ]
-
-(%\\) :: ENV -> ENV -> ENV
-env1 %\\ env2 = env1 %/\ compl env2
-
-----------------------------------------------------------------------------------------
-
-clean :: [ENV] -> [ENV]
-clean ss = [ s | s <- ss, s /= ENV [] ]
--}
+ex1 = Tup [x, y]
+ex2 = (z := ex1) :>: (z :@: x)
+ex3 = (y := If (x := 1) 5 7) :>: (y := 7)
 
 ----------------------------------------------------------------------------------------
 
