@@ -208,6 +208,9 @@ x .=. y = OR [ YES (case x `compare` y of
 hide :: Ident -> ENV -> ENV
 hide x (OR cs) = disj [ hideCase x c | c <- cs ]
 
+hides :: [Ident] -> ENV -> ENV
+hides xs env = foldr hide env xs
+
 compl :: ENV -> ENV
 compl (OR as) =
   foldr (/\) univ
@@ -325,6 +328,16 @@ sem (e1 :>: e2) r =
 
 sem (e1 :|: e2) r =
   sem e1 r ++ sem e2 r
+
+sem (If e1 e2 e3) r =
+  dodgyUnion
+  [ [ hides ys (env1 /\ env2) | env2 <- sem e2 r ]
+  , [ compl env1 /\ hides ys env3 | env3 <- sem e3 r ]
+  ]
+ where
+  [env1] = map (hide z) (sem e1 z) -- this is a hack, should use FIRST instead
+  z  = fresh (vars (If e1 e2 e3))
+  ys = exis e1
 
 sem (Exi x) r =
   [ univ ]
