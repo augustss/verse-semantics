@@ -282,17 +282,20 @@
 \newcommand{\Ident}{\M{\mathit{Iden}}}
 \newcommand{\Fun}{\M{\mathit{Fun}}}
 \newcommand{\Z}{\M{\mathbb Z}}
-\newcommand{\Val}{\M{W}}
-\newcommand{\Value}{\M{W}}
+\newcommand{\Val}{\Value}
+\newcommand{\Value}{\M{\mathit{Val}}}
+\newcommand{\VAL}{\M{\mathit{VAL}}}
 
 %% Sets and sequences
 \newcommand{\powerset}[1]{\M{\mathit{Set}(#1)}}    % Sets
-\newcommand{\seq}[1]{\M{ [\SP #1 \SP] }}           % Sequences
+\newcommand{\seq}[1]{\M{ [ #1 \,] }}           % Sequences
 
 %% Semantic function calls, e.g E[e]rho
 \newcommand{\semfun}[1]{\mathcal{#1}}
 \newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket}
+\newcommand{\semapsub}[3]{\semfun{#1}_{#2}\llbracket #3 \rrbracket}
 \newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
+\newcommand{\semappsub}[4]{\semfun{#1}_{#2}\llbracket #3 \rrbracket\, #4}
 \newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4}
 \newcommand{\semapppp}[5]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5}
 
@@ -306,10 +309,13 @@
 \newcommand{\hideE}{\mathbf{hide}}
 \newcommand{\extractE}{\mathbf{extract}}
 \newcommand{\combineE}{\mathbf{combine}}
+\newcommand{\firstE}{\mathbf{first}}
 \newcommand{\tupE}{\mathbf{tup}}
+\newcommand{\tupsE}{\mathbf{tups}}   % Takes argument /sets/
 
 % Functions over sequences
 \newcommand{\append}{+\!\!+\,}
+\newcommand{\dodgyunion}{\hat{\cup}}
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}

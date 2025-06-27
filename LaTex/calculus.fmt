@@ -25,14 +25,15 @@
 %format biter (e) = "\textit{iter}(" e ")"
 %format g_diverges = "\textit{g}_{diverges}"
 
+%% --------- Effects ------------
+%format fx = "\omega"
 %format fx_1
 %format fx_2
 
 %% Intersection of effects
 %format andeffects (fx1) (fx2) = fx1 "\cap" fx2
 
-%% --------- Effects ------------
-%format fx = "\omega"
+
 %format succeeds = "\textbf{succeeds}"
 %format succeedsE (e) = "\textbf{succeeds}\{" e "\}"
 %format decides = "\textbf{decides}"
@@ -94,7 +95,7 @@
 %format (SS u (e))    = "{\mathcal W}\llbracket" e "\rrbracket" u
 %format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
 %format `ueq`         = "\;\mathring{=}\;"
-%format underscore    = "{\bullet}"
+%format underscore    = "{\_}"
 %   Input for wrapping
 %format wu            = "\kappa"
 %format mkwu (dr) (inp) = dr ",\!" inp
@@ -403,6 +404,9 @@
 %format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
 %format lamOCv (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".\begin{array}[t]{@{}l} (" t1 ") \\ \{" t2 "\} \end{array}"
 
+%   \_q<fx>i.(e1)(y:=f[x]){e2}
+%format lamH q (fx)(i)(e1)(hw)(e2) = "\lambda_{" q "}\langle" fx "\rangle" i ".(" e1 ")(" hw ")\{" e2 "\}"
+%format lamHv q (fx)(i)(e1)(hw)(e2) = "\lambda_{" q "}\langle" fx "\rangle" i ".\begin{array}[t]{@{}l} (" e1 ") \\ (" hw ")\{" e2 "\} \end{array}"
 
 %% -------End of functions ---------------
 
@@ -521,6 +525,8 @@
 %format z_1
 %format z_2
 %format z_3
+%format z_i
+%format z_n
 
 %format k_1
 %format k_2
@@ -622,6 +628,7 @@
 %format v_x
 %format v_y
 %format gv_1
+%format gv_2
 %format gv_n
 
 %format dom_1
@@ -798,7 +805,7 @@
 %format phi         = "\varphi"
 %format psi         = "\psi"
 %format `elem`      = "\in"
-%format ++          = "\bowtie"
+%format ++          = "\append"
 %format term(v)     = "\termapp{" v "}"
 
 %format var         = "\textbf{var}"
@@ -833,8 +840,8 @@
 %format assume (x) = "\textbf{asm}\{" x "\}"
 %format assert (x) = "\textbf{suc}\{" x "\}"
 %format succeed (x) = "\textbf{suc}\{" x "\}"
-%format verify (x) = "\textbf{verify}\{" x "\}"
-%format verify2 (r) (a) (x) = "\textbf{verify}(" r ";\," a ")\{" x "\}"
+%format verify (x) = verifyKW "\{" x "\}"
+%format verify2 (r) (a) (x) = verifyKW "(" r ";\," a ")\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
 %format not (e) = "\neg" e

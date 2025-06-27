@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -38,7 +37,7 @@ import Verse.Core.Val (Val)
 import Verse.Core.Val qualified as Val
 import Verse.Fun (Fun)
 import Verse.Fun qualified as Fun
-import Verse.Monad (VerseT, runVerseT)
+import Verse.Monad (Stream (..), VerseT, runVerseT)
 import Verse.Monad qualified as Monad
 import Verse.Name
 
@@ -98,7 +97,7 @@ eval'
 eval' s1 s2 = wrap $ \ case
   Var x -> unifyS s1 s2 >> asks (Env.lookup x . (.env)) >>= \ case
     Just var -> pure var
-    Nothing -> fork' stuck *> freshVar
+    Nothing -> fork (addStack *> stuck) *> freshVar
   Abs x e -> unifyS s1 s2 >> asks (.env) >>= \ env ->
     newVar $ Val.Lam env x e
   App e1 e2 -> do
@@ -119,10 +118,10 @@ eval' s1 s2 = wrap $ \ case
     s3 <- freshS
     eval' s1 s3 e1 *> eval' s3 s2 e2
   Tup xs -> do
-    (s1, reverse -> xs) <- foldlM (\ (s1, xs) x -> do
-      s3 <- freshS
-      x <- eval' s1 s3 x
-      pure (s3, x:xs)) (s1, []) xs
+    (s1, xs) <- fmap reverse <$> foldlM (\ (s1, xs) x -> do
+      s2 <- freshS
+      x <- eval' s1 s2 x
+      pure (s2, x:xs)) (s1, []) xs
     unifyS s1 s2
     newTup xs
   e1 := e2 -> do
@@ -149,8 +148,7 @@ eval' s1 s2 = wrap $ \ case
       (,) <$> readVar var1 <*> readVar var2 >>= \ case
         (Val.Int x1, Val.Int x2) ->
           unifyVar var <=< asum $ newVar . Val.Int <$> [x1 .. x2]
-        _ ->
-          stuck
+        _ -> stuck
     pure var
   e1 :+ e2 -> do
     s3 <- freshS
@@ -176,19 +174,16 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     fork' $ unifyVar var =<< evalLess s4 s2 var1 var2
     pure var
-  Fail ->
-    empty
+  Fail -> empty
   All e -> do
-    unifyChoiceFree s1 s2
     var <- freshVar
     heap <- newHeap s1
     fork $ do
-      i <- addStack
-      unifyVar var <=< newTup <=< all' $ do
+      bracketStack $ unifyVar var <=< newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      removeStack i
+      unifyChoiceFree s1 s2
       unifyStoreFree s1 s2
     pure var
   For e1 x e2 -> do
@@ -200,28 +195,24 @@ eval' s1 s2 = wrap $ \ case
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1
       loop s1 = \ case
-        Monad.Done -> do
-          unifyS s1 s2
-          pure []
-        Monad.Step var1 m -> do
-          s3 <- freshS
-          var2 <- localEnv (Env.insert x var1) $ eval' s1 s3 e2
-          heap <- newHeap s3
-          fmap (var2:) . loop s3 <=< lift $ local (const heap) m
+        Done -> unifyS s1 s2 $> []
+        Step var1 m -> do
+          s2 <- freshS
+          var2 <- localEnv (Env.insert x var1) $ eval' s1 s2 e2
+          heap <- newHeap s2
+          fmap (var2:) . loop s2 <=< lift $ local (const heap) m
     var <- freshVar
     fork' $ unifyVar var =<< newTup =<< loop s1 =<< init s1
     pure var
   One e -> do
-    unifyChoiceFree s1 s2
     var <- freshVar
     heap <- newHeap s1
     fork $ do
-      i <- addStack
-      unifyVar var <=< one $ do
+      bracketStack . unifyVar var <=< one $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      removeStack i
+      unifyChoiceFree s1 s2
       unifyStoreFree s1 s2
     pure var
   If e1 x e2 e3 -> do
@@ -239,28 +230,23 @@ evalApp
   :: (MonadIO m, MonadRef m, MonadState Mem m)
   => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
-  Val.Int _ ->
-    stuck
-  Val.Lam env x e ->
-    localEnv (const $ Env.insert x var2 env) $ eval' s1 s2 e
+  Val.Int _ -> stuck
+  Val.Lam env x e -> localEnv (const $ Env.insert x var2 env) $ eval' s1 s2 e
   Val.Tup xs -> do
-    unifyStoreFree s1 s2
     readChoiceFree s1
     var <- asum $ zip [0 ..] xs <&> \ (i, var1) -> do
       unifyVar var2 <=< newVar $ Val.Int i
       pure var1
     unifyChoiceFree s1 s2
+    unifyStoreFree s1 s2
     pure var
-  Val.Fun f ->
-    evalAppFun s1 s2 f var2
-  Val.Ptr _ ->
-    stuck
+  Val.Fun f -> evalAppFun s1 s2 f var2
+  Val.Ptr _ -> stuck
   Val.Map xs -> readVar var2 >>= \ case
     Val.Int k
       | toInteger minInt <= k && k <= toInteger maxInt ->
-          evalAppMap (fromInteger k) xs
-      | otherwise ->
-          empty
+          evalAppMap s1 s2 (fromInteger k) xs
+      | otherwise -> empty
     _ -> stuck
 
 evalAppFun
@@ -327,14 +313,12 @@ evalAppFun s1 s2 f x = case f of
     heap <- newHeap s1
     let
       loop !xs = \ case
-        Monad.Done ->
-          newVar $ Val.Map xs
-        Monad.Step (k, v) m -> readVar k >>= \ case
+        Done -> newVar $ Val.Map xs
+        Step (k, v) m -> readVar k >>= \ case
           Val.Int k | toInteger minInt <= k && k <= toInteger maxInt ->
             loop (insert (fromInteger k) v xs) <=<
             lift $ local (const heap) m
-          _ ->
-            stuck
+          _ -> stuck
     var <- loop mempty <=< split $ do
       s1 <- newS
       s2 <- freshS
@@ -366,10 +350,15 @@ evalLess s1 s2 var1 var2 = do
   guard $ x1 < x2
   pure var1
 
-evalAppMap :: MonadRef m => Int -> IntMap [Var m] -> EvalT m (Var m)
-evalAppMap k = IntMap.lookup k >>> \ case
-  Nothing -> empty
-  Just xs -> asum $ pure <$> xs
+evalAppMap :: MonadRef m => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)
+evalAppMap s1 s2 k xs = do
+  readChoiceFree s1
+  var <- case IntMap.lookup k xs of
+    Nothing -> empty
+    Just xs -> asum $ pure <$> xs
+  unifyChoiceFree s1 s2
+  unifyStoreFree s1 s2
+  pure var
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))
 
@@ -447,10 +436,7 @@ localHeap :: (Heap m -> Heap m) -> EvalT m a -> EvalT m a
 localHeap f m = ReaderT $ local f . runReaderT m
 
 fork' :: (MonadRef m, MonadState Mem m) => EvalT m () -> EvalT m ()
-fork' m = fork $ do
-  i <- addStack
-  m
-  removeStack i
+fork' = fork . bracketStack
 
 fork :: MonadRef m => EvalT m () -> EvalT m ()
 fork m = ReaderT $ Monad.fork . runReaderT m
@@ -531,6 +517,13 @@ freshHeap = lift Monad.freshVar
 
 unifyHeap :: MonadRef m => Heap m -> Heap m -> EvalT m ()
 unifyHeap = (lift .) . Monad.unifyVar
+
+bracketStack :: MonadState Mem m => EvalT m a -> EvalT m a
+bracketStack m = do
+  i <- addStack
+  x <- m
+  removeStack i
+  pure x
 
 addStack :: MonadState Mem m => EvalT m Int
 addStack = asks (.stack) >>= \ stack -> lift $ do

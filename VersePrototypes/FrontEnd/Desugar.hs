@@ -247,7 +247,7 @@ sDesugarExpr = ds
     ds e@(EffAttr {}) = errorMessage (showWithHerald "Unexpected effects" (pPrint e))
 
     ds e = compos ds e    -- Core expressions like Lit, Variable,
-                          -- DefineE, Unify, EPrim, etc
+                          -- DefineV, DefineE, Unify, EPrim, etc
 
 encodeType :: SrcEssential -> DsM SrcEssential
  -- Encodes type{e}, returning  fun(x:=e}{x}
@@ -270,32 +270,19 @@ defn :: (HasCallStack) => SrcPat -> SrcExpr -> DsM SrcExpr
 defn (Parens p) e = defn p e
 defn (Tuple es) e = defn (Array es) e
 
+-- DSWILD1:   _ := e  -->  e
 defn (Variable i) e
   | isSrcUnderscore i = pure e
   | otherwise         = pure $ eDefine i e
 
-defn xs@(InfixOp _ (Op "&") _) e
-  = -- See Note [Desugaring ampersand]
-    do { es <- mapM (\p -> defn p e) (get xs)
-       ; pure $ Splice $ Array es }
-  where
-    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
-    get p                        = [p]
-
--- DSWILD1:   (:e2) := e  -->  (_:e2) := e
+-- DSWILD2:   (:e2) := e  -->  (_:e2) := e
 defn (PrefixOp op@(Op ":") e2) e
   = defn (InfixOp (Variable srcUnderscore) op e2) e
 
--- Rule: (f(a) := e)  -->  (f := function(a){e})
--- Rule: (p:ty := e)  -->  e |> ty
-defn (ApplyS p a)            e = defn_fun p a [] e      -- DSFUN2
-defn (InfixOp p (Op ":") e2) e = defn_ty p e2 [] e      -- DSTY2
-
--- Rule: (f(a)<fxs> := e)  -->  (f := function(a)<fxs>{e})
--- Rule: (p:ty<fxs> := e)  -->  e |><fxs> ty
-defn p@(EffAttr {}) e
-  | ApplyS p2 a <- p1            = defn_fun p2 a fxs e    -- DSFUN1
-  | InfixOp p2 (Op ":") e2 <- p1 = defn_ty  p2 e2 fxs e   -- DSTY1
+-- DSFUN1/2: (f(a)<fxs> := e)  -->  (f := function(a)<fxs>{e})
+-- DSTY1/2:  (p:ty<fxs> := e)  -->  e |><fxs> ty
+defn p rhs | ApplyS p2 a            <- p1 = defn_fun p2 a  fxs rhs   -- DSFUN1, DSFUN2
+           | InfixOp p2 (Op ":") e2 <- p1 = defn_ty  p2 e2 fxs rhs   -- DSTY1, DSTY2
   where
     (p1, fxs) = getEffs p
 
@@ -312,6 +299,14 @@ defn (InfixOp p1 (Op "->") p2) e = do
   r1 <- defn p1 (Variable x)
   r2 <- defn p2 (DefineIE x e)
   pure $ eSeq [DefineV x, r1, r2]
+
+defn xs@(InfixOp _ (Op "&") _) e
+  = -- See Note [Desugaring ampersand]
+    do { es <- mapM (\p -> defn p e) (get xs)
+       ; pure $ Splice $ Array es }
+  where
+    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
+    get p                        = [p]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
@@ -338,6 +333,7 @@ eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
 -- Smart contructor, floats out nested defines
 eDefine x (Seq e1 e2) = mkSeq e1 (eDefine x e2)
 eDefine x rhs = DefineE x rhs
+
 
 --------------------------------------------------------
 --         Functions to take apart SrcExpr
@@ -660,7 +656,7 @@ data WContext   -- The context for the W transformation
 
 data Input
   = NoInput       -- ^ Typeset as bullet, circle, or underscore
-  | PI SrcMini    -- ^ An input variable x
+  | PI Ident      -- ^ An input variable x
   deriving( Show )
 
 data EffContext
@@ -727,7 +723,7 @@ essToMini flags orig_e = go_expr orig_e
     -- The context has NoInput; try again with a unification variable
     try_again kap t
       = do { r <- newIdent (getLoc t) "r"
-           ; let kap' = kap { wc_inp = PI (Variable r) }
+           ; let kap' = kap { wc_inp = PI r }
            ; t' <- go kap' t
            ; return (eSeq [DefineV r, t']) }
 
@@ -739,7 +735,7 @@ essToMini flags orig_e = go_expr orig_e
     go kap e@(Variable v)
        | isSrcUnderscore v = case wc_inp kap of
                                NoInput -> return existsXX
-                               PI i    -> return i
+                               PI i    -> return (Variable i)
        | otherwise         = kap `ueq` return e
     go kap e@(EPrim {})    = kap `ueq` return e
     go _kp Fail            = return Fail
@@ -766,12 +762,11 @@ essToMini flags orig_e = go_expr orig_e
     -- WEXISTS (exists x);  WDEF (x:=t)
     go kap (Exists xs e) = Exists xs <$> go kap e   -- Just propagate Exists
     go _kp (DefineV x)   = return (DefineV x)
-    go kap (DefineE x t) = do { e <- go kap t
-                              ; return (eSeq [DefineV x, eUnify (Variable x) e]) }
+    go kap (DefineE x t) = do { e <- go kap t; return (mDefine x e) }
 
     -- WSQUIG (x~>y:=t)
     go kap (DefineIE x t) = do { capture <- kap `ueq` pure (Variable x)
-                               ; e <- go (kap { wc_inp = PI (Variable x) }) t
+                               ; e <- go (kap { wc_inp = PI x }) t
                                ; return (eSeq [capture, e]) }
 
     -- WCHK: check<fx>{t}
@@ -792,8 +787,8 @@ essToMini flags orig_e = go_expr orig_e
                      ; x <- newIdent (getLoc t) "x"
                      ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
           PI i -> case cfxs of
-                     DomCtxt     -> ApplyD <$> go_expr ty <*> pure i
-                     RngCtxt fxs -> OfType i fxs <$> go_expr ty
+                     DomCtxt     -> ApplyD <$> go_expr ty <*> pure (Variable i)
+                     RngCtxt fxs -> OfType (Variable i) fxs <$> go_expr ty
                        -- See Note [Pushing down the effects]
 
     -- WOFTYPE: t1 |> t2
@@ -821,20 +816,20 @@ essToMini flags orig_e = go_expr orig_e
                      do_one t          =            go kap t
 
           PI i | null ts   -- Optimisation: instead of (i=<>; <>), just generate (i=<>)
-               -> pure (eUnify i (Array []))
+               -> pure (eUnify (Variable i) (Array []))
                | otherwise     -- WTUP2
                -> do { prs <- mapM do_one ts
                      ; let (exi_js, es) = unzip prs
                      ; exi_js_arr <- mkArray exi_js
                      ; res_arr    <- mkArray es
-                     ; pure (eSeq [ eUnify i exi_js_arr, res_arr ]) }
+                     ; pure (eSeq [ eUnify (Variable i) exi_js_arr, res_arr ]) }
               where
                 do_one :: SrcExpr -> DsM (SrcExpr, SrcExpr)
                 -- Returns the pattern-match decl, and the thing to put in the tuple
                 do_one (Splice t) = do { (d, e) <- do_one t
                                        ; pure (Splice d, Splice e) }
                 do_one         t  = do { j <- newIdent (getLoc t) "j"
-                                       ; e <- go (kap { wc_inp = PI (Variable j) }) t
+                                       ; e <- go (kap { wc_inp = PI j }) t
                                        ; pure (DefineV j, e) }
 
     -- truth{t}: WTRU1 and WTRU2
@@ -842,30 +837,44 @@ essToMini flags orig_e = go_expr orig_e
       = case inp of
           NoInput -> Truth <$> go kap t
           PI i -> do { j <- newIdent (getLoc t) "j"
-                     ; e <- go (kap { wc_inp = PI (Variable j) }) t
-                     ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
+                     ; e <- go (kap { wc_inp = PI j }) t
+                     ; return (eSeq [ DefineV j
+                                    , eUnify (Variable i) (Truth (Variable j))
+                                    , Truth e ]) }
 
     -- Functions: WFUN1, WFUN2
-    go kap@(WC { wc_inp = inp }) t@(Function aperture t1 fxs1 t2)
+    go _ t@(Function Open _ _ _)
+      = error ("panic:open function" ++ show t)
+
+    go kap@(WC { wc_inp = inp }) t@(Function Closed t1 fxs1 t2)
       = case inp of
           NoInput
                | fDsUniform flags
                -> try_again kap t
                | otherwise
                -> do { i <- newIdent (getLoc t1) "i"
-                     ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }
-                           kap_body = WC { wc_inp = NoInput,         wc_fxs = RngCtxt fxs1 }
-                     ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1) (go kap_body t2) }
-          PI f -> do { i <- newIdent (getLoc t1) "i"
+                     ; let kap_arg  = WC { wc_inp = PI i,    wc_fxs = DomCtxt }
+                           kap_body = WC { wc_inp = NoInput, wc_fxs = RngCtxt fxs1 }
+                     ; e1 <- go kap_arg t1
+                     ; e2 <- go kap_body t2
+                     ; return ( MVLam { mvl_fxs  = fxs1, mvl_i = i
+                                      , mvl_dom  = e1
+                                      , mvl_wrap = NoWrap
+                                      , mvl_rng  = e2 }) }
+
+          PI h -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
-                     ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = DomCtxt}
-                           kap_body = WC { wc_inp = PI (ApplyD f (Variable x)), wc_fxs = RngCtxt fxs1 }
+                     ; y <- newIdent (getLoc t2) "y"
+                     ; let kap_arg  = WC { wc_inp = PI i, wc_fxs = DomCtxt}
+                           kap_body = WC { wc_inp = PI y, wc_fxs = RngCtxt fxs1 }
                      ; e1 <- go kap_arg  t1
                      ; e2 <- go kap_body t2
-                     ; return (eSeq [ ApplyD (EPrim IsFun) f
-                                    , XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
-                                                       (eCheck fxs1 e2) ]) }
-                                      -- IsFun[f]: see test M26Mar25-5
+                     ; let lam = MVLam { mvl_fxs  = fxs1, mvl_i = i
+                                       , mvl_dom  = mDefine x e1
+                                       , mvl_wrap = Wrap { wp_x = x, wp_h = h, wp_y = y }
+                                       , mvl_rng  = e2 }
+                     ; return (eSeq [ ApplyD (EPrim IsFun) (Variable h), lam ]) }
+                                      -- IsFun[h]: see test M26Mar25-5
 
     -- Core constructs used (only) in the Prelude
     go kap (Lam x t)    = kap `ueq` (Lam x <$> go_expr t)
@@ -882,12 +891,22 @@ essToMini flags orig_e = go_expr orig_e
       = case inp of
            NoInput -> ds_e
            PI i -> case cfxs of
-                    DomCtxt -> Unify i <$> ds_e  -- See M20Dec24-3 for a simple example
+                    DomCtxt -> Unify (Variable i) <$> ds_e  -- See M20Dec24-3 for a simple example
                     RngCtxt _fxs -> do { e <- ds_e    -- See test `blame0` for a simple example
                                        ; v <- newIdent noLoc "i"
-                                       ; pure (OfType i effSucceeds (Lam v (Unify (Variable v) e))) }
+                                       ; pure (OfType (Variable i) effSucceeds
+                                                      (Lam v (Unify (Variable v) e))) }
     -- Experimental: try effSucceeds rather than `fx` in this OfType call
     -- Goal transparent higher-order functions behave better; see M2May25-*
+
+
+mDefine :: HasCallStack => Ident -> SrcExpr -> SrcExpr
+-- Takes SrcMini to SrcMini, SrcCore to SrcCore etc
+-- Generates (x:=e)
+-- Smart contructor, floats out nested defines
+-- NB: eDefine must stay separate becuase it generates DefineE
+mDefine x (Seq e1 e2) = mkSeq e1 (mDefine x e2)
+mDefine x rhs         = mkSeq (DefineV x) (eUnify (Variable x) rhs)
 
 --------------------------------------------------------
 --
@@ -925,13 +944,13 @@ miniToCore add_verification e_top
     go_nt md            = go md
 
     go :: (DsMode, [Ident]) -> SrcMini -> DsM SrcCore
-    go _md Fail            = return Fail  -- MFAIL
-    go _md e@(Lit {})      = return e     -- MCONST
-    go _md e@(Variable {}) = return e     -- MVAR
-    go _md e@(EPrim {})    = return e     -- MOP
-    go _md e@(DefineV {})  = return e     -- MBIND
+    go _md Fail            = return Fail  -- VFAIL
+    go _md e@(Lit {})      = return e     -- VCONST
+    go _md e@(Variable {}) = return e     -- VVAR
+    go _md e@(EPrim {})    = return e     -- VOP
+    go _md e@(DefineV {})  = return e     -- VBIND
 
-    -- MTUP, MTRUTH, MSEMI, MEQ, MCHOICE, MAPP
+    -- VTUP, VTRUTH, VSEMI, VEQ, VCHOICE, VAPP
     go md (Array es)     = Array <$> mapM (go_nt md) es
     go md (Truth e)      = Truth <$> go md e
     go md (Seq e1 e2)    = mkSeq  <$> go_nt md e1 <*> go md e2
@@ -940,22 +959,22 @@ miniToCore add_verification e_top
     go md (Choice e1 e2) = Choice <$> go md    e1 <*> go md    e2
     go md (Exists xs e)  = Exists xs <$> go md e
 
-    -- MFOR, MIF
+    -- VFOR, VIF
     go md (For2 e1 e2)   = For2 <$> go_nt md e1 <*> go_nt md e2
     go md (If3 e1 e2 e3) = If3 <$> go_nt md e1 <*> go_nt md e2 <*> go_nt md e3
     go md (One e)        = One <$> go_nt md e
     go md (All e)        = All <$> go_nt md e
 
-    -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
+    -- VOFTYPE-, VOFTYPE+X: (e1 |> e2)
     go md@(dsm,xs) (OfType e1 fx e2)
       = case dsm of
           MI       -> do_mi
           MX       -> do_mvmx
           MV False -> do { body <- do_mvmx
                          ; rest <- do_mi
-                         ; return (eSeq [eVerify [] body, rest]) }
+                         ; return (eSeq [body, rest]) }
           MV True -> do { body <- do_mvmx
-                        ; return (eVerify [] body) }
+                        ; return body }
       where
         do_mi = do { (dz, z) <- defineDE "z" (go (MI,xs) e2)
                          -- Very important: use MX here because we don't want
@@ -972,39 +991,46 @@ miniToCore add_verification e_top
                      ; if isAtomic e1'  -- Just an optimisation
                        then return (add_check dsm effSucceeds (ApplyD e2' e1'))
                        else do { r <- newIdent (getLoc e1) "r"
-                              ; return (eSeq [ DefineV r
-                                             , eUnify (Variable r) $
-                                               add_check dsm fx e1'
+                              ; return (eSeq [ mDefine r (add_check dsm fx e1')
                                              , add_check dsm effSucceeds $
                                                ApplyD e2' (Variable r)
                                  ]) } }
 
-    -- MCHECK-, MCHECK+X:  check<fx>{e}
+    -- VCHECK-, VCHECK+X:  check<fx>{e}
     go md@(dsm,_) (Check fx e) = add_check dsm fx <$> go_nt md e
 
-    -- Functions proper: MCFUN+, MCFUN-, MCFUNX
-    go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
+    -- Functions proper: VFUN+, VFUN-, VFUNX
+    go (MV omit_client, is) e@(MVLam { mvl_fxs = fxs, mvl_i = i, mvl_wrap = wrap
+                                     , mvl_dom = e1 ,mvl_rng = e2 })
       | omit_verify, omit_client = return (Array [])
-      | omit_verify              = go (MI,xs) e
+      | omit_verify              = go (MI,is) e
       | omit_client              = do_verify
       | otherwise
       = do { ever <- do_verify
-           ; efun <- go (MI, xs) e
+           ; efun <- go (MI, is) e
            ; return (eSeq [ever, efun]) }
       where
         omit_verify = shortCutDefnVerify e1 e2
-        do_verify = do { e1' <- go (MI,      x:xs) e1
-                       ; e2' <- go (MV True, x:xs) e2
-                       ; return (eVerify [x] (eSeq [e1',e2'])) }
+        do_verify = do { e1' <- go (MI,      i:is) e1
+                       ; e2' <- go (MV True, i:is) e2
+                       ; return (eVerify [i] $
+                                 mkSeq e1' $
+                                 eCheck fxs $
+                                 mkSeq (go_wrap wrap) e2') }
 
-    go (MI,xs) (XDLam Closed x e1 e2)
-      = do { e1' <- go (MV False, x:xs) e1
-           ; e2' <- go (MI, x:xs) e2
-           ; return (Lam x (eSeq [ e1', e2' ])) }
-    go (MX,xs) (XDLam Closed x e1 e2)
-      = do { e1' <- go (MX, x:xs) e1
-           ; e2' <- go (MX, x:xs) e2
-           ; return (Lam x (eSeq [ e1', e2' ])) }
+    go (MI,is) (MVLam { mvl_i = i, mvl_wrap = wrap
+                      , mvl_dom = e1 ,mvl_rng = e2 })
+      = do { e1' <- go (MV False, i:is) e1
+           ; e2' <- go (MI, i:is) e2
+           ; return (Lam i (eSeq [ e1'
+                                 , go_wrap wrap
+                                 , e2' ])) }
+
+    go (MX,is) (MVLam { mvl_i = i, mvl_wrap = wrap
+                      , mvl_dom = e1 ,mvl_rng = e2 })
+      = do { e1' <- go (MX, i:is) e1
+           ; e2' <- go (MX, i:is) e2
+           ; return (Lam i (eSeq [ e1', go_wrap wrap, e2' ])) }
 
     -- Pass through Core constructs, used in Prelude
     go md (Lam x t)    = Lam x <$> go md t
@@ -1013,9 +1039,15 @@ miniToCore add_verification e_top
 
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
 
+    go_wrap :: MVLWrap -> SrcCore
+    go_wrap NoWrap
+      = eUnit
+    go_wrap (Wrap { wp_x = x, wp_h = h, wp_y = y })
+      = mDefine y (ApplyD (Variable h) (Variable x))
+
     add_check :: DsMode -> Eff -> SrcCore -> SrcCore
     add_check MI      _  e = e
-    add_check MX      _  e = e
+    add_check MX      fx e = eCheck fx e
     add_check (MV {}) fx e = eCheck fx e
       -- No Check in the MX case: needed for tests
       --    M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
@@ -1058,11 +1090,7 @@ defineDE nm ds_rhs
        ; if isAtomic rhs'
          then pure (eSeq [], rhs')
          else do { x <- newIdent (getLoc rhs') nm
-                 ; pure (coreDefine x rhs', Variable x) } }
-
-coreDefine :: Ident -> SrcCore -> SrcCore
-coreDefine x (Seq e1 e2) = mkSeq e1 (coreDefine x e2)
-coreDefine x rhs         = mkSeq (DefineV x) (Unify (Variable x) rhs)
+                 ; pure (mDefine x rhs', Variable x) } }
 
 -----------------------------------------------
 --

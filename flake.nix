@@ -7,6 +7,50 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        texEnv = (pkgs.texlive.combine {
+          inherit (pkgs.texlive)
+
+          scheme-basic
+          hyperref
+          xstring
+          totpages
+          environ
+          hyperxmp
+          ncctools # for manyfoot
+          xkeyval
+          microtype
+          booktabs
+          everyshi
+          textcase
+          ifmtarg
+          acmart
+          xcolor
+          cmap
+          caption
+          float
+          inconsolata
+          cbfonts
+          libertine
+          txfonts
+          comment
+          stmaryrd
+          polytable
+          tikz-cd
+          pgf       # contains tikz
+          lazylist
+          framed
+          cleveref
+          mathpartir
+          conteq
+          textgreek
+          mathtools
+          multirow
+          makecell
+          upquote
+          metafont
+          latexmk
+          ;
+        });
 
         hPkgs =
           pkgs.haskell.packages."ghc967"; # need to match Stackage LTS version
@@ -20,6 +64,8 @@
           hPkgs.haskell-language-server # LSP server for editor
           hPkgs.implicit-hie            # auto generate LSP hie.yaml file from cabal
           hPkgs.cabal-install
+          hPkgs.lhs2tex                 # for latex make
+          texEnv                        # the latex packages
           stack-wrapped
           pkgs.zlib # External C library needed by some Haskell packages
         ];

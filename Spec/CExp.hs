@@ -8,6 +8,7 @@ import Data.Data
 import qualified Data.List as L
 import Exp
 
+-- Mostly MiniVerse
 data CExp
   = CVar Ident
   | CInt Integer
@@ -177,7 +178,9 @@ syntaxN u (Fun q e0 e1) = do
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
-  pure $ CLam q i (cblocks [CDef x c0, CLHS]) (cblocks [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
+  pure $ CLam q i (cblocks [CDef x c0, CLHS])
+                  (cblocks [CDef k $ CApp (CVar u) (CVar x), c1 ])
+                  cq
 syntaxN u (Block e) = CBlock <$> syntaxNB u e
 
 checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))

@@ -6,6 +6,138 @@
 
 \begin{figure}
 $$
+% ------------- Denotationals semantics of DPS Verse ---------------
+\begin{array}{c}
+\textbf{Domains} \\
+\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
+  & \Val & = & \Z + \Fun \\\
+  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \\
+  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+  & \text{Partial functions} \\
+  \\
+  & \tupE & : & [\Val] \rightarrow \Val \\
+  & \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mycdots n \} ]
+\end{array} \\
+\\
+\textbf{Denotational semantics} \\
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+& \semapsub{E}{d}{|e|} r & : & \seq{ \ENV } \\
+\rulename{edef} & \semapsub{E}{d}{|defintro x|}r & = & [ \Env ]  \hspace{8mm} \text{All environments} \\
+\rulename{eatom} &  \semapsub{E}{d}{|a|}r & = & [  r \equalsE a ] \\
+\rulename{earr} &  \semapsub{E}{d}{|arr (x_0, xdots, x_n)|}r
+   & = & [ \{ \rho \in \Env \vb \rho(r) = \tupE [ \rho(x_0), \mydots, \rho(x_n) ] \} ] \\
+\rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
+\rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}r
+ & = & \semapsub{E}{d}{e_1}r \append \semapsub{E}{d}{e_2}r  \\
+\rulename{eseq} &  \semapsub{E}{d}{|e_1 ; e_2|}r
+& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1}s,
+          \EV_2 \in \semapsub{E}{d}{e_2}r ] \hspace{8mm} \text{|s| fresh} \\
+\rulename{elam} &  \semapsub{E}{d}{|dpslam x e_1 e2 y|}r & = & ??? \\
+\rulename{eapp} & \semapsub{E}{d}{|apply1N f x|}r
+ & = & [ \{ \rho \in \Env \vb \rho(f)=Fun(hs), (\fpr{\rho(x)}{\rho(r)}) \in hs[i] \} \vb i \in 0\mydots ] \\
+\multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
+  \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }r
+& = & [ \hideE(Y, \EV_1 \cap \EV_2)
+      \vb \EV_2 |<-| \semapsub{E}{d}{|e_2|}r] \; \dodgyunion \\
+&&&  [ \EV_3 \setminus (\hideE(Y, \EV_1)
+       \vb \EV_3 |<-| \semapsub{E}{d}{|e_3|}r] \\
+&&& |where| \begin{array}[t]{ll}
+  Y = \semap{I}{|e_1|} \\
+  \EV_1 = \firstE(Y, \semapsub{E}{d}{|e_3|}x)  & \text{$x$ fresh}
+  \end{array} \\
+\rulename{eall} & \semapsub{E}{d}{|all e|}r
+& = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{V}{e}), \rho \in \EV, \rho(r)=\tupE(vs) \}\, ]
+\\[2mm]
+
+& \semap{V}{|e|} & : & \seq{ \powerset{\Val, \ENV} } \\
+& \semap{V}{|e|} & = &
+  [ \extractE(r,\EV) \vb \EV \in \semapp{B}{e}r ] \hspace{8mm} \text{|r| fresh}
+\\[1mm]
+
+& \semapp{B}{|e|}r & : & \seq{ \ENV } \\
+& \semapp{B}{|e|}r & = & [ \hideE(\semapp{I}{|e|}, \EV) \vb \EV \in \semapsub{E}{d}{e}r ]
+\\[1mm]
+& \semap{I}{|e|} & : & [\Ident] \\
+& \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
+\end{array}
+\\
+\begin{array}{rcll}
+\semap{O}{|o|} & : & \Val \\
+\semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,]
+\end{array} \\
+
+\end{array}
+$$
+\caption{DPS-style denotational semantics} \label{fig:dps-verse-densem}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+ (\equalsE) & : & \Ident \rightarrow \mathit{Atom} \rightarrow \ENV \\
+  x \equalsE k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\
+  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\
+  x \equalsE o & = & \{ \rho \in \Env \vb \rho(x) = \semap{O}{o} \} \\[1mm]
+%  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
+%  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
+
+ \hideE & : & \seq{\Ident} \rightarrow \ENV \rightarrow \ENV \\
+ \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
+
+ \extractE & : & (\Ident, \ENV) \rightarrow \powerset{\Val, \ENV} \\
+ \extractE(y, \EV) & = & \{ (v, \hideE(y, \EV'))
+                          \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(y)=v \} \} \\[1mm]
+ \combineE & : & \seq{ \powerset{\Val, \ENV} } \rightarrow \powerset{\seq{\Val}, \ENV} \\
+ \multicolumn{3}{c}{\text{Not quite right yet}} \\
+ \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
+     \{  & (\langle v_0, \mydots, v_n \rangle, \EV_1 \intersectE \mydots \intersectE \EV_n) \\
+     \vb & (v_0,\EV_0) \in s_0, \mydots, (v_n,\EV_n) \in s_n \}
+ \end{array} \\
+
+ \firstE & : & \powerset{\Ident} \rightarrow \seq{\ENV} \rightarrow \ENV \\
+ ToDo
+\end{array}
+$$
+\caption{Auxiliary functions for DPS-style denotational semantics}
+\end{figure}
+
+
+\begin{figure}
+$$
+\begin{array}{c}
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+  \semapsub{E}{d}{e}r & : & \seq{ \ENV } \\
+  \semapsub{E}{e}{e}  & : & \Env \rightarrow \seq{ \powerset{\Val} } \\
+\\
+\semapsub{E}{e}{e} \rho
+  & = & [ \, \{ v \vb (v,\EV')\in \extractE(r,\EV), \rho \in \EV' \}
+          \vb \EV \leftarrow \semapsub{E}{d}{e}r \, ]
+\\ \\
+\semapsub{E}{d}{e}r
+  & = & [ \, \{ \rho \in \Env \vb \rho(r) \in (\semapsub{E}{e}{e}\rho)[i] \} \vb i \leftarrow 0\mydots \, ]
+
+\end{array}
+\end{array}
+$$
+\caption{Equivalences} \label{fig:dps-verse-densem}
+\end{figure}
+
+
+
+Questions:
+* Why do we need ``scope'' and ``nop''?
+
+
+
+% ------------------------ Translating to DPS Verse -------------------
+
+
+\begin{comment}   %          OMITTED FOR NOW
+
+\begin{figure}
+$$
 % ------------- Syntax of DPS Verse ---------------
 \begin{array}{l}
 \textbf{Syntax of DPS Verse} \\
@@ -54,7 +186,7 @@ $$
 \begin{figure}
 $$
 % ------------- Denotationals semantics of DPS Verse ---------------
-\begin{array}{l}
+\begin{array}{c}
 \textbf{Domains} \\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   & \Val & = & \Z + \Fun \\\
@@ -102,7 +234,7 @@ $$
 \rulename{econst} &  \semapp{E}{|x=k|} & = & [  x \equalsE k ] \\
 \rulename{eeq} &  \semapp{E}{|x=y|} & = & [  x \equalsE y ] \\
 \rulename{eop2} &  \semapp{E}{|r = apply1N o_2 (x,y)|}
-   & = & [ \{ \rho \in \Env \vb \rho(x) \in \Z, \rho(y) \in \Z, r = o_2( \rho(x), \rho(y)) \} ] \\
+   & = & [ \{ \rho \in \Env \vb r = \semapp{O}{o_2}( \rho(x), \rho(y)) \} ] \\
 \rulename{earr} &  \semapp{E}{|x = arr (x_0, xdots, x_n)|$$}
  & = & [ \{ \rho \in \Env \vb \rho(x) = \tupE[ \rho(x_0), \mydots, \rho(x_n) ] \}]  \\
 \rulename{echoice} &  \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
@@ -128,13 +260,17 @@ $$
 \\[1mm]
 & \semap{I}{|op|} & : & [\Ident] \\
 & \semap{I}{|op|} & = & \text{the outer $\exists$-bound variables in |op|} \\[1mm]
-
+\end{array} \\
+\\
+\begin{array}{rcll}
+\semap{O}{|o_2|} & : & \parfun{\Val \times \Val}{\Val} \\
+\semap{O}{|<=|}(x,y) & = & \{ \fpr{(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}
 \end{array} \\
 
 \end{array}
 $$
 \caption{Denotational semantics of DPS Verse} \label{fig:dps-verse-densem}
 \end{figure}
+\end{comment}
 
-Questions:
-* Why do we need ``scope'' and ``nop''?
+% ------------------- END OF OMITTED PART --------------------

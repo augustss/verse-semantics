@@ -12,6 +12,401 @@
 
 % \subsection{Denotational semantics of Mini Verse}
 
+
+% ------------- Denotional semantics of Mini Verse with choice -------------------
+
+\subsection{Denotional semantics of Mini Verse with choice}
+
+\newcommand{\EE}[2]{\semappsub{E}{e}{#1}{#2}}
+\newcommand{\CC}[2]{\semapp{C}{#1}{#2}}
+\newcommand{\applyo}{\textbf{applyo}}
+\newcommand{\applyf}{\textbf{applyf}}
+\newcommand{\applys}{\textbf{applys}}
+\newcommand{\squash}{\textbf{squash}}
+\newcommand{\trim}{\textbf{squashTail}}
+\newcommand{\mkall}{\textbf{all}}
+\newcommand{\mkarr}{\textbf{arr}}
+\newcommand{\combine}{\textbf{comb}}
+\newcommand{\trunc}{\textbf{trunc}}
+\newcommand{\once}{\textbf{once}}
+\newcommand{\sequence}{\textbf{seq}}
+\newcommand{\maplist}{\textbf{map}}
+\newcommand{\mapset}{\textbf{map}_{\{\}}}
+\newcommand{\cross}{\textbf{cross}}
+\newcommand{\dist}{\textbf{dist}}
+\newcommand{\group}{\textbf{group}}
+\newcommand{\myenv}[1]{E\{ #1 \}}
+\newcommand{\mybind}[2]{#1 \mapsto #2}
+\newcommand{\succeeds}{\textbf{succeeds}}
+\newcommand{\seqcompat}{\textbf{compat}}
+\newcommand{\setcompat}{\textbf{comp}}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
+  v \in & \Value & = & \Z + \Fun \\\
+  s \in & \VAL & = & \powerset{\Value} \\
+  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value for \emph{in-scope} identifiers} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \\
+  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+  & \text{Partial functions} \\
+\end{array} \\
+\\[-2mm]
+
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
+  \semappsub{A}{e}{|a|} & : & \Env \rightarrow \Val \\
+  \semappsub{A}{e}{|x|}\rho & = & \rho(x) \\
+  \semappsub{A}{e}{|k|}\rho & = & k \\
+  \semappsub{A}{e}{|o|}\rho & = & \semap{O}{o} \\[1mm]
+  \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \quad\quad \text{\textbf{invariant}: no trailing \{\}}\\
+  \EE{|a|}{\rho} & = & [\msing{\semappsub{A}{e}{a}\rho}] \\
+  \EE{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
+  \EE{|arr (a_0, xdots, a_n)|}{\rho} & = &
+    [\,\{ \tupE [ \semappsub{A}{e}{a_0}\rho, \mydots, \semappsub{A}{e}{a_n}\rho ] \} \,] \\
+
+  \EE{|apply1N a_1 a_2|}{\rho}      & = &   \apply( \semappsub{A}{e}{a_1}\rho,  \semappsub{A}{e}{a_2}\rho)       \\
+  \EE{|fail|}{\rho} & = & [] \\
+  \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
+  \EE{|e_1 = e_2|}{\rho}      & = &
+      \trim([ s_1 \cap s_2\, ||\,
+           |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ]) \\
+
+  \EE{|e_1 ; e_2|}{\rho}      & = &
+    [ s_2 \vb
+      |s_1 <-| \EE{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \EE{|e_2|}{\rho} ] \\
+
+  \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\EE{e}{\rho})) \, ] \\[1mm]
+
+  \EE{|vif e_1 e_2 e_3|}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{D}{|e_3|}{\rho} & \text{if}\; \EV = \mempty \\
+    \hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \EV \} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
+  \\[1mm]
+
+\multicolumn{3}{@@{}l}{\EE{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho}} \\
+\multicolumn{3}{l}{
+  = \left\{
+  \begin{array}{ll} \multicolumn{2}{l}{ \trim([
+    \{ f \hspace{-0.5em}
+    \begin{array}[t]{l@@{\;}l}
+    || & f \inb \Value, \forall v \inb \Value . \\
+    & \apply(f,v) = \EE{|x :== e_1; y :== one (apply1N h x); e_2|}{(\extendrho{\rho}{i \fmapsto v})} \} ]) \\
+    \end{array}
+    }\\
+    & \text{if}\; \CC{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} \\
+    {}[] & \text{otherwise} \\
+  \end{array}
+  \right. } \\
+
+
+\semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
+\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
+\semap{R}{|e|}{} & : & \Env \rightarrow \ENV \\
+\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \EE{|e|}{\rho'} \neq [] \} \\[2mm]
+\semap{X}{e} & : & \Env \rightarrow \ENV \\
+\semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
+                                  \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & |where [x_1,xdots,x_n]| = \semap{I}{|e|} \\[1mm]
+
+\semap{I}{|e|} & : & [\mathit{Ident}] \quad = \text{the outer $\exists$-bound variables in |e|} \\[1mm]
+\end{array}
+\\
+% ---------------------------
+\semap{C}{|e|} :  Bool \\
+\semapp{C}{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho} \\
+= \begin{array}[t]{l}
+\forall v \inb \Value .\, \exists w \inb \Value .\, \forall \rho' \inb \semapp{X}{e_1}{(\extendrho{\rho}{i \fmapsto v})} . \\
+|case|\; \squash(\EE{e_1}{\rho'}) \\
+\quad [] : (q = |open|) \vee (\apply(\rho(h), v) = []) \\
+\quad [ \{ v_x \} ] : \begin{array}[t]{@@{}l}
+  |case|\; \apply(\rho(h),v_x) \\
+  \quad \begin{array}[t]{l@@{\,}c@@{\,}l}
+    [] & : &|eff fx| = |eff decides| \\
+       &   & \wedge \forall v_y \in \Value.\,
+                     \semapp{D}{e_2}{\extendrho{\rho'}{y \mapsto v_y, mustSucceed=1}} = [] \\
+    {[\{\}]^{k}} \append [\{v_y\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto v_y})}) \; = \; [\{\}]^k \append [\{w\}] \\
+    \textbf{otherwise} & : & False
+    \end{array}
+    \end{array} \\
+ \quad \textbf{otherwise} : False
+\end{array}
+\end{array}
+$$
+\caption{Denotational semantics of Mini Verse: expression style}
+\end{figure}
+
+
+\begin{figure}
+$$
+\begin{array}{lcll}
+%  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
+%  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
+  \apply & : & (\Value \times \Value) \rightarrow [\VAL] \\
+  \apply(Fun(hs),v) & = & \trim([ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ]) & \text{All elts will be singleton or empty} \\
+  \apply(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
+
+  \tupE & : & [\Val] \rightarrow \Val \\
+  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i |<-| 0 \mydots n ] \\
+  \tupsE & : & [\VAL] \rightarrow \VAL \\
+  \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \inb s_n \} \\[1mm]
+
+  \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \squash(xs) & = & [ x \, || \, x |<-| xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
+
+  \trim & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
+  \trim(xs) & = & xs \text{ with trailing \{\} removed} \\
+
+%%\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
+%%\semopen{|open|}{(G)} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
+%%\semopen{|closed|}{(G)} & = & G \\[1mm]
+
+% \succeeds & : & \myset{[\myset{\Value}]} \rightarrow Bool \\
+% \succeeds(s) & = & \multicolumn{2}{l}{\text{if all sequences in $s$ have a non-empty element}} \\[1mm]
+
+\bigcap[] & = & \mempty \\
+\bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
+
+\end{array}
+$$
+\caption{Auxiliary functions for expression-style denotational semantics}
+\end{figure}
+
+\newcommand{\newfcn}{\Value \hookrightarrow \Value}
+\newcommand{\mknewfcn}[1]{[ #1 ]}
+\newcommand{\perm}[1]{\textbf{perm}(#1)}
+
+
+The semantic function $\semap{F}{}$ gives meaning to a function applied to a single value, \ie,
+$\semappp{F}{f}{\rho}{v}$ is the meaning of $f$ applied to $v$, when $f$ is a $\lambda$-expression.
+Informally, if $f$ is |lamOC q x e_1 e_2| then the meaning of this is determined by first evalusing |e_1|,
+if this succeeds the input is in the domain, and we proceed to evaluate |e_2|.
+In more detail, $ws$ is defined by:
+\begin{itemize}
+\item $\rho' \inb \semapp{X}{|e_1|}{(\rho[x \fmapsto v])}$ \\
+  $x$ is the input to the function, we extend the environment with $x$ mapped to the value $v$.
+  Then $\semap{X}{e_1}$ will produce all possible environments binding the variables defined in $e_1$.
+\item $|let ss| = \EE{|e_1|}{\rho'}$ \\
+  For each of these $\rho'$ we evaluate $e_1$, yielding a sequence.
+\item $\squash(|ss|) \neq []$ \\
+  If there are no values (\ie, non-empty sets) in the sequence, then $e_1$ failed, and we discard this.
+\item $|let w| = \once(\semapp{D}{e_2}{\rho'})$ \\
+  If $e_1$ did not fail, get the denotation of $e_2$ in the same environment.
+  The {\once} function gets the set out of a singleton sequence, if it is not a singleton then
+  $e_2$ failed or is multi-valued (which we do not allow) and so we get the empty set.
+\item $[ |if s=|\mempty\,| then|\,\mempty\,| else|\, w\,||\, s \inb ss ]$ \\
+  For each non-empty element of the sequence produced by $e_1$ we use the meaning of $e_2$.
+\item $\hat{\bigcup}\{\mydots\}$ \\
+  The set of sequences from all the different $\rho'$ are combined using $\hat{\bigcup}$;
+  this may introduce raggedness.
+\end{itemize}
+The $ws$ is a sequence of the possible values that the function application can produce.
+Since we want the function to behave like a mathematical function, it should only have a single denotation.
+The $r$ is the intersection of all the sets in the sequence, this is what all the evaluations of $e_2$ have
+in common, so this is what to return.  Finally, per Tim's wish, {\trunc}, will truncate the sequence after
+the first non-empty set, replacing it with $r$.
+
+Note that if the domain fails for the given value, $v$, then $semap{F}{}$ will return the empty sequence, $[]$.
+Whereas, if the range fails $semap{F}{}$ will return a sequence of empty sets.
+The range can fail for several reasons:
+\begin{enumerate}
+\item the range actually fails
+\item there are multiple elements in the sequence whose intersection is empty
+\item for a higher order function, the argument failed
+\item for a higher order argument, the closedness test failed (added my the \textbf{K} desugaring)
+\end{enumerate}
+
+Below I will use |a `uchoice` b| for unordered choice.  It can easily be defined by |block{x:int; if(x=0){a}else{b}}|.
+
+Example 1, |functionOC c 0 5|, desugared |lamOC c x (x = 0) 5|, $\semappp{F}{|lamOC c x (x = 0) 5|}{\myenv{}}{v}$:
+
+\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
+  \hline
+  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
+  \hline
+  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\}]$ \} & $[\{0\}]$ & \{5\} & \{[\{5\}]\} & [\{5\}] & \{5\} & [\{5\}] \\
+  \hline
+  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
+  \hline
+\end{tabular} \\[4mm]
+
+Example 2, |functionOC c (0 `choice` 1) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1)) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1)) 5|}{\myenv{}}{v}$:
+
+\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
+  \hline
+  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
+  \hline
+  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\},\{\}]$ \} & $[\{0\}]$ & \{5\} & \{[\{5\},\{\}]\} & [\{5\},\{\}] & \{5\} & [\{5\}] \\
+  \hline
+  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{\}.\{1\}]$ \} & $[\{1\}]$ & \{5\} & \{[\{\},\{5\}]\} & [\{\},\{5\}] & \{5\} & [\{\},\{5\}] \\
+  \hline
+  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\},\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
+  \hline
+\end{tabular} \\[4mm]
+
+Example 3, |functionOC c (0 `choice` 1 `choice` 0) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|}{\myenv{}}{v}$:
+
+\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
+  \hline
+  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
+  \hline
+  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\},\{\},\{0\}]$ \} & $[\{0\},\{0\}]$ & \{5\} & \{[\{5\},\{\},\{5\}]\} & [\{5\},\{\},\{5\}] & \{5\} & [\{5\}] \\
+  \hline
+  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{\}.\{1\},\{\}]$ \} & $[\{1\}]$ & \{5\} & \{[\{\},\{5\},\{\}]\} & [\{\},\{5\},\{\}] & \{5\} & [\{\},\{5\}] \\
+  \hline
+  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\},\{\},\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
+  \hline
+\end{tabular} \\[4mm]
+
+Example 4, |functionOC c (0 `uchoice` 1) (5 `uchoice` 6)|, desugared |lamOC c x ((x = 0) `uchoice` (x = 1) (5 `uchoice` 6)|, $\semappp{F}{|lamOC c x ((x = 0) `uchoice` (x = 1)) (5 `uchoice` 6)|}{\myenv{}}{v}$:
+
+\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
+  \hline
+  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
+  \hline
+  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\}]$ \} & $[\{0\}]$ & \{5,6\} & \{[\{5,6\}]\} & [\{5,6\}] & \{5,6\} & [\{5,6\}] \\
+  \hline
+  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{1\}]$ \} & $[\{1\}]$ & \{5,6\} & \{[\{5,6\}]\} & [\{5,6\}] & \{5,6\} & [\{5,6\}] \\
+  \hline
+  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
+  \hline
+\end{tabular} \\[4mm]
+
+To obtain the denotation of a function the $\semap{E}{}$ function will select all functions
+that are compatible with the function definition.
+\begin{itemize}
+\item $\{ f \,||\, f \inb [\semfcn]$ \\
+  For all functions (\ie, list of mathematical functions),
+\item $\forall v \inb \Value .$ \\
+  for all values $v$ (\ie, possible function arguments)
+\item $\seqcompat(\apply(f,v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v})$ \\
+  the result of applying the function, $f$, to the argument $v$ is compatible
+  with the applying the function definition to the argument.
+\item $\semopen{q}{(fs)}$ \\
+  Finally, if the is an open function get the set of all functions with a larger domain.
+\end{itemize}
+
+The result of $\apply(f,v)$ will be a sequence of sets.
+Each set is either empty or a singleton set, because the sets come from applying
+mathematical functions to a single value.
+On the other hand, the result of $\semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}$ is a sequence
+of sets where the sets can contain multiple values.  This is because the function definition may
+denote many functions.
+These two are compatible (checked by \seqcompat) if the sequences have the same length and the
+individual sets are compatible (checked by \setcompat).
+A set from $\apply(f,v)$ is compatible with a set from $\semap{F}{\mydots}$ if they are
+both empty or, for non-empty sets, if the first is a subset of the second.
+
+\lennart{I need to think more about decides functions.  This doesn't smell quite right.}
+
+%  To obtain the denotation of a function the $\semap{E}{}$ function will iterate through all possible
+%  value and use $\semap{F}{}$ to find out how the function behaves for each of them.  It will then use this
+%  to stitch together (the singleton sequence of) the set of functions that is the denotation.  In more detail:
+%  \begin{itemize}
+%  \item $v \inb \Value$ \\
+%    For all values $v$,
+%  \item $|let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v$ \\
+%    find the function result (a sequence of sets) for that $v$,
+%  \item $r \neq []$ \\
+%    and only keep the ones where the function succeeds.
+%  \item $[ \dist(v, s) \,||\, s \inb r ]$ \\
+%    Pair up the argument with each possible result.
+%    The pairs are formed by $\mapsto$ to indicate that they will form a function.
+%  \item $\combine(|fs|)$ \\
+%    Form the actual closed functions from all the pieces.
+%    \combine is described in more detail below.
+%  \item $\semopen{q}{(\mydots)}$ \\
+%    If the function is open, select all functions that are compatible
+%    with result of \combine.
+%  \item \succeeds \\
+%    Check that all sequences in |fs| contain a non-empty set.  If not, it means that the range failed when the domain succeeded.
+%    Omit this check for a \textbf{decides} function.
+%  \end{itemize}
+%  
+%  Continuing with the examples.
+%  
+%  Example 1, |functionOC c 0 5|
+%  
+%  \begin{tabular}{||c||c||c||c||c||}
+%    \hline
+%    $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
+%    \hline
+%    $0$ & $[\{5\}]$ & $[\{5\}]$ & $[\{0 \mapsto 5\}]$ & \multirow{2}{*}{$\{[\{0 \mapsto 5\}]\}$}\\
+%    \cline{1-4}
+%    $1$ & $[]$ & & & \\
+%    \hline
+%  \end{tabular}\\
+%  \begin{tabular}{||c||c||c||c||}
+%    \hline
+%    |fs| & \group & \maplist(\cross) & \sequence \\
+%    \hline
+%    $\{[\{0 \mapsto 5\}]\}$ & $[\{0 \mapsto 5\}]$ & $[\{0 \mapsto 5\}]$ & $\{[0 \mapsto 5]\}$ \\
+%    \hline
+%  \end{tabular}\\[5mm]
+%  
+%  Example 2, |functionOC c (0 `choice` 1) 5|
+%  \lennart{WRONG}
+%  \begin{tabular}{||c||c||c||c||c||}
+%    \hline
+%    $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
+%    \hline
+%    $0$ & $[\{5\}]$ & $[\{5\}]$ & $[\{0 \mapsto 5\}]$ & \multirow{3}{*}{$\{[\{0 \mapsto 5\}],[\{\},\{1 \mapsto 5\}]\}$}\\
+%    \cline{1-4}
+%    $1$ & $[\{\},\{5\}]$ & $[\{\},\{5\}]$ & $[\{\},\{1 \mapsto 5\}]$ & \\
+%    \cline{1-4}
+%    $2$ & $[]$ & & & \\
+%    \hline
+%  \end{tabular}\\
+%  \begin{tabular}{||c||c||c||c||}
+%    \hline
+%    |fs| & \group & \maplist(\cross) & \sequence \\
+%    \hline
+%    $\{[\{0 \mapsto 5\}],[\{\},\{1 \mapsto 5\}]\}$ &
+%      $[\{0 \mapsto 5\}, \{1 \mapsto 5\}]$ &
+%      $[\{0 \mapsto 5\}, \{1 \mapsto 5\}]$ &
+%      TBD \\
+%    \hline
+%  \end{tabular}\\[5mm]
+%  
+%  Example 3, same as example 2
+%  
+%  Example 4, |functionOC c (0 `uchoice` 1) (5 `uchoice` 6)|
+%  \lennart{WRONG}
+%  
+%  \begin{tabular}{||c||c||c||c||c||}
+%    \hline
+%    $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
+%    \hline
+%    $0$ & $[\{5,6\}]$ & $[\{5,6\}]$ & $[\{0 \mapsto 5, 0 \mapsto 6\}]$ & \multirow{3}{*}{
+%      \makecell{$\{[\{0 \mapsto 5, 0 \mapsto 6,$ \\
+%                $1 \mapsto 5, 1 \mapsto 6\}]\}$}
+%    }\\
+%    \cline{1-4}
+%    $1$ & $[\{5,6\}]$ & $[\{5,6\}]$ & $[\{1 \mapsto 5, 0 \mapsto 6\}]$ & \\
+%    \cline{1-4}
+%    $2$ & $[]$ & & & \\
+%    \hline
+%  \end{tabular}\\
+%  \begin{tabular}{||c||c||c||c||}
+%    \hline
+%    |fs| & \group & \maplist(\cross) & \sequence \\
+%    \hline
+%      \makecell{$\{[\{0 \mapsto 5, 0 \mapsto 6,$ \\
+%                $1 \mapsto 5, 1 \mapsto 6\}]\}$} &
+%      \makecell{$[\{0 \mapsto 5, 0 \mapsto 6,$ \\
+%          $1 \mapsto 5, 1 \mapsto 6\}]$} &
+%      TBD & TBD \\
+%    \hline
+%  \end{tabular}\\[5mm]
+%  
+%  
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% \begin{figure}                                                                                                                                          %%
 %% $$                                                                                                                                                      %%
@@ -99,225 +494,6 @@
 %% \caption{Plan C: Idealised denotational semantics of Mini Verse (without choice)}                                                                       %%
 %% \end{figure}                                                                                                                                            %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% ------------- Denotional semantics of Mini Verse with choice -------------------
-
-\subsection{Denotional semantics of Mini Verse with choice}
-
-\newcommand{\applyo}{\textbf{applyo}}
-\newcommand{\applyf}{\textbf{applyf}}
-\newcommand{\applys}{\textbf{applys}}
-\newcommand{\squash}{\textbf{squash}}
-\newcommand{\Ws}{\textit{Ws}}
-\newcommand{\mkall}{\textbf{all}}
-\newcommand{\mkarr}{\textbf{arr}}
-\newcommand{\combine}{\textbf{comb}}
-\newcommand{\trunc}{\textbf{trunc}}
-\newcommand{\once}{\textbf{once}}
-\newcommand{\sequence}{\textbf{seq}}
-\newcommand{\maplist}{\textbf{map}}
-%% \newcommand{\maplist}{\textbf{map}_{[]}}
-\newcommand{\mapset}{\textbf{map}_{\{\}}}
-\newcommand{\cross}{\textbf{cross}}
-\newcommand{\dist}{\textbf{dist}}
-\newcommand{\group}{\textbf{group}}
-\newcommand{\myset}[1]{\text{Set}(#1)}
-%\newcommand{\fold}{\textbf{fold}}
-%\newcommand{\filter}{\textbf{filter}}
-\newcommand{\myenv}[1]{E\{ #1 \}}
-\newcommand{\mybind}[2]{#1 \mapsto #2}
-\newcommand{\succeeds}{\textbf{succeeds}}
-\newcommand{\seqcompat}{\textbf{compat}}
-\newcommand{\setcompat}{\textbf{comp}}
-
-\begin{figure}
-$$
-\begin{array}{l}
-
-\textbf{Domains (sets)} \\
-\begin{array}{rcll}
-\Value & = & \mathbb{Z} + [\semfcn] \\
-\Env & = & |Ident| \rightarrow \Value \\
-\Ws & = & \powerset{W} \\
-W^{*} & = & [\Ws] \\
-Env^{*} & = & \myset{Env} \\
-\end{array}
-\\ \\
-\begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
-  \semap{E}{|e|} & : & \Env \rightarrow \mtype \\
-  \semapp{E}{|x|}{\rho} & = & [\msing{\rho(x)}] \\
-  \semapp{E}{|k|}{\rho} & = & [\msing{k}] \\
-  \semapp{E}{|o|}{\rho} & = & [\msing{\semapp{O}{|o|}{}}] \\
-  \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
-  \semapp{E}{|fail|}{\rho} & = & [] \\
-  \semapp{E}{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
-  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
-         [ r \, || \,
-           |fs <-| \semapp{E}{|e_1|}{\rho}, \;
-            as|<-| \semapp{E}{|e_2|}{\rho}, \;
-           |r| \inb \applys(fs, as) \}
-         ]
-           \\
-
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = &
-      [ s_1 \cap s_2\, ||\, 
-           |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
-
-  \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
-    [ \{ x_2 \, || \, x_1 \inb s_1, \; x_2 \inb s_2 \}\, ||\,
-      |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
-
-  \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
-    [ \{ \mkarr(x_0,\mydots,x_n) \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
-      & & ||\, s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \\
-
-  \semapp{E}{|all e|}{\rho} & = & [ \mkall(\semapp{E}{e}{\rho}) ] \\[1mm]
-
-  \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
-  \left\{
-  \begin{array}{ll}
-    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
-    \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \bar{\rho} \} & \text{otherwise} \\
-  \end{array}
-  \right. \\
-  & &  |where|\; \bar{\rho} = \semapp{R}{e_1}{\rho}
-  \\[1mm]
-
-%  \textit{succeeds function:} \\
-%    \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = &
-%    \left\{
-%    \begin{array}{ll}
-%      [\semopen{q}(\combine(|fs|))] & \text{if } \succeeds(|fs|) \\
-%      \mbox{}[\mempty] & \text{otherwise}\\
-%    \end{array}
-%    \right. \\
-%    & & |where|
-%      \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-%        |fs| & = &
-%        \{ [ \dist(v, s) \,||\, s \inb r ] \\
-%        & & ||\, v \inb \Value, |let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v, r \neq [] \} \\
-%      \end{array}
-    \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & [ \semopen{q}{(fs)} ] \\
-    & & |where|
-      \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-        |fs| & = & \{ f \,||\, f \inb [\semfcn], \\
-        & & \forall v \inb \Value .\\
-        & & \seqcompat(\applyo(f,v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}) \}
-      \end{array}
-    
-  \\
-  \\
-\semap{F}{e} & : & \Env \rightarrow \Value \rightarrow [\myset{\Value}] \\
-\semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
-& & |where|
-    \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-      |ws| & = & \hat{\bigcup} \{ & [ |if s=|\mempty\,| then|\,\mempty\,| else|\, |w|\,||\, s \inb ss ] \\
-      & & & ||\, \rho' \inb \semapp{X}{|e_1|}{(\rho[x \fmapsto v])}, \\
-      & & & |let ss| = \semapp{E}{|e_1|}{\rho'},\, \squash(|ss|) \neq [], \\
-      & & & |let w| = \once(\semapp{D}{e_2}{\rho'}) \, \} \\
-      |r| & = & \multicolumn{2}{l} { \bigcap [ w \, || \, w \inb ws, ws \neq \mempty ] }
-    \end{array} \\
-
-
-%\end{array}
-\\ 
-%\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
-\semap{D}{|e|} & : & \Env \rightarrow \mtype \\
-%\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
-\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \semapp{E}{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
-\semap{R}{|e|}{} & : & \Env \rightarrow \myset{\Env} \\
-\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho'}) \neq [] \} \\[2mm]
-%% \semap{C}{|e|} & : & \Env -> \rightarrow [Env^{*}] \\
-%% \semapp{C}{|e|}{\rho} & = & xxx \\
-\semap{X}{e} & : & \Env \rightarrow \myset{\Env} \\
-\semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
-                                  \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
-  & & |where [x_1,xdots,x_n]| = \semap{I}{|e|} \\[1mm]
-
-\semap{I}{|e|} & : & [\mathit{Ident}] \\
-\semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
-\end{array}
-\\
-
-\end{array}
-$$
-\caption{Denotational semantics of Mini Verse with choice}
-\end{figure}
-
-
-\begin{figure}
-$$
-\begin{array}{l}
-
-\textbf{Auxiliary functions}\\
-\begin{array}{l@@{\;}c@@{\;}ll}
-\apply & : & (\Value \times \Value) \rightarrow \mtype \\
-\apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
-\apply( f, w ) & = & \mempty & \text{otherwise} \\[1mm]
-
-  \applys & : & (\Ws, \Ws) \rightarrow [\Ws] \\
-  \applys(|fss|, as) & = & \hat{\bigcup} \{ \applyf(|fs|, as) \, || \, |fs| \inb |fss| \} \\
-  \applyf & : & ([\semfcn], \Ws) \rightarrow [\Ws] \\
-  \applyf(|fs|, as) & = & \bar{\bigcup} \{ \applyo(|fs|, a) \, || \, a \inb as \} \\
-  \applyo & : & ([\semfcn], \Value) \rightarrow [\Ws] \\
-  \applyo(|fs|,a) & = & [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \\[2mm]
-  \squash & : & \mtype \rightarrow \mtype \\
-  \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
-  \mkall([s_1,\mydots,s_n]) & = & \{ \mkarr(x_1,\mydots,x_n) \, || \, x_1 \inb s_1, \, \mydots \, x_n \inb s_n \} \\
-  \mkarr(x_0,\mydots,x_n) & = & [ \{0 \mapsto x_0\}, \mydots, \{n \mapsto x_n\} ]
-                              & \text{make an array-function} \\
-  \once([x]) & = & x \\
-  \once(\_) & = & \mempty & \text{or WRONG} \\
-  \trunc(x,[\mempty, \mydots, s, \mydots]) & = & [\mempty, \mydots, x] & s \neq \mempty, \text{replace first non-empty} \\
-\\
-
-\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
-\semopen{|open|}{(G)} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
-\semopen{|closed|}{(G)} & = & G \\[1mm]
-
-% \succeeds & : & \myset{[\myset{\Value}]} \rightarrow Bool \\
-% \succeeds(s) & = & \multicolumn{2}{l}{\text{if all sequences in $s$ have a non-empty element}} \\[1mm]
-
-\bigcap[] & = & \mempty \\
-\bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
-
-\seqcompat & : & (\mtype \times \mtype) \rightarrow |Bool| \\
-\seqcompat([s_1,\mydots,s_n], [t_1,\mydots,t_m]) & = & n = m \land \setcompat(s_1,t_1) \land \mydots \land \setcompat(s_n,t_n) \\
-\setcompat & : & (\myset{\Value} \times \myset{\Value}) \rightarrow Bool \\
-\setcompat(\{\},\{\}) & = & |true| \\
-\setcompat(\{\},\{\mydots\}) & = & |false| \\
-\setcompat(\{\mydots\},\{\}) & = & |false| \\
-\setcompat(s, t) & = & s \subseteq t \\[1mm]
-
-\end{array} \\ \\
-
-\textbf{Notation}\\
-\begin{array}{lcll}
-  |[e_1,xdots,e_n]| & : & \mtype & \text{sequence of items} \\[2mm]
-
-  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \mtype & \text{sequence comprehension (order preserving)}, \\[2mm]
-
-  |++| & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{sequence concatenation} \\
-  |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
-
-  \hat{\cup} & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{elementwise union of sequences,} \\
-  |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]| & \text{right-padding shorter sequence with \mempty} \\[2mm]
-
-  \hat{\bigcup} & : & \powerset{\mtype} \rightarrow \mtype \\
-  \hat{\bigcup} & = & \cdots & \hat{\cup} \text{ extended to sets} \\[2mm]
-
-%  |re| & : & \mtype \rightarrow \mtype & \text{remove all empty sets} \\
-%  |re(s)| & = & ... \\
-\end{array}
-
-\end{array}
-$$
-\caption{Denotational semantics of Mini Verse with choice: notation}
-\end{figure}
-
-\newcommand{\newfcn}{\Value \hookrightarrow \Value}
-\newcommand{\mknewfcn}[1]{[ #1 ]}
-\newcommand{\perm}[1]{\textbf{perm}(#1)}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% \begin{figure}                                                                                                                %%
@@ -427,227 +603,3 @@ $$
 %% \caption{Plan C: Idealised denotational semantics of Mini Verse with choice, new functions}                                   %%
 %% \end{figure}                                                                                                                  %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-The semantic function $\semap{F}{}$ gives meaning to a function applied to a single value, \ie,
-$\semappp{F}{f}{\rho}{v}$ is the meaning of $f$ applied to $v$, when $f$ is a $\lambda$-expression.
-Informally, if $f$ is |lamOC q x e_1 e_2| then the meaning of this is determined by first evalusing |e_1|,
-if this succeeds the input is in the domain, and we proceed to evaluate |e_2|.
-In more detail, $ws$ is defined by:
-\begin{itemize}
-\item $\rho' \inb \semapp{X}{|e_1|}{(\rho[x \fmapsto v])}$ \\
-  $x$ is the input to the function, we extend the environment with $x$ mapped to the value $v$.
-  Then $\semap{X}{e_1}$ will produce all possible environments binding the variables defined in $e_1$.
-\item $|let ss| = \semapp{E}{|e_1|}{\rho'}$ \\
-  For each of these $\rho'$ we evaluate $e_1$, yielding a sequence.
-\item $\squash(|ss|) \neq []$ \\
-  If there are no values (\ie, non-empty sets) in the sequence, then $e_1$ failed, and we discard this.
-\item $|let w| = \once(\semapp{D}{e_2}{\rho'})$ \\
-  If $e_1$ did not fail, get the denotation of $e_2$ in the same environment.
-  The {\once} function gets the set out of a singleton sequence, if it is not a singleton then
-  $e_2$ failed or is multi-valued (which we do not allow) and so we get the empty set.
-\item $[ |if s=|\mempty\,| then|\,\mempty\,| else|\, w\,||\, s \inb ss ]$ \\
-  For each non-empty element of the sequence produced by $e_1$ we use the meaning of $e_2$.
-\item $\hat{\bigcup}\{\mydots\}$ \\
-  The set of sequences from all the different $\rho'$ are combined using $\hat{\bigcup}$;
-  this may introduce raggedness.
-\end{itemize}
-The $ws$ is a sequence of the possible values that the function application can produce.
-Since we want the function to behave like a mathematical function, it should only have a single denotation.
-The $r$ is the intersection of all the sets in the sequence, this is what all the evaluations of $e_2$ have
-in common, so this is what to return.  Finally, per Tim's wish, {\trunc}, will truncate the sequence after
-the first non-empty set, replacing it with $r$.
-
-Note that if the domain fails for the given value, $v$, then $semap{F}{}$ will return the empty sequence, $[]$.
-Whereas, if the range fails $semap{F}{}$ will return a sequence of empty sets.
-The range can fail for several reasons:
-\begin{enumerate}
-\item the range actually fails
-\item there are multiple elements in the sequence whose intersection is empty
-\item for a higher order function, the argument failed
-\item for a higher order argument, the closedness test failed (added my the \textbf{K} desugaring)
-\end{enumerate}
-
-Below I will use |a `uchoice` b| for unordered choice.  It can easily be defined by |block{x:int; if(x=0){a}else{b}}|.
-
-Example 1, |functionOC c 0 5|, desugared |lamOC c x (x = 0) 5|, $\semappp{F}{|lamOC c x (x = 0) 5|}{\myenv{}}{v}$:
-
-\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
-  \hline
-  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
-  \hline
-  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\}]$ \} & $[\{0\}]$ & \{5\} & \{[\{5\}]\} & [\{5\}] & \{5\} & [\{5\}] \\
-  \hline
-  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
-  \hline
-\end{tabular} \\[4mm]
-
-Example 2, |functionOC c (0 `choice` 1) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1)) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1)) 5|}{\myenv{}}{v}$:
-
-\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
-  \hline
-  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
-  \hline
-  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\},\{\}]$ \} & $[\{0\}]$ & \{5\} & \{[\{5\},\{\}]\} & [\{5\},\{\}] & \{5\} & [\{5\}] \\
-  \hline
-  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{\}.\{1\}]$ \} & $[\{1\}]$ & \{5\} & \{[\{\},\{5\}]\} & [\{\},\{5\}] & \{5\} & [\{\},\{5\}] \\
-  \hline
-  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\},\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
-  \hline
-\end{tabular} \\[4mm]
-
-Example 3, |functionOC c (0 `choice` 1 `choice` 0) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|}{\myenv{}}{v}$:
-
-\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
-  \hline
-  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
-  \hline
-  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\},\{\},\{0\}]$ \} & $[\{0\},\{0\}]$ & \{5\} & \{[\{5\},\{\},\{5\}]\} & [\{5\},\{\},\{5\}] & \{5\} & [\{5\}] \\
-  \hline
-  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{\}.\{1\},\{\}]$ \} & $[\{1\}]$ & \{5\} & \{[\{\},\{5\},\{\}]\} & [\{\},\{5\},\{\}] & \{5\} & [\{\},\{5\}] \\
-  \hline
-  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\},\{\},\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
-  \hline
-\end{tabular} \\[4mm]
-
-Example 4, |functionOC c (0 `uchoice` 1) (5 `uchoice` 6)|, desugared |lamOC c x ((x = 0) `uchoice` (x = 1) (5 `uchoice` 6)|, $\semappp{F}{|lamOC c x ((x = 0) `uchoice` (x = 1)) (5 `uchoice` 6)|}{\myenv{}}{v}$:
-
-\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
-  \hline
-  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
-  \hline
-  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\}]$ \} & $[\{0\}]$ & \{5,6\} & \{[\{5,6\}]\} & [\{5,6\}] & \{5,6\} & [\{5,6\}] \\
-  \hline
-  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{1\}]$ \} & $[\{1\}]$ & \{5,6\} & \{[\{5,6\}]\} & [\{5,6\}] & \{5,6\} & [\{5,6\}] \\
-  \hline
-  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
-  \hline
-\end{tabular} \\[4mm]
-
-To obtain the denotation of a function the $\semap{E}{}$ function will select all functions
-that are compatible with the function definition.
-\begin{itemize}
-\item $\{ f \,||\, f \inb [\semfcn]$ \\
-  For all functions (\ie, list of mathematical functions),
-\item $\forall v \inb \Value .$ \\
-  for all values $v$ (\ie, possible function arguments)
-\item $\seqcompat(\applyo(f,v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v})$ \\
-  the result of applying the function, $f$, to the argument $v$ is compatible
-  with the applying the function definition to the argument.
-\item $\semopen{q}{(fs)}$ \\
-  Finally, if the is an open function get the set of all functions with a larger domain.
-\end{itemize}
-
-The result of $\applyo(f,v)$ will be a sequence of sets.
-Each set is either empty or a singleton set, because the sets come from applying
-mathematical functions to a single value.
-On the other hand, the result of $\semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}$ is a sequence
-of sets where the sets can contain multiple values.  This is because the function definition may
-denote many functions.
-These two are compatible (checked by \seqcompat) if the sequences have the same length and the
-individual sets are compatible (checked by \setcompat).
-A set from $\applyo(f,v)$ is compatible with a set from $\semap{F}{\mydots}$ if they are
-both empty or, for non-empty sets, if the first is a subset of the second.
-
-\lennart{I need to think more about decides functions.  This doesn't smell quite right.}
-
-%  To obtain the denotation of a function the $\semap{E}{}$ function will iterate through all possible
-%  value and use $\semap{F}{}$ to find out how the function behaves for each of them.  It will then use this
-%  to stitch together (the singleton sequence of) the set of functions that is the denotation.  In more detail:
-%  \begin{itemize}
-%  \item $v \inb \Value$ \\
-%    For all values $v$,
-%  \item $|let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v$ \\
-%    find the function result (a sequence of sets) for that $v$,
-%  \item $r \neq []$ \\
-%    and only keep the ones where the function succeeds.
-%  \item $[ \dist(v, s) \,||\, s \inb r ]$ \\
-%    Pair up the argument with each possible result.
-%    The pairs are formed by $\mapsto$ to indicate that they will form a function.
-%  \item $\combine(|fs|)$ \\
-%    Form the actual closed functions from all the pieces.
-%    \combine is described in more detail below.
-%  \item $\semopen{q}{(\mydots)}$ \\
-%    If the function is open, select all functions that are compatible
-%    with result of \combine.
-%  \item \succeeds \\
-%    Check that all sequences in |fs| contain a non-empty set.  If not, it means that the range failed when the domain succeeded.
-%    Omit this check for a \textbf{decides} function.
-%  \end{itemize}
-%  
-%  Continuing with the examples.
-%  
-%  Example 1, |functionOC c 0 5|
-%  
-%  \begin{tabular}{||c||c||c||c||c||}
-%    \hline
-%    $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
-%    \hline
-%    $0$ & $[\{5\}]$ & $[\{5\}]$ & $[\{0 \mapsto 5\}]$ & \multirow{2}{*}{$\{[\{0 \mapsto 5\}]\}$}\\
-%    \cline{1-4}
-%    $1$ & $[]$ & & & \\
-%    \hline
-%  \end{tabular}\\
-%  \begin{tabular}{||c||c||c||c||}
-%    \hline
-%    |fs| & \group & \maplist(\cross) & \sequence \\
-%    \hline
-%    $\{[\{0 \mapsto 5\}]\}$ & $[\{0 \mapsto 5\}]$ & $[\{0 \mapsto 5\}]$ & $\{[0 \mapsto 5]\}$ \\
-%    \hline
-%  \end{tabular}\\[5mm]
-%  
-%  Example 2, |functionOC c (0 `choice` 1) 5|
-%  \lennart{WRONG}
-%  \begin{tabular}{||c||c||c||c||c||}
-%    \hline
-%    $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
-%    \hline
-%    $0$ & $[\{5\}]$ & $[\{5\}]$ & $[\{0 \mapsto 5\}]$ & \multirow{3}{*}{$\{[\{0 \mapsto 5\}],[\{\},\{1 \mapsto 5\}]\}$}\\
-%    \cline{1-4}
-%    $1$ & $[\{\},\{5\}]$ & $[\{\},\{5\}]$ & $[\{\},\{1 \mapsto 5\}]$ & \\
-%    \cline{1-4}
-%    $2$ & $[]$ & & & \\
-%    \hline
-%  \end{tabular}\\
-%  \begin{tabular}{||c||c||c||c||}
-%    \hline
-%    |fs| & \group & \maplist(\cross) & \sequence \\
-%    \hline
-%    $\{[\{0 \mapsto 5\}],[\{\},\{1 \mapsto 5\}]\}$ &
-%      $[\{0 \mapsto 5\}, \{1 \mapsto 5\}]$ &
-%      $[\{0 \mapsto 5\}, \{1 \mapsto 5\}]$ &
-%      TBD \\
-%    \hline
-%  \end{tabular}\\[5mm]
-%  
-%  Example 3, same as example 2
-%  
-%  Example 4, |functionOC c (0 `uchoice` 1) (5 `uchoice` 6)|
-%  \lennart{WRONG}
-%  
-%  \begin{tabular}{||c||c||c||c||c||}
-%    \hline
-%    $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
-%    \hline
-%    $0$ & $[\{5,6\}]$ & $[\{5,6\}]$ & $[\{0 \mapsto 5, 0 \mapsto 6\}]$ & \multirow{3}{*}{
-%      \makecell{$\{[\{0 \mapsto 5, 0 \mapsto 6,$ \\
-%                $1 \mapsto 5, 1 \mapsto 6\}]\}$}
-%    }\\
-%    \cline{1-4}
-%    $1$ & $[\{5,6\}]$ & $[\{5,6\}]$ & $[\{1 \mapsto 5, 0 \mapsto 6\}]$ & \\
-%    \cline{1-4}
-%    $2$ & $[]$ & & & \\
-%    \hline
-%  \end{tabular}\\
-%  \begin{tabular}{||c||c||c||c||}
-%    \hline
-%    |fs| & \group & \maplist(\cross) & \sequence \\
-%    \hline
-%      \makecell{$\{[\{0 \mapsto 5, 0 \mapsto 6,$ \\
-%                $1 \mapsto 5, 1 \mapsto 6\}]\}$} &
-%      \makecell{$[\{0 \mapsto 5, 0 \mapsto 6,$ \\
-%          $1 \mapsto 5, 1 \mapsto 6\}]$} &
-%      TBD & TBD \\
-%    \hline
-%  \end{tabular}\\[5mm]
-%  
-%  
