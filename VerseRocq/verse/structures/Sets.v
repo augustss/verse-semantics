@@ -29,7 +29,7 @@ Arguments Intersection {_}.
 Arguments Same_set {_}.
 Arguments Singleton {_}.
 Arguments Empty_set {_}.
-
+Arguments Inhabited {_}.
 
 Module SetNotations. 
   Notation "∅"  := Empty_set : set_scope.

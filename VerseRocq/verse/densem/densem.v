@@ -3,6 +3,8 @@ Require Import structures.Sets.
 Require Import syntax.common.
 Require syntax.mini.
 From Stdlib Require Lists.List.
+From Stdlib Require Import Classes.EquivDec.
+
 Import structures.List.
 Import structures.Monad.
 
@@ -18,6 +20,22 @@ Open Scope list_scope.
 Open Scope mini_expr_scope.
 
 Arguments Inhabited {_}.
+
+Lemma Value_dec ( v1 v2 : Dom.Value) : {v1 = v2} + { not (v1 = v2) }.
+Admitted.
+
+#[export] Instance EqDec_Value : EqDec Dom.Value Logic.eq.
+exact Value_dec. Defined.
+
+Locate EqDec.
+
+(* Truncate a list to contain at most one element *)
+Definition take1 {A} (xs : list A) : list A := 
+  match xs with 
+  | h :: _ => [ h ] 
+  | [] => [] 
+  end.
+
 
 Definition VAL := P Dom.Value.
 
@@ -36,6 +54,18 @@ Definition extend : Ident -> Dom.Value -> env -> env :=
 
 End Env.
 
+Declare Scope env_scope.
+Delimit Scope env_scope with env.
+Bind Scope env_scope with env.
+
+Module EnvNotation.
+Notation "[ x |-> v ]" := (Env.extend x v Env.empty) : env_scope.
+End EnvNotation.
+
+Open Scope env_scope.
+Import EnvNotation.
+
+
 Definition ENV := P env.
 
 (* -------------- primitives ------------ *)
@@ -50,40 +80,12 @@ Definition evalPrim (p : PrimOp) : Dom.Value -> Prop :=
   | _ => fun v => False    (* TODO: Lt, etc. *)
   end.
 
-(* -------------- atomic expressions ------------ *)
-
-(*
-(* Evaluation of atomic expressions. This is 
-   partial because variables may be unbound. *)
-Inductive evalA (rho : env) : mini.Expr -> Dom.Value -> Prop := 
-  | evalA_Var : forall x v,
-    rho x = Some v ->
-    evalA rho (mini.Var x) v
-  | evalA_Lit : forall x, 
-    evalA rho (mini.Lit (Int x)) (Dom.Int x)
-  | evalA_Prim p v :
-    evalPrim p v ->
-    evalA rho (mini.EPrim p) v
-.*)
+(* -------------- auxiliary definitions ------------ *)
 
 Definition tups (VS : list VAL) : VAL := 
   fun v => 
-    exists vs, v = Dom.Value.mkTup vs /\ List.Forall2 Sets.In vs VS.
-
-Definition retP (vo : option Dom.Value) : VAL := 
-  match vo with 
-  | Some v => ⌈ v ⌉ 
-  | None => ∅
-  end.
-
-
-(* inject the result of evaluation of an atomic 
-   expression into the computational result. *)
-Definition ret_ (vo : option Dom.Value) : list VAL := 
-  match vo with 
-  | Some v => [⌈ v ⌉]
-  | None => []
-  end.
+    exists (vs : list Dom.Value), v = Dom.Value.mkTup vs 
+                             /\ List.Forall2 Sets.In vs VS.
 
 (* apply f to x. 
    All elts in the list will either be singleton
@@ -102,7 +104,14 @@ Definition apply (f : Dom.Value)
   | _ => []
   end.
 
-Inductive Squashed : list VAL -> list VAL -> Prop := 
+(* -------------- Squash and TailSquash ------------ *)
+
+(* Squashed VS WS holds when WS = filter (fun x => x <> ∅) VS
+
+   (We cannot define this as a function because results
+   in Type cannot depend on Prop.)
+*)
+Inductive Squashed {A} : list (P A) -> list (P A) -> Prop := 
   | sq_nil : Squashed nil nil 
   | sq_consIn : forall x xs ys,
     x <> ∅ ->
@@ -113,38 +122,46 @@ Inductive Squashed : list VAL -> list VAL -> Prop :=
     Squashed xs ys -> 
     Squashed (cons x xs) ys.
 
-Definition NonEmptyTail : list VAL -> Prop := 
+Search list.
+
+(* The list is either empty, or the last element is inhabited. *)
+Definition NonEmptyTail {A} : list (P A) -> Prop := 
   fun VS => 
-    (* NB: if VS is nil, last returns d, which 
-       is trivially inhabited. *)
-    let d := ⌈ Dom.Int 0 ⌉ in
-    (List.last VS d) <> ∅.
+    match VS with 
+    | [] => True 
+    | _  => exists WS d, VS = WS ++ [d] /\ d <> ∅
+    end.
 
-Definition TailSquashed : list VAL -> list VAL -> Prop := 
-  fun VS1 VS2 => 
-    (exists n, VS1 = VS2 ++ List.repeat ∅ n) /\ NonEmptyTail VS2.
+Definition TailSquashed {A} : list (P A) -> list (P A) -> Prop := 
+  fun VS WS => 
+    (exists n, VS = WS ++ List.repeat ∅ n) /\ NonEmptyTail WS.
 
+(* ---------- Extended environments for blocks ------------ *)
 
-Definition take1 {A} (xs : list A) : list A := 
-  match xs with 
-  | h :: _ => [ h ] 
-  | [] => [] 
-  end.
+(* The set of all environments that extend rho with arbitrary 
+   definitions for the variables declared in e. 
 
+*)
 
-(* The set of all environments that extend rho
-   with definitions for the variables defined 
-   by e. *)
+Search Scope.t bool.
 Definition X (e : mini.Expr) (rho : env) : ENV :=
   fun rho' =>
+    let sc := mini.I e in 
     forall x, 
-      (* must agree with rho on its domain *)
+      if (Scope.mem x sc) then exists v, rho' x = Scope v
+      else rho' x = rho x.
+    forall x, 
+      (* rho' must agree with rho on variables already in scope *)
       (forall v, rho x = Some v -> rho' x = Some v) /\
-      (* must be defined on binding variables of e *)
-      (Scope.In x (mini.I e) -> exists v, rho' x = Some v).
+      (* rho' must be defined on binding variables of e *)
+      (Scope.In x sc -> exists v, rho' x = Some v) /\
+      (* rho' shouldn't bind anything else *) 
+      (rho x = None /\ not (Scope.In x (mini.I e)) -> rho' x = None).
          
+(* --------- (dodgy) unions ------------ *)
          
-(* elementwise union of sequences *)
+(* elementwise union of sequences, missing elements
+   are ∅s.  *)
 Fixpoint unions (VS : list VAL) (WS : list VAL) : 
   list VAL := 
   match VS , WS with 
@@ -156,8 +173,15 @@ Fixpoint unions (VS : list VAL) (WS : list VAL) :
 Definition Unions : list (list VAL) -> list VAL :=
   List.fold_right unions nil.
   
-(* every position in VS is the union of corresponding 
-   elements in VVS *)
+Definition UNION (VS : P VAL) : VAL := 
+  fun v => exists V, (V ∈ VS) /\ (v ∈ V).
+
+Definition nth (i : nat) (VS : P (list VAL)) : P VAL := 
+  fun V => exists (vs : list VAL), (vs ∈ VS) /\ List.nth_error vs i = Some V.
+
+
+(* every position in VS contains corresponding 
+   elements from VVS *)
 Definition UNIONS : P (list VAL) -> list VAL -> Prop := 
   fun (VVS : list VAL -> Prop) (VS : list VAL) => 
     forall V i, 
@@ -172,6 +196,8 @@ Lemma UNIONS_mem (ls : list (list VAL)) : (UNIONS (mem ls)) = ⌈ Unions ls ⌉.
 Proof.
 Admitted.
 
+
+(* --------- (dodgy) unions ------------ *)
                      
 
 (* Type of denotation relation *)
@@ -183,28 +209,34 @@ Definition check (eval:D) (rho:env) (q:Aperture)
   (eff:Effect) i e1 y h (x:Ident) e2 : Prop := 
     (exists vh, rho h = Some vh /\   (* h is in scope *)
       forall v, exists w, (* for every input, there is some result *)
-      forall rho', 
-        rho' ∈ X e1 (Env.extend i v rho) ->
-        exists V1, eval rho' e1 V1 /\
-            (Squashed V1 [] /\ apply vh v = []) (* !! /\ or \/ ?? *)
-              \/
-            (* evaluating e1 produces a value vx *)
-            (exists vx, Squashed V1 [ ⌈ vx ⌉ ] /\
-             exists V2, apply vh vx = V2 /\
-                 (* apply h[x] fails, eff must be decides, and e2 must fail *)
-                 (Squashed V2 [] /\ eff = Decides
-                                 /\ forall vy, eval (Env.extend y vy rho') e2 []) 
-                 \/
-                 (* apply h[x] produces a value vy *)
-                 exists vy k, TailSquashed V2 (List.repeat ∅ k ++ [ ⌈ vy ⌉ ]) /\
-                   (* evaluating e2 doesn't fail *)
-                    eval (Env.extend y vy rho') e2 (List.repeat ∅ k ++ [⌈ w ⌉]))).
+      forall rho', rho' ∈ X e1 (Env.extend i v rho) ->  (* for every extension of rho' *)
 
+        (* evaluating e1 should be defined *)
+        exists V1, eval rho' e1 V1 /\
+
+             (* evaluating e1 fails and applying h also fails *) 
+             (Squashed V1 [] /\ exists V2, apply vh v = V2 /\ Squashed V2 []) 
+              \/
+
+             (* evaluating e1 produces a singleton value vx *)
+             (forall vx, Squashed V1 [ ⌈ vx ⌉ ] /\
+              exists V2, apply vh vx = V2 /\
+                 (* apply h[x] fails, eff must be decides, and e2 must fail *)
+                 (Squashed V2 [] /\ (eff = Decides
+                                    /\ forall vy, eval (Env.extend y vy rho') e2 [])) 
+                 \/
+                 (* apply h[x] produces a value vy after k failures *)
+                 exists vy k, TailSquashed V2 (List.repeat ∅ k ++ [ ⌈ vy ⌉ ]) /\
+                   (* evaluating e2 produces w after k failures *)
+                    eval (Env.extend y vy rho') e2 (List.repeat ∅ k ++ [⌈ w ⌉]))).
 
 Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
 
   | eval_Block e VV VS :
-    (forall rho', rho' ∈ X e rho -> exists VS', eval rho' e VS' /\ (VS' ∈ VV)) ->
+    (* every result has to be decomposable into a union of 
+       evaluations of e with an appropriate rho' *)
+    (forall WS, WS ∈ VV -> 
+            exists rho', (rho' ∈ X e rho) /\ eval rho' e WS) ->
     UNIONS VV VS ->
     eval rho (mini.Block e) VS
 
@@ -334,7 +366,8 @@ Definition eval_top t d := eval Env.empty t d.
 
 Create HintDb sets.
 
-
+Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
+Admitted.
 Lemma singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. Admitted.
 Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  Admitted.
 Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
@@ -345,13 +378,12 @@ Proof.
 Qed.
 
 
+Lemma NonEmptyTail_nil {A} : @NonEmptyTail A [].
+done. Qed.
+Lemma NonEmptyTail_singleton {A}{v :A}: NonEmptyTail [ ⌈v⌉ ].
+cbn. exists nil. exists ⌈v⌉. cbv. split; auto; eapply singleton_not_empty. Qed.
 
-Lemma NonEmptyTail_nil : NonEmptyTail [].
-cbv. eapply singleton_not_empty. Qed.
-Lemma NonEmptyTail_singleton {v}: NonEmptyTail [ ⌈v⌉ ].
-cbv. eapply singleton_not_empty. Qed.
-
-Lemma TailSquashed_singleton v VS : 
+Lemma TailSquashed_singleton {A} (v:A) VS : 
   VS = [⌈ v ⌉] ->
   TailSquashed [⌈ v ⌉] VS.
 Proof. intros ->. unfold TailSquashed. split. exists 0. cbn. auto.
@@ -369,7 +401,7 @@ Lemma TailSquashed_empty (VS : list VAL) :
 Proof. intros ->. unfold TailSquashed. split. exists 1. cbn. auto.
 eapply NonEmptyTail_nil; eauto. Qed.
 
-Lemma noEmptyInSquashed : forall xs ys, Squashed xs ys -> 
+Lemma noEmptyInSquashed : forall {A} (xs ys : list (P A)), Squashed xs ys -> 
                                    not (List.In ∅ ys).
 Proof.
   induction 1; unfold not; intros. inversion H.
@@ -377,7 +409,7 @@ Proof.
 Qed.
 
 
-Lemma Squashed_singleton v VS : 
+Lemma Squashed_singleton {A} (v:A) VS : 
   VS = [⌈ v ⌉] ->
   Squashed [⌈ v ⌉] VS.
 Proof. intros ->. eapply sq_consIn; eauto using singleton_not_empty.
@@ -400,14 +432,14 @@ Hint Resolve
   Squashed_nil
  :sets.
 
-Lemma Squashed_singleton_invert v VS : 
+Lemma Squashed_singleton_invert {A} (v:A) VS : 
   Squashed [⌈ v ⌉] VS -> VS = [⌈ v ⌉].
 Proof. intro h. inversion h. subst. inversion H3. auto.
 subst. apply singleton_not_empty in H1. done. Qed.
-Lemma Squashed_nil_invert VS : 
+Lemma Squashed_nil_invert {A} (VS : list (P A)) : 
   Squashed [] VS -> VS = [].
 Proof. intro h. inversion h. auto. Qed.
-Lemma Squashed_empty_invert VS : 
+Lemma Squashed_empty_invert {A} (VS : list (P A)) : 
   Squashed [∅] VS -> VS = [].
 Proof. intro h. inversion h. done. inversion H3. done. Qed.
 
@@ -446,8 +478,6 @@ Module Test.
 Lemma t1 : eval_top mini.Test.t1 [ ⌈ Dom.Int 2 ⌉ ].
 Proof. unfold mini.Test.t1, eval_top. repeat eeval. Qed.
 
-Lemma Value_dec ( v1 v2 : Dom.Value) : {v1 = v2} + { not (v1 = v2) }.
-Admitted.
 
 (* { x:=1; x }  *)
 Lemma t2 : 
@@ -455,39 +485,24 @@ Lemma t2 :
 Proof. unfold mini.Test.t2.
        (* set up the block. *)
        eeval1.
-       intros rho' inX.
-       cbv in inX.
-       specialize (inX mini.Test.x) as [_ h2].
-       specialize (h2 ltac:(eauto)) as [v EQv].
-       (* need to do this case analysis here, before we instantiate 
-          the individual result. *)
-       destruct (Value_dec v (Dom.Int 1)).
-       - exists ([ ⌈ Dom.Int 1 ⌉ ]).
-         split; subst.
-         eeval.
-         ego.
-       - exists ([ ]).
-         split. 
-         eeval1.
-         + eeval.
-         + ego.
-         + eeval1.
-           ++ eeval1.
-              eeval.
-              eeval.
-              cbn.
-              rewrite Intersection_diff; auto.
-              ego.
-           ++ eapply Squashed_nil. eauto.
-           ++ eeval.
-           ++ ego.
-           ++ cbn. ego.
-         + ego.
-         + ego.
-         + eauto with sets.
-       - instantiate (1 := nil).
-         rewrite UNIONS_mem.
-         eapply in_singleton.
+       instantiate (1 := mem [ [ ⌈ Dom.Int 1 ⌉] ]).
+       intros WS WSIn.
+       2: { rewrite UNIONS_mem. cbn. eapply in_singleton. } 
+       apply mem_In in WSIn. cbn in WSIn.
+       destruct WSIn. 
+       - subst.
+         exists [ mini.Test.x |-> Dom.Int 1 ].
+         split; auto.
+         ++ intros y.
+            split. intros sv h1. done.
+            split. intros h1. cbv in h1. inversion h1. subst.
+            eexists. cbv. eauto.
+            subst. inversion H0.
+            intros [h1 h2]. cbv in h2. 
+            cbv. destruct y eqn:Ey. done.
+            destruct i eqn: Ei. assert False. eapply h2. eauto. done. done.
+         ++ eeval.
+       - done.
 Qed.
 
 
@@ -533,10 +548,6 @@ End Test.
 
 Module Theory.
 
-Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
-Admitted.
-
-
 Lemma NonEmptyTail_UNIONS : 
   forall V VV, 
     UNIONS VV V -> 
@@ -548,11 +559,11 @@ Proof.
     unfold UNIONS in *.
     unfold NonEmptyTail.
     cbn. eauto with sets.
-  - intros VV VH U.
+  - intros VV VH U.    
     unfold UNIONS in *.
 Admitted.
 
-Lemma NonEmptyTail_app VS1 VS2 : 
+Lemma NonEmptyTail_app {A} ( VS1 VS2 : list (P A)) : 
   NonEmptyTail VS1 -> NonEmptyTail VS2 ->
   NonEmptyTail (VS1 ++ VS2).
 Admitted.
@@ -566,6 +577,7 @@ Fixpoint evalNonEmptyTail {e}{rho}{VS} (ev : eval rho e VS) : NonEmptyTail VS.
   - (* block *)
     eapply NonEmptyTail_UNIONS; eauto.
     intros V1 in1.
+    
 Admitted.
 
 (*
