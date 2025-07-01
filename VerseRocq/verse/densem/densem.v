@@ -59,7 +59,9 @@ Delimit Scope env_scope with env.
 Bind Scope env_scope with env.
 
 Module EnvNotation.
-Notation "[ x |-> v ]" := (Env.extend x v Env.empty) : env_scope.
+Notation "[ x |-> v ]" := (Env.extend x v Env.empty) : env_scope. 
+(* Notation "[ x |-> vx ; y |-> vy ; .. ; z |-> vz ]" := 
+  (Env.extend x vx (Env.extend y vy .. (Env.extend z vz Env.empty) ..)) :  env_scope. *)
 End EnvNotation.
 
 Open Scope env_scope.
@@ -143,21 +145,13 @@ Definition TailSquashed {A} : list (P A) -> list (P A) -> Prop :=
 
 *)
 
-Search Scope.t bool.
 Definition X (e : mini.Expr) (rho : env) : ENV :=
   fun rho' =>
-    let sc := mini.I e in 
     forall x, 
-      if (Scope.mem x sc) then exists v, rho' x = Scope v
-      else rho' x = rho x.
-    forall x, 
-      (* rho' must agree with rho on variables already in scope *)
-      (forall v, rho x = Some v -> rho' x = Some v) /\
-      (* rho' must be defined on binding variables of e *)
-      (Scope.In x sc -> exists v, rho' x = Some v) /\
-      (* rho' shouldn't bind anything else *) 
-      (rho x = None /\ not (Scope.In x (mini.I e)) -> rho' x = None).
-         
+      if (Scope.mem x (mini.I e)) 
+      then exists v, rho' x = Some v    (* arbitrary value for vars in new scope *)
+      else rho' x = rho x.         (* same value for vars in old scope *)
+
 (* --------- (dodgy) unions ------------ *)
          
 (* elementwise union of sequences, missing elements
@@ -475,6 +469,32 @@ Ltac eeval := match goal with
 
 Module Test.
 
+Coercion Dom.Int : nat >-> Dom.Value.
+
+(*   {y:=if(x=1){0|1}else{2|3}; x:=0|1; y}  =?= 2|0|3|1 *)
+
+Definition y := mini.Test.y.
+Definition x := mini.Test.x.
+
+Definition lennart := 
+  { y :=: mini.If3 (mini.Unify x 1) (0 :|: 1) (2 :|: 3) :>: 
+    x :=: (0 :|: 1)  :>:
+    y }.
+
+Lemma dodgy : eval Env.empty lennart 
+                ([ ⌈ Dom.Int 2 ⌉ ; ⌈ Dom.Int 0 ⌉ ; ⌈ Dom.Int 3 ⌉ ; ⌈ Dom.Int 1 ⌉ ]).
+Proof.
+  unfold lennart.
+  eeval.
+  instantiate (1 := 
+    (mem [ [ ⌈ Dom.Int 2 ⌉ ; ⌈ Dom.Int 0 ⌉ ; ⌈ Dom.Int 3 ⌉ ; ⌈ Dom.Int 1 ⌉ ] ;
+           [ ⌈ Dom.Int 2 ⌉ ; ⌈ Dom.Int 0 ⌉ ; ⌈ Dom.Int 3 ⌉ ; ⌈ Dom.Int 1 ⌉ ] ])).
+  intros WS WSIn.
+  apply mem_In in WSIn.
+  destruct WSIn.
+  - (* first option *)
+    exists ( (Env.extend y (Dom.Int 2) (Env.extend x (Dom.Int 1) Env.empty))).
+
 Lemma t1 : eval_top mini.Test.t1 [ ⌈ Dom.Int 2 ⌉ ].
 Proof. unfold mini.Test.t1, eval_top. repeat eeval. Qed.
 
@@ -494,16 +514,23 @@ Proof. unfold mini.Test.t2.
          exists [ mini.Test.x |-> Dom.Int 1 ].
          split; auto.
          ++ intros y.
-            split. intros sv h1. done.
-            split. intros h1. cbv in h1. inversion h1. subst.
-            eexists. cbv. eauto.
-            subst. inversion H0.
-            intros [h1 h2]. cbv in h2. 
-            cbv. destruct y eqn:Ey. done.
-            destruct i eqn: Ei. assert False. eapply h2. eauto. done. done.
+            destruct Scope.mem eqn:IN.
+            -- (* in new scope *) 
+              unfold mini.I in IN.
+              cbn in IN. fold Nat.compare in IN.
+              destruct Nat.compare eqn:CMP; try done.
+              apply PeanoNat.Nat.compare_eq in CMP. subst.
+              eexists. cbn. eauto. 
+            -- (* in old scope *)
+              unfold mini.I in IN.
+              cbn in IN. fold Nat.compare in IN.
+              destruct Nat.compare eqn:CMP; try done.
+              apply PeanoNat.Nat.compare_lt_iff in CMP.
+              admit.
+              admit.
          ++ eeval.
        - done.
-Qed.
+Admitted.
 
 
 
