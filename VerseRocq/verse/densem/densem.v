@@ -19,16 +19,6 @@ Open Scope monad_scope.
 Open Scope list_scope.
 Open Scope mini_expr_scope.
 
-Arguments Inhabited {_}.
-
-Lemma Value_dec ( v1 v2 : Dom.Value) : {v1 = v2} + { not (v1 = v2) }.
-Admitted.
-
-#[export] Instance EqDec_Value : EqDec Dom.Value Logic.eq.
-exact Value_dec. Defined.
-
-Locate EqDec.
-
 (* Truncate a list to contain at most one element *)
 Definition take1 {A} (xs : list A) : list A := 
   match xs with 
@@ -39,9 +29,10 @@ Definition take1 {A} (xs : list A) : list A :=
 
 Definition VAL := P Dom.Value.
 
-(* --------------- environments ----------- *)
+(* --------------- (partial) environments ----------- *)
 
-(* gives a value for in-scope identitfiers *)
+(* gives a value for *in-scope* identitfiers *)
+(* The denotation of out of scope identifiers is NOT defined. *)
 Definition env := Ident -> option Dom.Value.
 
 Module Env. 
@@ -59,10 +50,19 @@ Delimit Scope env_scope with env.
 Bind Scope env_scope with env.
 
 Module EnvNotation.
-Notation "[ x |-> v ]" := (Env.extend x v Env.empty) : env_scope. 
-(* Notation "[ x |-> vx ; y |-> vy ; .. ; z |-> vz ]" := 
-  (Env.extend x vx (Env.extend y vy .. (Env.extend z vz Env.empty) ..)) :  env_scope. *)
+Notation " x |-> v " := (Env.extend x v Env.empty) (at level 80) : env_scope.
+Notation " x |-> v , e " := (Env.extend x v e) (at level 80, right associativity): env_scope. 
+
+Section NotationExamples.
+Open Scope env_scope.
+Variable x y : Ident.
+Variable v w : Dom.Value.
+Check  x |-> v.
+Check  x |-> v, y |-> w.
+End NotationExamples.
+
 End EnvNotation.
+
 
 Open Scope env_scope.
 Import EnvNotation.
@@ -106,25 +106,53 @@ Definition apply (f : Dom.Value)
   | _ => []
   end.
 
-(* -------------- Squash and TailSquash ------------ *)
+(* -------------- Squash ------------ *)
 
-(* Squashed VS WS holds when WS = filter (fun x => x <> ∅) VS
+(* Squashed VS WS holds when WS := filter (fun x => x <> ∅) VS
 
-   (We cannot define this as a function because results
-   in Type cannot depend on Prop.)
+   NOTE: We cannot define this as a function because results
+   in Type cannot depend on Prop. But this relation 
+   is total and functional.
 *)
-Inductive Squashed {A} : list (P A) -> list (P A) -> Prop := 
-  | sq_nil : Squashed nil nil 
+Inductive Squash {A} : list (P A) -> list (P A) -> Prop := 
+  | sq_nil : Squash nil nil 
   | sq_consIn : forall x xs ys,
     x <> ∅ ->
-    Squashed xs ys -> 
-    Squashed (cons x xs) (cons x ys)
+    Squash xs ys -> 
+    Squash (cons x xs) (cons x ys)
   | sq_consOut : forall x xs ys,
     x = ∅ ->
-    Squashed xs ys -> 
-    Squashed (cons x xs) ys.
+    Squash xs ys -> 
+    Squash (cons x xs) ys.
 
-Search list.
+Lemma Squash_functional {A} (VS : list (P A)) : forall WS1 WS2,
+      Squash VS WS1 -> Squash VS WS2 -> WS1 = WS2.
+Proof. 
+  induction VS; intros WS1 WS2 h1 h2; inversion h1; inversion h2; subst.
+  all: try done.
+  all: eauto.
+  - erewrite (IHVS ys ys0); auto.
+Qed.
+
+(* NOTE: Showing that Squash is functional requires classical reasoning. 
+   We need to know that 
+
+       forall any S, S = ∅ \/ S <> ∅
+
+   In order to prove this lemma:
+*)
+
+Lemma Squash_total {A} (decide_equality : forall (S:P A), S = ∅ \/ S <> ∅) 
+  : forall (VS : list (P A)), exists WS, Squash VS WS.
+Proof.
+  induction VS. exists nil. eapply sq_nil.
+  move: IHVS => [WS' IHWS'].
+  destruct (decide_equality a).
+  + exists WS'. eapply sq_consOut; auto.
+  + exists (a :: WS'). eapply sq_consIn; auto.
+Qed.
+
+(* -------------- SquashTail ------------ *)
 
 (* The list is either empty, or the last element is inhabited. *)
 Definition NonEmptyTail {A} : list (P A) -> Prop := 
@@ -134,7 +162,7 @@ Definition NonEmptyTail {A} : list (P A) -> Prop :=
     | _  => exists WS d, VS = WS ++ [d] /\ d <> ∅
     end.
 
-Definition TailSquashed {A} : list (P A) -> list (P A) -> Prop := 
+Definition TailSquash {A} : list (P A) -> list (P A) -> Prop := 
   fun VS WS => 
     (exists n, VS = WS ++ List.repeat ∅ n) /\ NonEmptyTail WS.
 
@@ -152,27 +180,34 @@ Definition X (e : mini.Expr) (rho : env) : ENV :=
       then exists v, rho' x = Some v    (* arbitrary value for vars in new scope *)
       else rho' x = rho x.         (* same value for vars in old scope *)
 
+
+(* --------- big union ------------ *)
+
+(* Union S T := fun v => (v ∈ S) + (v ∈ T) *)
+
+(* Union of a set of sets. Includes all elements 
+   that are in any set of the union. This is monadic 
+   join. *)
+
+Definition UNION {A} (VS : P (P A)) : P A := 
+  fun v => exists V, (V ∈ VS) /\ (v ∈ V).
+
 (* --------- (dodgy) unions ------------ *)
          
-(* elementwise union of sequences, missing elements
-   are ∅s.  *)
-Fixpoint unions (VS : list VAL) (WS : list VAL) : 
-  list VAL := 
+(* elementwise union of sequences, missing elements are ∅s.  *)
+Fixpoint unions {A} (VS : list (P A)) (WS : list (P A)) : 
+  list (P A) := 
   match VS , WS with 
   | [] , _ => WS
   | _  , [] => VS 
   | V :: VS', W :: WS' => (V ∪ W) :: unions VS' WS' 
   end.
 
-Definition Unions : list (list VAL) -> list VAL :=
+Definition Unions {A} : list (list (P A)) -> list (P A) :=
   List.fold_right unions nil.
-  
-Definition UNION (VS : P VAL) : VAL := 
-  fun v => exists V, (V ∈ VS) /\ (v ∈ V).
 
-Definition nth (i : nat) (VS : P (list VAL)) : P VAL := 
+Definition nth (VS : P (list VAL)) (i : nat) : VAL -> Prop := 
   fun V => exists (vs : list VAL), (vs ∈ VS) /\ List.nth_error vs i = Some V.
-
 
 (* every position in VS contains corresponding 
    elements from VVS *)
@@ -186,13 +221,53 @@ Definition UNIONS : P (list VAL) -> list VAL -> Prop :=
             List.nth_error WS i = Some W /\
             (v ∈ W).
 
+
+
 Lemma UNIONS_mem (ls : list (list VAL)) : (UNIONS (mem ls)) = ⌈ Unions ls ⌉.
 Proof.
 Admitted.
 
 
-(* --------- (dodgy) unions ------------ *)
-                     
+(* ----------------- version one: fixpoint ----------- *)
+
+Module FixpointVersion.
+
+Definition evalA (rho : env) (e : mini.Expr) : VAL := 
+  match e with 
+  | mini.Var x => fun v => rho x = Some v
+  | mini.Lit (Int i) => ⌈ Dom.Int i ⌉
+  | mini.EPrim p => evalPrim p
+  | _ => fun v => False
+  end.
+
+
+Fixpoint eval (rho : env) (e : mini.Expr) : P (list VAL) := 
+  
+  match e with 
+  | mini.Block e =>
+
+      UNION (fun (WS : P (list VAL)) => rho' <- X e rho ;; eval rho' e = WS)
+
+(*   UNION { ws | rho' ∈ X e rho,  ws ∈ eval rho' e } *)
+
+  | mini.Var _ => pure [ evalA rho e ] 
+  | mini.Lit _ => pure [ evalA rho e ] 
+  | mini.EPrim _ => pure [ evalA rho e ] 
+
+  | mini.DefineV x => pure [ ⌈ Dom.Value.mkTup nil ⌉ ] 
+
+  | mini.Array es => fun VS => 
+     exists vs, (List.Forall2 (evalA rho) es vs) /\ VS = [ ⌈ Dom.Value.mkTup vs ⌉ ]
+
+
+  | _ => empty
+  end.
+
+End FixpointVersion.
+
+
+(* ----------------- version two: Inductive relation ----------- *)
+
 
 (* Type of denotation relation *)
 Definition D := forall (rho : env) (e : mini.Expr), (list VAL) -> Prop.
@@ -209,18 +284,18 @@ Definition check (eval:D) (rho:env) (q:Aperture)
         exists V1, eval rho' e1 V1 /\
 
              (* evaluating e1 fails and applying h also fails *) 
-             (Squashed V1 [] /\ exists V2, apply vh v = V2 /\ Squashed V2 []) 
+             (Squash V1 [] /\ exists V2, apply vh v = V2 /\ Squash V2 []) 
               \/
 
              (* evaluating e1 produces a singleton value vx *)
-             (forall vx, Squashed V1 [ ⌈ vx ⌉ ] /\
+             (forall vx, Squash V1 [ ⌈ vx ⌉ ] /\
               exists V2, apply vh vx = V2 /\
                  (* apply h[x] fails, eff must be decides, and e2 must fail *)
-                 (Squashed V2 [] /\ (eff = Decides
+                 (Squash V2 [] /\ (eff = Decides
                                     /\ forall vy, eval (Env.extend y vy rho') e2 [])) 
                  \/
                  (* apply h[x] produces a value vy after k failures *)
-                 exists vy k, TailSquashed V2 (List.repeat ∅ k ++ [ ⌈ vy ⌉ ]) /\
+                 exists vy k, TailSquash V2 (List.repeat ∅ k ++ [ ⌈ vy ⌉ ]) /\
                    (* evaluating e2 produces w after k failures *)
                     eval (Env.extend y vy rho') e2 (List.repeat ∅ k ++ [⌈ w ⌉]))).
 
@@ -260,22 +335,22 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
   | eval_ApplyD a1 a2 h v VS:
     evalA rho a1 h -> 
     evalA rho a2 v ->
-    TailSquashed (apply h v) VS ->
+    TailSquash (apply h v) VS ->
     eval rho (mini.ApplyD a1 a2) VS
 
   | eval_Seq e1 e2 VS1 VS1' VS2 VS :
     eval rho e1 VS1 -> 
-    Squashed VS1 VS1' ->
+    Squash VS1 VS1' ->
     eval rho e2 VS2 -> 
     not (List.In ∅ VS1) ->
-    TailSquashed ( s1 <- VS1' ;; s2 <- VS2 ;; [ s2 ] ) VS ->
+    TailSquash ( s1 <- VS1' ;; s2 <- VS2 ;; [ s2 ] ) VS ->
     eval rho (mini.Seq e1 e2) VS
          
 
   | eval_Unify e1 e2 VS1 VS2 VS3 : 
     eval rho e1 VS1 -> 
     eval rho e2 VS2 ->
-    TailSquashed (s1 <- VS1 ;; s2 <- VS2 ;; [ s1 ∩ s2 ] ) VS3 ->
+    TailSquash (s1 <- VS1 ;; s2 <- VS2 ;; [ s1 ∩ s2 ] ) VS3 ->
     eval rho (mini.Unify e1 e2) VS3
              
   | eval_Choice e1 e2 VS1 VS2 VS : 
@@ -291,13 +366,13 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
 
   | eval_One e VS1 VS2 VS:
     eval rho e VS1 -> 
-    Squashed VS1 VS2 ->
+    Squash VS1 VS2 ->
     take1 VS2 = VS ->
     eval rho (mini.One e) VS
 
   | eval_All e VS1 VS2 :
     eval rho e VS1 ->
-    Squashed VS1 VS2 -> 
+    Squash VS1 VS2 -> 
     eval rho (mini.All e) [ tups VS2 ]
 
   | eval_If3 e1 e2 e3  VS :
@@ -320,7 +395,7 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
             (mini.Block (mini.DefineV x :>: (x :=: e1)
                          :>: y :=: (mini.One (h :@: x))
                          :>: e2)) W) ->
-    Squashed [ F ] FS ->  (* if F is emptyset, get rid of it *)
+    Squash [ F ] FS ->  (* if F is emptyset, get rid of it *)
     eval rho (mini.Fun q eff i e1 (y,h,x) e2) FS
 
 
@@ -377,25 +452,25 @@ done. Qed.
 Lemma NonEmptyTail_singleton {A}{v :A}: NonEmptyTail [ ⌈v⌉ ].
 cbn. exists nil. exists ⌈v⌉. cbv. split; auto; eapply singleton_not_empty. Qed.
 
-Lemma TailSquashed_singleton {A} (v:A) VS : 
+Lemma TailSquash_singleton {A} (v:A) VS : 
   VS = [⌈ v ⌉] ->
-  TailSquashed [⌈ v ⌉] VS.
-Proof. intros ->. unfold TailSquashed. split. exists 0. cbn. auto.
+  TailSquash [⌈ v ⌉] VS.
+Proof. intros ->. unfold TailSquash. split. exists 0. cbn. auto.
 eapply NonEmptyTail_singleton; eauto. Qed.
 
-Lemma TailSquashed_nil (VS : list VAL) : 
+Lemma TailSquash_nil (VS : list VAL) : 
   VS = nil ->
-  TailSquashed [] VS.
-Proof. intros ->. unfold TailSquashed. split. exists 0. cbn. auto.
+  TailSquash [] VS.
+Proof. intros ->. unfold TailSquash. split. exists 0. cbn. auto.
 eapply NonEmptyTail_nil; eauto. Qed.
 
-Lemma TailSquashed_empty (VS : list VAL) : 
+Lemma TailSquash_empty (VS : list VAL) : 
   VS = nil ->
-  TailSquashed [∅] VS.
-Proof. intros ->. unfold TailSquashed. split. exists 1. cbn. auto.
+  TailSquash [∅] VS.
+Proof. intros ->. unfold TailSquash. split. exists 1. cbn. auto.
 eapply NonEmptyTail_nil; eauto. Qed.
 
-Lemma noEmptyInSquashed : forall {A} (xs ys : list (P A)), Squashed xs ys -> 
+Lemma noEmptyInSquash : forall {A} (xs ys : list (P A)), Squash xs ys -> 
                                    not (List.In ∅ ys).
 Proof.
   induction 1; unfold not; intros. inversion H.
@@ -403,15 +478,15 @@ Proof.
 Qed.
 
 
-Lemma Squashed_singleton {A} (v:A) VS : 
+Lemma Squash_singleton {A} (v:A) VS : 
   VS = [⌈ v ⌉] ->
-  Squashed [⌈ v ⌉] VS.
+  Squash [⌈ v ⌉] VS.
 Proof. intros ->. eapply sq_consIn; eauto using singleton_not_empty.
        eapply sq_nil. Qed.
 
-Lemma Squashed_nil (VS : list VAL) : 
+Lemma Squash_nil (VS : list VAL) : 
   VS = nil ->
-  Squashed [] VS.
+  Squash [] VS.
 Proof. intros ->. eapply sq_nil. Qed.
 
 Hint Resolve 
@@ -419,22 +494,22 @@ Hint Resolve
   NonEmptyTail_nil 
   NonEmptyTail_singleton 
   notIn_singleton
-  TailSquashed_singleton
-  TailSquashed_nil
-  TailSquashed_empty
-  Squashed_singleton
-  Squashed_nil
+  TailSquash_singleton
+  TailSquash_nil
+  TailSquash_empty
+  Squash_singleton
+  Squash_nil
  :sets.
 
-Lemma Squashed_singleton_invert {A} (v:A) VS : 
-  Squashed [⌈ v ⌉] VS -> VS = [⌈ v ⌉].
+Lemma Squash_singleton_invert {A} (v:A) VS : 
+  Squash [⌈ v ⌉] VS -> VS = [⌈ v ⌉].
 Proof. intro h. inversion h. subst. inversion H3. auto.
 subst. apply singleton_not_empty in H1. done. Qed.
-Lemma Squashed_nil_invert {A} (VS : list (P A)) : 
-  Squashed [] VS -> VS = [].
+Lemma Squash_nil_invert {A} (VS : list (P A)) : 
+  Squash [] VS -> VS = [].
 Proof. intro h. inversion h. auto. Qed.
-Lemma Squashed_empty_invert {A} (VS : list (P A)) : 
-  Squashed [∅] VS -> VS = [].
+Lemma Squash_empty_invert {A} (VS : list (P A)) : 
+  Squash [∅] VS -> VS = [].
 Proof. intro h. inversion h. done. inversion H3. done. Qed.
 
 
@@ -494,6 +569,8 @@ Proof.
   destruct WSIn.
   - (* first option *)
     exists ( (Env.extend y (Dom.Int 2) (Env.extend x (Dom.Int 1) Env.empty))).
+Admitted.
+
 
 Lemma t1 : eval_top mini.Test.t1 [ ⌈ Dom.Int 2 ⌉ ].
 Proof. unfold mini.Test.t1, eval_top. repeat eeval. Qed.
@@ -511,7 +588,7 @@ Proof. unfold mini.Test.t2.
        apply mem_In in WSIn. cbn in WSIn.
        destruct WSIn. 
        - subst.
-         exists [ mini.Test.x |-> Dom.Int 1 ].
+         exists (mini.Test.x |-> Dom.Int 1 ).
          split; auto.
          ++ intros y.
             destruct Scope.mem eqn:IN.
@@ -556,6 +633,8 @@ Proof.  exists (Dom.Int 1). exists (Dom.Int 3).
                   +++ eapply eval_If3_false.
                   --- intros rho' rho'X.
                       unfold X, Ensembles.In in rho'X. 
+Admitted.
+(*
                       move: (rho'X mini.Test.x) => [h _].
                       cbn in h.
                       specialize (h (Dom.Int 1) ltac:(auto)).                       
@@ -569,7 +648,7 @@ Proof.  exists (Dom.Int 1). exists (Dom.Int 3).
         - ego.
         - ego.
 Qed.
-
+*)
 End Test.
 
 
@@ -599,7 +678,7 @@ Fixpoint evalNonEmptyTail {e}{rho}{VS} (ev : eval rho e VS) : NonEmptyTail VS.
   destruct ev; subst; eauto.
   all: try eapply NonEmptyTail_singleton.
   all: try solve [match goal with 
-    | [ H : TailSquashed _ ?VS |- _ ] => move: H => [ _ h1 ] 
+    | [ H : TailSquash _ ?VS |- _ ] => move: H => [ _ h1 ] 
     end; done].
   - (* block *)
     eapply NonEmptyTail_UNIONS; eauto.
@@ -618,7 +697,7 @@ Proof.
 
   (* true because we tail squashed *)
   all: try solve [match goal with 
-    | [ H : TailSquashed _ ?VS |- _ ] => move: H => [ _ h1 ] 
+    | [ H : TailSquash _ ?VS |- _ ] => move: H => [ _ h1 ] 
     end; done].
   - (* block *)
 
@@ -670,7 +749,7 @@ Proof.
   intros VS vIn. unfold Ensembles.In in *.
   repeat invert_eval.
   clear H4.
-  apply Squashed_singleton_invert in H2. subst.
+  apply Squash_singleton_invert in H2. subst.
 Admitted.
 
 (*

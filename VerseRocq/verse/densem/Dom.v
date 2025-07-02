@@ -76,6 +76,12 @@ Admitted.
 #[export] Instance V_EquivDec : DecidableEquivalence V_Equivalence.
 Admitted.
 
+Lemma Value_dec ( v1 v2 : Dom.Value) : {v1 = v2} + { not (v1 = v2) }.
+Admitted.
+
+#[export] Instance EqDec_Value : EqDec Dom.Value Logic.eq.
+exact Value_dec. Defined.
+
 (* -------------------- example primitives ------------- *)
 
 Import ListNotations.
