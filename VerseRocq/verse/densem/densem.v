@@ -240,15 +240,172 @@ Definition evalA (rho : env) (e : mini.Expr) : VAL :=
   | _ => fun v => False
   end.
 
+Require Import Logic.FunctionalExtensionality.
+Require Import Logic.PropExtensionality.
 
-Fixpoint eval (rho : env) (e : mini.Expr) : P (list VAL) := 
+Variant Maybe (A : Type) : Prop := 
+  | Nothing : Maybe A
+  | Just : A -> Maybe A.
+
+Arguments Just {_}.
+Arguments Nothing {_}.
+
+Definition Maybe_map {A B} (f: A -> B) (m : Maybe A) : Maybe B := 
+  match m with 
+  | Just s => Just (f s)
+  | Nothing => Nothing
+  end.
+
+Definition Maybe_bind {A B} (m : Maybe A) (k : A -> Maybe B) := 
+  match m with 
+  | Just s => k s 
+  | Nothing => Nothing
+  end.
+
+Definition M A := Maybe (list A).
+
+Definition M_map {A B} (f : A -> B) (x : M A) :  M B := 
+  Maybe_map (fmap f) x.
+
+Lemma fmap_map {A B C} (f:B -> A) (g : C -> B) x : 
+  M_map f (M_map g x) = M_map (fun x => f (g x)) x.
+Proof.
+  unfold M_map. unfold fmap, Functor_list.
+  destruct x as [y|].
+  cbn. auto.
+  cbn. rewrite List.map_map. auto.
+Qed.
+
+Definition M_ret {A} : A -> M A :=
+  fun x => Just [ x ].
+
+Definition firstJust {A} : Maybe A -> Maybe A -> Maybe A :=
+  fun l r => 
+    match l with 
+    | Nothing => r
+    | y => y
+    end.
+
+Definition M_bind {A B} (x : Maybe (list A)) (f : A -> Maybe (list B)) : 
+  Maybe (list B) := 
+  match x with 
+  | Nothing => Nothing
+  | Just x => let RS := (List.map f x : list (Maybe (list B))) in
+             (List.fold_left firstJust RS Nothing) 
+  end.
+
+Eval cbn in List.fold_left firstJust [ Nothing ; Just [1] ; Just [2] ; Nothing ] Nothing.
+Eval cbn in List.fold_left firstJust [ Nothing ] Nothing.
+
+Lemma M_bind_ret {A B} (x : A) (k : A -> M B) : 
+  M_bind (M_ret x) k = k x.
+Proof.
+  unfold M_bind, M_ret. 
+  cbn. auto.
+Qed.
+
+Lemma M_ret_bind {A} (m : M A): M_bind m M_ret = m.
+Proof. 
+  unfold M_bind, M_ret. 
+  destruct m. auto.
+  induction l.
+  - cbn.
+  split.
+  - intros y yIn.
+    cbn in yIn.
+    destruct yIn as [AS [h1 h2]].
+Abort.
+
+
+
+
+Definition M A := P (list A).
+
+Definition M_map {A B} (f : A -> B) (x : P (list A)) :  P (list B) := 
+  fmap (fmap f) x.
+
+Lemma fmap_map {A B C} (f:B -> A) (g : C -> B) x : 
+  M_map f (M_map g x) = M_map (fun x => f (g x)) x.
+Proof.
+  unfold M_map. unfold fmap, Functor_P, Functor_list.
+  cbn.
+  extensionality b.
+  eapply propositional_extensionality.
+  split.
+  - intros [BS [[CS [h1 h2]] h3]]. 
+    inversion h2. subst. clear h2.
+    inversion h3. subst. clear h3.
+    exists CS. split; auto.
+    rewrite List.map_map. 
+    eapply in_singleton.
+  - intros [CS [h1 h2]]. 
+    inversion h2. subst. clear h2.
+    exists (List.map g CS). split.
+    exists CS. split; eauto. eapply in_singleton.
+    rewrite List.map_map. eapply in_singleton.
+Qed.
+
+Definition M_ret {A} : A -> P (list A) :=
+  fun x => ⌈ [ x ] ⌉.
+
+Definition M_bind {A B} (m : P (list A)) (k : A -> P (list B)) : P (list B) := 
+    AS <- m ;;
+    let RS := List.map k AS in
+    (List.fold_right Union ∅ RS).
+
+
+Lemma M_bind_ret {A B} (x : A) (k : A -> M B) : 
+  M_bind (M_ret x) k = k x.
+Proof.
+  unfold M_bind, M_ret. 
+  eapply Extensionality_Ensembles.
+  split.
+  - intros y yIn.
+    cbn in yIn.
+    move: yIn => [a [h1 h2]]. 
+    inversion h1. subst. clear h1. 
+    cbn in h2. inversion h2; try done. 
+  - intros y yIn.
+    cbn.
+    exists [ x ].
+    split.  eapply in_singleton; auto.
+    cbn. left. auto.
+Qed.  
+
+Lemma M_ret_bind {A} (m : M A): M_bind m M_ret = m.
+Proof. 
+  unfold M_bind, M_ret. 
+  eapply Extensionality_Ensembles.
+  split.
+  - intros y yIn.
+    cbn in yIn.
+    destruct yIn as [AS [h1 h2]].
+Abort.
+
+(* Set comprehension notation *)
+Notation "{ K | y <:- M }" := (bind M (fun y => K)) : set_scope.
+
+Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) := 
+  
+  (* extend the environment with all possible versions, producing 
+     multiple results in the set *)
+  let D' (rho : env) (e : mini.Expr)  : P (list VAL) :=
+    UNION (fun VS => rho' <- X e rho ;; E_e rho' e = VS) in
+
+  (* extend the environment with all possible versions, 
+     dodgy unioning the results together into a set 
+     containing at most 1 result *)
+  let D (rho : env) (e : mini.Expr )  : P (list VAL) :=
+    UNIONS { E_e rho' e | rho' <:- (X e rho) } in
+
+  
+  let R (rho : env) (e : mini.Expr) : ENV := 
+    rho' <- X e rho  ;;
+    VS <- E_e rho' e ;;
+    ⌈ rho' ⌉ in
   
   match e with 
-  | mini.Block e =>
-
-      UNION (fun (WS : P (list VAL)) => rho' <- X e rho ;; eval rho' e = WS)
-
-(*   UNION { ws | rho' ∈ X e rho,  ws ∈ eval rho' e } *)
+  | mini.Block e => D rho e
 
   | mini.Var _ => pure [ evalA rho e ] 
   | mini.Lit _ => pure [ evalA rho e ] 
@@ -259,7 +416,54 @@ Fixpoint eval (rho : env) (e : mini.Expr) : P (list VAL) :=
   | mini.Array es => fun VS => 
      exists vs, (List.Forall2 (evalA rho) es vs) /\ VS = [ ⌈ Dom.Value.mkTup vs ⌉ ]
 
+  | mini.Seq e1 e2 =>
+     VS1  <- E_e rho e1 ;;  
+     VS1' <- Squash VS1 ;;
+     VS2  <- E_e rho e2 ;;  
+     pure (s1 <- VS1' ;; s2 <- VS2 ;; [s2] )
 
+  | mini.Unify e1 e2 => 
+     VS1 <- E_e rho e1 ;;
+     VS2 <- E_e rho e2 ;;
+     pure ( s1 <- VS1 ;; s2 <- VS2 ;; [s1 ∩ s2] )
+
+  | mini.Choice e1 e2 =>
+     VS1 <- D rho e1 ;;
+     VS2 <- D rho e2 ;;
+     pure (VS1 ++ VS2)
+
+  | mini.Fail => 
+      pure []
+
+  | mini.One e => 
+      VS1 <- E_e rho e ;;
+      VS2 <- Squash VS1 ;;
+      pure (take1 VS2)
+
+  | mini.All e => 
+      VS1 <- E_e rho e ;;
+      VS2 <- Squash VS1 ;;
+      pure [tups VS2]
+
+  | mini.If3 e1 e2 e3 =>
+
+      UNIONS (rho' <- X e1 rho ;; E_e rho' e1 )
+
+(*
+      (fun VS => 
+         (forall rho', rho' ∈ X e1 rho -> forall V1, E_e rho' e1 V1 -> V1 = [])
+         ->
+         E_e rho e3 VS) ∪
+      (fun VS => 
+        (* union together the result of e2 
+           for all extensions of rho where e1 doesn't 
+           fail *)
+         UNIONS (fun V2 =>
+             (forall rho', rho' ∈ X e1 rho -> 
+              exists V1, E_e rho' e1 V1 /\ V1 <> [] /\ 
+                    E_e rho' e2 V2)) VS)
+ *)
+    
   | _ => empty
   end.
 
