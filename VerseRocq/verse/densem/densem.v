@@ -1,19 +1,20 @@
-Require densem.Dom.
-Require Import structures.Sets.
-Require Import syntax.common.
-Require syntax.mini.
+Require Import Imports.
+
 From Stdlib Require Lists.List.
 From Stdlib Require Import Classes.EquivDec.
+Import ssreflect.
 
+Require Import syntax.common.
+Require syntax.mini.
+Require densem.Dom.
+Require Import structures.Sets.
 Import structures.List.
 Import structures.Monad.
 
 Import mini.MiniNotation.
-
 Import MonadNotation.
 Import SetNotations.
 Import List.ListNotations.
-Import ssreflect.
 
 Open Scope monad_scope.
 Open Scope list_scope.
@@ -74,7 +75,7 @@ Definition ENV := P env.
 
 Definition evalPrim (p : PrimOp) : Dom.Value -> Prop := 
   match p with 
-  | Add  => Dom.add1
+  | common.Add  => Dom.add1
   | ArrayLen => Dom.arrayLen
   | IsInt => Dom.isInt
   | IsArr => Dom.isArr
@@ -124,6 +125,10 @@ Inductive Squash {A} : list (P A) -> list (P A) -> Prop :=
     x = ∅ ->
     Squash xs ys -> 
     Squash (cons x xs) ys.
+
+(* A success is any list that contains at least one nonempty VAL *)
+Definition Succeeds (VS : P (list VAL)) : Prop :=
+  forall l, l ∈ VS -> exists v, v <> ∅ /\ List.In v l.
 
 Lemma Squash_functional {A} (VS : list (P A)) : forall WS1 WS2,
       Squash VS WS1 -> Squash VS WS2 -> WS1 = WS2.
@@ -183,8 +188,6 @@ Definition X (e : mini.Expr) (rho : env) : ENV :=
 
 (* --------- big union ------------ *)
 
-(* Union S T := fun v => (v ∈ S) + (v ∈ T) *)
-
 (* Union of a set of sets. Includes all elements 
    that are in any set of the union. This is monadic 
    join. *)
@@ -206,12 +209,9 @@ Fixpoint unions {A} (VS : list (P A)) (WS : list (P A)) :
 Definition Unions {A} : list (list (P A)) -> list (P A) :=
   List.fold_right unions nil.
 
-Definition nth (VS : P (list VAL)) (i : nat) : VAL -> Prop := 
-  fun V => exists (vs : list VAL), (vs ∈ VS) /\ List.nth_error vs i = Some V.
-
 (* every position in VS contains corresponding 
    elements from VVS *)
-Definition UNIONS : P (list VAL) -> list VAL -> Prop := 
+Definition UNIONS : P (list VAL) -> P (list VAL) := 
   fun (VVS : list VAL -> Prop) (VS : list VAL) => 
     forall V i, 
       List.nth_error VS i = Some V -> 
@@ -232,6 +232,34 @@ Admitted.
 
 Module FixpointVersion.
 
+(* In this version, the denotation is defined as a fixpoint 
+   over the syntax of miniverse expressions, taking an 
+   environment as an argument. 
+
+   The result of this function is a (potentially-infinite) 
+   set of sequences of sets of values. i.e. 
+
+     P (list VAL) 
+
+   The set plays two roles:
+
+    - allows us to eliminate VAL in determining the list
+      (list in Rocq may not depend on Prop).
+
+    - allow the result of evaluation to be "undefined" in 
+      the case of an unbound variable, type error, etc.
+   
+   Generally, this set will either be an empty set or a 
+   singleton set.
+
+*)
+
+Definition M A := P (list A).
+
+Definition TestEmpty {A B} (e1 : P A) (e2 : P (list B)) (e3 : P (list B)) := 
+  fun bs => 
+    (e1 = ∅ -> e2 bs) /\ (e1 <> ∅ -> e3 bs).
+
 Definition evalA (rho : env) (e : mini.Expr) : VAL := 
   match e with 
   | mini.Var x => fun v => rho x = Some v
@@ -240,150 +268,12 @@ Definition evalA (rho : env) (e : mini.Expr) : VAL :=
   | _ => fun v => False
   end.
 
-Require Import Logic.FunctionalExtensionality.
-Require Import Logic.PropExtensionality.
-
-Variant Maybe (A : Type) : Prop := 
-  | Nothing : Maybe A
-  | Just : A -> Maybe A.
-
-Arguments Just {_}.
-Arguments Nothing {_}.
-
-Definition Maybe_map {A B} (f: A -> B) (m : Maybe A) : Maybe B := 
-  match m with 
-  | Just s => Just (f s)
-  | Nothing => Nothing
-  end.
-
-Definition Maybe_bind {A B} (m : Maybe A) (k : A -> Maybe B) := 
-  match m with 
-  | Just s => k s 
-  | Nothing => Nothing
-  end.
-
-Definition M A := Maybe (list A).
-
-Definition M_map {A B} (f : A -> B) (x : M A) :  M B := 
-  Maybe_map (fmap f) x.
-
-Lemma fmap_map {A B C} (f:B -> A) (g : C -> B) x : 
-  M_map f (M_map g x) = M_map (fun x => f (g x)) x.
-Proof.
-  unfold M_map. unfold fmap, Functor_list.
-  destruct x as [y|].
-  cbn. auto.
-  cbn. rewrite List.map_map. auto.
-Qed.
-
-Definition M_ret {A} : A -> M A :=
-  fun x => Just [ x ].
-
-Definition firstJust {A} : Maybe A -> Maybe A -> Maybe A :=
-  fun l r => 
-    match l with 
-    | Nothing => r
-    | y => y
-    end.
-
-Definition M_bind {A B} (x : Maybe (list A)) (f : A -> Maybe (list B)) : 
-  Maybe (list B) := 
-  match x with 
-  | Nothing => Nothing
-  | Just x => let RS := (List.map f x : list (Maybe (list B))) in
-             (List.fold_left firstJust RS Nothing) 
-  end.
-
-Eval cbn in List.fold_left firstJust [ Nothing ; Just [1] ; Just [2] ; Nothing ] Nothing.
-Eval cbn in List.fold_left firstJust [ Nothing ] Nothing.
-
-Lemma M_bind_ret {A B} (x : A) (k : A -> M B) : 
-  M_bind (M_ret x) k = k x.
-Proof.
-  unfold M_bind, M_ret. 
-  cbn. auto.
-Qed.
-
-Lemma M_ret_bind {A} (m : M A): M_bind m M_ret = m.
-Proof. 
-  unfold M_bind, M_ret. 
-  destruct m. auto.
-  induction l.
-  - cbn.
-  split.
-  - intros y yIn.
-    cbn in yIn.
-    destruct yIn as [AS [h1 h2]].
-Abort.
-
-
-
-
-Definition M A := P (list A).
-
-Definition M_map {A B} (f : A -> B) (x : P (list A)) :  P (list B) := 
-  fmap (fmap f) x.
-
-Lemma fmap_map {A B C} (f:B -> A) (g : C -> B) x : 
-  M_map f (M_map g x) = M_map (fun x => f (g x)) x.
-Proof.
-  unfold M_map. unfold fmap, Functor_P, Functor_list.
-  cbn.
-  extensionality b.
-  eapply propositional_extensionality.
-  split.
-  - intros [BS [[CS [h1 h2]] h3]]. 
-    inversion h2. subst. clear h2.
-    inversion h3. subst. clear h3.
-    exists CS. split; auto.
-    rewrite List.map_map. 
-    eapply in_singleton.
-  - intros [CS [h1 h2]]. 
-    inversion h2. subst. clear h2.
-    exists (List.map g CS). split.
-    exists CS. split; eauto. eapply in_singleton.
-    rewrite List.map_map. eapply in_singleton.
-Qed.
-
-Definition M_ret {A} : A -> P (list A) :=
-  fun x => ⌈ [ x ] ⌉.
-
-Definition M_bind {A B} (m : P (list A)) (k : A -> P (list B)) : P (list B) := 
-    AS <- m ;;
-    let RS := List.map k AS in
-    (List.fold_right Union ∅ RS).
-
-
-Lemma M_bind_ret {A B} (x : A) (k : A -> M B) : 
-  M_bind (M_ret x) k = k x.
-Proof.
-  unfold M_bind, M_ret. 
-  eapply Extensionality_Ensembles.
-  split.
-  - intros y yIn.
-    cbn in yIn.
-    move: yIn => [a [h1 h2]]. 
-    inversion h1. subst. clear h1. 
-    cbn in h2. inversion h2; try done. 
-  - intros y yIn.
-    cbn.
-    exists [ x ].
-    split.  eapply in_singleton; auto.
-    cbn. left. auto.
-Qed.  
-
-Lemma M_ret_bind {A} (m : M A): M_bind m M_ret = m.
-Proof. 
-  unfold M_bind, M_ret. 
-  eapply Extensionality_Ensembles.
-  split.
-  - intros y yIn.
-    cbn in yIn.
-    destruct yIn as [AS [h1 h2]].
-Abort.
-
-(* Set comprehension notation *)
-Notation "{ K | y <:- M }" := (bind M (fun y => K)) : set_scope.
+(* empty if x is empty, singleton if x is singleton. *)
+Definition retA (x : VAL) : P (list VAL) := 
+  TestEmpty x ∅ ⌈ [ x ] ⌉.
+(*
+  fun xs => 
+    (exists v, x = ⌈ v ⌉ /\ xs = [ ⌈ v ⌉ ]). *)
 
 Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) := 
   
@@ -396,9 +286,9 @@ Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) :=
      dodgy unioning the results together into a set 
      containing at most 1 result *)
   let D (rho : env) (e : mini.Expr )  : P (list VAL) :=
-    UNIONS { E_e rho' e | rho' <:- (X e rho) } in
+    UNIONS (rho' <- X e rho ;; E_e rho' e ) in
 
-  
+  (* all extended environments that succeed when evaluating e *)
   let R (rho : env) (e : mini.Expr) : ENV := 
     rho' <- X e rho  ;;
     VS <- E_e rho' e ;;
@@ -407,9 +297,9 @@ Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) :=
   match e with 
   | mini.Block e => D rho e
 
-  | mini.Var _ => pure [ evalA rho e ] 
-  | mini.Lit _ => pure [ evalA rho e ] 
-  | mini.EPrim _ => pure [ evalA rho e ] 
+  | mini.Var _ => retA (evalA rho e)
+  | mini.Lit _ => retA (evalA rho e)
+  | mini.EPrim _ => retA (evalA rho e)
 
   | mini.DefineV x => pure [ ⌈ Dom.Value.mkTup nil ⌉ ] 
 
@@ -417,10 +307,10 @@ Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) :=
      exists vs, (List.Forall2 (evalA rho) es vs) /\ VS = [ ⌈ Dom.Value.mkTup vs ⌉ ]
 
   | mini.Seq e1 e2 =>
-     VS1  <- E_e rho e1 ;;  
+     VS1  <- E_e rho e1 ;;    (* outer set monad *)
      VS1' <- Squash VS1 ;;
      VS2  <- E_e rho e2 ;;  
-     pure (s1 <- VS1' ;; s2 <- VS2 ;; [s2] )
+     pure (s1 <- VS1' ;; s2 <- VS2 ;; [s2] )  (* inner list monad *)
 
   | mini.Unify e1 e2 => 
      VS1 <- E_e rho e1 ;;
@@ -446,24 +336,9 @@ Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) :=
       pure [tups VS2]
 
   | mini.If3 e1 e2 e3 =>
-
-      UNIONS (rho' <- X e1 rho ;; E_e rho' e1 )
-
-(*
-      (fun VS => 
-         (forall rho', rho' ∈ X e1 rho -> forall V1, E_e rho' e1 V1 -> V1 = [])
-         ->
-         E_e rho e3 VS) ∪
-      (fun VS => 
-        (* union together the result of e2 
-           for all extensions of rho where e1 doesn't 
-           fail *)
-         UNIONS (fun V2 =>
-             (forall rho', rho' ∈ X e1 rho -> 
-              exists V1, E_e rho' e1 V1 /\ V1 <> [] /\ 
-                    E_e rho' e2 V2)) VS)
- *)
-    
+      let Δ := R rho e1 in
+      TestEmpty Δ (D rho e3)
+                  (UNIONS (rho' <- Δ ;; E_e rho' e2))
   | _ => empty
   end.
 
