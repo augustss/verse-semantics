@@ -61,3 +61,8 @@ Spec/verse-rules.tex
 Spec/verse-source.tex
 Spec/verse-spec.tex
 Spec/densem-koen.tex
+
+*.vo
+*.glob
+*.vos
+*.vok
