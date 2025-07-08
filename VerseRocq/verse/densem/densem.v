@@ -27,8 +27,42 @@ Definition take1 {A} (xs : list A) : list A :=
   | [] => [] 
   end.
 
+(* --------- big union ------------ *)
+
+(* Union of a set of sets. Includes all elements 
+   that are in any set of the union. This is monadic 
+   join. *)
+
+Definition UNION {A} (VS : P (P A)) : P A := 
+  fun v => exists V, (V ∈ VS) /\ (v ∈ V).
+
+(* --------------------------------------------------- *)
+
 
 Definition VAL := P Dom.Value.
+
+(* --------------- (total) environments ----------- *)
+
+Definition tenv := Ident -> Dom.Value.
+
+Module TEnv.
+
+Definition empty : tenv := fun x => Dom.Int 0.
+
+Definition extend : Ident -> Dom.Value -> tenv -> tenv := 
+  fun x v rho => 
+    fun y => if Nat.eqb x y then v else rho y.
+
+End TEnv.
+
+Declare Scope tenv_scope.
+Delimit Scope tenv_scope with tenv.
+Bind Scope tenv_scope with tenv.
+
+Module TEnvNotation.
+Notation " x |-> v " := (TEnv.extend x v TEnv.empty) (at level 80) : tenv_scope.
+Notation " x |-> v , e " := (TEnv.extend x v e) (at level 80, right associativity): tenv_scope. 
+End TEnvNotation.
 
 (* --------------- (partial) environments ----------- *)
 
@@ -65,11 +99,6 @@ End NotationExamples.
 End EnvNotation.
 
 
-Open Scope env_scope.
-Import EnvNotation.
-
-
-Definition ENV := P env.
 
 (* -------------- primitives ------------ *)
 
@@ -107,7 +136,71 @@ Definition apply (f : Dom.Value)
   | _ => []
   end.
 
+Module DPS.
+
+
+Open Scope tenv_scope.
+Import TEnvNotation.
+
+
+Definition ENV := P tenv.
+
+Definition Env : ENV := fun ρ => True. 
+
+(* if e is not atomic, it is interpreted as 0 *)
+Definition evalA (ρ : tenv) (e : mini.Expr) : Dom.Value := 
+  match e with 
+  | mini.Var x => ρ x
+  | mini.Lit (Int i) => Dom.Int i
+  | _ => Dom.Int 0
+  end.
+
+Definition constrain (x : Ident) (f : tenv -> Dom.Value) : ENV := fun ρ => ρ x = f ρ.
+
+Definition equate (x : Ident) (e : mini.Expr) : ENV := constrain x (fun ρ => evalA ρ e).
+
+Infix "≈" := equate (at level 60).
+
+(* Generalize all of the xs to be anything *)
+Definition hide (xs : list Ident) (Δ : ENV) : ENV := 
+  fun ρ => exists ρ', (ρ' ∈ Δ) /\ 
+              forall x, ~ (List.In x xs) -> (ρ x = ρ' x).
+
+
+(* Sets of sequences of sets *)
+
+Fixpoint eval (e : mini.Expr) (r : Ident) : P (list ENV) := 
+  match e with 
+  | mini.Var _ => ⌈ [r ≈ e] ⌉
+  | mini.Lit _ => ⌈ [r ≈ e] ⌉
+  | mini.DefineV _ => ⌈ [ Env ] ⌉
+  | mini.Array es => 
+      ⌈ [ constrain r 
+            (fun ρ => Dom.Value.mkTup (List.map (evalA ρ) es)) ] ⌉
+  | mini.Fail => ⌈ [] ⌉                   
+
+  | mini.Choice e1 e2 => fun ρs =>
+      forall d1, d1 ∈ eval e1 r -> 
+      forall d2, d2 ∈ eval e2 r -> 
+      ρs ∈ ⌈ d1 ++ d2 ⌉
+
+  | mini.Seq e1 e2 => fun ρs =>
+      forall Δ1, [ Δ1 ] ∈ eval e1 r ->
+      forall Δ2, [ Δ2 ] ∈ eval e2 r ->
+      ρs ∈ ⌈ [ (hide [r] Δ1) ∩ Δ2 ] ⌉
+
+  | mini.Unify 
+
+  | _ => fun _ => False
+  end.
+
+
+(* -------------------------------------------------------- *)
+(* -------------------------------------------------------- *)
+(* -------------------------------------------------------- *)
+
 (* -------------- Squash ------------ *)
+
 
 (* Squashed VS WS holds when WS := filter (fun x => x <> ∅) VS
 
@@ -173,6 +266,13 @@ Definition TailSquash {A} : list (P A) -> list (P A) -> Prop :=
 
 (* ---------- Extended environments for blocks ------------ *)
 
+
+Open Scope env_scope.
+Import EnvNotation.
+
+
+Definition ENV := P env.
+
 (* The set of all environments that extend rho with arbitrary 
    definitions for the variables declared in e. 
 
@@ -186,14 +286,6 @@ Definition X (e : mini.Expr) (rho : env) : ENV :=
       else rho' x = rho x.         (* same value for vars in old scope *)
 
 
-(* --------- big union ------------ *)
-
-(* Union of a set of sets. Includes all elements 
-   that are in any set of the union. This is monadic 
-   join. *)
-
-Definition UNION {A} (VS : P (P A)) : P A := 
-  fun v => exists V, (V ∈ VS) /\ (v ∈ V).
 
 (* --------- (dodgy) unions ------------ *)
          
@@ -228,7 +320,7 @@ Proof.
 Admitted.
 
 
-(* ----------------- version one: fixpoint ----------- *)
+(* ----------------- version: fixpoint ----------- *)
 
 Module FixpointVersion.
 
