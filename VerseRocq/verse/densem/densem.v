@@ -91,7 +91,7 @@ End EnvNotation.
 
 
 
-(* -------------- primitives ------------ *)
+(* -------------- primitives and atomic expressions ------ *)
 
 Definition evalPrim (p : PrimOp) : Dom.Value -> Prop := 
   match p with 
@@ -103,34 +103,8 @@ Definition evalPrim (p : PrimOp) : Dom.Value -> Prop :=
   | _ => fun v => False    (* TODO: Lt, etc. *)
   end.
 
-(* -------------- auxiliary definitions ------------ *)
-
-Definition tups (VS : list VAL) : VAL := 
-  fun v => 
-    exists (vs : list Dom.Value), v = Dom.Value.mkTup vs 
-                             /\ List.Forall2 Sets.In vs VS.
-
-(* apply f to x. 
-   All elts in the list will either be singleton
-   or emptysets. 
-   NOTE: Tail is not squashed in this definition.
- *)
-Definition apply (f : Dom.Value) 
-                 (v : Dom.Value) : list VAL := 
-  match f with 
-  | Dom.Fun hs => 
-      h <- hs ;;
-      match (PFun.apply_opt _ _ Dom.Value.eqb h v) with 
-      | Some w => [ ⌈ w ⌉ ]
-      | None => [ ∅ ] 
-      end
-  | _ => []
-  end.
-
-Module DPS.
-
-
-(* if e is not atomic, it is interpreted as 0 *)
+(* Total evaluation function for atomic expressions. 
+   If e is not atomic, it is interpreted as 0 *)
 Definition evalA (e : mini.Expr) (ρ : tenv) : Dom.Value := 
   match e with 
   | mini.Var x => ρ x
@@ -139,55 +113,109 @@ Definition evalA (e : mini.Expr) (ρ : tenv) : Dom.Value :=
   end.
 
 
+(* -------------- auxiliary definitions ------------ *)
+
+(* Create a tuple from a list of VALs *)
+Definition tups (VS : list VAL) : VAL := 
+  fun v => 
+    exists (vs : list Dom.Value), v = Dom.Value.mkTup vs 
+                             /\ List.Forall2 Sets.In vs VS.
+
+(* apply f to x. 
+   F is a list of partial functions, corresponding to 
+   iteration on the input. Any inputs that are in the 
+   domain of the function will produce output.
+ *)
+Definition apply (f : Dom.Value) 
+                 (v : Dom.Value) : list VAL := 
+  match f with 
+  | Dom.Fun hs => 
+      h <- hs ;;
+      match (PFun.apply_opt _ _ Dom.Value.eqb h v) with 
+      | Some w => [ ⌈ w ⌉ ]
+      | None => [ ] 
+      end
+  | _ => []
+  end.
+
+
+(* ----------- dest passing style --------------------- *)
+
+Module DPS.
+
 Open Scope tenv_scope.
 Import TEnvNotation.
+Import Dom.
 
 (* Operations on Sets of environments. *)
 
 Definition ENV := P tenv.
 
-(* total set *)
+Definition M A := P (list A).
+
+(* total set of environments *)
 Definition Env : ENV := fun ρ => True. 
 
-Definition constrain (x : Ident) (f : tenv -> Dom.Value) : ENV := 
+(* Constrain a variable to be equal to a particular value.
+   All other mappings in the environment are unconstrained. *)
+Definition constrain (x : Ident) (f : tenv -> Value) : ENV := 
   fun ρ => ρ x = f ρ.
-
-Definition equate (x : Ident) (e : mini.Expr) : ENV := 
-  constrain x (evalA e).
 
 Infix "≈" := constrain (at level 60).
 
 (* Generalize all of the xs to be anything *)
-Definition hide (xs : list Ident) (Δ : ENV) : ENV := 
+Definition hide (xs : Scope.t) (Δ : ENV) : ENV := 
   fun ρ => exists ρ', (ρ' ∈ Δ) /\ 
-              forall x, ~ (List.In x xs) -> (ρ x = ρ' x).
+              forall x, ~ (Scope.In x xs) -> (ρ x = ρ' x).
+
+Definition liftA1 {A} (f : A -> A) : P A -> P A := fmap f.
+Definition liftA2 {A} (f : A -> A -> A) : P A -> P A -> P A := 
+  fun D1 D2 => 
+  d1 <- D1 ;; 
+  d2 <- D2 ;;
+  ⌈ f d1 d2 ⌉.
+
+(* Semantic operations *)
+
+Definition FAIL : P (list ENV) := ⌈ [] ⌉.
+
+Definition CHOICE (d1 : list ENV) (d2: list ENV) : list ENV := 
+      d1 ++ d2.
 
 
-(* Sets of sequences of sets *)
+Definition SEQ (r:Ident) (d1 : list ENV) (d2: list ENV) : list ENV := 
+  ρ1 <- d1 ;;
+  ρ2 <- d2 ;;
+  [ hide (Scope.singleton r) ρ1 ∩ ρ2 ].
+
+Definition UNIFY (d1 : list ENV) (d2: list ENV) : list ENV := 
+  ρ1 <- d1 ;;
+  ρ2 <- d2 ;;
+  [ ρ1 ∩ ρ2 ].
 
 
 Fixpoint eval (e : mini.Expr) (r : Ident) : P (list ENV) := 
   match e with 
-  | mini.Var _ => ⌈ [ r ≈ evalA e ] ⌉
-  | mini.Lit _ => ⌈ [ r ≈ evalA e ] ⌉
-  | mini.DefineV _ => ⌈ [ Env ] ⌉
+
+  | mini.Block e =>  liftA1 (map (hide (mini.I e))) (eval e r)
+
+  | mini.Var _ => ⌈[ r ≈ evalA e ]⌉
+
+  | mini.Lit _ => ⌈[ r ≈ evalA e ]⌉
+
+  | mini.DefineV _ => ⌈[ Env ]⌉
+
   | mini.Array es => 
-      ⌈ [ r ≈ (fun ρ => Dom.Value.mkTup (fmap (fun e => evalA e ρ) es)) ] ⌉
+      ⌈[ r ≈ (fun ρ => Value.mkTup (fmap (fun e => evalA e ρ) es)) ]⌉
 
-  | mini.Fail => ⌈ [] ⌉                   
+  | mini.Fail => FAIL
 
-  | mini.Choice e1 e2 => 
-      d1 <- eval e1 r ;;
-      d2 <- eval e2 r ;;
-      ⌈ d1 ++ d2 ⌉
+  | mini.Choice e1 e2 => liftA2 CHOICE (eval e1 r) (eval e2 r)
 
-  | mini.Seq e1 e2 => fun ρs =>
-      forall Δ1, [ Δ1 ] ∈ eval e1 r ->
-      forall Δ2, [ Δ2 ] ∈ eval e2 r ->
-      ρs ∈ ⌈ [ (hide [r] Δ1) ∩ Δ2 ] ⌉
+  | mini.Seq e1 e2 => liftA2 (SEQ r) (eval e1 r) (eval e2 r)
 
-  | mini.Unify e1 e2 => 
-      (eval e1 r) ∩ (eval e2 r)
+  | mini.Unify e1 e2 => liftA2 UNIFY ⌈[r ≈ evalA e1]⌉ (eval e2 r)
+
 (*
   | mini.All e1 => fun rhos =>
       d1 <- eval e1 r 
