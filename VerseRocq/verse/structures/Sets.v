@@ -31,6 +31,27 @@ Arguments Singleton {_}.
 Arguments Empty_set {_}.
 Arguments Inhabited {_}.
 
+Definition P := Ensemble.
+
+(* More operations on sets *)
+
+
+Definition map {A B} (f : A -> B) : P A -> P B := 
+  fun s => fun y => exists x, f x = y /\ (In s x).
+
+Definition filter {A} (f : A -> bool) : P A -> P A := 
+  fun s => fun x => (f x = true) /\ (In s x).
+
+
+(* Union of a set of sets (monadic join) *)
+Definition UNION {A} (VS : P (P A)) : P A := 
+  fun v => exists V, (In VS V) /\ (In V v).
+
+(* define a set via set comprehension (monadic bind): {{ k x | x <- s }} *)
+Definition comprehension {A B} (k : A -> P B) (s : P A) : P B := 
+  fun b => exists a, (In s a) /\ (In (k a) b).
+
+
 Module SetNotations. 
   Notation "∅"  := Empty_set : set_scope.
   Notation "x ∈ s"  := (In s x) (at level 90) : set_scope.
@@ -39,11 +60,26 @@ Module SetNotations.
   Infix "∪"  := Union (at level 90) : set_scope.
   Infix "∩"  := Intersection (at level 90) : set_scope.
   Infix "≃"  := Same_set (at level 90) : set_scope.
+  Notation "⨃" := UNION : set_scope.
 End SetNotations. 
 
-Definition P := Ensemble.
+Module SetComprehensionNotation.
+  Notation "{{ k | x <- s }}" := (comprehension (fun x => (Singleton k)) s)
+      (at level 61) : set_scope.
+
+  Notation "{{ k | x <- s1 , y <- s2 }}" := 
+    (comprehension 
+       (fun x => 
+          (comprehension 
+             (fun y => 
+                (Singleton k)) s2)) s1) (at level 61) : set_scope.
+
+  Notation "{{ k | ' pat <- s }}" := (comprehension (fun x => match x with pat => Singleton k end) s)
+      (at level 61) : set_scope.
+End SetComprehensionNotation. 
 
 Import SetNotations.
+Import SetComprehensionNotation.
 Open Scope set_scope.
 
 (* Test cases for notations *)
@@ -51,6 +87,9 @@ Check (1 ∈ ⌈ 1 ⌉).
 Check (∅ ⊆ ⌈ 1 ⌉).
 Check (∅ ∪ ⌈ 1 ⌉).
 Check (∅ ∪ ⌈ 1 ⌉ ≃ ∅).
+Check {{ x | x <- ⌈ 1 ⌉ }}.
+Check {{ x + y | x <- ⌈ 1 ⌉ , y <- ⌈ 2 ⌉}}.
+
 
 (* A proposition that a set is inhabited. Due to the restrictions
    of Coq, the witness cannot be extracted except to produce a 
@@ -195,8 +234,6 @@ Proof. intros. unfold Exists. reflexivity. Qed.
 (* ----------------------------------------- *)
 
 
-Definition filter {A} (f : A -> bool) : P A -> P A := 
-  fun s => fun x => (f x = true) /\ (x ∈ s).
 
 
 (* P is a monad *)
