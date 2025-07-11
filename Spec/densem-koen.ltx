@@ -8,26 +8,10 @@
 $$
 % ------------- Denotational semantics of DPS Verse ---------------
 \begin{array}{c}
-\textbf{Domains} \\
-\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
-  & \Val & = & \Z + \Fun \\\
-  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
-  \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
-  \EV \in &\ENV & = & \powerset{ \Env } \\
-  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
-  & \text{Partial functions} \\
-  \\
-  & \tupE & : & [\Val] \rightarrow \Val \\
-  & \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mycdots n \} ]
-\end{array} \\
-\\
-\textbf{Denotational semantics} \\
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
 & \semapsub{E}{d}{|e|} r & : & \seq{ \ENV } \\
 \rulename{edef} & \semapsub{E}{d}{|defintro x|}r & = & [ \Env ]  \hspace{8mm} \text{All environments} \\
-\rulename{eatom} &  \semapsub{E}{d}{|a|}r & = & [  r \equalsE a ] \\
-\rulename{earr} &  \semapsub{E}{d}{|arr (x_0, xdots, x_n)|}r
-   & = & [ \{ \rho \in \Env \vb \rho(r) = \tupE [ \rho(x_0), \mydots, \rho(x_n) ] \} ] \\
+\rulename{eatom} &  \semapsub{E}{d}{|a|}r & = & [ \{ \rho \in \Env \vb \rho(r) = \semapp{A}{a}{\rho} \} ] \\
 \rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
 \rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}r
  & = & \semapsub{E}{d}{e_1}r \append \semapsub{E}{d}{e_2}r  \\
@@ -35,8 +19,8 @@ $$
 & = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1}s,
           \EV_2 \in \semapsub{E}{d}{e_2}r ] \hspace{8mm} \text{|s| fresh} \\
 \rulename{elam} &  \semapsub{E}{d}{|dpslam x e_1 e2 y|}r & = & ??? \\
-\rulename{eapp} & \semapsub{E}{d}{|apply1N f x|}r
- & = & [ \{ \rho \in \Env \vb \rho(f)=Fun(hs), (\fpr{\rho(x)}{\rho(r)}) \in hs[i] \} \vb i \in 0\mydots ] \\
+\rulename{eapp} & \semapsub{E}{d}{|apply1N a_1 a_2|}r
+ & = & [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(r)}) \in hs[i] \} \vb i \in 0\mydots ] \\
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
   \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }r
 & = & [ \hideE(Y, \EV_1 \cap \EV_2)
@@ -58,16 +42,7 @@ $$
 
 & \semapp{B}{|e|}r & : & \seq{ \ENV } \\
 & \semapp{B}{|e|}r & = & [ \hideE(\semapp{I}{|e|}, \EV) \vb \EV \in \semapsub{E}{d}{e}r ]
-\\[1mm]
-& \semap{I}{|e|} & : & [\Ident] \\
-& \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
 \end{array}
-\\
-\begin{array}{rcll}
-\semap{O}{|o|} & : & \Val \\
-\semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,]
-\end{array} \\
-
 \end{array}
 $$
 \caption{Denotational semantics: plan (D-LS)} \label{fig:d-ls1}
@@ -76,13 +51,6 @@ $$
 \begin{figure}
 $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
- (\equalsE) & : & \Ident \rightarrow \mathit{Atom} \rightarrow \ENV \\
-  x \equalsE k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\
-  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\
-  x \equalsE o & = & \{ \rho \in \Env \vb \rho(x) = \semap{O}{o} \} \\[1mm]
-%  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
-%  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
-
  \hideE & : & \seq{\Ident} \rightarrow \ENV \rightarrow \ENV \\
  \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
 

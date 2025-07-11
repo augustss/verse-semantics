@@ -44,47 +44,28 @@
 \begin{figure}
 $$
 \begin{array}{l}
-\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
-  v \in & \Value & = & \Z + \Fun \\\
-  s \in & \VAL & = & \powerset{\Value} \\
-  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
-  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value for \emph{in-scope} identifiers} \\
-  \EV \in &\ENV & = & \powerset{ \Env } \\
-  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
-  & \text{Partial functions} \\
-\end{array} \\
-\\[-2mm]
-
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
-  \semappsub{A}{e}{|a|} & : & \Env \rightarrow \Val \\
-  \semappsub{A}{e}{|x|}\rho & = & \rho(x) \\
-  \semappsub{A}{e}{|k|}\rho & = & k \\
-  \semappsub{A}{e}{|o|}\rho & = & \semap{O}{o} \\[1mm]
-
-  \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \quad\quad \text{\textbf{invariant}: no trailing \{\}}\\
-  \EE{|a|}{\rho} & = & [\msing{\semappsub{A}{e}{a}\rho}] \\
+  \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \quad\quad \text{\textbf{NON-invariant}: no trailing \{\}}\\
+  \EE{|a|}{\rho} & = & [\msing{\semapp{A}{a}\rho}] \\
   \EE{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
-  \EE{|arr (a_0, xdots, a_n)|}{\rho} & = &
-    [\,\{ \tupE [ \semappsub{A}{e}{a_0}\rho, \mydots, \semappsub{A}{e}{a_n}\rho ] \} \,] \\
-
-  \EE{|apply1N a_1 a_2|}{\rho}      & = &   \apply( \semappsub{A}{e}{a_1}\rho,  \semappsub{A}{e}{a_2}\rho)       \\
+  \EE{|apply1N a_1 a_2|}{\rho}      & = &   \apply( \semapp{A}{a_1}\rho,  \semapp{A}{a_2}\rho)       \\
   \EE{|fail|}{\rho} & = & [] \\
-  \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
+  \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{B}{|e_1|}{\rho} |++| \semapp{B}{|e_1|}{\rho} \\
   \EE{|e_1 = e_2|}{\rho}      & = &
-      \trim([ s_1 \cap s_2\, ||\,
-           |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ]) \\
+      [ s_1 \cap s_2\, ||\,
+           |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
 
   \EE{|e_1 ; e_2|}{\rho}      & = &
     [ s_2 \vb
-      |s_1 <-| \EE{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \EE{|e_2|}{\rho} ] \\
+      |s_1 <-| \squash( \EE{|e_1|}{\rho}), \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
 
-  \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\EE{e}{\rho})) \, ] \\[1mm]
+  \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\semapp{B}{e}{\rho})) \, ] \\[1mm]
 
   \EE{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
   \begin{array}{ll}
-    \semapp{D}{|e_3|}{\rho} & \text{if}\; \EV = \mempty \\
-    \hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \EV \} & \text{otherwise} \\
+    \semapp{B}{|e_3|}{\rho} & \text{if}\; \EV = \mempty \\
+    \hat{\bigcup}\{ \semapp{B}{e_2}{\rho'} \, || \, \rho' \inb \EV \} & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
@@ -106,8 +87,8 @@ $$
   \right. } \\
 
 
-\semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
-\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
+\semap{B}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
+\semapp{B}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
 \semap{R}{|e|}{} & : & \Env \rightarrow \ENV \\
 \semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \EE{|e|}{\rho'} \neq [] \} \\[2mm]
 \semap{X}{e} & : & \Env \rightarrow \ENV \\
@@ -130,7 +111,7 @@ $$
   \quad \begin{array}[t]{l@@{\,}c@@{\,}l}
     [] & : &|eff fx| = |eff decides| \\
        &   & \wedge \forall v_y \in \Value.\,
-                     \semapp{D}{e_2}{\extendrho{\rho'}{y \mapsto v_y, mustSucceed=1}} = [] \\
+                     \semapp{B}{e_2}{\extendrho{\rho'}{y \mapsto v_y, mustSucceed=1}} = [] \\
     {[\{\}]^{k}} \append [\{v_y\}] & : & \semapp{D}{e_2}{(\extendrho{\rho'}{y \fmapsto v_y})}) \; = \; [\{\}]^k \append [\{w\}] \\
     \textbf{otherwise} & : & False
     \end{array}
