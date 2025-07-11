@@ -6,7 +6,8 @@ Import ssreflect.
 
 Require Import syntax.common.
 Require syntax.mini.
-Require densem.Dom.
+Require Import PFun.
+Require Import densem.Dom.
 Require Import structures.Sets.
 Import structures.List.
 Import structures.Monad.
@@ -20,27 +21,19 @@ Open Scope monad_scope.
 Open Scope list_scope.
 Open Scope mini_expr_scope.
 
-(* Truncate a list to contain at most one element *)
-Definition take1 {A} (xs : list A) : list A := 
-  match xs with 
-  | h :: _ => [ h ] 
-  | [] => [] 
-  end.
-
 (* --------------------------------------------------- *)
 
-
-Definition VAL := P Dom.Value.
+Definition VAL := P value.
 
 (* --------------- (total) environments ----------- *)
 
-Definition tenv := Ident -> Dom.Value.
+Definition tenv := Ident -> value.
 
 Module TEnv.
 
 Definition empty : tenv := fun x => Dom.Int 0.
 
-Definition extend : Ident -> Dom.Value -> tenv -> tenv := 
+Definition extend : Ident -> value -> tenv -> tenv := 
   fun x v rho => 
     fun y => if Nat.eqb x y then v else rho y.
 
@@ -59,13 +52,13 @@ End TEnvNotation.
 
 (* gives a value for *in-scope* identitfiers *)
 (* The denotation of out of scope identifiers is NOT defined. *)
-Definition env := Ident -> option Dom.Value.
+Definition env := Ident -> option value.
 
 Module Env. 
 
 Definition empty : env := fun x => None.
 
-Definition extend : Ident -> Dom.Value -> env -> env := 
+Definition extend : Ident -> value -> env -> env := 
   fun x v rho => 
     fun y => if Nat.eqb x y then Some v else rho y.
 
@@ -82,33 +75,32 @@ Notation " x |-> v , e " := (Env.extend x v e) (at level 80, right associativity
 Section NotationExamples.
 Open Scope env_scope.
 Variable x y : Ident.
-Variable v w : Dom.Value.
+Variable v w : value.
 Check  x |-> v.
 Check  x |-> v, y |-> w.
 End NotationExamples.
 
 End EnvNotation.
 
-
-
 (* -------------- primitives and atomic expressions ------ *)
 
-Definition evalPrim (p : PrimOp) : Dom.Value -> Prop := 
+Definition evalPrim (p : PrimOp) : value  := 
   match p with 
-  | common.Add  => Dom.add1
-  | ArrayLen => Dom.arrayLen
-  | IsInt => Dom.isInt
-  | IsArr => Dom.isArr
-  | IsFun => Dom.isFun
-  | _ => fun v => False    (* TODO: Lt, etc. *)
+  | common.Add  => Prim.add1
+  | ArrayLen => Prim.arrayLen
+  | IsInt => Prim.isInt
+  | IsArr => Prim.isArr
+  | IsFun => Prim.isFun
+  | _ => Dom.Int 0  (* others.... *)
   end.
 
 (* Total evaluation function for atomic expressions. 
    If e is not atomic, it is interpreted as 0 *)
-Definition evalA (e : mini.Expr) (ρ : tenv) : Dom.Value := 
+Definition evalA (e : mini.Expr) (ρ : tenv) : value := 
   match e with 
   | mini.Var x => ρ x
-  | mini.Lit (Int i) => Dom.Int i
+  | mini.Lit (common.Int i) => Dom.Int i
+  | mini.EPrim p => evalPrim p
   | _ => Dom.Int 0
   end.
 
@@ -118,7 +110,7 @@ Definition evalA (e : mini.Expr) (ρ : tenv) : Dom.Value :=
 (* Create a tuple from a list of VALs *)
 Definition tups (VS : list VAL) : VAL := 
   fun v => 
-    exists (vs : list Dom.Value), v = Dom.Value.mkTup vs 
+    exists (vs : list value), v = mkTup vs 
                              /\ List.Forall2 Sets.In vs VS.
 
 (* apply f to x. 
@@ -126,12 +118,12 @@ Definition tups (VS : list VAL) : VAL :=
    iteration on the input. Any inputs that are in the 
    domain of the function will produce output.
  *)
-Definition apply (f : Dom.Value) 
-                 (v : Dom.Value) : list VAL := 
+Definition apply (f : value) 
+                 (v : value) : list VAL := 
   match f with 
   | Dom.Fun hs => 
       h <- hs ;;
-      match (PFun.apply_opt _ _ Dom.Value.eqb h v) with 
+      match (PFun.apply_opt _ _ Value.eqb h v) with 
       | Some w => [ ⌈ w ⌉ ]
       | None => [ ] 
       end
@@ -158,7 +150,7 @@ Definition Env : ENV := fun ρ => True.
 
 (* Constrain a variable to be equal to a particular value.
    All other mappings in the environment are unconstrained. *)
-Definition constrain (x : Ident) (f : tenv -> Value) : ENV := 
+Definition constrain (x : Ident) (f : tenv -> value) : ENV := 
   fun ρ => ρ x = f ρ.
 
 Infix "≈" := constrain (at level 60).
@@ -179,6 +171,9 @@ Definition liftA2 {A} (f : A -> A -> A) : P A -> P A -> P A :=
 
 Definition FAIL : P (list ENV) := ⌈ [] ⌉.
 
+Definition HIDE (xs : Scope.t) (DS : list ENV) : list ENV := 
+  List.map (hide xs) DS.
+
 Definition CHOICE (d1 : list ENV) (d2: list ENV) : list ENV := 
       d1 ++ d2.
 
@@ -197,7 +192,7 @@ Definition UNIFY (d1 : list ENV) (d2: list ENV) : list ENV :=
 Fixpoint eval (e : mini.Expr) (r : Ident) : P (list ENV) := 
   match e with 
 
-  | mini.Block e =>  liftA1 (map (hide (mini.I e))) (eval e r)
+  | mini.Block e =>  liftA1 (hides (mini.I e)) (eval e r)
 
   | mini.Var _ => ⌈[ r ≈ evalA e ]⌉
 
@@ -206,7 +201,7 @@ Fixpoint eval (e : mini.Expr) (r : Ident) : P (list ENV) :=
   | mini.DefineV _ => ⌈[ Env ]⌉
 
   | mini.Array es => 
-      ⌈[ r ≈ (fun ρ => Value.mkTup (fmap (fun e => evalA e ρ) es)) ]⌉
+      ⌈[ r ≈ (fun ρ => mkTup (fmap (fun e => evalA e ρ) es)) ]⌉
 
   | mini.Fail => FAIL
 
@@ -336,7 +331,7 @@ Definition UNIONS : P (list VAL) -> P (list VAL) :=
   fun (VVS : list VAL -> Prop) (VS : list VAL) => 
     forall V i, 
       List.nth_error VS i = Some V -> 
-      V = fun (v : Dom.Value) => 
+      V = fun (v : value) => 
           exists (WS : list VAL) W, 
             (WS ∈ VVS) /\
             List.nth_error WS i = Some W /\
@@ -422,10 +417,10 @@ Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) :=
   | mini.Lit _ => retA (evalA rho e)
   | mini.EPrim _ => retA (evalA rho e)
 
-  | mini.DefineV x => pure [ ⌈ Dom.Value.mkTup nil ⌉ ] 
+  | mini.DefineV x => pure [ ⌈ mkTup nil ⌉ ] 
 
   | mini.Array es => fun VS => 
-     exists vs, (List.Forall2 (evalA rho) es vs) /\ VS = [ ⌈ Dom.Value.mkTup vs ⌉ ]
+     exists vs, (List.Forall2 (evalA rho) es vs) /\ VS = [ ⌈ mkTup vs ⌉ ]
 
   | mini.Seq e1 e2 =>
      VS1  <- E_e rho e1 ;;    (* outer set monad *)
@@ -524,12 +519,12 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
     eval rho (mini.EPrim p) VS
 
   | eval_DefineV x VS : 
-    VS = [ ⌈ Dom.Value.mkTup nil ⌉ ]  ->
+    VS = [ ⌈ mkTup nil ⌉ ]  ->
     eval rho (mini.DefineV x) VS
 
   | eval_Array es vs VS : 
     List.Forall2 (evalA rho) es vs ->
-    VS =  [ ⌈ Dom.Value.mkTup vs ⌉ ] ->
+    VS =  [ ⌈ mkTup vs ⌉ ] ->
     eval rho (mini.Array es) VS
 
   | eval_ApplyD a1 a2 h v VS:
@@ -605,7 +600,7 @@ Inductive eval (rho : env) : mini.Expr -> list VAL -> Prop :=
     [] = VS ->
     eval rho (mini.Fun q eff i e1 (y,h,x) e2) VS
 
-with evalA (rho : env) : mini.Expr -> Dom.Value -> Prop := 
+with evalA (rho : env) : mini.Expr -> value -> Prop := 
  | evalA_one e v : 
    eval rho e [ ⌈ v ⌉ ] -> 
    evalA rho e v
@@ -744,7 +739,7 @@ Ltac eeval := match goal with
 
 Module Test.
 
-Coercion Dom.Int : nat >-> Dom.Value.
+Coercion Dom.Int : nat >-> value.
 
 (*   {y:=if(x=1){0|1}else{2|3}; x:=0|1; y}  =?= 2|0|3|1 *)
 

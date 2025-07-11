@@ -1,39 +1,84 @@
-(* Partial functions, represented as tables. 
-   (Cannot represent as functions as that is not inductive.)
- *)
-
-Require Import structures.Imports.
-Require densem.PFun.
-Require Import structures.List.
+(* The domain of values for the denotational semantics *)
 
 From Stdlib Require Import List.
 From Stdlib Require Import Sorting.Sorted.
 From Stdlib Require Import Classes.EquivDec.
+From Stdlib Require Import Psatz.
 
-(* Create the list [j , j + 1 , ... , j+(k-1) ]  *)
-Fixpoint enumFrom j k := 
-  match k with 
-  | 0 => nil
-  | S m => j :: enumFrom (S j) m 
-  end.
+Require Import structures.Imports.
+Require Import structures.List.
+Require Import densem.PFun.
 
- 
+Import ListNotations.
+Import MonadNotation.
+Open Scope list_scope.
+Open Scope monad_scope.
+
+
+(* There are a finite number of values in this semantics, 
+   but a lot of them. As a result, we can represent 
+   all functions as finite tables. 
+*)
+
+
+(** * Numbers 
+
+   The size of the value domain is determined by the definition 
+   of the largestNumber. We keep this definition abstract.
+*)
+
+Parameter largestNum : nat.
+Definition limitNum := S largestNum.
+
+Axiom ge10 : 10 <= largestNum.
+Definition ge0 : 0 <= largestNum. lia. Qed.
+Definition ge1 : 1 <= largestNum. move: ge10; lia. Qed.
+Definition ge2 : 2 <= largestNum. move: ge10; lia. Qed.
+Definition ge3 : 3 <= largestNum. move: ge10; lia. Qed.
+
+(* because there is a bound on the numbers, we can list them all *)
+Definition allNums := enumFrom 0 limitNum.
+Definition mostNums := enumFrom 0 largestNum.
+Lemma allNums_mostNums : allNums = mostNums ++ [largestNum].
+Admitted.
+
+Lemma all_in_allNums : forall n, n <= largestNum -> List.In n allNums.
+Proof. Admitted.
+
 (* ------------------------------------------------------ *)
 
-Inductive Value : Type := 
-  | Int : nat -> Value
-  | Fun : list (PFun.PFun Value Value) -> Value. 
+(** * Values *)
+
+Inductive value : Type := 
+  | Int : nat -> value
+  | Fun : list (pfun value value) -> value. 
+
+Definition v0 := Int 0.
+Definition v1 := Int 1.
+Definition v2 := Int 2.
+Definition v3 := Int 3.
    
+(* n-ary tuples are enumerated partial functions i -> v *)
+Definition mkTup (vs : list value) : value :=
+  let fix loop ws k : list (pfun value value) := 
+    match ws with 
+    | nil => nil
+    | cons v vs => cons (cons (Int k , v) nil) (loop vs (S k))
+    end
+  in Fun (loop vs 0).
+
+(* partial function with empty domain *)
+Definition emptyFun : value := Fun nil.
+
 (* Function values can have ordered and unordered domains. *)
 (* If the domain is ordered, you can iterate over it. 
    For example, a tuple (a,b,c) is represented as:
       Fun [ (0 |-> a) ; (1 |-> b) ; (2 |-> c) ]
  *)
  
-
 Module Value.
 
-Fixpoint eqb (v1 : Value) (v2 : Value) : bool := 
+Fixpoint eqb (v1 : value) (v2 : value) : bool := 
   match v1 , v2 with 
   | Int i , Int j => Nat.eqb i j
   | Fun fs1 , Fun fs2 => 
@@ -41,7 +86,7 @@ Fixpoint eqb (v1 : Value) (v2 : Value) : bool :=
   | _ , _ => false
   end.
                         
-Fixpoint compare (v1 : Value) (v2 : Value) : comparison := 
+Fixpoint compare (v1 : value) (v2 : value) : comparison := 
   match v1 , v2 with 
   | Int i , Int j => Nat.compare i j
   | Int _ , Fun _ => Lt
@@ -50,126 +95,122 @@ Fixpoint compare (v1 : Value) (v2 : Value) : comparison :=
       list_compare (PFun.compare _ _ compare compare) fs1 fs2 
   end.
 
+Definition V_eq (v1 : value) (v2 : value) := 
+  Value.eqb v1 v2 = true.
+Definition V_lt (v1 : value) (v2 : value) := 
+  Value.compare v1 v2 = Lt.
+
+Lemma value_dec ( v1 v2 : Dom.value) : 
+  {v1 = v2} + { not (v1 = v2) }.
+Admitted.
 
 
-(* n-ary tuples are enumerated partial functions i -> v *)
-Definition mkTup (vs : list Value) : Value :=
-  let fix loop ws k : list (PFun.PFun Value Value) := 
-    match ws with 
-    | nil => nil
-    | cons v vs => cons (cons (Int k , v) nil) (loop vs (S k))
-    end
-  in Fun (loop vs 0).
+Inductive valid : value -> Prop := 
+ | valid_Int k : (k <= largestNum) -> valid (Int k)
+ | valid_Fun fs : 
+   Forall (fun f => PFun.valid _ _ compare f /\ forall v1 v2, 
+               List.In (v1, v2) f -> valid v1 /\ valid v2) fs ->
+   valid (Fun fs).
 
-(* partial function with empty domain *)
-Definition emptyFcn : Value := Fun nil.
+(* all valid values, in order. *)
+Parameter universe : list value.
+Axiom universe_valid : forall v, List.In v universe -> valid v.  
+Axiom valid_universe : forall v, valid v -> List.In v universe.
 
-Parameter joinFcn : forall {a b} (f1 : PFun.PFun a b) (f2: PFun.PFun a b), PFun.PFun a b.
-(* 
--- (?\/) :: Ord a => (a :->? b) -> (a :->? b) -> (a :->? b)
--- f1 ?\/ f2 = PFun (dom f1 `union` dom f2)
-                 -- (\x -> if x `elem` dom f1 then apply f1 x else apply f2 x) *)
-  
+Lemma emptyFun_valid : valid emptyFun. 
+  eapply valid_Fun. econstructor. Qed.
+Lemma mkTuple_valid : forall vs, Forall valid vs -> 
+                            valid (mkTup vs).
+Admitted.
+
 End Value.
 
-Definition V_eq (v1 : Value) (v2 : Value) := Value.eqb v1 v2 = true.
-Definition V_lt (v1 : Value) (v2 : Value) := Value.compare v1 v2 = Lt.
-
-#[export] Instance V_Equivalence : Equivalence V_eq.
-unfold V_eq.
+#[export] Instance V_Equivalence : Equivalence Value.V_eq.
+unfold Value.V_eq.
 split.
 Admitted.
 
-#[export] Instance V_StrictOrder : StrictOrder V_lt.
+#[export] Instance V_StrictOrder : StrictOrder Value.V_lt.
 Admitted.
 
 #[export] Instance V_EquivDec : DecidableEquivalence V_Equivalence.
 Admitted.
 
-Lemma Value_dec ( v1 v2 : Dom.Value) : {v1 = v2} + { not (v1 = v2) }.
-Admitted.
-
-#[export] Instance EqDec_Value : EqDec Dom.Value Logic.eq.
-exact Value_dec. Defined.
+#[export] Instance EqDec_value : EqDec Dom.value Logic.eq.
+exact Value.value_dec. Defined.
 
 (* -------------------- example primitives ------------- *)
 
-Import ListNotations.
-Import MonadNotation.
+Module Prim.
 
-Open Scope monad_scope.
 
-Definition most_ints := [0;1;2;3;4;5].
-Definition all_ints := most_ints ++ [6].
+Definition add1 : value := 
+  let h := x <- mostNums ;;
+           [ (Int x, Int (x + 1)) ]
+  in
+    Fun [ h ].
 
-(* The denotation of an add1 function. 
-   Must be a singleton list (domain is unordered).
-   The partial function must only include 
-   mappings x |-> x + 1. 
- *)
-Definition add1 : Value -> Prop := 
-  fun v => 
-      match v with 
-      | Fun (cons h nil ) => 
-          forall x, List.In x most_ints ->
-               List.In (Int x, Int (x+1)) h
-      | _ => False
-      end.
+Lemma add1_spec : 
+  exists h, add1 = Fun [ h ] /\
+  forall x, x < largestNum -> List.In (Int x, Int (x+1)) h.
+Admitted.
 
-(* identity function, but only on ints *)
-Definition isInt : Value -> Prop := 
-  fun v => 
-    match v with 
-    | Fun (cons h nil) => 
-        forall x, List.In x all_ints ->
-             List.In (Int x, Int x) h
-    | _ => False
-    end.
+Definition any : value := 
+  let h := v <- Value.universe ;; [ (v, v) ] 
+  in Fun [ h ].
+
+Lemma any_spec :
+  exists h, any = Fun [ h ] /\ 
+         forall v, Value.valid v -> List.In (v,v) h.
+Admitted.    
+
+Definition isInt : value := 
+  let h := k <- allNums ;; [ (Int k, Int k) ] 
+  in Fun [ h ].
+Lemma isInt_spec :
+  exists h, isInt = Fun [ h ] /\
+         forall k, k <= largestNum -> List.In (Int k,Int k) h.
+Admitted.
+
+
+Parameter isArr : value.
 
 (* identity function, but only on functions with 
    enumerated domains [(0,v0) .. (n,vn)] *)
-Definition isArr : Value -> Prop :=
-    fun v => 
-      match v with 
-      | Fun (cons h nil) => 
-          forall sz, List.In sz all_ints ->
-                let vs := enumFrom 0 sz in
-                let t  := Value.mkTup (List.map Int vs) in 
-                exists v, List.In (t,v) h
-      | _ => False
-    end.
+Lemma isArr_spec :
+  exists h, isArr = Fun [ h ] /\
+       forall v vs, Value.valid v -> 
+               v = mkTup vs -> 
+               List.In (v,v) h.
+Admitted.
 
-(* NONE of these definitions are correct. They should be singleton sets, not 
-   the union of all finite approximations of the function. *)
+Parameter isFun : value.
+Lemma isFun_spec : 
+  exists h, isFun = Fun [h] /\
+     forall v hs, Value.valid v -> 
+             v = Fun hs ->
+             List.In (v,v) h.
+Admitted.
 
-(* identity function on any argument. *)
-Definition any : Value -> Prop :=  
-  fun v => 
-    match v with 
-    | Fun (cons h nil) => 
-        forall x y, List.In (x,y) h -> x = y
-    | _ => False
-    end.
+Parameter arrayLen : value.
+Lemma arrayLen_spec :
+  exists h, arrayLen = Fun [h] /\
+         forall v vs, v = mkTup vs -> 
+                 List.In (v, Int (length vs)) h.
+Admitted.
 
-
-
-(* identity function, but only on functions *)
-Definition isFun : Value -> Prop := 
-    fun v => 
-    match v with 
-    | Fun (cons h nil) => 
-        forall x y, List.In (x,y) h -> 
-               exists hs, x = Fun hs /\ y = Fun hs
-    | _ => False
-    end.
+End Prim.
 
 
-(* Array length *)
-Definition arrayLen : Value -> Prop := 
-  fun v =>
-    match v with 
-    | Fun (cons h nil) => 
-        forall x y, List.In (x,y) h -> 
-               exists vs, x = Value.mkTup vs /\ y = Int (length vs)
-    | _ => False
-    end.
+Declare Scope value_scope.
+Delimit Scope value_scope with value.
+Open Scope value_scope. 
+
+Module ValueNotation.
+
+Notation "0" := v0 : value_scope.
+Notation "1" := v1 : value_scope.
+Notation "2" := v2 : value_scope.
+Notation "3" := v3 : value_scope.
+
+End ValueNotation.

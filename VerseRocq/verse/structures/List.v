@@ -136,3 +136,19 @@ Definition Exists2_any {A B:Type} :
   forall (P : A -> B -> Prop), list A -> list B -> Prop :=
   fun P XS YS =>
       exists x y, List.In x XS /\ List.In y YS /\ P x y.
+
+
+
+(* Create the list [j , j + 1 , ... , j+(k-1) ]  *)
+Fixpoint enumFrom j k := 
+  match k with 
+  | 0 => nil
+  | S m => j :: enumFrom (S j) m 
+  end.
+
+(* Truncate a list to contain at most one element *)
+Definition take1 {A} (xs : list A) : list A := 
+  match xs with 
+  | h :: _ => [ h ] 
+  | [] => [] 
+  end.
