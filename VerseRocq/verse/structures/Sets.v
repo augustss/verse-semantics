@@ -35,6 +35,7 @@ Definition P := Ensemble.
 
 (* More operations on sets *)
 
+Definition Total_set {A} := fun (x:A) => True.
 
 Definition map {A B} (f : A -> B) : P A -> P B := 
   fun s => fun y => exists x, f x = y /\ (In s x).
@@ -53,6 +54,7 @@ Definition comprehension {A B} (k : A -> P B) (s : P A) : P B :=
 
 
 Module SetNotations. 
+  Notation "⊤"  := Total_set : set_scope.
   Notation "∅"  := Empty_set : set_scope.
   Notation "x ∈ s"  := (In s x) (at level 90) : set_scope.
   Notation "⌈ x ⌉" := (Singleton x) : set_scope.
@@ -83,6 +85,7 @@ Import SetComprehensionNotation.
 Open Scope set_scope.
 
 (* Test cases for notations *)
+Check (1 ∈ ⊤).
 Check (1 ∈ ⌈ 1 ⌉).
 Check (∅ ⊆ ⌈ 1 ⌉).
 Check (∅ ∪ ⌈ 1 ⌉).

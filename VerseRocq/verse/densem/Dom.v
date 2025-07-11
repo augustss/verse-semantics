@@ -27,14 +27,16 @@ Open Scope monad_scope.
    of the largestNumber. We keep this definition abstract.
 *)
 
-Parameter largestNum : nat.
+Definition largestNum := 1.
 Definition limitNum := S largestNum.
 
+(*
 Axiom ge10 : 10 <= largestNum.
 Definition ge0 : 0 <= largestNum. lia. Qed.
 Definition ge1 : 1 <= largestNum. move: ge10; lia. Qed.
 Definition ge2 : 2 <= largestNum. move: ge10; lia. Qed.
 Definition ge3 : 3 <= largestNum. move: ge10; lia. Qed.
+*)
 
 (* because there is a bound on the numbers, we can list them all *)
 Definition allNums := enumFrom 0 limitNum.
@@ -49,6 +51,10 @@ Proof. Admitted.
 
 (** * Values *)
 
+(* Invariant: domains of partial 
+   functions in the list are disjoint   
+   but --- advantage for nondisjoint -- functinos 
+   can return choices*)
 Inductive value : Type := 
   | Int : nat -> value
   | Fun : list (pfun value value) -> value. 

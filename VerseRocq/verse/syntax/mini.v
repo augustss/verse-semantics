@@ -173,6 +173,7 @@ Import MiniNotation.
 Open Scope list_scope.
 Open Scope mini_expr_scope.
 
+Definition r : Ident := 0.
 Definition x : Ident := 1.
 Definition y : Ident := 2.
 Definition t : Ident := 3.
