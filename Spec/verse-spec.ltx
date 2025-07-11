@@ -29,7 +29,7 @@
 \author{Tim, Jan, Andy S, Simon, Lennart, Koen, Ranjit \today}
 \maketitle
 
-\section{Overview}
+\section{Overview x}
 
 \begin{itemize}
 \item {\bf Source Verse} is (an approximation of) the full source language.
@@ -89,6 +89,27 @@
 \section{Denotational semantics: notation}
 \input{densem-notation}
 
+Design variants:
+\begin{itemize}
+\item \textbf{(E-LV)}: expression-style, list of values.
+  \begin{itemize}
+  \item $\semappsub{E}{e}{|e|} : \Env \rightarrow \seq{ \VAL }$
+  \item \Cref{fig:e-lv1} and \Cref{fig:e-lv2}
+    \end{itemize}
+
+\item \textbf{(D-LS)}: dps-style, list of sets of environments.
+  \begin{itemize}
+  \item $\semapsub{E}{d}{|e|} r : \seq{ \ENV }$
+  \item \Cref{fig:d-ls1} and \Cref{fig:d-ls2}
+    \end{itemize}
+
+\item \textbf{(D-SLS)}: dps-style, sets of lists of sets of environments.
+  \begin{itemize}
+  \item $\semapsub{E}{d}{|e|} r : \powersetnp{\seq{ \ENV }}$
+  \item \Cref{fig:d-sls1} and \Cref{fig:d-sls2}
+    \end{itemize}
+\end{itemize}
+
 % -------------------------------------------------------------
 %               Denotational semantics: expression style
 % -------------------------------------------------------------
@@ -104,6 +125,14 @@
 \clearpage \newpage
 \section{Denotational semantics: DPS (Koen style)}
 \input{densem-koen}
+
+% -------------------------------------------------------------
+%               Denotational semantics: Koen style
+% -------------------------------------------------------------
+
+\clearpage \newpage
+\section{Denotational semantics: DPS (sets of sequences of sets)}
+\input{densem-set-seq-set}
 
 % -------------------------------------------------------------
 %               Denotational semantics: destination style

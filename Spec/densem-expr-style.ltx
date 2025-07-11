@@ -60,6 +60,7 @@ $$
   \semappsub{A}{e}{|x|}\rho & = & \rho(x) \\
   \semappsub{A}{e}{|k|}\rho & = & k \\
   \semappsub{A}{e}{|o|}\rho & = & \semap{O}{o} \\[1mm]
+
   \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \quad\quad \text{\textbf{invariant}: no trailing \{\}}\\
   \EE{|a|}{\rho} & = & [\msing{\semappsub{A}{e}{a}\rho}] \\
   \EE{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
@@ -138,7 +139,8 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Mini Verse: expression style}
+\caption{Denotational semantics: plan (E-LV)}
+\label{fig:e-lv1}
 \end{figure}
 
 
@@ -174,7 +176,8 @@ $$
 
 \end{array}
 $$
-\caption{Auxiliary functions for expression-style denotational semantics}
+\caption{Auxiliary functions for plan (E-LV)}
+\label{fig:e-lv2}
 \end{figure}
 
 \newcommand{\newfcn}{\Value \hookrightarrow \Value}

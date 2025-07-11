@@ -287,8 +287,9 @@
 \newcommand{\VAL}{\M{\mathit{VAL}}}
 
 %% Sets and sequences
-\newcommand{\powerset}[1]{\M{\mathit{Set}(#1)}}    % Sets
-\newcommand{\seq}[1]{\M{ [ #1 \,] }}           % Sequences
+\newcommand{\powerset}[1]{\powersetnp{(#1)}}       % Sets
+\newcommand{\powersetnp}[1]{\M{\mathit{Set}#1}}   % Sets without parens
+\newcommand{\seq}[1]{\M{ [ #1 \,] }}              % Sequences
 
 %% Semantic function calls, e.g E[e]rho
 \newcommand{\semfun}[1]{\mathcal{#1}}
@@ -306,7 +307,10 @@
 \newcommand{\cleanE}{\mathbf{clean}}
 \newcommand{\intersectE}{\cap}
 \newcommand{\unionE}{\cup}
+\newcommand{\unionEL}{\mathbf{unionEL}}
 \newcommand{\hideE}{\mathbf{hide}}
+\newcommand{\mapE}{\mathbf{trans}}
+\newcommand{\singleE}{\mathbf{single}}
 \newcommand{\extractE}{\mathbf{extract}}
 \newcommand{\combineE}{\mathbf{combine}}
 \newcommand{\firstE}{\mathbf{first}}
