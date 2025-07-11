@@ -132,7 +132,8 @@ verify("M20Mar25-2", fail) { f( :int | :string ):int := 3
                            ; f['c'] }
 
 # -------------- A collection of examples that involve choice in the domain ------------
-verify("M19Mar25-1", pass) { f( g:type{(:int) => :char} ):char := g[3] }
+verify("M19Mar25-1", pass)  { f( g:type{(:int) => :char} ):char := g[3] }
+verify("M19Mar25-1a", pass) { f( g(:int):char            ):char := g[3] }
   # This should surely pass!  We apply g to 3, which gives a char.
 
 verify("M19Mar25-2", pass) { (f( x:int    )<decides>  := x=(1|2)); all{ exists y { f[y] } } = (1,2) }
