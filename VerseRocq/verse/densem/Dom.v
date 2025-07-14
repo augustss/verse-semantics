@@ -24,11 +24,14 @@ Open Scope monad_scope.
 (** * Numbers 
 
    The size of the value domain is determined by the definition 
-   of the largestNumber. We keep this definition abstract.
+   of the largestNumber and the rank of the largest function. 
+   We keep these definitions abstract.
 *)
 
 Definition largestNum := 1.
 Definition limitNum := S largestNum.
+Definition largestRank := 1.
+
 
 (*
 Axiom ge10 : 10 <= largestNum.
@@ -72,6 +75,15 @@ Definition mkTup (vs : list value) : value :=
     | cons v vs => cons (cons (Int k , v) nil) (loop vs (S k))
     end
   in Fun (loop vs 0).
+
+(* extend a tuple value with a new component at the end *)
+Definition snoc (tup : value) (v: value) : value := 
+  match tup with 
+  | Fun hs =>
+      Fun (hs ++ [[(Int (List.length hs),v)]])
+  | _ => tup
+  end.
+
 
 (* partial function with empty domain *)
 Definition emptyFun : value := Fun nil.

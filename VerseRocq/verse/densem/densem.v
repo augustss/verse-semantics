@@ -4,6 +4,9 @@ From Stdlib Require Lists.List.
 From Stdlib Require Import Classes.EquivDec.
 Import ssreflect.
 
+From Stdlib Require Import Logic.PropExtensionality.
+From Stdlib Require Import Logic.FunctionalExtensionality.
+
 Require Import syntax.common.
 Require syntax.mini.
 Require Import PFun.
@@ -33,6 +36,10 @@ Open Scope set_scope.
 Definition VAL := P value.
 Definition ENV := P env.
 
+Definition guard {A} (ϕ : Prop) (e : P A) : P A := 
+  fun ρ => ϕ /\ (ρ ∈ e).
+
+
 (* -------------- semantic functions ---------------- *)
 
 Definition evalPrim (p : PrimOp) : value  := 
@@ -59,10 +66,9 @@ Fixpoint evalA (e : mini.Expr) (ρ : env) : value :=
 (* ------------- operations on sequences of sets ---------------- *)
 
 
-
 Definition SUCCEED {A} : list (P A) := [ Total_set ]. 
 
-Definition FAIL {A} : list (P A) := [] .
+Definition FAIL {A} : list (P A) := [ ∅ ] .
 
 Definition CHOICE {A} (d1 : list A) (d2: list A) : list A := 
   d1 ++ d2.
@@ -72,7 +78,54 @@ Definition UNIFY {A} (d1 : list (P A)) (d2: list (P A)) : list (P A) :=
   ρ2 <- d2 ;;
   [ ρ1 ∩ ρ2 ].
 
-(* -------------- auxiliary definitions ------------ *)
+Infix "*" := UNIFY.
+
+
+(* left to right squash *)
+Definition squash_fold_left {A B} (f : P A -> P B -> P A) : list (P B) -> P A -> P A := 
+  List.fold_left 
+    (fun bs x => fun b => ((x ≃ ∅) /\ (b ∈ bs)) \/ (not (x ≃ ∅) /\ (b ∈ (f bs x)))).
+
+(* right to left squash *)
+Fixpoint squash {A} (xs : list(P A)) : list (P A) -> Prop := 
+  match xs with 
+  | nil => ⌈ nil ⌉
+  | cons x xs' => 
+      fun ys => ((x ≃ ∅) /\ squash xs' ys) \/ (not (x ≃ ∅)) /\  match ys with 
+                                           | nil => False 
+                                           | cons y ys' => x = y /\ squash xs' ys'
+                                         end
+  end.
+
+Lemma squash_unique {A} : forall (xs ys zs: list (P A)), 
+    squash xs ys -> squash xs zs -> ys = zs.
+Proof.
+  induction xs; simpl; intros ys' zs' h1 h2. 
+  - inversion h1; inversion h2; auto. 
+  - destruct h1 as [ [E1 S1] | [NE1 M1] ]; destruct h2 as [[E2 S2] | [NE2 M2]].
+    + eapply IHxs; eauto.
+    + done.
+    + done.
+    + destruct ys'; destruct zs'; try done.
+      move: M1 => [<- M1].
+      move: M2 => [<- M2].
+      f_equal; eauto.
+Qed.
+
+(* If it is decidable whether sets are empty, we can always squash a list. *)
+Axiom dec_empty : forall {A} (s : P A), (s ≃ ∅) \/ not (s ≃ ∅).
+Lemma squash_total {A} : forall (xs : list (P A)), exists ys, squash xs ys.
+Proof.
+  induction xs.
+  exists nil. reflexivity.
+  move: IHxs => [ys' h].
+  destruct (dec_empty a).
+  - exists ys'. left. split; auto.
+  - exists (a :: ys'). right. split; auto.
+Qed.
+
+
+(* -------------- auxiliary definitions for VAL ------ *)
 
 (* Create a tuple from a list of VALs *)
 Definition tups (VS : list VAL) : VAL := 
@@ -85,8 +138,7 @@ Definition tups (VS : list VAL) : VAL :=
    iteration on the input. Any inputs that are in the 
    domain of the function will produce output.
  *)
-Definition apply (f : value) 
-                 (v : value) : list VAL := 
+Definition apply (f : value) (v : value) : list VAL := 
   match f with 
   | Dom.Fun hs => 
       h <- hs ;;
@@ -97,105 +149,146 @@ Definition apply (f : value)
   | _ => []
   end.
 
-Fixpoint squash {A} (xs : list(P A)) : list (P A) -> Prop := 
-  match xs with 
-  | nil => ⌈ nil ⌉
-  | cons y ys => 
-      fun zs => (y ≃ ∅) \/ squash ys zs
-  end.
+  
+(* ---------- auxiliary definitions for ENV and list ENV ------ *)
 
-(* ------------------------------------------------------- *)
-
-
-
-(* 
-
-We define the denotation E{op} as a sequence of sets of Verse environments as follows:
-    E{exists x}     := [{ρ | ρ∈Environments          }]
-    E{x=u}          := [{ρ | ρ∈Environments, ρ.x=ρ.u }]
-    E{x=atom}       := [{ρ | ρ∈Environments, ρ.x=atom}]
-    E{x=fail}       := [{                             }]
-    E{a; b}         := E{a}*E{b}
-    E{a|b}          := E{a}+E{b}
-    E{f=tuple(n) t} :=
-    E{f=tuple{a_0,...,a_n}} := 
-       [{(tuple(n) t)(0)=V_0,(tuple(n) t)(n)=V_n,f=function[(0->V_0),...,(n->V_n)]) | V_0∈V,...,V_n∈V}]
-    E{y=if(a){b}else{c}} :=
-       ([E{a}[0]                                      ]             +
-        [E{a}[1] \{xs} E{a}[0]                        ]             +
-        [E{a}[n] \{xs} E{a}[0] \{xs} ... \{xs} E{a}[n]] )*E{y=b}\xs +
-       ([P(Env)  \{xs} E{a}[0] \{xs} ... \{xs} E{a}[n]] )*E{y=c}\xs
-        where n     := Length(E{a})
-        where xs    := Exis{a}\/Exis{b}\/Exis{c}
-  NOTE: Pure if(a){b}else{c} <=> if(a){b}else{:false} | if(a){:false}else{c}
-    E{y=for(a){z:=b}} := [{(e,y=W_0+...+W_n) | (e,t_0=W_0,...,t_n=W_n)∈es} | es∈c(0)*...*c(n)]
-       where c(i) := s(i) + f(i) # Ordered, so E{x:nat<2; for(x=1){2}} = [{x=1},{x=0}].
-  where s(i) := [(e,t_i=tuple{e.z}) | e∈es\xs} | es∈[E{b}   *     E{a}[i]]]
-       where f(i) := [(e,t_i=tuple{   }) | e∈es\xs} | es∈[P(Env) \{xs} E{a}[i]]]
-       where n    := Length(E{a})
-       where xs   := Exis{c}\/Exis{d}
-  NOTE: D{for{:nat<2}} = {[tuple{0}],[tuple{1}]}
-    E{stage(fxv,f,fx) i x {op0}} in context where assumed := [s(0),s(1),...]\n (ρ.n fresh) where:
-        s(j) := {ρ | ρs∈Scoped(ρ,i,op0), ρ∈ps, ρ.n∈fx, j<ρ.n, not fails⊆fx or ρ.AllowFails=1}
-    E{y=f[x]} :=
-        [{ρ | ρ.f=Fun(fss), fs=fss[i], (ρ.x,ρ.y) ∈ fs} | i in [0,1,...]]
-    E{f=lambda(oc,fx,h) i w {op0} j z {op1}} := CONSIDERING SETS ONLY, IGNORING SEQUENCES
-        {ρ | ρ∈Environments,
-            fx⊆{0,1},
-            exists hs∈V->V, ρ.h  = relation hs, IsFunction(hs),
-            exists hs∈V->V, ρ.f  = relation fs, IsFunction(fs),
-            ρ0s := Scoped(ρ,i,op0)
-            forall ρ0∈p0s.
-                ρ1s:=Scoped(ρ0,z,op1)
-                (    exists J∈Values. (ρ0.w,J)∈hs) => 1∈fx
-                (not exists J∈Values. (ρ0.w,J)∈hs) => 0∈fx and AllowFails(ρ1s)
-            forall I∈Values. exists Z∈Values. (I,Z)∈fs) <=>
-                (not exists ρ0∈p0s. ρ0.i=I) and oc=open and (I,Z)∈hs or
-                (    exists ρ0∈p0s. ρ0.i=I) and forall ρ0∈p0s where ρ0.i=I.
-                                                     exists ρ1∈Scoped(ρ0,z,op1).
-                                                         (ρ1.w,ρ1.j)∈hs and ρ1.z=Z
-        }\AllowFails
-    E{f=lambda(oc,fx,h) i w {op0} j z {op1}} :=
-        [{ρ | ρ∈Environments,
-            fx⊆{0,1},
-            exists hss∈[V->V]. ρ.h  = relation hss, IsFunction(hss),
-            exists fss∈[V->V]. ρ.f  = relation fss, IsFunction(fss),
-n    := |hss|=|fss|
-            ρ0ss := Scoped(ρ,i,op0)
-exists js∈[|p0ss|]nat
-if oc=open   then for all i∈nat<|p0ss|-1. js[i]<js[i+1]<n
-if oc=closed then for all i∈nat<|p0ss|.   js[i]=i
-            forall i∈[0,|p0ss|-1], j:=js[i], ρ0∈p0ss[i].
-   ρ1ss := Scoped(ρ0,z,op1)
-|ρ1ss| <= 1
-                (    exists J∈Values. (ρ0.w,J)∈hss[j]) => 1∈fx
-                (not exists J∈Values. (ρ0.w,J)∈hss[j]) => 0∈fx and AllowFails({ρ1 | ρ1s∈ρ1ss, ρ1∈ρ1s})
-            forall j:=0..n-1, I∈Values. exists Z∈Values. (I,Z)∈fss[j]) <=>
-                (not exists i∈nat, ρ0∈p0ss[i]. ρ0.i=I) and oc=open and (I,Z)∈hss[j] or
-                (    exists i∈nat, ρ0∈p0ss[i]. ρ0.i=I) and forall ρ0∈p0ss[i] where ρ0.i=I.
-                                                     exists ρ1∈Scoped(ρ0,z,op1)[0].
-                                                         (ρ1.w,ρ1.j)∈hss[j] and ρ1.z=Z
-        }\AllowFails]
-NOTE: This works for function(0|1){4}=function(2|3){5} because ρ.f&h range over all possible functions
-   and are then filtered by op0&op1, producing the possibile interleavings of 0|1 and 2|3.
-REALIZATION: f(x:int)<decides>{x=1|x=2} is bogus, as universal quantification over x:int of a choice is ill-defined,
-and <iterates> is disallowed by <decides> and if it weren't then f(:int)<decides>:int might choose.
-*)
-
-(* ----------- dest passing style Fig 20 ----------------- *)
-
-Module DPS.
+(* destinguished result variable *)
+Definition r : Ident := mini.Test.r.
 
 (* Constrain a variable to be equal to a particular value.
    All other mappings in the environment are unconstrained. *)
 Definition constrain (x : Ident) (f : env -> value) : ENV := 
   fun ρ => ρ x = f ρ.
 
-Infix "≈" := constrain (at level 60).
 
 (* Generalize all of the xs to be anything *)
+(* "Envs Drop Variables" *)
 Definition hide (xs : Scope.t) (Δ : ENV) : ENV := 
   fun ρ => exists ρ', (ρ' ∈ Δ) /\ forall x, ~ (Scope.In x xs) -> (ρ x = ρ' x).
+
+(* just generalize r *)
+Definition hide_r : ENV -> ENV := hide (Scope.singleton r).
+
+(* Generalize all of the xs to be anything *)
+(* Envss Drop Variables *)
+Definition hide_list (xs : Scope.t) (Δs : list ENV) : list ENV := 
+  List.map (hide xs) Δs.
+
+(* Envs Difference       es \{xs} fs := {e | e∈es, for all f∈fs. not e∈{f}\xs} *)
+Definition envs_difference (es : ENV) (xs : Scope.t) (fs : ENV) : ENV := 
+  e <- es ;;
+  f <- fs ;;
+  guard (not (e ∈ (hide xs ⌈f⌉))) ⌈ e ⌉.
+
+
+(* Two different versions of application. Arguments must be atomic, 
+   i.e. have a single value
+   The set of all environments such that the ith result of 
+   apply e1 to e2 is ρ r. Not sure yet which one of these is easier to 
+   reason about.
+*)
+Definition APPi (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
+  fun ρ => 
+    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some ⌈ ρ r ⌉.
+
+Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
+  fun ρ => 
+    exists hs h, evalA e1 ρ = Fun hs 
+            /\ List.nth_error hs i = Some h 
+            /\ List.In (evalA e2 ρ , ρ r ) h.
+
+Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV := 
+  i <- allNums ;;
+  [ APPi e1 e2 i ].
+
+
+
+(* find all environments in Δ such that ρ(r) = v and then hide r *)
+Definition extract (Δ : ENV) : P (value * ENV) := 
+  fun '(v , Δ'') => 
+    Δ'' = hide_r (Δ ∩ (constrain r (fun _ => v))).
+
+Definition combine : list ENV -> P (list value * ENV) := 
+  List.fold_right 
+    (fun Δ VSS => 
+       '(vi, Δi) <- extract Δ ;;
+       fun '(vs, Δs) => (vi :: vs, Δi ∩ Δs) ∈ VSS)
+    (fun _ => False).
+       
+Definition ALL (s : list ENV) : ENV := 
+  '( vs, Δ ) <- combine s ;;
+     (Δ ∩ (constrain r (fun _ => mkTup vs))).
+
+(* ------  Notation ----------------------------------------- *)
+
+Infix "≈" := constrain (at level 60).
+Notation "Δ \ xs" := (hide xs Δ) (at level 70).
+Notation "Δ [\] xs" := (hide_list xs Δ) (at level 70).
+Notation "es \{ xs } fs" := (envs_difference es xs fs) (at level 40) : ENV_scope.
+
+Notation "⟨ n ⟩" := (fun ρ => Int n) (at level 40).
+
+
+Lemma not_r : forall (x r : Ident), (SetoidList.InA eq x [r] -> False) -> Nat.eqb x r = false. Admitted.
+
+Example ex_ALL : 
+  (r |-> mkTup [Int 3;Int 4]) ∈ (ALL [r ≈ ⟨ 3 ⟩;  r ≈ ⟨ 4 ⟩] ).
+cbn. exists ([Int 3; Int 4], Total_set).
+split; [exists (Int 3, Total_set);split|idtac]. 
+- cbv. extensionality ρ.
+  eapply propositional_extensionality.
+  split; try done. intro h.
+  exists (Env.extend r (Int 3) ρ). 
+  split. split. cbv. auto. cbv. auto.
+  intros x xIn. apply not_r in xIn. 
+  cbv. destruct x. done. done.
+- cbv.
+
+(* ------  Fig 17 ----------------------------------------- *)
+
+Module DLS.
+
+Fixpoint E (e : mini.Expr) : list ENV := 
+  match e with 
+  | mini.DefineV _ => [ Total_set ]
+
+  | mini.Var _ => [ r ≈ evalA e ]
+  | mini.Lit _ => [ r ≈ evalA e ]
+  | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ]
+
+  | mini.Fail => FAIL 
+
+  | mini.Choice e1 e2 => E e1 ++ E e2
+
+  | mini.Seq e1 e2 => (E e1 [\] Scope.singleton r) * E e2
+
+  | mini.Unify e1 e2 => E e1 * E e2
+
+  | mini.ApplyD e1 e2 => APP e1 e2
+
+  | mini.If3 a b c =>  
+    (* Note, not quite right *)
+    let Y := mini.I a in 
+    ((E a [\] (Scope.add r Y)) * (E b [\] Y)) ++ (E c [\] Y)
+
+  | mini.All a => 
+      let Y := mini.I a in 
+      
+
+  (* TODO: functions, all, one *)                                                    
+
+  | _ => [ ∅ ] 
+  end.
+
+End DLS.
+
+(* ----------- dest passing style Fig 20 ----------------- *)
+
+Module DSLS.
+
+
+
 
 (* Semantic operations *)
 
@@ -226,38 +319,21 @@ Definition ALL (s : list ENV) : list ENV :=
 Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
   UNIFY (HIDE (Scope.singleton r) d1) d2.
 
-(* Two different versions of application. 
-   The set of all environments such that the ith result of 
-   apply e1 to e2 is ρ r.
-*)
-Definition APPi (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
-  fun ρ => 
-    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some ⌈ ρ r ⌉.
 
-Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
-  fun ρ => 
-    exists hs h, evalA e1 ρ = Fun hs 
-            /\ List.nth_error hs i = Some h 
-            /\ List.In (evalA e2 ρ , ρ r ) h.
-
-Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV := 
-  i <- allNums ;;
-  [ APPi e1 e2 i ].
-
-Fixpoint eval (e : mini.Expr) : P (list ENV) := 
+Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
   let B (e : mini.Expr) : P (list ENV)  :=
-    HIDE (mini.I e) <$> (eval e)
+    HIDE (mini.I e) <$> (E e)
   in
 
   match e with 
 
   | mini.Block e =>  B e
 
-  | mini.Var _ => ⌈[ r ≈ evalA e ]⌉
-  | mini.Lit _ => ⌈[ r ≈ evalA e ]⌉
-  | mini.EPrim _ => ⌈[ r ≈ evalA e ]⌉
-  | mini.Array es =>  ⌈[ r ≈ evalA e ]⌉
+  | mini.Var _ => ⌈[ r ≈ EA e ]⌉
+  | mini.Lit _ => ⌈[ r ≈ EA e ]⌉
+  | mini.EPrim _ => ⌈[ r ≈ EA e ]⌉
+  | mini.Array es =>  ⌈[ r ≈ EA e ]⌉
 
   | mini.DefineV _ => ⌈ SUCCEED ⌉
 
@@ -267,9 +343,9 @@ Fixpoint eval (e : mini.Expr) : P (list ENV) :=
 
   | mini.Choice e1 e2 => CHOICE <$> (B e1) <*> (B e2)
 
-  | mini.Seq e1 e2 => SEQ <$> (eval e1) <*> (eval e2)
+  | mini.Seq e1 e2 => SEQ <$> (E e1) <*> (E e2)
 
-  | mini.Unify e1 e2 => UNIFY <$> (eval e1) <*> (eval e2)
+  | mini.Unify e1 e2 => UNIFY <$> (E e1) <*> (E e2)
 
   | mini.All e1 => ALL <$> (B e1)
 
@@ -325,7 +401,7 @@ Definition x : Ident := mini.Test.x.
 
 (* { x:=1; x }  *)
 Lemma t2 : 
-  [ ⌈r |-> Int 1⌉ ] ∈ eval mini.Test.t2.
+  [ ⌈r |-> Int 1⌉ ] ∈ E mini.Test.t2.
 Proof.
   unfold mini.Test.t2.
   exists [ ⌈r |-> Int 1, mini.Test.x |-> Int 1⌉ ].
