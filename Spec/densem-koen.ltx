@@ -9,24 +9,30 @@ $$
 % ------------- Denotational semantics of DPS Verse ---------------
 \begin{array}{c}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
-& \semapsub{E}{d}{|e|} r & : & \seq{ \ENV } \\
-\rulename{edef} & \semapsub{E}{d}{|defintro x|}r & = & [ \Env ]  \hspace{8mm} \text{All environments} \\
-\rulename{eatom} &  \semapsub{E}{d}{|a|}r & = & [ \{ \rho \in \Env \vb \rho(r) = \semapp{A}{a}{\rho} \} ] \\
+& \semapsub{E}{d}{|e|} & : & \seq{ \ENV } \\
+\rulename{edef} & \semapsub{E}{d}{|defintro x|} & = & [ \Env ]  \hspace{8mm} \text{All environments} \\
+\rulename{eatom} &  \semapsub{E}{d}{|a|} & = & [ \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \} ] \\
 \rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
-\rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}r
- & = & \semapsub{E}{d}{e_1}r \append \semapsub{E}{d}{e_2}r  \\
-\rulename{eseq} &  \semapsub{E}{d}{|e_1 ; e_2|}r
-& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1}s,
-          \EV_2 \in \semapsub{E}{d}{e_2}r ] \hspace{8mm} \text{|s| fresh} \\
-\rulename{elam} &  \semapsub{E}{d}{|dpslam x e_1 e2 y|}r & = & ??? \\
-\rulename{eapp} & \semapsub{E}{d}{|apply1N a_1 a_2|}r
- & = & [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(r)}) \in hs[i] \} \vb i \in 0\mydots ] \\
+\rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}
+ & = & \semapsub{E}{d}{e_1} \append \semapsub{E}{d}{e_2}  \\
+\rulename{eunify} &  \semapsub{E}{d}{|e_1 == e_2|}
+& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1},
+          \EV_2 \in \semapsub{E}{d}{e_2} ] \\
+\rulename{eseq} &  \semapsub{E}{d}{|e_1 ; e_2|}
+& = &  [ \hideE(\RES,\EV_1) \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1},
+          \EV_2 \in \semapsub{E}{d}{e_2} ] \\
+\rulename{elam} &  \semapsub{E}{d}{|dpslam x e_1 e_2 y|} & = & ??? \\
+\rulename{eapp} & \semapsub{E}{d}{|apply1N a_1 a_2|}
+ & = & \begin{array}[t]{@@{}l@@{\;}l}
+  [ & \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
+    |vbar| &  i \in 0\mydots \; ]
+  \end{array} \\
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
-  \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }r
+  \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }
 & = & [ \hideE(Y, \EV_1 \cap \EV_2)
-      \vb \EV_2 |<-| \semapsub{E}{d}{|e_2|}r] \; \dodgyunion \\
+      \vb \EV_2 |<-| \semapsub{E}{d}{|e_2|}] \; \dodgyunion \\
 &&&  [ \EV_3 \setminus (\hideE(Y, \EV_1)
-       \vb \EV_3 |<-| \semapsub{E}{d}{|e_3|}r] \\
+       \vb \EV_3 |<-| \semapsub{E}{d}{|e_3|}] \\
 &&& |where| \begin{array}[t]{ll}
   Y = \semap{I}{|e_1|} \\
   \EV_1 = \firstE(Y, \semapsub{E}{d}{|e_3|}x)  & \text{$x$ fresh}
