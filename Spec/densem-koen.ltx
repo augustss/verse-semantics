@@ -19,7 +19,7 @@ $$
 & \semapsub{E}{d}{|e|} & : & \seq{ \ENV } \\
 \rulename{edef} & \semapsub{E}{d}{|defintro x|} & = & [ \Env ]  \hspace{8mm} \text{All environments} \\
 \rulename{eatom} &  \semapsub{E}{d}{|a|} & = & [ \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \} ] \\
-\rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
+\rulename{efail} &  \semapsub{E}{d}{|fail|} & = & [ ] \\
 \rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}
  & = & \semapsub{E}{d}{e_1} \append \semapsub{E}{d}{e_2}  \\
 \rulename{eunify} &  \semapsub{E}{d}{|e_1 == e_2|}
@@ -59,13 +59,6 @@ $$
 \begin{figure}
 $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
- \combineE & : & \seq{ \powerset{\Val, \ENV} } \rightarrow \powerset{\seq{\Val}, \ENV} \\
- \multicolumn{3}{c}{\text{Not quite right yet}} \\
- \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
-     \{  & (\langle v_0, \mydots, v_n \rangle, \EV_1 \intersectE \mydots \intersectE \EV_n) \\
-     \vb & (v_0,\EV_0) \in s_0, \mydots, (v_n,\EV_n) \in s_n \}
- \end{array} \\
-
  \firstE & : & \powerset{\Ident} \rightarrow \seq{\ENV} \rightarrow \ENV \\
  ToDo
 \end{array}

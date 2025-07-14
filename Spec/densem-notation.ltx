@@ -48,12 +48,12 @@ $$
 \text{Primitive ops} &   \semap{O}{|o|} & : & \Val \\
 &   \semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
 
-\text{Binders of block} & \semap{I}{|e|} & : & [\Ident] \\
+\text{Binders of block} & \semap{I}{|e|} & : & \powerset{\Ident} \\
 &  \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
 
 \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
-&  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mycdots n \} ] \\[1mm]
-\text{Hiding} & \hideE & : & \seq{\Ident + \RES} \rightarrow \ENV \rightarrow \ENV \\
+&  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
+\text{Hiding} & \hideE & : & \powerset{\Ident + \RES} \rightarrow \ENV \rightarrow \ENV \\
 & \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
 
 \text{Extract result} & \extractE & : & \ENV \rightarrow \powerset{\Val, \ENV} \\
