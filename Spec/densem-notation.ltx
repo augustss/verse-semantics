@@ -24,8 +24,7 @@ $$
   && \vb & |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
   && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
 \end{array} \\
-    \\
-    \textbf{Domains}\\
+\textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
   s \in & \VAL & = & \powerset{\Value} \\
@@ -46,26 +45,33 @@ $$
 &  \semapp{A}{|o|}\rho & = & \semap{O}{o} \\
 &  \semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
 
-
-\text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
-&  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mycdots n \} ] \\[1mm]
-
 \text{Primitive ops} &   \semap{O}{|o|} & : & \Val \\
 &   \semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
 
 \text{Binders of block} & \semap{I}{|e|} & : & [\Ident] \\
 &  \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
-\end{array}\\
-\\
 
-    \textbf{Notation for sets and sequences} \\
+\text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
+&  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mycdots n \} ] \\[1mm]
+\text{Hiding} & \hideE & : & \seq{\Ident + \RES} \rightarrow \ENV \rightarrow \ENV \\
+& \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
+
+\text{Extract result} & \extractE & : & \ENV \rightarrow \powerset{\Val, \ENV} \\
+& \extractE(\EV) & = & \{ (v, \hideE(\RES, \EV'))
+                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(\RES)=v \} \} \\[1mm]
+& \combineE & : & \seq{ \ENV } \rightarrow \powerset{\seq{\Val}, \ENV} 
+     \hspace{1cm} \text{Not quite right yet??} \\
+& \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
+     \{  & ([ v_0, \mydots, v_n ],\, \EV_0 \intersectE \mydots \intersectE \EV_n) \\
+     \vb & (v_0,\EV_0) \in \extractE(s_0), \mydots, (v_n,\EV_n) \in \extractE(s_n) \}
+ \end{array} \\
+\end{array}\\[2mm]
+
+\textbf{Notation for sets and sequences} \\
 \begin{array}{l@@{\,}c@@{\,}ll}
-  |[e_1,xdots,e_n]| & : & \seq{A} & \text{Sequence of items} \\[2mm]
-
-  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension}, \\[2mm]
-
-  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\
-  |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
+  |[e_1,xdots,e_n]| & : & \seq{A} & \text{Sequence of items} \\
+  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension}, \\
+  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\[2mm]
 
   \dodgyunion & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}}
             & \text{``Dodgy union''} \\

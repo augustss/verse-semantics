@@ -7,7 +7,14 @@
 \begin{figure}
 $$
 % ------------- Denotational semantics of DPS Verse ---------------
-\begin{array}{c}
+\begin{array}{l}
+\textbf{Domains} \\
+\begin{array}{r@@{\;}l@@{\;\;}c@@{\;\;}ll}
+  \rho \in & \Env & = & (\Ident + \RES) \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
+  &&&& \hspace{3mm} \text{plus result token $\RES$}
+\end{array} \\
+\\
+\textbf{Denotational semantics} \\
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
 & \semapsub{E}{d}{|e|} & : & \seq{ \ENV } \\
 \rulename{edef} & \semapsub{E}{d}{|defintro x|} & = & [ \Env ]  \hspace{8mm} \text{All environments} \\
@@ -30,24 +37,19 @@ $$
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
   \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }
 & = & [ \hideE(Y, \EV_1 \cap \EV_2)
-      \vb \EV_2 |<-| \semapsub{E}{d}{|e_2|}] \; \dodgyunion \\
+         \vb \EV_2 |<-| \semapsub{E}{d}{|e_2|}] \; \dodgyunion \\
 &&&  [ \EV_3 \setminus (\hideE(Y, \EV_1)
        \vb \EV_3 |<-| \semapsub{E}{d}{|e_3|}] \\
 &&& |where| \begin{array}[t]{ll}
   Y = \semap{I}{|e_1|} \\
   \EV_1 = \firstE(Y, \semapsub{E}{d}{|e_3|}x)  & \text{$x$ fresh}
   \end{array} \\
-\rulename{eall} & \semapsub{E}{d}{|all e|}r
-& = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{V}{e}), \rho \in \EV, \rho(r)=\tupE(vs) \}\, ]
+\rulename{eall} & \semapsub{E}{d}{|all e|}
+& = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{B}{e}), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ]
 \\[2mm]
 
-& \semap{V}{|e|} & : & \seq{ \powerset{\Val, \ENV} } \\
-& \semap{V}{|e|} & = &
-  [ \extractE(r,\EV) \vb \EV \in \semapp{B}{e}r ] \hspace{8mm} \text{|r| fresh}
-\\[1mm]
-
-& \semapp{B}{|e|}r & : & \seq{ \ENV } \\
-& \semapp{B}{|e|}r & = & [ \hideE(\semapp{I}{|e|}, \EV) \vb \EV \in \semapsub{E}{d}{e}r ]
+& \semapp{B}{|e|} & : & \seq{ \ENV } \\
+& \semapp{B}{|e|} & = & [ \hideE(\semapp{I}{|e|}, \EV) \vb \EV \in \semapsub{E}{d}{e} ]
 \end{array}
 \end{array}
 $$
@@ -57,12 +59,6 @@ $$
 \begin{figure}
 $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
- \hideE & : & \seq{\Ident} \rightarrow \ENV \rightarrow \ENV \\
- \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
-
- \extractE & : & (\Ident, \ENV) \rightarrow \powerset{\Val, \ENV} \\
- \extractE(y, \EV) & = & \{ (v, \hideE(y, \EV'))
-                          \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(y)=v \} \} \\[1mm]
  \combineE & : & \seq{ \powerset{\Val, \ENV} } \rightarrow \powerset{\seq{\Val}, \ENV} \\
  \multicolumn{3}{c}{\text{Not quite right yet}} \\
  \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
