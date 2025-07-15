@@ -228,11 +228,30 @@ Notation "es \{ xs } fs" := (envs_difference es xs fs) (at level 40) : ENV_scope
 
 Notation "⟨ n ⟩" := (fun ρ => Int n) (at level 40).
 
+Lemma extend_lookup_same {x ρ v} : (x |-> v, ρ) x = v. Admitted.
+Lemma not_r : forall (x r : Ident), (SetoidList.InA eq x [r] -> False) -> Nat.eqb r x = false. Admitted.
+Lemma extend_lookup_diff {x y ρ v} : Nat.eqb x y = false -> (x |-> v, ρ) y = ρ y. Admitted.
 
-Lemma not_r : forall (x r : Ident), (SetoidList.InA eq x [r] -> False) -> Nat.eqb x r = false. Admitted.
+Lemma hide_constraint {i v} : (i ≈ fun _ => v) \ (Scope.singleton i) ≃ Total_set.
+split. 
+intros x xIn. cbv. auto.
+intros ρ ρIn. cbv.
+eexists.
+instantiate (1 := i |-> v, ρ).
+split. rewrite extend_lookup_same. auto.
+intros x NI. 
+apply not_r in NI. rewrite extend_lookup_diff; auto.
+Qed.
+
+Lemma extract_one {x} : extract (r ≈ ⟨ x ⟩) = ⌈(Int x, Total_set)⌉.
+eapply Extensionality_Ensembles.
+split.
+- intros [v ρ] yIn. 
+  cbn in yIn.
+Admitted.  
 
 Example ex_ALL : 
-  (r |-> mkTup [Int 3;Int 4]) ∈ (ALL [r ≈ ⟨ 3 ⟩;  r ≈ ⟨ 4 ⟩] ).
+  (r |-> mkTup [Int 3;Int 4]) ∈ (ALL [ r ≈ ⟨3⟩;  r ≈ ⟨4⟩] ).
 cbn. exists ([Int 3; Int 4], Total_set).
 split; [exists (Int 3, Total_set);split|idtac]. 
 - cbv. extensionality ρ.
@@ -243,6 +262,7 @@ split; [exists (Int 3, Total_set);split|idtac].
   intros x xIn. apply not_r in xIn. 
   cbv. destruct x. done. done.
 - cbv.
+Admitted.
 
 (* ------  Fig 17 ----------------------------------------- *)
 
@@ -274,6 +294,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 
   | mini.All a => 
       let Y := mini.I a in 
+      [ ALL (E a) ] 
       
 
   (* TODO: functions, all, one *)                                                    
@@ -330,10 +351,10 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 
   | mini.Block e =>  B e
 
-  | mini.Var _ => ⌈[ r ≈ EA e ]⌉
-  | mini.Lit _ => ⌈[ r ≈ EA e ]⌉
-  | mini.EPrim _ => ⌈[ r ≈ EA e ]⌉
-  | mini.Array es =>  ⌈[ r ≈ EA e ]⌉
+  | mini.Var _ => ⌈[ r ≈ evalA e ]⌉
+  | mini.Lit _ => ⌈[ r ≈ evalA e ]⌉
+  | mini.EPrim _ => ⌈[ r ≈ evalA e ]⌉
+  | mini.Array es =>  ⌈[ r ≈ evalA e ]⌉
 
   | mini.DefineV _ => ⌈ SUCCEED ⌉
 
@@ -467,14 +488,9 @@ Proof.
       unfold mini.Test.x in *.
       unfold r,mini.Test.r in *.
       rewrite h3. auto.
+Admitted.      
       
-      
-End DPS.
-
-
-
-
-End DPS.
+End DSLS.
 
 
 (* -------------------------------------------------------- *)
