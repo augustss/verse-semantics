@@ -1,4 +1,10 @@
 \documentclass[acmsmall,screen,review,9pt]{acmart}\settopmatter{}
+
+% Put \everythingfalse in a file local.tex to build a streamlined
+% version with just DPS semantics
+\newif\ifeverything \everythingtrue
+\IfFileExists{local.tex}{\input{local.tex}}{}
+
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
@@ -25,10 +31,14 @@
 \input{../LaTex/verse-macros}
 
 \begin{document}
-\title{The Specification of Verse}
-\author{Tim, Jan, Andy S, Simon, Lennart, Koen, Ranjit \today}
-\maketitle
 
+\title{The Specification of Verse}
+\author{Tim, Jan, Andy S, Simon, Lennart, Koen, Ranjit, \today}
+\ifeverything
+\maketitle
+\fi
+
+\ifeverything
 \section{Overview}
 
 % Updated July 15 2025 by BCP from Simon's description in MaxVerse doc
@@ -114,12 +124,14 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 
 \clearpage \newpage
 \section{Denotational semantics: notation}
+\fi
 \input{densem-notation}
 
 % -------------------------------------------------------------
 %               Denotational semantics: expression style
 % -------------------------------------------------------------
 
+\ifeverything
 \clearpage \newpage
 \section{Denotational semantics: expression style}
 \input{densem-expr-style}
@@ -130,7 +142,9 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 
 \clearpage \newpage
 \section{Denotational semantics: DPS (Koen style)}
+\fi
 \input{densem-koen}
+\ifeverything
 
 % -------------------------------------------------------------
 %               Denotational semantics: Koen style
@@ -155,5 +169,6 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \clearpage \newpage
 \section{Denotational semantics: Plan A}
 \input{verse-densem-planA}
+\fi
 
 \end{document}

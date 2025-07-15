@@ -13,7 +13,7 @@
 \begin{figure}[h]
 $$
 \begin{array}{l}
-\textbf{Syntax of Mini Verse} \text{(copied from \Cref{fig:mini-verse})} \\
+\textbf{Syntax of Mini Verse}\ \ \ifeverything\text{(copied from \Cref{fig:mini-verse})}\fi \\
  \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
   \text{Simple values}    & a & ::= & |x| \vb |o| \vb |k| \vb  |arr (a_0, xdots, a_n)|  \hspace{5mm} \text{Can add strings, floats...} \\
@@ -24,6 +24,7 @@ $$
   && \vb & |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
   && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
 \end{array} \\
+  \\
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
@@ -59,7 +60,7 @@ $$
 \text{Extract result} & \extractE & : & \ENV \rightarrow \powerset{\Val, \ENV} \\
 & \extractE(\EV) & = & \{ (v, \hideE(\RES, \EV'))
                       \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(\RES)=v \} \} \\[1mm]
-& \combineE & : & \seq{ \ENV } \rightarrow \powerset{\seq{\Val}, \ENV} 
+& \combineE & : & \seq{ \ENV } \rightarrow \powerset{\seq{\Val}, \ENV}
      \hspace{1cm} \text{Not quite right yet??} \\
 & \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
      \{  & ([ v_0, \mydots, v_n ],\, \EV_0 \intersectE \mydots \intersectE \EV_n) \\
