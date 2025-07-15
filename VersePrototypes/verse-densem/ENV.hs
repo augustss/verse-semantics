@@ -27,7 +27,7 @@ import Dom
 ----------------------------------------------------------------------------------------
 
 numInt :: Integer
-numInt = 3
+numInt = 4
 
 ints :: [Integer]
 ints = [0..numInt-1]

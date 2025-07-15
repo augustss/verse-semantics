@@ -43,7 +43,6 @@ Definition map {A B} (f : A -> B) : P A -> P B :=
 Definition filter {A} (f : A -> bool) : P A -> P A := 
   fun s => fun x => (f x = true) /\ (In s x).
 
-
 (* Union of a set of sets (monadic join) *)
 Definition UNION {A} (VS : P (P A)) : P A := 
   fun v => exists V, (In VS V) /\ (In V v).
@@ -52,6 +51,16 @@ Definition UNION {A} (VS : P (P A)) : P A :=
 Definition comprehension {A B} (k : A -> P B) (s : P A) : P B := 
   fun b => exists a, (In s a) /\ (In (k a) b).
 
+(* monadic sequence (>>): requires s1 to be inhabited *)
+Definition seq {A B} (s1 : P A) (s2 : P B) := 
+  fun b => Inhabited s1 /\ In s2 b.
+
+(* Total set if proposition holds, emptyset otherwise *)
+Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
+
+(* when ϕ s == guard ϕ >> s *)
+Definition when {A} (ϕ : Prop) (s : P A) : P A := 
+  fun ρ => ϕ /\ (In s ρ).
 
 Module SetNotations. 
   Notation "⊤"  := Total_set : set_scope.
@@ -65,23 +74,7 @@ Module SetNotations.
   Notation "⨃" := UNION : set_scope.
 End SetNotations. 
 
-Module SetComprehensionNotation.
-  Notation "{{ k | x <- s }}" := (comprehension (fun x => (Singleton k)) s)
-      (at level 61) : set_scope.
-
-  Notation "{{ k | x <- s1 , y <- s2 }}" := 
-    (comprehension 
-       (fun x => 
-          (comprehension 
-             (fun y => 
-                (Singleton k)) s2)) s1) (at level 61) : set_scope.
-
-  Notation "{{ k | ' pat <- s }}" := (comprehension (fun x => match x with pat => Singleton k end) s)
-      (at level 61) : set_scope.
-End SetComprehensionNotation. 
-
 Import SetNotations.
-Import SetComprehensionNotation.
 Open Scope set_scope.
 
 (* Test cases for notations *)
@@ -90,8 +83,6 @@ Check (1 ∈ ⌈ 1 ⌉).
 Check (∅ ⊆ ⌈ 1 ⌉).
 Check (∅ ∪ ⌈ 1 ⌉).
 Check (∅ ∪ ⌈ 1 ⌉ ≃ ∅).
-Check {{ x | x <- ⌈ 1 ⌉ }}.
-Check {{ x + y | x <- ⌈ 1 ⌉ , y <- ⌈ 2 ⌉}}.
 
 
 (* A proposition that a set is inhabited. Due to the restrictions
@@ -168,6 +159,13 @@ Qed.
 
 #[export] Hint Resolve in_singleton_sub : core.
 
+Lemma Singleton_inv A (x y : A) : ⌈ x ⌉ = ⌈ y ⌉ -> x = y.
+Proof.  intros h. 
+        have k: (x ∈ ⌈ x ⌉ <-> x ∈ ⌈ y ⌉). rewrite h.
+        tauto.
+        move: k => [h1 h2].
+        specialize (h1 ltac:(auto)). inversion h1. auto.
+Qed.
 
 (* Facts about union *)
 
@@ -437,3 +435,20 @@ Proof. intros. induction l. cbv in H. done.
 
 
 
+
+
+Lemma all_intersect {A} (s : P A) : (Total_set ∩ s) = s.
+Proof.
+  eapply Extensionality_Ensembles.
+  split. intros x xIn. inversion xIn. auto.
+  split. cbv. auto. auto.
+Qed.
+
+Lemma intersect_all {A} (s : P A) : (s ∩ Total_set) = s.
+  eapply Extensionality_Ensembles.
+  split. intros x xIn. inversion xIn. auto.
+  split; cbv; auto. 
+Qed.
+
+Lemma in_singleton' {A} (x y : A) : x = y -> x ∈ ⌈ y ⌉.
+Proof. intros. subst. eapply in_singleton. Qed.
