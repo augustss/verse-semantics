@@ -29,36 +29,51 @@
 \author{Tim, Jan, Andy S, Simon, Lennart, Koen, Ranjit \today}
 \maketitle
 
-\section{Overview x}
+\section{Overview}
+
+% Updated July 15 2025 by BCP from Simon's description in MaxVerse doc
 
 \begin{itemize}
-\item {\bf Source Verse} (\Cref{fig:source-verse-expr,fig:source-verse-expr2}) is (an approximation of) the full source language.
+\item {\bf Source Verse} (\Cref{fig:source-verse-expr,fig:source-verse-expr2}) is an approximation of the full source language.
 \item The \emph{superficial-desugar} pass desugars
 (\Cref{fig:sv-to-sv-1,fig:sv-to-sv-2}) Source Verse into
   {\bf Essential Verse} (\Cref{fig:small-source-verse}), whose distinctive feature is TimLambdas.
   Essential Verse is a subset of Source Verse.
 \item A \emph{wrapping transformation} (\Cref{fig:mini-verse}) further
 desugars Essential Verse into {\bf Mini Verse}
-(\Cref{fig:mini-verse}). \emph{BCP: Why is the figure labeled Plan C?}
+(\Cref{fig:mini-verse}).
 \item A \emph{translation for verification and execution}
 (\Cref{fig:ds12})
 takes Mini Verse to {\bf Core Verse} (\Cref{fig:core-verse}).  The
 operational semantics of Core Verse in terms of rewrite and
-verification rules is defined in \Crefrange{fig:vc-syntax}{fig:verifier-rules-arrays}
-(\emph{BCP: As of July 2025, Simon says \Cref{fig:vc-contexts} is out of date}).
-\item From here, we have three different approaches to the denotational semantics
-  of Core Verse: \emph{BCP: These still need figure numbers...}
+verification rules is defined in \Crefrange{fig:vc-syntax}{fig:verifier-rules-arrays}.
+(As of July 2025, \Cref{fig:vc-contexts} is out of date.  Not clear
+how \Cref{fig:ds12} fits in.)
+\item We are currently experimenting with three different approaches
+to the {\bf denotational semantics} of Mini Verse. (Tim and Koen prefer DPS;
+Simon finds expression style easier to grok.)
+\Cref{fig:densem-notation} defines some common notations.
+\begin{enumerate}
+\item \textbf{(E-LV)}: expression-style, list of values.
   \begin{itemize}
-  \item Plan A: a direct denotational semantics
-    (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}---as of July 2025,
-    Lennart is just starting on this)
-  \item Plan B: desugar into {\bf Destination Passing Style Verse}
-    (DpsVerse), then give a semantics to that.
-  \item Plan C: desugar into {\bf Mini Verse}, still in expression
-    style, and give a semantics to that.
-  \end{itemize}
-\item The rewrite rules
-\item The verification rules
+  \item $\semappsub{E}{e}{|e|} : \Env \rightarrow \seq{ \VAL }$
+  \item \Cref{fig:e-lv1} and \Cref{fig:e-lv2}
+    \end{itemize}
+\item \textbf{(D-LS)}: dps-style, list of sets of environments.
+  \begin{itemize}
+  \item $\semapsub{E}{d}{|e|} r : \seq{ \ENV }$
+  \item \Cref{fig:d-ls1} and \Cref{fig:d-ls2}
+    \end{itemize}
+\item \textbf{(D-SLS)}: dps-style, sets of lists of sets of environments.
+  \begin{itemize}
+  \item $\semapsub{E}{d}{|e|} r : \powersetnp{\seq{ \ENV }}$
+  \item \Cref{fig:d-sls1} and \Cref{fig:d-sls2}
+    \end{itemize}
+\end{enumerate}
+\item \Cref{fig:jan-style-dps-1,fig:jan-style-dps-2}
+are work in progress on a ``Jan-style'' variant of the DPS semantics.
+\item Lennart is working on reviving a ``direct denotational
+semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \end{itemize}
 
 % -------------------------------------------------------------
@@ -100,27 +115,6 @@ verification rules is defined in \Crefrange{fig:vc-syntax}{fig:verifier-rules-ar
 \clearpage \newpage
 \section{Denotational semantics: notation}
 \input{densem-notation}
-
-Design variants:
-\begin{itemize}
-\item \textbf{(E-LV)}: expression-style, list of values.
-  \begin{itemize}
-  \item $\semappsub{E}{e}{|e|} : \Env \rightarrow \seq{ \VAL }$
-  \item \Cref{fig:e-lv1} and \Cref{fig:e-lv2}
-    \end{itemize}
-
-\item \textbf{(D-LS)}: dps-style, list of sets of environments.
-  \begin{itemize}
-  \item $\semapsub{E}{d}{|e|} r : \seq{ \ENV }$
-  \item \Cref{fig:d-ls1} and \Cref{fig:d-ls2}
-    \end{itemize}
-
-\item \textbf{(D-SLS)}: dps-style, sets of lists of sets of environments.
-  \begin{itemize}
-  \item $\semapsub{E}{d}{|e|} r : \powersetnp{\seq{ \ENV }}$
-  \item \Cref{fig:d-sls1} and \Cref{fig:d-sls2}
-    \end{itemize}
-\end{itemize}
 
 % -------------------------------------------------------------
 %               Denotational semantics: expression style

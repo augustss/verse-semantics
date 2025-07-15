@@ -137,7 +137,7 @@ $
 \begin{array}{l}
 
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
-  
+
   \eapp{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
   \eapp{w_1}{w_2} & = & [ r \, || \, |s_1 <-|  w_1, |s_2 <-| w_2, |r <-| \eapps{s_1}{s_2} ] \\
   \eapps{\cdot}{\cdot} & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
@@ -188,7 +188,7 @@ $
    & &  |where|\; \EV = \semappp{C}{e_1}{\rho} \\
 
    \semappp{M}{|all e|}{u}{\rho} & = & \isval{u}{
-          [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \} 
+          [\,\{ \tupE [ w_0, \mycdots, w_n ] \,||\, w_o \inb s_o,\mycdots,w_n \inb s_n \}
             \;||\;  |[s_0, xdots, s_n] =| \squash(\semapp{D}{e}{\rho})
             \,]} \\
 
@@ -263,7 +263,7 @@ $
 \\
 
   \end{array} \\ \\
-  
+
 
 \end{array}
 $
@@ -283,7 +283,7 @@ $
   \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
   \semapp{O}{|add|}{} & = & \{ f \, || \, f \inb \semfcn, \; \forall x,y \inb \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
   \end{array} \\ \\
-  
+
 \text{\bf Defined identifiers} \\
   \begin{array}{rcll}
   \semapp{I}{|e|}{} & : & |[Ident]| \\
@@ -295,7 +295,7 @@ $
   \semapp{I}{|arr (e_1, e_2)|}{}  & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
   \semapp{I}{|e|}                 & = & |[]| & \text{otherwise} \\
   \end{array} \\ \\
-    
+
 \begin{array}{rcll}
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
@@ -430,7 +430,7 @@ Env^{*} & = & \powerset{Env} \\
 
   \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
   \semappp{C}{|e|}{\rho} & = &
-  \{ \rho' \; || 
+  \{ \rho' \; ||
   \begin{array}[t]{l}
   w_1 \inb \Value, \mycdots, w_n \inb \Value, \\
   |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mycdots, x_n \fmapsto w_n}, \\
@@ -447,13 +447,13 @@ Env^{*} & = & \powerset{Env} \\
 \end{array}
 $
 \caption{Plan A: Expression semantics, with choice}
-\label{fig:den-sem1}
+\label{fig:den-sem1-choice}
 \end{figure}
 
 \begin{figure}
 $
 \begin{array}{l}
-  
+
 
   \begin{array}{rcll}
     \munits{s} & = & \{ (\lblemp, x) \} & \text{singleton set of a value with no labels} \\
@@ -509,7 +509,7 @@ $
 \end{array}
 $
 \caption{Plan A: Misc}
-\label{fig:den-sem1}
+\label{fig:den-sem1-misc}
 \end{figure}
 
 \begin{figure}
@@ -522,7 +522,7 @@ $
 %\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
   \semapp{B}{|e|} & : & \Value \rightarrow \Env \rightarrow \Env^{*} \\
   \semappp{B}{|e|}{u}{\rho} & = &
-  \{ \rho' \; || 
+  \{ \rho' \; ||
   \begin{array}[t]{l}
   w_1 \inb \Value, \mycdots, w_n \inb \Value, \\
   |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mycdots, x_n \fmapsto w_n}, \\
@@ -530,7 +530,7 @@ $
   \end{array} \\
   & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
-    
+
   \semapp{L}{|e|}{} & : & \Value \rightarrow \Env \rightarrow \mtypec \\
   \semappp{L}{|e|}{u}{\rho} & = &
   \{ r\, ||  \,
@@ -594,9 +594,9 @@ $
     & & \} \\
 
 \\
-    
+
   \end{array} \\ \\
-  
+
 
 \end{array}
 $
@@ -679,7 +679,7 @@ This can probably be easily fixed.
 $
 \begin{array}{l}
 
-  
+
   \begin{array}{rcll}
 %\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
   \semappp{E}{|e|}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
@@ -696,7 +696,7 @@ $
     \{ \rho'' \, || \, \rho' \inb \semappp{E}{|e_1|}{x}{\rho}, \; \rho'' \inb \semappp{E}{|e_2|}{v}{\rho'} \} & x \text{ fresh}\\
   \semappp{E}{|x := e|}{v}{\rho} & = & %% \msing{\rho(x)} \;\cap\; \semappp{E}{e}{v}{\rho} \\
     \semappp{E}{|x = e|}{v}{\rho} \\
-    
+
   \semappp{E}{|:e|}{v}{\rho} & = & %% \ran(\semappp{E}{|e|}{v}{\rho}) \\
     \{ \extendrho{\rho'}{v \fmapsto r} \, || \,
     \rho' \inb \semappp{E}{|e|}{f}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} & f \text{ fresh} \\
@@ -715,7 +715,7 @@ $
 %  \semappp{E}{|arr (e_0, xdots, e_n)|}{v}{\rho} & = &
 %    \{ \mkfcn{0 \fmapsto x_0, \mycdots, n \fmapsto x_n} \, || \, x_0 \inb \semappp{E}{|e_1|}{v}{\rho}, \,\mycdots,\, x_n \inb \semappp{E}{|e_n|}{v}{\rho} \} \\
   \semappp{E}{|funk q e_1 e_2|}{v}{\rho} & = & \{ \extendrho{\rho}{u \fmapsto f} \; \\
-    & & 
+    & &
     \begin{array}[t]{lll}
       || & f \inb \semfcn \\
 
@@ -733,7 +733,7 @@ $
 
     \end{array} \\
     & & \} & v \text{ fresh} \\
-    \\ 
+    \\
 
     %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
   \semapp{X}{|e|} & : & \Env \rightarrow \Env^{*} \\
@@ -756,4 +756,3 @@ $
 \caption{Expression semantics, destination passing}
 \label{fig:den-sem-dest1}
 \end{figure}
-
