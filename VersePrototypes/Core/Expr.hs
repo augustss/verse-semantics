@@ -51,7 +51,7 @@ import Data.Data(Data)
 import Data.List( union )
 import Core.Bind
 import Core.Traced
-import Test.QuickCheck
+import Test.QuickCheck hiding( Some )
 
 import Control.Monad( liftM2 )
 import Data.Scientific(Scientific)
