@@ -84,21 +84,40 @@ Definition MINUS {A} (d1 : list (P A)) (d2: list (P A)) :
   ρ2 <- d2 ;;
   [ @Setminus A ρ1 ρ2 ].
 
+Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) := 
+  (~ ϕ1 /\ ϕ3).
+
+Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
+  (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
+
+Definition If2 {A B} (s1 : P A) (s3 : P B) := 
+  (when (~ (s1 ≃ ∅)) s3).
+
+Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
+  (when (s1 ≃ ∅) s2) ∪
+  (when (not (s1 ≃ ∅)) s3).
+
+Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 
 (* left to right squash *)
 Definition squash_fold_left {A B} (f : P A -> P B -> P A) : list (P B) -> P A -> P A := 
-  List.fold_left 
-    (fun bs x => fun b => ((x ≃ ∅) /\ (b ∈ bs)) \/ (not (x ≃ ∅) /\ (b ∈ (f bs x)))).
+  List.fold_left (fun bs x => If3 x bs (f bs x)).
+
+(*
+fun b => ((x ≃ ∅) /\ (b ∈ bs)) \/ (not (x ≃ ∅) /\ (b ∈ (f bs x)))).
+*)
 
 (* right to left squash *)
 Fixpoint squash {A} (xs : list(P A)) : list (P A) -> Prop := 
   match xs with 
   | nil => ⌈ nil ⌉
   | cons x xs' => 
-      fun ys => ((x ≃ ∅) /\ squash xs' ys) \/ (not (x ≃ ∅)) /\  match ys with 
-                                           | nil => False 
-                                           | cons y ys' => x = y /\ squash xs' ys'
-                                         end
+      fun ys => ((x ≃ ∅) /\ squash xs' ys) 
+             \/ (not (x ≃ ∅)) /\  
+                 match ys with 
+                 | nil => False 
+                 | cons y ys' => x = y /\ squash xs' ys'
+                 end
   end.
 
 Lemma squash_unique {A} : forall (xs ys zs: list (P A)), 
@@ -162,8 +181,8 @@ Definition ONE {A} (VS : list (P A)) : P A :=
 Example ONE_example_none {A} : @ONE A  [ ∅ ] = ∅ .
   eapply Extensionality_Ensembles. split.
   - move => y yIn. 
-    destruct yIn as [[h1 h2]|h1]. 
-    auto. destruct h1; auto.
+    unfold ONE in yIn. cbv in yIn.
+    inversion yIn; inversion H; subst; auto.
   - move => y yIn. done.
 Qed.
 
@@ -171,9 +190,9 @@ Example ONE_example {A} (x:A) : ONE  [ ∅ ; ⌈ x ⌉ ] = ⌈ x ⌉.
 Proof.
   eapply Extensionality_Ensembles. split.
   - move => y yIn. 
-    destruct yIn as [[h1 h2]|h1].
+    inversion yIn; inversion H; subst.
     eapply not_Singleton_empty; eauto.
-    destruct h1 as [_ h2]. done.
+    auto.
   - move => y yIn.
     right.
     split. intro h. eapply not_Singleton_empty; eauto. auto.
@@ -606,7 +625,10 @@ Admitted.
 Example ALL_example : 
   ALL [ ⌈ Int 2 ⌉ ; ⌈ Int 3 ⌉ ] = ⌈ mkTup [Int 2; Int 3] ⌉.
 cbn. eapply Extensionality_Ensembles. split.
-- move => x [[h1 [[h2 h3]|h2]]|h1]. 
+- 
+Admitted.
+(*
+move => x [[h1 [[h2 h3]|h2]]|h1]. 
   eapply not_Singleton_empty; eauto.
   eapply not_Singleton_empty; eauto.
   destruct h1 as [_ [a h1]].
@@ -621,20 +643,73 @@ cbn. eapply Extensionality_Ensembles. split.
   cbn in h4. eauto.
 - admit.
 Admitted.
+*)
 
 
-(* TODO(!!): this is not correct as it doesn't filter out 
-   the empty sets of the sequence. *)
-Definition SEQ (s1 : list VAL) (s2 : list VAL) : list VAL := 
-  v1 <- s1 ;; s2.
-  
+Lemma map_union {A B} (f : A -> B) (s1 : P A) (s2 : P A) :
+  (Sets.map f (s1 ∪ s2)) = ((Sets.map f s1) ∪ (Sets.map f s2)).
+Proof.
+  unfold Sets.map.
+  eapply Extensionality_Ensembles.
+  split.
+  - intros x [a [h1 h2]]. subst. inversion h2. subst.
+    left. exists a. split; auto.
+    right. exists a. split; auto.
+  - intros b1 h1. 
+    inversion h1. subst. clear h1.
+    + move: H => [ y [h2 h3]]. subst.
+      exists y. split; auto. left. auto.
+    + move: H => [ y [h2 h3]]. subst.
+      exists y. split; auto. right. auto.
+Qed.
+
+Lemma map_singleton {A B} (f : A -> B) (a : A) :
+  (Sets.map f ⌈ a ⌉) = ⌈ f a ⌉.
+Admitted.
+Lemma Union_empty {A} (V : P A) : (∅ ∪ V) = V.
+Admitted.
 
 (* another version of the dodgy big union *)
-Definition UNIONS (VVS : P (list VAL)) : list VAL := 
+Definition UNIONS {A} (VVS : P (list (P A))) : list (P A) := 
   i <- allNums ;;
-  let V := ( VS <- VVS ;; List.nth i VS ∅ ) in
-  [ V ].
+  let VS : P (P A) := Sets.map (fun VS => List.nth i VS ∅) VVS in
+  [ UNION VS ].
 
+Lemma UNION_union {A} (V W : P A) : (⨃ (⌈V ⌉ ∪ ⌈ W ⌉)) = (V ∪ W).
+eapply Extensionality_Ensembles.
+split.
+- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
+  inversion h1. subst. inversion H. subst. left. auto.
+  subst. inversion H. subst. right. auto.
+- intros x xIn. cbv. inversion xIn.
+  + subst. exists V. split. left. eapply in_singleton. auto.
+  + subst. exists W. split. right. eapply in_singleton. auto.
+Qed.
+
+Lemma UNION_Singleton {A} (V : P A) W : (⨃ (⌈V ⌉ ∪ W )) = (V ∪ ⨃ W).
+Proof.
+eapply Extensionality_Ensembles.
+split.
+- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
+  inversion h1. subst. inversion H. subst. left. auto.
+  right.  exists v. split; eauto.
+- intros x xIn. inversion xIn. subst.
+  exists V. split; auto. left. eapply in_singleton.
+  cbv in H. move: H => [w [h1 h2]].
+  exists w. split. right. eauto. eauto.
+Qed.
+
+Example UNIONS_ex : 
+  UNIONS (⌈ [ ∅ ; ⌈ 3 ⌉ ] ⌉ ∪ ⌈ [ ⌈ 4 ⌉ ] ⌉) = 
+    [  ⌈ 4 ⌉ ; ⌈ 3 ⌉ ].
+Proof.
+  unfold UNIONS, allNums. 
+  replace limitNum with 2.
+  cbn.
+  repeat rewrite map_union. repeat rewrite map_singleton.
+  cbn.
+  repeat rewrite -> UNION_union. rewrite Union_empty.
+Admitted.  
 
 Fixpoint E (e :mini.Expr) (ρ:env) : list VAL := 
   
@@ -642,6 +717,7 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
     UNIONS
       (ρ' <- X e ρ ;; ⌈ E e ρ' ⌉) 
     in
+
   let R (e : mini.Expr) ρ : ENV := 
     ρ' <- X e ρ ;; 
     when (E e ρ' <> []) 
@@ -665,7 +741,7 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
 
   | mini.Choice e1 e2 => CHOICE (B e1 ρ) (B e2 ρ)
 
-  | mini.Seq e1 e2 => SEQ (E e1 ρ) (E e2 ρ)
+  | mini.Seq e1 e2 => IF2 (E e1 ρ) (E e2 ρ)
 
   | mini.Unify e1 e2 => UNIFY (E e1 ρ) (E e2 ρ)
 
@@ -675,8 +751,8 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
       let Δ  : ENV := R e1 ρ in
       let TS := UNIONS ( ρ' <- Δ ;; ⌈ B e2 ρ' ⌉ )in
       let FS := B e2 ρ in
-      (* TODO: combine these together better *)
-      TS ++ FS
+      (* NEED SETMINUS HERE *)
+      IF2 TS FS
       
   | mini.Fun q eff i e1 (y,h,x) e2 =>  []
 
