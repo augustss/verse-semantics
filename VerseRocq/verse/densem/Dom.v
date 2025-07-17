@@ -84,6 +84,10 @@ Definition snoc (tup : value) (v: value) : value :=
   | _ => tup
   end.
 
+Lemma snoc_mktup xs v : 
+  snoc (mkTup xs) v = mkTup (xs ++ [v]).
+Admitted.
+
 
 (* partial function with empty domain *)
 Definition emptyFun : value := Fun nil.

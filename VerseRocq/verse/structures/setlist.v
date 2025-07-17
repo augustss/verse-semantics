@@ -88,7 +88,7 @@ Proof.
         + rewrite IHl in H. unfold mem in H. right. auto.
       - intros x xIn. rewrite IHl.
         destruct xIn.
-        + subst. left. auto.
+        + subst. left. auto with sets.
         + right. auto.
     }
 

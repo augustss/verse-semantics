@@ -30,13 +30,12 @@ Arguments Same_set {_}.
 Arguments Singleton {_}.
 Arguments Empty_set {_}.
 Arguments Inhabited {_}.
-
-Create HintDb sets.
+Arguments Full_set {_}.
+Arguments Setminus {_}.
 
 Definition P := Ensemble.
 
 (* More operations on sets *)
-
 Definition Total_set {A} := fun (x:A) => True.
 
 Definition map {A B} (f : A -> B) : P A -> P B := 
@@ -83,6 +82,7 @@ Module SetNotations.
   Infix "∪"  := Union (at level 90) : set_scope.
   Infix "∩"  := Intersection (at level 90) : set_scope.
   Infix "≃"  := Same_set (at level 90) : set_scope.
+  Infix "-"  := Setminus : set_scope.
   Notation "⨃" := UNION : set_scope.
 End SetNotations. 
 
@@ -162,21 +162,21 @@ Lemma in_singleton {A:Type} {v : A} :
   v ∈ ⌈ v ⌉.
 Proof. unfold In. econstructor. Qed.
 
-#[export] Hint Resolve in_singleton : core.
+#[export] Hint Resolve in_singleton : sets.
 
 Lemma in_singleton_sub {A}{v:A}{X} : v ∈ X -> ⌈ v ⌉ ⊆ X.
 Proof.
   intros.  intros w wIn. inversion wIn. subst. done.
 Qed.
 
-#[export] Hint Resolve in_singleton_sub : core.
+#[export] Hint Resolve in_singleton_sub : sets.
 
 Lemma Singleton_inv A (x y : A) : ⌈ x ⌉ = ⌈ y ⌉ -> x = y.
 Proof.  intros h. 
         have k: (x ∈ ⌈ x ⌉ <-> x ∈ ⌈ y ⌉). rewrite h.
         tauto.
         move: k => [h1 h2].
-        specialize (h1 ltac:(auto)). inversion h1. auto.
+        specialize (h1 ltac:(eauto with sets)). inversion h1. auto.
 Qed.
 
 (* Facts about union *)
@@ -187,7 +187,7 @@ Proof. intros x I.  econstructor; eauto. Qed.
 Lemma sub_union_right {A} (X Y : P A) : Y ⊆ (X ∪ Y).
 Proof. intros x I. eapply Union_intror; eauto. Qed.
 
-#[export] Hint Resolve sub_union_left sub_union_right : core.
+#[export] Hint Resolve sub_union_left sub_union_right : sets.
 
 Lemma union_idem {A:Type}{E : P A} : (E ∪ E) ≃ E.
 Proof.
@@ -195,7 +195,7 @@ Proof.
   intros x h. left. auto.
 Qed.
 
-#[export] Hint Resolve union_idem : core.
+#[export] Hint Resolve union_idem : sets.
 
 Lemma union_left {A}{X Y Z: P A} : X ⊆ Z -> Y ⊆ Z -> X ∪ Y ⊆ Z.
 Proof. intros h1 h2.
@@ -213,7 +213,7 @@ Proof.
 Qed.
 
 
-#[export] Hint Resolve union_left_inv1 union_left_inv2 : core.
+#[export] Hint Resolve union_left_inv1 union_left_inv2 : sets.
 
 
 (* ----------------------------------------- *)
@@ -348,7 +348,7 @@ Proof.
   eapply in_cons.
 Qed.
 
-#[export] Hint Resolve mem_head mem_cons mem_one_inv : core.
+#[export] Hint Resolve mem_head mem_cons mem_one_inv : sets.
 
 
 Lemma In_Sub {A}{x:A}{D}: x ∈ D <-> mem (x :: nil) ⊆ D.
@@ -356,7 +356,7 @@ Proof. split. intros h y yIn. inversion yIn. subst; auto. inversion H.
        intros h. cbv in h. specialize (h x). tauto.
 Qed.
 
-#[export] Hint Resolve In_Sub : core.
+#[export] Hint Resolve In_Sub : sets.
 
 Lemma union_mem {A:Type}{E1 E2 : list A} : mem (E1 ++ E2) = (mem E1 ∪ mem E2).
 Proof. unfold mem. 
@@ -389,7 +389,7 @@ Proof. intro v. cbv. intros. inversion H. subst. econstructor; eauto. done. Qed.
 Lemma mem_singleton_eq {A} {x:A} : mem (x :: nil) ≃ ⌈ x ⌉.
 Proof. split; eauto using mem_singleton, singleton_mem. Qed.
 
-#[export] Hint Resolve singleton_mem mem_singleton : core. 
+#[export] Hint Resolve singleton_mem mem_singleton : sets. 
 
 
 Lemma mem_cons_inv {A} {a:A} {xs ys : list A} : 
@@ -432,8 +432,8 @@ Proof.
   intros A D.
   induction D; intros X Pr SUB F.
   eauto.
-  econstructor; eauto. eapply F. eapply SUB. eauto.
-  eapply IHD with (X:=X); auto. intros x xIn. eapply SUB; eauto.
+  econstructor; eauto. eapply F. eapply SUB. eauto with sets.
+  eapply IHD with (X:=X); auto. intros x xIn. eapply SUB; eauto with sets.
 Qed.
 
 Lemma mem_In : forall A (x:A) l, x ∈ mem l -> List.In x l.
@@ -507,8 +507,19 @@ Qed.
 Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
 Admitted.
 
-Lemma singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. Admitted.
+Lemma not_Singleton_empty : forall A B (x:B), ⌈ x ⌉ ≃ ∅ -> A.
+Admitted.
+Lemma Singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. 
+Admitted.
+
 
 Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  Admitted.
 Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
 Lemma Intersection_commutes {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1). Admitted.
+
+Lemma SetMinus_empty {A} (s : P A) : s - ∅ = s. Admitted.
+Lemma SetMinusUnion {A} (s1 s2 s3 : P A) : s1 - (s2 ∪ s3) = (s1 - s2) - s3.
+Proof. 
+Admitted.
+
+
