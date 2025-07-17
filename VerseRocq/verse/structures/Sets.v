@@ -31,6 +31,8 @@ Arguments Singleton {_}.
 Arguments Empty_set {_}.
 Arguments Inhabited {_}.
 
+Create HintDb sets.
+
 Definition P := Ensemble.
 
 (* More operations on sets *)
@@ -61,6 +63,16 @@ Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
 (* when ϕ s == guard ϕ >> s *)
 Definition when {A} (ϕ : Prop) (s : P A) : P A := 
   fun ρ => ϕ /\ (In s ρ).
+
+(* if2 s1 s2 == guard (s1 = ∅) >> s *)
+Definition If2 {A B} (s1 : P A) (s3 : P B) := 
+  (when (~ (Same_set s1 Empty_set)) s3).
+
+Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
+  Union 
+    (when (Same_set s1 Empty_set) s2) 
+    (when (not (Same_set s1 Empty_set)) s3).
+
 
 Module SetNotations. 
   Notation "⊤"  := Total_set : set_scope.
@@ -241,13 +253,11 @@ Proof. intros. unfold Exists. reflexivity. Qed.
 
 #[export] Instance Monad_P : Monad P :=
   { ret  := (fun A (x : A) => ⌈ x ⌉);
-     bind := fun A B (ca : P A) (k : A -> P B) =>
-             fun b => exists a, (a ∈ ca) /\ (b ∈ k a)
+     bind := fun A B x y => @comprehension A B y x
    }.
 
 #[export] Instance Functor_P : Functor P :=
-  { fmap := fun A B (f : A -> B) (x : A -> Prop) => 
-               bind x (fun y => ret (f y)) 
+  { fmap := fun A => @map A
   }.
 
 #[export] Instance Applicative_P : Applicative P :=
@@ -270,7 +280,6 @@ Lemma fmap_Included {A B}{f : A -> B}{s1}{s2} :
 Proof. 
   cbv.
   intros h x [a [h1 h2]]. 
-  apply h in h1.
   exists a. split; auto.
 Qed.
 
@@ -434,7 +443,8 @@ Proof. intros. induction l. cbv in H. done.
 
 
 
-
+Lemma in_singleton' {A} (x y : A) : x = y -> x ∈ ⌈ y ⌉.
+Proof. intros. subst. eapply in_singleton. Qed.
 
 
 Lemma all_intersect {A} (s : P A) : (Total_set ∩ s) = s.
@@ -450,5 +460,55 @@ Lemma intersect_all {A} (s : P A) : (s ∩ Total_set) = s.
   split; cbv; auto. 
 Qed.
 
-Lemma in_singleton' {A} (x y : A) : x = y -> x ∈ ⌈ y ⌉.
-Proof. intros. subst. eapply in_singleton. Qed.
+Lemma Union_empty {A} (V : P A) : (∅ ∪ V) = V.
+Admitted.
+
+Lemma empty_Union {A} (V : P A) : (∅ ∪ V) = V.
+Admitted.
+
+Lemma map_union {A B} (f : A -> B) (s1 : P A) (s2 : P A) :
+  (Sets.map f (s1 ∪ s2)) = ((Sets.map f s1) ∪ (Sets.map f s2)).
+Proof.
+  unfold Sets.map.
+  eapply Extensionality_Ensembles.
+  split.
+  - intros x [a [h1 h2]]. subst. inversion h2. subst.
+    left. exists a. split; auto.
+    right. exists a. split; auto.
+  - intros b1 h1. 
+    inversion h1. subst. clear h1.
+    + move: H => [ y [h2 h3]]. subst.
+      exists y. split; auto. left. auto.
+    + move: H => [ y [h2 h3]]. subst.
+      exists y. split; auto. right. auto.
+Qed.
+
+Lemma map_singleton {A B} (f : A -> B) (a : A) :
+  (Sets.map f ⌈ a ⌉) = ⌈ f a ⌉.
+Admitted.
+
+
+Lemma UNION_empty {A} (W : P (P A)) : (⨃ (∅ ∪ W )) = (⨃ W).
+Admitted.
+
+Lemma UNION_Singleton {A} (V : P A) W : (⨃ (⌈V ⌉ ∪ W )) = (V ∪ ⨃ W).
+Proof.
+eapply Extensionality_Ensembles.
+split.
+- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
+  inversion h1. subst. inversion H. subst. left. auto.
+  right.  exists v. split; eauto.
+- intros x xIn. inversion xIn. subst.
+  exists V. split; auto. left. eapply in_singleton.
+  cbv in H. move: H => [w [h1 h2]].
+  exists w. split. right. eauto. eauto.
+Qed.
+
+Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
+Admitted.
+
+Lemma singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. Admitted.
+
+Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  Admitted.
+Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
+Lemma Intersection_commutes {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1). Admitted.

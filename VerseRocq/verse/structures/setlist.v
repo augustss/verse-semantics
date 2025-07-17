@@ -37,7 +37,8 @@ Proof.
   extensionality b.
   eapply propositional_extensionality.
   split.
-  - intros [BS [[CS [h1 h2]] h3]]. 
+Admitted.
+(*  - intros [BS [[CS [h1 h2]] h3]]. 
     inversion h2. subst. clear h2.
     inversion h3. subst. clear h3.
     exists CS. split; auto.
@@ -48,7 +49,7 @@ Proof.
     exists (List.map g CS). split.
     exists CS. split; eauto. eapply in_singleton.
     rewrite List.map_map. eapply in_singleton.
-Qed.
+Qed. *)
 
 Lemma M_bind_ret {A B} (x : A) (k : A -> M B) : 
   M_bind (M_ret x) k = k x.

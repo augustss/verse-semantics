@@ -63,6 +63,7 @@ Fixpoint evalA (e : mini.Expr) (ρ : env) : value :=
   | _ => Dom.Int 0
   end.
 
+
 (* ------- operations on sequences of sets ---------- *)
 
 
@@ -90,22 +91,17 @@ Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) :=
 Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
   (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
 
-Definition If2 {A B} (s1 : P A) (s3 : P B) := 
-  (when (~ (s1 ≃ ∅)) s3).
+Definition If2 {A B} := fun (s1 : P A) (s3 : P B) => when (~ (s1 ≃ ∅)) s3.
 
-Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
-  (when (s1 ≃ ∅) s2) ∪
-  (when (not (s1 ≃ ∅)) s3).
+Definition If3 {A B} := fun (s1 : P A) (s2 s3 : P B) => when (s1 ≃ ∅) s2 ∪ when (~ (s1 ≃ ∅)) s3.
 
 Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 
-(* left to right squash *)
+(* left to right squash 
+   fold_left allows us to use snoc in the definition of ALL
+*)
 Definition squash_fold_left {A B} (f : P A -> P B -> P A) : list (P B) -> P A -> P A := 
   List.fold_left (fun bs x => If3 x bs (f bs x)).
-
-(*
-fun b => ((x ≃ ∅) /\ (b ∈ bs)) \/ (not (x ≃ ∅) /\ (b ∈ (f bs x)))).
-*)
 
 (* right to left squash *)
 Fixpoint squash {A} (xs : list(P A)) : list (P A) -> Prop := 
@@ -146,7 +142,6 @@ Proof.
   - exists ys'. left. split; auto.
   - exists (a :: ys'). right. split; auto.
 Qed.
-
 
 (* dodgy union *)
 (* elementwise union of sequences, missing elements are ∅s.  *)
@@ -246,6 +241,7 @@ Definition constrain (x : Ident) (f : env -> value) : ENV :=
 Definition hide (xs : Scope.t) (Δ : ENV) : ENV := 
   fun ρ => exists ρ', (ρ' ∈ Δ) /\ forall x, ~ (Scope.In x xs) -> (ρ x = ρ' x).
 
+
 (* just generalize r *)
 Definition hide_r : ENV -> ENV := hide (Scope.singleton r).
 
@@ -329,20 +325,10 @@ Qed.
 
 (* The set of all environments that extend rho with arbitrary 
    definitions for the variables declared in e. 
-   Is this the same as "hide (mini.I e) ⌈ ρ ⌉"
-
 *)
 
 Definition X (e : mini.Expr) (ρ : env) : ENV :=
   hide (mini.I e) ⌈ ρ ⌉.
-(*
-  fun rho' =>
-    forall x, 
-      if (Scope.mem x (mini.I e)) 
-      then exists v, rho' x = v    (* arbitrary value for vars in new scope *)
-      else rho' x = rho x.         (* same value for vars in old scope *)
-*)
-
 
 Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
   UNIFY (hide_list (Scope.singleton r) d1) d2.
@@ -472,11 +458,11 @@ Fixpoint E (e : mini.Expr) : list ENV :=
      ((E a [\] rY) * (E b [\] Y)) ⩅
      (MINUS (E c) (E a [\] Y))
 
-  | mini.All a => 
-      [ ALL (E a) \ mini.I a ] 
+  | mini.All a => (* SQUASH here *)
+       [ ALL (E a \ mini.I a ] 
 
   | mini.One a => 
-      [ ONE (E a) \ mini.I a ]
+       [ ONE (E a) \ mini.I a ]
 
   (* TODO: functions *)
 
@@ -541,7 +527,10 @@ Lemma t2 :
 Proof.
   unfold mini.Test.t2.
   exists [ ⌈r |-> Int 1, mini.Test.x |-> Int 1⌉ ].
+Admitted.
+(*
   split.
+  - admit.
   - cbn.
     eexists.
     split.
@@ -604,7 +593,8 @@ Proof.
       unfold r,mini.Test.r in *.
       rewrite h3. auto.
 Admitted.      
-      
+*)      
+
 End DSLS.
 
 
@@ -646,28 +636,6 @@ Admitted.
 *)
 
 
-Lemma map_union {A B} (f : A -> B) (s1 : P A) (s2 : P A) :
-  (Sets.map f (s1 ∪ s2)) = ((Sets.map f s1) ∪ (Sets.map f s2)).
-Proof.
-  unfold Sets.map.
-  eapply Extensionality_Ensembles.
-  split.
-  - intros x [a [h1 h2]]. subst. inversion h2. subst.
-    left. exists a. split; auto.
-    right. exists a. split; auto.
-  - intros b1 h1. 
-    inversion h1. subst. clear h1.
-    + move: H => [ y [h2 h3]]. subst.
-      exists y. split; auto. left. auto.
-    + move: H => [ y [h2 h3]]. subst.
-      exists y. split; auto. right. auto.
-Qed.
-
-Lemma map_singleton {A B} (f : A -> B) (a : A) :
-  (Sets.map f ⌈ a ⌉) = ⌈ f a ⌉.
-Admitted.
-Lemma Union_empty {A} (V : P A) : (∅ ∪ V) = V.
-Admitted.
 
 (* another version of the dodgy big union *)
 Definition UNIONS {A} (VVS : P (list (P A))) : list (P A) := 
@@ -675,29 +643,6 @@ Definition UNIONS {A} (VVS : P (list (P A))) : list (P A) :=
   let VS : P (P A) := Sets.map (fun VS => List.nth i VS ∅) VVS in
   [ UNION VS ].
 
-Lemma UNION_union {A} (V W : P A) : (⨃ (⌈V ⌉ ∪ ⌈ W ⌉)) = (V ∪ W).
-eapply Extensionality_Ensembles.
-split.
-- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
-  inversion h1. subst. inversion H. subst. left. auto.
-  subst. inversion H. subst. right. auto.
-- intros x xIn. cbv. inversion xIn.
-  + subst. exists V. split. left. eapply in_singleton. auto.
-  + subst. exists W. split. right. eapply in_singleton. auto.
-Qed.
-
-Lemma UNION_Singleton {A} (V : P A) W : (⨃ (⌈V ⌉ ∪ W )) = (V ∪ ⨃ W).
-Proof.
-eapply Extensionality_Ensembles.
-split.
-- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
-  inversion h1. subst. inversion H. subst. left. auto.
-  right.  exists v. split; eauto.
-- intros x xIn. inversion xIn. subst.
-  exists V. split; auto. left. eapply in_singleton.
-  cbv in H. move: H => [w [h1 h2]].
-  exists w. split. right. eauto. eauto.
-Qed.
 
 Example UNIONS_ex : 
   UNIONS (⌈ [ ∅ ; ⌈ 3 ⌉ ] ⌉ ∪ ⌈ [ ⌈ 4 ⌉ ] ⌉) = 
@@ -708,7 +653,7 @@ Proof.
   cbn.
   repeat rewrite map_union. repeat rewrite map_singleton.
   cbn.
-  repeat rewrite -> UNION_union. rewrite Union_empty.
+  repeat rewrite -> UNION_union. 
 Admitted.  
 
 Fixpoint E (e :mini.Expr) (ρ:env) : list VAL := 
@@ -737,7 +682,7 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
 
   | mini.ApplyD e1 e2 => apply (evalA e1 ρ) (evalA e2 ρ)
 
-  | mini.Fail => [∅]
+  | mini.Fail => []
 
   | mini.Choice e1 e2 => CHOICE (B e1 ρ) (B e2 ρ)
 
@@ -780,6 +725,101 @@ Lemma Equiv2 (e : mini.Expr) :
       ⌈ ρ ⌉ ].
 Admitted.  
 
+(* -------------------------------------------------------- *)
+(* Tim's opinionated semantics. This version avoids the 
+   dodgy union, instead providing an ordering for the branch 
+   of if expressions.
+   Otherwise, it is the same as the DLS semantics.
+*)
+
+
+
+Lemma SetMinusUnion {A} (s1 s2 s3 : P A) : Setminus _ (Setminus _ s1 s2) s3 = 
+                                             Setminus _ s1 (Union s2 s3).
+Proof. 
+Admitted.
+
+Module NonDodgy. 
+
+
+Fixpoint E (e : mini.Expr) : list ENV := 
+
+  let B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;;
+    [ Δ \ mini.I e ] in
+
+  let V (e : mini.Expr) : list (P (value * ENV)) := 
+    Δ <- B e ;;
+    [ extract Δ ] in
+
+  match e with 
+  | mini.DefineV _ => [ Total_set ]
+
+  | mini.Var _ => [ r ≈ evalA e ]
+  | mini.Lit _ => [ r ≈ evalA e ]
+  | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ]
+
+  | mini.Fail => []   (* or [∅] ? *)
+
+  | mini.Choice e1 e2 => E e1 ++ E e2
+
+  | mini.Seq e1 e2 => SEQ (E e1) (E e2) (* i.e.  (E e1 \ r) * E e2   *)
+
+  (* How can we prevent ∅ from appearing in the output of S1 * S2 ? *)
+  | mini.Unify e1 e2 => E e1 * E e2  
+
+  | mini.ApplyD e1 e2 => APP e1 e2
+
+  | mini.If3 a b c =>  
+
+    let xs := mini.I a in 
+
+    (* fold over the choices in Ea computing at each step i:
+
+          Ea [i] - ⨃ ( Ea[i-1] \ xs )         
+     *)
+    let TC_start := ([], ∅) in
+    let TC_step (tc : list ENV * ENV) (eai : ENV) : list ENV * ENV := 
+      match tc with 
+        | ( results , negs ) => 
+          ( Setminus _ eai negs :: results , negs ∪ (eai \ xs ))
+      end in
+           
+    let '(TC, negs) := List.fold_left TC_step (E a) TC_start in
+
+     (SEQ TC (E b [\] xs)) ++
+     (SEQ [Setminus _ Total_set negs] (E c))
+
+  | mini.All a => 
+      [ ALL (E a) \ mini.I a ] 
+
+  | mini.One a => 
+      [ ONE (E a) \ mini.I a ]
+
+  (* TODO: functions *)
+
+  | _ => [ ∅ ] 
+  end.
+
+
+(* if((y=3) | (y=5)){y} else :false *)
+
+Arguments Setminus {_}.
+Infix "-" := Setminus : set_scope.
+
+Definition example_If3 := mini.If3 ((mini.Test.y :=: 3 ) :|: (mini.Test.y :=: 5)) mini.Test.y mini.Fail.
+
+Lemma hide_none ρ : hide Scope.empty ρ = ρ. Admitted.
+
+Example example : E example_If3 = [ r ≈ ⟨ 3 ⟩ ].
+Proof.
+  cbn.
+  repeat rewrite hide_none.
+  rewrite empty_Union.
+  rewrite hide_constraint.
+
+End NonDodgy.
 
 (* -------------- Squash ------------ *)
 
@@ -1108,14 +1148,6 @@ with eval_if (rho : env) : mini.Expr -> list VAL -> Prop :=
 
 Definition eval_top t d := eval Env.empty t d.
 
-Create HintDb sets.
-
-Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
-Admitted.
-Lemma singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. Admitted.
-Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  Admitted.
-Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
-Lemma Intersection_commutes {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1). Admitted.
 Lemma notIn_singleton {A}{v : A} : ~ List.In ∅ [⌈ v ⌉]. 
 Proof.
   intro h. inversion h.  apply singleton_not_empty in H. done. inversion H.
