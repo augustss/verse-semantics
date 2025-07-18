@@ -47,6 +47,8 @@ Definition ENV := P env.
 (* distinguished result variable (0) *)
 Definition r : Ident := mini.Test.r.
 Definition rs : Scope.t := Scope.singleton r.
+(* another variable (1) *)
+Definition x := mini.Test.x.
 
 
 (* -------------- atomic expressions  ---------------- *)
@@ -299,7 +301,7 @@ End ELV.
 
 
 (* ------------------------------------------------------ *)
-(* ------  Fig 15 E-LV (doesn't use dodgy union) --------------- *)
+(* ------  E-LV (doesn't use dodgy union) --------------- *)
 
 Module NonDodgyELV.
 
@@ -361,7 +363,6 @@ Fixpoint E (e :mini.Expr) (ρ:env) : P (list VAL) :=
 
   end.
 
-Definition x := mini.Test.x.
 
 Definition t := (x :=: common.Int 0).
 
@@ -377,6 +378,90 @@ split.
 Admitted.
 
 End NonDodgyELV.
+
+
+(* ------------------------------------------------------ *)
+(* ------  Sets of lists of values (nondodgy)------------ *)
+
+Module ESL.
+
+Definition ALL (VS : list value) : value := 
+  List.fold_left snoc VS (mkTup []).
+
+Definition apply (f : value) (v : value) : list value := 
+  match f with 
+  | Dom.Fun hs => 
+      h <- hs ;;
+      match (PFun.apply_opt _ _ Value.eqb h v) with 
+      | Some w => [w]
+      | None => [] 
+      end
+  | _ => []
+  end.
+
+
+Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) := 
+  
+  let B (e : mini.Expr) (ρ : env) : P (list value)  := 
+      (ρ' <- X e ρ ;; E e ρ' ) 
+    in
+
+(*
+  let R (e : mini.Expr) ρ : ENV := 
+    ρ' <- X e ρ ;; 
+    when (E e ρ' <> []) 
+    ⌈ ρ' ⌉
+  in
+*)
+
+  match e with 
+
+  | mini.Block e =>  B e ρ
+
+  | mini.Var _ => ⌈[ evalA e ρ ]⌉
+  | mini.Lit _ => ⌈[ evalA e ρ ]⌉
+  | mini.EPrim _ => ⌈[ evalA e ρ ]⌉
+  | mini.Array es =>  ⌈[ evalA e ρ ]⌉
+
+  | mini.DefineV _ => ⌈[  mkTup[]  ]⌉
+
+  | mini.ApplyD e1 e2 => ⌈apply (evalA e1 ρ) (evalA e2 ρ) ⌉
+
+  | mini.Fail =>  ⌈[]⌉
+
+  | mini.Choice e1 e2 => CHOICE <$> (B e1 ρ) <*> (B e2 ρ)
+
+  | mini.Unify e1 e2 => 
+      vs1 <- (E e1 ρ) ;;  (* list in first set *)
+      vs2 <- (E e2 ρ) ;;  (* list in second set *)
+      let unify (vs1 : list value) (vs2 : list value) : list value :=
+        v1 <- vs1 ;;
+        v2 <- vs2 ;; 
+        if (Value.eqb v1 v2) then [v1] else []
+      in
+      (* need to return a set of lists *)
+      ⌈ unify vs1 vs2  ⌉
+
+  | mini.Seq e1 e2 =>  
+      vs1 <- (E e1 ρ) ;;  (* list in first set *)
+      vs2 <- (E e2 ρ) ;;  (* list in second set *)
+      let seq (vs1 : list value) (vs2 : list value) : list value :=
+        v1 <- vs1 ;; (* make sure vs1 is inhabited *)
+        vs2 
+      in
+      (* need to return a set of lists *)
+      ⌈ seq vs1 vs2  ⌉
+
+  | mini.All e1 =>  
+      vs <- B e1 ρ ;;
+      ⌈ [ ALL vs ] ⌉
+
+  (* TODO: functions, one *)      
+  | mini.If3 e1 e2 e3 => ∅
+  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
+  | _ => ∅
+
+  end.
 
 
 
@@ -426,8 +511,7 @@ split.
  + intros ρ ρIn. done.
  + intros ρ ρIn. exists ρ. split; auto.
 Qed.
-
-
+ 
 Lemma constrain_hide r f : 
   (r ≈ f) \ (Scope.singleton r) = Total_set.
 unfold hide.
@@ -437,6 +521,8 @@ Lemma extract_one {x} : extract (r ≈ ⟨ x ⟩) = ⌈(x, Total_set)⌉.
 eapply Extensionality_Ensembles.
 unfold extract. unfold hide_r. 
 Admitted.  
+
+
 
 
 Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
@@ -475,8 +561,9 @@ cbn.   done. Qed.
 
 Example ex_combine1 : combine [ r ≈ ⟨ Int 1 ⟩ ] = ⌈ ([Int 1], Total_set ) ⌉.
 Proof.
-cbn. unfold
-rewrite extract_one.
+cbn. 
+Abort.
+
 
 Example ex_combine2 : 
   combine ([(r ≈ x ≈ ⟨ Int 1 ⟩); (r ≈ x ≈ ⟨ Int 0 ⟩)]) = 
@@ -489,6 +576,8 @@ Proof.
   + intros v vIn.
     destruct v as [v Δ].
     cbn in vIn.
+Abort.
+(*
     move: vIn => [[w1 Δ1] [h1 h2]].
     cbn in h2.  
     move: h2 => [h2|h2].
@@ -506,10 +595,11 @@ Proof.
        inversion h5. subst. clear h5.
        exists (Int 1, x ≈ ⟨ Int 1 ⟩). split. admit.
        right.
-       
+Abort. *)
 
 (* simon's new version *)
-Definition combine2 (Δs : list ENV) -> P (list value * ENV) := 
+(* 
+Definition combine2 (Δs : list ENV) : P (list value * ENV) := 
   fun '(vs, Δ) => 
     (* D is the set of environments such that vs 
          is the list of values gotten from the elements of 
@@ -522,11 +612,63 @@ Definition combine2 (Δs : list ENV) -> P (list value * ENV) :=
        fun '(vs, Δs) => (vi :: vs, Δi ∩ Δs) ∈ VSS)
     (fun _ => False).
 
-
 Definition ALL (s : list ENV) : ENV := 
   '( vs, Δ ) <- combine s ;;
      (Δ ∩ (r ≈ ⟨mkTup vs⟩)).
+*)
 
+(* SPJ's version of  ALL 
+Ed[all{e}]  = [ { rho \in Env
+                | exists vs.
+                        vs = [ v | D2:ENV <- Ed[e]
+                                  , (v,D3) ∈ extract(D2)   -- nonconstructive
+                                  , rho ∈ D3 ]
+                , rho(r) = tup(vs) }
+              ]
+*)
+
+Lemma flat_map_nil {A B}(xs:list A) : 
+  List.flat_map (fun x => ([] : list B)) xs = [].
+induction xs. simpl. auto. simpl. auto. Qed.
+
+Notation "v ≐ vs !! i" := 
+  (List.nth_error vs i = Some v) (at level 80).
+
+Opaque limitNum.
+
+Definition guard {A} (b : bool) (xs : list A) : list A := if b then xs else [].
+
+Lemma enumerate k : 
+   (i <- allNums;; guard (Nat.leb i k) [Int i]) = 
+   (List.map Int (enumFrom 0 (S k))).
+Proof.
+Admitted.
+
+Lemma nth_iterate {A}  j : forall (v : A)  (k : nat -> A), j < limitNum ->
+  (v ≐ (i <- allNums ;; [ k i ]) !! j) <-> (v = k j).
+Proof.
+  induction j; intros v k LT.
+  + cbn.
+Admitted.
+
+
+Lemma nth_iterate_guard {A}  j : forall (v : A)  (f : nat -> bool) (k : nat -> A),
+    (j < limitNum) ->
+    (v ≐ (i <- allNums ;; guard (f i) [ k i ]) !! j) <-> (f j = true /\ v = k j).
+Proof.
+  induction j; intros v f k LT.
+  + cbn.
+Admitted.
+
+    
+Definition ALL' (Δs : list ENV) : ENV := 
+  fun ρ => 
+    exists vs, ρ r = mkTup vs  
+         /\ forall i, i < limitNum -> forall Δ2, (Δ2 ≐ Δs !! i ) ->
+                  exists v, exists Δ3, 
+                    ((v, Δ3) ∈ extract Δ2)
+                    /\ (v ≐ vs !! i)
+                    /\ (ρ ∈ Δ3).
 
 (* ------------------------------------------------------ *)
 (* ------  Fig 17 D-LS (using dodgy union) -------------- *)
@@ -567,7 +709,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
      (Δ3 <- E e3 ;; [Δ3 - Δ1 \ Y])
 
   | mini.All a => 
-       [ ALL (B a)  ] 
+       [ ALL' (B a)  ] 
 
   | mini.One a =>  (* not quite right *)
        [ first (E a) \ mini.I a ]
@@ -576,6 +718,113 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 
   | _ => [ ∅ ] 
   end.
+
+Definition value_leb (v1 : value) (v2 : value) : bool := 
+  match v1, v2 with 
+  | Int k1, Int k2 => Nat.leb k1 k2
+  | _,_ => false
+  end.
+
+
+(* The semantics of 1..x 
+   [ {{r=1,x>=1}}, {{r=2,x>=2}}, ... ]
+   [ {{r=i,x>=i}} | i <- [0 ..] ]
+
+ *)
+Definition sem : list ENV := 
+  i <- allNums ;;
+  [ (fun ρ => (ρ r = Int i) /\ exists n, (ρ x = Int n) /\ n >= i) ].
+
+(* The semantics that we want for all{1..n} 
+
+   ==  [ { rho | rho(r) = tup[ i | i <- 0.., rho(n) >= i ]  } ]     ←- the answer we want
+
+   =?= [ UNION { {{r=tup[1,..k], n=k}} | k \in Z } ] 
+*)
+
+
+(* This is "the answer we want" *)
+Definition all_sem : ENV := 
+  fun rho => 
+    exists n, rho x = Int n /\
+           let l : list value := 
+    (* [ i | i <- 0.., i <= rho(n) ] *)
+    i <- allNums ;; guard (value_leb (Int i) (rho x)) [Int i] in 
+  rho r = mkTup l.
+
+
+
+Lemma Extensionality_list {A} ( vs1 vs2 : list A) : 
+  (forall i, forall v, (v ≐ vs1 !! i) <-> v ≐ vs2 !! i) -> vs1 = vs2.
+Proof.
+  move: vs2.
+  induction vs1; intros vs2 X; destruct vs2. done.
+  + specialize (X 0 a). cbn in X. destruct X. 
+    specialize (H0 ltac:(auto)). discriminate.
+  + specialize (X 0 a). cbn in X. destruct X. 
+    specialize (H ltac:(auto)). discriminate.
+  + move: (X 0 a) => Y. cbn in Y. destruct Y.
+    specialize (H ltac:(auto)). inversion H. 
+    f_equal. eapply IHvs1. intros i v.
+    specialize (X (1 + i) v). cbn in X. done.
+Qed.
+
+
+Require Import Psatz.
+
+
+Example ALL_sem : ALL' sem = all_sem.
+unfold ALL', all_sem.
+eapply Extensionality_Ensembles.
+split.
+- intros ρ xIn. 
+  move: xIn => [vs [h1 h2]].
+  unfold Ensembles.In. 
+  exists (length vs).
+  split.
+  + admit.
+  + 
+  rewrite h1.
+  f_equal.
+  eapply Extensionality_list.
+  intros i v.
+  have LTi: i < limitNum. admit.
+  remember (fun ρ => (ρ r = Int i) /\ exists k, (ρ x = Int k) /\ k >= i) as ρi.
+  have h: (ρi ≐ sem !! i).
+  { unfold sem. rewrite nth_iterate. auto. auto. }
+  specialize (h2 i LTi ρi h).
+  move: h2 => [vi [Δ3 [h3 [h4 h5]]]].
+  rewrite nth_iterate_guard; auto.
+  rewrite Heqρi in h3. cbn in h3. rewrite h3 in h5.
+  move: h5 => [ ρ' [k1 k2]]. inversion k1. subst. clear k1.
+  inversion H. clear H. move: H2 => [k [EQ LE]].
+  inversion H0. clear H0. clear h.
+  have NE: ~ Scope.In x (Scope.singleton r). admit.
+  specialize (k2 x NE).
+  rewrite k2.
+  rewrite EQ. cbn.
+  rewrite PeanoNat.Nat.leb_le. 
+  split.
+  ++ move => h5. split.
+    lia.
+    rewrite H1 in H.
+    rewrite -> h4 in h5. inversion h5. subst. auto.
+  ++ intros [m1 m2]. 
+    subst. rewrite H1 in h4. done.
+- intros ρ h1. unfold Ensembles.In in h1.
+  move: h1 => [n [Ex h1]].
+  rewrite Ex in h1. unfold value_leb in h1.
+  rewrite enumerate in h1.
+  unfold Ensembles.In.
+  eexists. split. eauto.
+  intros i LTi Δ2 h.
+  unfold sem in h.
+  rewrite nth_iterate in h. auto.
+  eexists.
+  eexists.
+  split.
+  rewrite h.
+Admitted.
 
 End DLS.
 
@@ -656,9 +905,6 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   | _ => [ ] 
   end.
 
-Lemma flat_map_nil {A B}(xs:list A) : 
-  List.flat_map (fun x => ([] : list B)) xs = [].
-induction xs. simpl. auto. simpl. auto. Qed.
 
 
 (* if(a){b}else{c} <=> if(a){b}else{:false} | if(a){:false}else{c} *)
