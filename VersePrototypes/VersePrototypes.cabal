@@ -1,10 +1,12 @@
-cabal-version:      2.4
+cabal-version:      3.0
 name:               VersePrototypes
 version:            0.1.0.0
 synopsis:           Haskell prototypes and testing for Verse
 description:        Programs for automated and interactive tests of Core Verse rewrite systems.
 tested-with:        GHC==9.4
 copyright:          Epic Games 2022
+data-dir:           versetests
+data-files:         *.versetest
 
 extra-source-files: CHANGELOG.md
                     README.md
@@ -28,7 +30,6 @@ executable verse-repl
 
     -- In the repl/ subdirectory
     hs-source-dirs:   repl
-
     build-depends:    verse-libs,
                       verse-densem,
                       haskeline,
@@ -190,7 +191,7 @@ library verse-densem
                       text,
                       pretty,
                       QuickCheck,
-                      scientific,
+                      scientific
 
 -- Various Verse utilities on which other stuff depends
 -- Should really have its own cabal project
@@ -264,7 +265,6 @@ library verse-libs
 
     build-depends:
                       parser-combinators,
---                      lens,
                       text,
                       uniplate,
                       QuickCheck,
@@ -272,4 +272,38 @@ library verse-libs
                       scientific,
                       transformers,
                       unordered-containers,
---                      z3,
+
+
+-- shared parser for various verse implementations and experiments
+library verse-parser
+    import:           general-libs
+    hs-source-dirs:   parser
+    exposed-modules:
+                      Parser.Expr
+                      Parser.Error
+                      Parser.Parser
+                      Parser.OpParser
+    other-modules:
+
+    build-depends: parser-combinators
+                 , verse-libs
+
+test-suite verse-parser-test
+    import:           general-libs
+    hs-source-dirs:   parser/test
+    type: exitcode-stdio-1.0
+
+    -- exposed-modules:
+    main-is:          Main.hs
+
+    default-language: GHC2021
+    ghc-options:      -Wall -Wno-name-shadowing
+
+    other-modules: Paths_VersePrototypes
+    build-depends: base
+                 , megaparsec
+                 , containers
+                 , text
+                 , filepath
+                 , directory
+                 , verse-parser
