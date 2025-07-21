@@ -16,12 +16,12 @@ $$
 \textbf{Syntax of Mini Verse}\ \ \ifeverything\text{(copied from \Cref{fig:mini-verse})}\fi \\
  \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
-  \text{Simple values}    & a & ::= & |x| \vb |o| \vb |k| \vb  |arr (a_0, xdots, a_n)|  \hspace{5mm} \text{Can add strings, floats...} \\
+  \text{Simple values}    & a & ::= & |x| \vb |o| \vb |k| \vb  |arr (a_0, xdots, a_n)| \vb |truth a| \hspace{5mm} \text{Can add strings, floats...} \\
   \text{Wrappings}   & |hw| & ::= & |wrapemp| \vb |y:== apply1N h x| \\
   \text{Expressions} & e & ::= & |a| \vb e_1; e_2
      \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail| \\
      && \vb & |apply1N a_1 a_2| \vb |lamH q fx i e_1 hw e_2| \\
-  && \vb & |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
+  && \vb & |oftypefx e_1 fx e_2| \vb |check fx e| \\
   && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
 \end{array} \\
   \\
@@ -44,6 +44,7 @@ $$
 &  \semapp{A}{|x|}\rho & = & \rho(x) \\
 &  \semapp{A}{|k|}\rho & = & k \\
 &  \semapp{A}{|o|}\rho & = & \semap{O}{o} \\
+&  \semapp{A}{|truth a|}\rho & = & ?? \\
 &  \semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
 
 \text{Primitive ops} &   \semap{O}{|o|} & : & \Val \\

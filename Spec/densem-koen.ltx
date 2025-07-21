@@ -21,18 +21,19 @@ $$
 \rulename{eatom} &  \semapsub{E}{d}{|a|} & = & [ \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \} ] \\
 \rulename{efail} &  \semapsub{E}{d}{|fail|} & = & [ ] \\
 \rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}
- & = & \semapsub{E}{d}{e_1} \append \semapsub{E}{d}{e_2}  \\
+ & = & \semap{B}{e_1} \append \semap{B}{e_2}  \\
 \rulename{eunify} &  \semapsub{E}{d}{|e_1 == e_2|}
-& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1},
-          \EV_2 \in \semapsub{E}{d}{e_2} ] \\
+& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 |<-| \semapsub{E}{d}{e_1},
+          \EV_2 |<-| \semapsub{E}{d}{e_2} ] \\
 \rulename{eseq} &  \semapsub{E}{d}{|e_1 ; e_2|}
-& = &  [ \hideE(\RES,\EV_1) \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1},
-          \EV_2 \in \semapsub{E}{d}{e_2} ] \\
+& = &  [ \hideE(\RES,\EV_1) \intersectE \EV_2
+       \vb \EV_1 |<-| \semapsub{E}{d}{e_1},
+           \EV_2 |<-| \semapsub{E}{d}{e_2} ] \\
 \rulename{elam} &  \semapsub{E}{d}{|dpslam x e_1 e_2 y|} & = & ??? \\
 \rulename{eapp} & \semapsub{E}{d}{|apply1N a_1 a_2|}
  & = & \begin{array}[t]{@@{}l@@{\;}l}
   [ & \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
-    |vbar| &  i \in 0\mydots \; ]
+    |vbar| &  i |<-| 0\mydots \; ]
   \end{array} \\
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
   \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }
@@ -42,11 +43,21 @@ $$
        \vb \EV_3 |<-| \semapsub{E}{d}{|e_3|}] \\
 &&& |where| \begin{array}[t]{ll}
   Y = \semap{I}{|e_1|} \\
-  \EV_1 = \firstE(Y, \semapsub{E}{d}{|e_3|}x)  & \text{$x$ fresh}
+  \EV_1 = \firstE(Y, \semapsub{E}{d}{|e_3|}) 
   \end{array} \\
+% \rulename{eall} & \semapsub{E}{d}{|all e|}
+%  & = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{B}{e}), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ]
 \rulename{eall} & \semapsub{E}{d}{|all e|}
-& = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{B}{e}), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ]
-\\[2mm]
+ & = & [ \, \{ \rho \in \Env \;
+           \begin{array}[t]{@@{}l@@{\;}l}
+             \vb & vs \in \pickE (\squashE
+             \begin{array}[t]{@@{}l@@{\;}l}
+               [ & \{ v \vb (v,\EV') \in \extractE(\RES,\EV), \rho \in \EV' \} \\
+               \vb & \EV \in \semapsub{E}{d}{|e|} \; ])
+               \end{array} \\
+           , & \rho(\RES) = \tupE(vs) \} \, ]
+           \end{array} \\
+\\
 
 & \semapp{B}{|e|} & : & \seq{ \ENV } \\
 & \semapp{B}{|e|} & = & [ \hideE(\semapp{I}{|e|}, \EV) \vb \EV \in \semapsub{E}{d}{e} ]
@@ -59,6 +70,10 @@ $$
 \begin{figure}
 $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
+  \squashE & : & [\powerset{A}] \rightarrow [\powerset{A}] \\
+  \squashE(ss) & = & [ s \vb s |<-| ss, s \not= \{ \} ] \\[1mm]
+  \pickE & : & [\powerset{A}] \rightarrow \powersetnp{[A]} \\
+  \pickE[s_0, \mydots, s_n] & = & [ [v_0, \mydots, v_n]  \vb \forall 0 \leq i \leq n.\; v_i \in s_i ] \\[1mm]
  \firstE & : & \powerset{\Ident} \rightarrow \seq{\ENV} \rightarrow \ENV \\
  ToDo
 \end{array}
@@ -76,7 +91,7 @@ $$
   \semapsub{E}{e}{e}  & : & \Env \rightarrow \seq{ \powerset{\Val} } \\
 \\
 \semapsub{E}{e}{e} \rho
-  & = & [ \, \{ v \vb (v,\EV')\in \extractE(r,\EV), \rho \in \EV' \}
+  & = & [ \, \{ v \vb (v,\EV')\in \extractE(\EV), \rho \in \EV' \}
           \vb \EV \leftarrow \semapsub{E}{d}{e}r \, ]
 \\ \\
 \semapsub{E}{d}{e}r
