@@ -13,6 +13,7 @@ Require Import PFun.
 Require Import structures.Sets.
 Import structures.List.
 Import structures.Monad.
+Require Import structures.Laws.
 
 Require Import densem.Dom.
 Require Import densem.tenv.  (* environments are total *)
@@ -24,6 +25,7 @@ Import MonadNotation.
 Import SetNotations.
 Import List.ListNotations.
 Import EnvNotation.
+Import AlternativeNotation.
 
 Open Scope monad_scope.
 Open Scope list_scope.
@@ -31,8 +33,81 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
+Ltac inv H := inversion H; try subst; clear H.
+
+Ltac crunch :=
+  repeat match goal with
+          | [ H : exists X, _ |- _ ] => destruct H
+          | [ H : _ /\ _ |- _ ] => destruct H
+          | [ H : _ \/ _ |- _ ] => destruct H
+          | [ |- _ /\ _ ] => split
+          end.
+
+
+Lemma set_extensionality {A} (s1 s2 : P A) :
+  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
+Proof.
+  intros h.
+  eapply Extensionality_Ensembles.
+  split. intros x. rewrite h. done. intros x. rewrite h. done.
+Qed.
+
+Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
+  (ρ ∈ (x <- ma ;; k x)) <->
+  (exists x, (x ∈ ma) /\ (ρ ∈ (k x))).
+Proof. cbn. unfold bind_. cbn. reflexivity. Qed.
+
+Lemma in_ret {A} (x y :A) :
+  x ∈ (ret y : P A) <-> x = y.
+Proof.     
+  cbn. split. intros h1; inversion h1. done.
+  intros h. subst. done.
+Qed.
+
+Lemma in_intersection {A} (x : A) s1 s2 :
+  x ∈ (s1 ∩ s2) <-> (x ∈ s1) /\ (x ∈ s2).
+Proof.
+  split. intros h1; inversion h1. split; done.
+  intros [h1 h2]; econstructor; eauto.
+Qed.
+
+Lemma in_union {A} (x : A) s1 s2 :
+  x ∈ (s1 ∪ s2) <-> (x ∈ s1) \/ (x ∈ s2).
+Proof.
+  split. intros [h1|h1]; [left; auto| right; auto].
+  intros [h1|h1];  [left; auto| right; auto].
+Qed.
+
+
+
+Hint Rewrite @in_bind @in_ret @in_intersection @in_union : sets.
+
+Lemma intersection_assoc
+     : forall (A : Type) (l m n : P A), 
+    (l ∩ (m ∩ n)) = ((l ∩ m) ∩ n).
+Admitted.
+Lemma union_assoc
+     : forall (A : Type) (l m n : P A), 
+    (l ∪ (m ∪ n)) = ((l ∪ m) ∪ n).
+Admitted.
+
+
+(* ---------------------------------------------- *)
+
 (* This axiom is BAD. But convenient for now.... *)
-Axiom empty_dec : forall {A} (s : P A), { s ≃ ∅ } + { ~ (s ≃ ∅) }.
+Axiom choose_elements  : forall {A} (s : P A), list A.
+
+Axiom choose_empty : 
+  forall {A}, choose_elements ∅ = ([] : list A).
+Axiom choose_ret : 
+  forall {A}{v}, choose_elements (ret v) = ([v] : list A).
+Axiom choose_when : forall {A} {ϕ} {s:P A},
+  (ϕ     /\ choose_elements (when ϕ s) = 
+             choose_elements s) \/
+  (not ϕ /\ choose_elements (when ϕ s) = []).
+
+Axiom empty_dec : forall {A} (s : P A), 
+    { s ≃ ∅ } + { ~ (s ≃ ∅) }.
 
 Definition is_Empty_set {A} (s : P A) : bool := 
   match empty_dec s with 
@@ -47,9 +122,9 @@ Definition ENV := P env.
 (* distinguished result variable (0) *)
 Definition r : Ident := mini.Test.r.
 Definition rs : Scope.t := Scope.singleton r.
+Notation "⟅ r ⟆" := (Scope.singleton r).
 (* another variable (1) *)
 Definition x := mini.Test.x.
-
 
 (* -------------- atomic expressions  ---------------- *)
 
@@ -76,24 +151,23 @@ Fixpoint evalA (e : mini.Expr) (ρ : env) : value :=
 
 (* ------- operations on lists of sets ---------- *)
 
+Definition SUCCEED {A} : list (P A) := ret Total_set. 
 
-Definition SUCCEED {A} : list (P A) := [ Total_set ]. 
-
-Definition FAIL {A} : list (P A) := [ ∅ ] .
+Definition FAIL {A} : list (P A) := ret ∅.
 
 Definition CHOICE {A} (d1 : list A) (d2: list A) : list A := 
-  d1 ++ d2.
+  d1 <|> d2.
 
 Definition UNIFY {A} (d1 : list (P A)) (d2: list (P A)) : list (P A) := 
   ρ1 <- d1 ;;
   ρ2 <- d2 ;;
-  [ ρ1 ∩ ρ2 ].
+  ret (ρ1 ∩ ρ2).
 
 Definition MINUS {A} (d1 : list (P A)) (d2: list (P A)) : 
   list (P A) := 
   ρ1 <- d1 ;;
   ρ2 <- d2 ;;
-  [ ρ1 - ρ2 ].
+  ret (ρ1 - ρ2).
 
 Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) := 
   (~ ϕ1 /\ ϕ3).
@@ -114,6 +188,10 @@ Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 Definition squash_fold_left {A B} (f : P A -> P B -> P A) : 
   list (P B) -> P A -> P A := 
   List.fold_left (fun bs x => If3 x bs (f bs x)).
+
+(* Find the first nonempty set, or an empty set if none exist. *)
+Definition first {A} (VS : list (P A)) : P A := 
+  squash_fold_left (fun xs x => x) VS ∅.
 
 (* squash using axiom *)
 Fixpoint squash {A} (xs : list(P A)) : list (P A) := 
@@ -136,12 +214,8 @@ Definition Pointwise_Unions {A} : list (list (P A)) -> list (P A) :=
 (* another version of the dodgy big union *)
 Definition DODGY_UNIONS {A} (VVS : P (list (P A))) : list (P A) := 
   i <- allNums ;;
-  let VS : P (P A) := Sets.map (fun VS => List.nth i VS ∅) VVS in
+  let VS : P (P A) := fmap (fun VS => List.nth i VS ∅) VVS in
   [ UNION VS ].
-
-(* Find the first nonempty set, or an empty set if non exists. *)
-Definition first {A} (VS : list (P A)) : P A := 
-  squash_fold_left (fun xs x => x) VS ∅.
 
 (* -------------- tuples and application ------ *)
 
@@ -149,7 +223,7 @@ Definition first {A} (VS : list (P A)) : P A :=
 Definition tups (VS : list VAL) : VAL := 
   fun v => 
     exists (vs : list value), 
-      v = mkTup vs /\ List.Forall2 Sets.In vs VS.
+      v = mkTup vs /\ List.Forall2 (fun x y => x ∈ y) vs VS.
 
 (* apply domain function value f to x 
    f is a list of partial functions, corresponding to 
@@ -161,10 +235,10 @@ Definition apply (f : value) (v : value) : list VAL :=
   | Dom.Fun hs => 
       h <- hs ;;
       match (PFun.apply_opt _ _ Value.eqb h v) with 
-      | Some w => [ ⌈ w ⌉ ]
-      | None => [ ∅ ] 
+      | Some w => ret (ret w)
+      | None => empty 
       end
-  | _ => []
+  | _ => empty
   end.
 
 (* Two different versions of application. Arguments must be atomic, 
@@ -175,7 +249,7 @@ Definition apply (f : value) (v : value) : list VAL :=
 *)
 Definition APPi (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
   fun ρ => 
-    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some ⌈ ρ r ⌉.
+    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some (ret (ρ r)).
 
 Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
   fun ρ => 
@@ -185,9 +259,9 @@ Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV :=
 
 Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV := 
   i <- allNums ;;
-  [ APPi e1 e2 i ].
+  ret (APPi e1 e2 i).
   
-(* ---------- auxiliary definitions for ENV and list ENV ------ *)
+(* ------ auxiliary definitions for ENV and list ENV ------ *)
 
 
 (* Constrain a variable to be equal to a particular value.
@@ -210,7 +284,7 @@ Definition hide_r : ENV -> ENV := hide (Scope.singleton r).
 (* Generalize all of the xs to be anything *)
 (* Envss Drop Variables Δs [\] xs *)
 Definition hide_list (xs : Scope.t) (Δs : list ENV) : list ENV := 
-  List.map (hide xs) Δs.
+  fmap (hide xs) Δs.
 
 Definition envs_difference (Δ1 : ENV) (xs : Scope.t) (Δ2 : ENV) : ENV :=
   Δ1 - (hide xs Δ2).
@@ -232,270 +306,53 @@ Infix "*" := UNIFY.
    definitions for the variables declared in e. 
 *)
 Definition X (e : mini.Expr) (ρ : env) : ENV :=
-  ⌈ ρ ⌉ \ mini.I e .
+  ret ρ \ mini.I e .
 
 Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
   (d1 [\] (Scope.singleton r)) * d2.
 
 
-(* ------------------------------------------------------ *)
-(* ------  Fig 15 E-LV (uses dodgy union) --------------- *)
-
-Module ELV.
-
-Definition ALL (VS : list VAL) : VAL := 
-  squash_fold_left (liftM2 snoc) VS ⌈ mkTup [] ⌉.
-
-Fixpoint E (e :mini.Expr) (ρ:env) : list VAL := 
-  
-  let B (e : mini.Expr) (ρ : env) : list VAL  := 
-    DODGY_UNIONS
-      (ρ' <- X e ρ ;; ⌈ E e ρ' ⌉) 
-    in
-
-  let R (e : mini.Expr) ρ : ENV := 
-    ρ' <- X e ρ ;; 
-    when (E e ρ' <> []) 
-    ⌈ ρ' ⌉
-  in
-
-  match e with 
-
-  | mini.Block e =>  B e ρ
-
-  | mini.Var _ => [ ⌈evalA e ρ⌉ ]
-  | mini.Lit _ => [ ⌈evalA e ρ⌉ ] 
-  | mini.EPrim _ => [ ⌈evalA e ρ⌉ ] 
-  | mini.Array es =>  [ ⌈evalA e ρ⌉ ] 
-
-  | mini.DefineV _ => [ ⌈ mkTup[] ⌉ ]
-
-  | mini.ApplyD e1 e2 => apply (evalA e1 ρ) (evalA e2 ρ)
-
-  | mini.Fail => []
-
-  | mini.Choice e1 e2 => CHOICE (B e1 ρ) (B e2 ρ)
-
-  | mini.Seq e1 e2 => IF2 (E e1 ρ) (E e2 ρ)
-
-  | mini.Unify e1 e2 => UNIFY (E e1 ρ) (E e2 ρ)
-
-  | mini.All e1 =>  [ ALL (B e1 ρ) ]
-
-  | mini.If3 e1 e2 e3 => 
-      let Δ  : ENV := R e1 ρ in
-      if is_Empty_set Δ then
-        B e2 ρ
-      else
-        DODGY_UNIONS ( ρ' <- Δ ;; ⌈ B e2 ρ' ⌉ )
-
-  (* TODO: functions, one *)      
-
-  | mini.Fun q eff i e1 (y,h,x) e2 =>  []
-
-  | _ => []
-
-  end.
-
-End ELV.
-
-
-(* ------------------------------------------------------ *)
-(* ------  E-LV (doesn't use dodgy union) --------------- *)
-
-Module NonDodgyELV.
-
-Definition ALL (VS : list VAL) : VAL := 
-  List.fold_left (liftM2 snoc) VS ⌈ mkTup [] ⌉.
-
-Fixpoint E (e :mini.Expr) (ρ:env) : P (list VAL) := 
-  
-  let B (e : mini.Expr) (ρ : env) : P (list VAL)  := 
-      (ρ' <- X e ρ ;; E e ρ' ) 
-    in
-
-(*
-  let R (e : mini.Expr) ρ : ENV := 
-    ρ' <- X e ρ ;; 
-    when (E e ρ' <> []) 
-    ⌈ ρ' ⌉
-  in
-*)
-
-  match e with 
-
-  | mini.Block e =>  B e ρ
-
-  | mini.Var _ => ⌈ [ ⌈evalA e ρ⌉ ] ⌉
-  | mini.Lit _ => ⌈[ ⌈evalA e ρ⌉ ] ⌉
-  | mini.EPrim _ => ⌈[ ⌈evalA e ρ⌉ ] ⌉
-  | mini.Array es =>  ⌈ [ ⌈evalA e ρ⌉ ] ⌉
-
-  | mini.DefineV _ => ⌈ [ ⌈ mkTup[] ⌉ ] ⌉
-
-  | mini.ApplyD e1 e2 => ⌈apply (evalA e1 ρ) (evalA e2 ρ) ⌉
-
-  | mini.Fail =>  ⌈[]⌉
-
-  | mini.Choice e1 e2 => CHOICE <$> (B e1 ρ) <*> (B e2 ρ)
-
-  | mini.Unify e1 e2 => UNIFY <$> (E e1 ρ) <*> (E e2 ρ)
-
-  | mini.Seq e1 e2 =>  IF2 <$> (E e1 ρ) <*> (E e2 ρ)
-
-  | mini.All e1 =>  
-      vs <- B e1 ρ ;;
-      ⌈ [ ALL vs ] ⌉
-
-(*
-  | mini.If3 e1 e2 e3 => 
-      let Δ  : ENV := R e1 ρ in
-      if is_Empty_set Δ then
-        B e2 ρ
-      else
-        DODGY_UNIONS ( ρ' <- Δ ;; ⌈ B e2 ρ' ⌉ )
-*)
-
-  (* TODO: functions, one *)      
-
-  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
-  | _ => ∅
-
-  end.
-
-
-Definition t := (x :=: common.Int 0).
-
-Example example1 :
-  E t (x |-> Int 0) ≃ ⌈ [ ⌈Int 0⌉ ] ⌉.
-Admitted.
-
-Example example2 :
-  E t (x |-> Int 1) ≃ ⌈ [ ] ⌉.
-cbn.
-split.
-+ intros x xIn.
-Admitted.
-
-End NonDodgyELV.
-
-
-(* ------------------------------------------------------ *)
-(* ------  Sets of lists of values (nondodgy)------------ *)
-
-Module ESL.
-
-Definition ALL (VS : list value) : value := 
-  List.fold_left snoc VS (mkTup []).
-
-Definition apply (f : value) (v : value) : list value := 
-  match f with 
-  | Dom.Fun hs => 
-      h <- hs ;;
-      match (PFun.apply_opt _ _ Value.eqb h v) with 
-      | Some w => [w]
-      | None => [] 
-      end
-  | _ => []
-  end.
-
-
-Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) := 
-  
-  let B (e : mini.Expr) (ρ : env) : P (list value)  := 
-      (ρ' <- X e ρ ;; E e ρ' ) 
-    in
-
-(*
-  let R (e : mini.Expr) ρ : ENV := 
-    ρ' <- X e ρ ;; 
-    when (E e ρ' <> []) 
-    ⌈ ρ' ⌉
-  in
-*)
-
-  match e with 
-
-  | mini.Block e =>  B e ρ
-
-  | mini.Var _ => ⌈[ evalA e ρ ]⌉
-  | mini.Lit _ => ⌈[ evalA e ρ ]⌉
-  | mini.EPrim _ => ⌈[ evalA e ρ ]⌉
-  | mini.Array es =>  ⌈[ evalA e ρ ]⌉
-
-  | mini.DefineV _ => ⌈[  mkTup[]  ]⌉
-
-  | mini.ApplyD e1 e2 => ⌈apply (evalA e1 ρ) (evalA e2 ρ) ⌉
-
-  | mini.Fail =>  ⌈[]⌉
-
-  | mini.Choice e1 e2 => CHOICE <$> (B e1 ρ) <*> (B e2 ρ)
-
-  | mini.Unify e1 e2 => 
-      vs1 <- (E e1 ρ) ;;  (* list in first set *)
-      vs2 <- (E e2 ρ) ;;  (* list in second set *)
-      let unify (vs1 : list value) (vs2 : list value) : list value :=
-        v1 <- vs1 ;;
-        v2 <- vs2 ;; 
-        if (Value.eqb v1 v2) then [v1] else []
-      in
-      (* need to return a set of lists *)
-      ⌈ unify vs1 vs2  ⌉
-
-  | mini.Seq e1 e2 =>  
-      vs1 <- (E e1 ρ) ;;  (* list in first set *)
-      vs2 <- (E e2 ρ) ;;  (* list in second set *)
-      let seq (vs1 : list value) (vs2 : list value) : list value :=
-        v1 <- vs1 ;; (* make sure vs1 is inhabited *)
-        vs2 
-      in
-      (* need to return a set of lists *)
-      ⌈ seq vs1 vs2  ⌉
-
-  | mini.All e1 =>  
-      vs <- B e1 ρ ;;
-      ⌈ [ ALL vs ] ⌉
-
-  (* TODO: functions, one *)      
-  | mini.If3 e1 e2 e3 => ∅
-  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
-  | _ => ∅
-
-  end.
-
-
-
-
-(* ------- semantics of all for dest passing --------------- *)
-
-(* find all environments in Δ such that ρ(r) = v and then hide r *)
-Definition extract (Δ : ENV) : P (value * ENV) := 
-  fun '(v , Δ') => 
-    Δ' = hide_r (Δ ∩ r ≈ ⟨v⟩).
-
-Lemma constrain_Intersect Δ r v1 v2 : 
-  (Δ ≃ (r ≈ ⟨ v1 ⟩ ∩ r ≈ ⟨ v2 ⟩)) -> 
-  if Value.eqb v1 v2 then 
-    Δ = (r ≈ ⟨v1⟩)
-  else 
-    Δ = ∅.
+(* theory about constrain/hide *)
+Lemma in_constrain_eq (ρ : env) (x:Ident) k :
+  ρ ∈ (x ≈ k) <-> ρ x = k ρ.
+split. intro h. inversion h. done.
+intro h. unfold constrain_eq. done.
+Qed.
+
+Hint Rewrite in_constrain_eq : sets.
+
+Lemma constrain_eq_same {r v} : 
+  (r ≈ ⟨ v ⟩ ∩ r ≈ ⟨ v ⟩) = (r ≈ ⟨ v ⟩).
 Proof.
-  move=> [h1 h2].
-  destruct (Value.eqb v1 v2) eqn:EV.
-  + have EQ: (v1 = v2). admit.
-    subst. 
-    eapply Extensionality_Ensembles.
-    split. intros x xIn.
-    specialize (h1 x xIn). inversion h1; auto.
-    intros x xIn. 
-    have h3: (x ∈ (r ≈ ⟨ v2 ⟩ ∩ r ≈ ⟨ v2 ⟩)). split; auto.
-    specialize (h2 x h3). auto.
-  + have NEQ: (v1 <> v2). admit.
-    eapply Extensionality_Ensembles.
-    split. intros x xIn. specialize (h1 x xIn). inversion h1.
-    cbv in H. cbv in H0. rewrite H in H0. done.
-    intros x xIn. inversion xIn.
-Admitted.
+  eapply set_extensionality; intros x.
+  rewrite in_intersection.
+  repeat rewrite in_constrain_eq. 
+  tauto.
+Qed.
+
+Hint Rewrite @constrain_eq_same : sets.
+
+
+Lemma constrain_eq_intersection {r v1 v2} : 
+  (r ≈ ⟨ v1 ⟩ ∩ r ≈ ⟨ v2 ⟩) = 
+  if Value.eqb v1 v2 then 
+    (r ≈ ⟨v1⟩)
+  else 
+    ∅.
+Proof.
+  destruct (Value.eqb v1 v2) eqn:EV;
+   [rewrite Value.eqb_eq in EV; subst|
+    rewrite Value.eqb_neq in EV].
+    + eapply set_extensionality; intros x.
+    rewrite in_intersection.
+    rewrite in_constrain_eq. tauto.
+    + eapply set_extensionality; intros x.  
+      subst.
+      rewrite in_intersection.
+      repeat rewrite in_constrain_eq.
+      split; try done.
+      intros [h1 h2]; congruence.
+Qed.
 
 Lemma Empty_set_hide (s : Scope.t) : ∅ \ s = ∅.
 unfold hide. 
@@ -504,6 +361,9 @@ split.
  + intros ρ ρIn. inversion ρIn. inversion H. done.
  + intros ρ ρIn. inversion ρIn.
 Qed.
+
+Hint Rewrite Empty_set_hide : sets.
+
 Lemma Total_set_hide (s : Scope.t) : Total_set \ s = Total_set.
 unfold hide. 
 eapply Extensionality_Ensembles.
@@ -512,29 +372,227 @@ split.
  + intros ρ ρIn. exists ρ. split; auto.
 Qed.
  
-Lemma constrain_hide r f : 
-  (r ≈ f) \ (Scope.singleton r) = Total_set.
+Hint Rewrite Total_set_hide : sets.
+
+Lemma constrain_eq_hide_same r k : 
+  ((r ≈ ⟨k⟩) \ ⟅r⟆) = Total_set.
+eapply set_extensionality. intro ρ.
 unfold hide.
+split.
++ intro h. done.
++ intros _. 
+  exists (r |-> k, ρ).
+  split.
+  rewrite in_constrain_eq.
+  rewrite extend_lookup_same.
+  done.
+  intros y h.
+  rewrite Scope.singleton_spec in h.
+  rewrite extend_lookup_diff.
+  rewrite PeanoNat.Nat.eqb_neq. easy.
+  done.
+Qed.
+
+Hint Rewrite constrain_eq_hide_same : sets.
+
+Lemma constrain_eq_hide_diff x y k : 
+  x <> y ->
+  ((x ≈ ⟨k⟩) \ ⟅y⟆) = (x ≈ ⟨k⟩).
+intro NE.
+eapply set_extensionality. intro ρ.
 Admitted.
 
-Lemma extract_one {x} : extract (r ≈ ⟨ x ⟩) = ⌈(x, Total_set)⌉.
-eapply Extensionality_Ensembles.
-unfold extract. unfold hide_r. 
-Admitted.  
+Lemma hide_intersect x s1 s2 : hide x (s1 ∩ s2) ⊆ ((hide x s1) ∩ (hide x s2)).
+Proof. 
+  intros ρ [_ [[ρ' h11] h2]].
+  unfold hide.
+    split. 
+    exists ρ'. split; auto. exists ρ'. split; auto.
+Qed. 
+(* NOTE: converse is not true *)
 
 
+Ltac set_crunch :=
+    repeat match goal with 
+    | [ H : ?ρ ∈ (bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh "ρ" in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (ret ?v) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
+        inv H; crunch
+      end.
 
+(* --- semantics of ALL for dest passing --------- *)
+
+(* find all environments in Δ such that ρ(r) = v, then hide r *)
+
+Definition extract (Δ : ENV) : P (value * ENV) := 
+  ρ <- Δ ;;
+  ret ( ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆ ).
+
+
+Lemma extract_one {v} : 
+  extract (r ≈ ⟨ v ⟩) = ret (v, Total_set).
+eapply set_extensionality. intro ρ.
+unfold extract. 
+set_crunch.
+autorewrite with sets.
+split.
+- move=>h. crunch. 
+  set_crunch.
+  autorewrite with sets.
+  f_equal.
+- destruct ρ as [w Δ].
+  intro h. inv h.
+  exists (r |-> v).
+  autorewrite with sets.
+  cbn.
+  done.
+Qed.
+
+
+Lemma extract_example :
+  extract (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩) = 
+    ret (Int 0, x ≈ ⟨ Int 0 ⟩).
+Proof.
+  unfold extract.
+  eapply set_extensionality. intros [v Δ].
+  autorewrite with sets.
+  split.
+  + intros h. crunch.
+    set_crunch.
+    repeat rewrite H2.  clear H2. clear H1 x0.
+    f_equal.
+    eapply set_extensionality. intros ρ.    
+    autorewrite with sets.
+    rewrite <- intersection_assoc.
+    rewrite constrain_eq_same.
+    split.
+    ++ intro h.
+       apply hide_intersect in h.
+       set_crunch.
+       rewrite constrain_eq_hide_diff in H.
+       easy.
+       set_crunch. 
+       done.
+    ++ intro h.
+       exists (x |-> Int 0, r |-> Int 0, ρ).
+       split.
+       autorewrite with sets.
+       cbn. done.
+       intros y nr.
+       rewrite Scope.singleton_spec in nr.
+       destruct (PeanoNat.Nat.eq_dec x y); subst.
+       rewrite extend_lookup_same. auto.
+       rewrite extend_lookup_diff.
+       rewrite PeanoNat.Nat.eqb_neq. easy.
+       rewrite extend_lookup_diff.
+       rewrite PeanoNat.Nat.eqb_neq. easy.
+       done.
+  + intro h. inv h.
+    exists (x |-> Int 0, r |-> Int 0).
+    autorewrite with sets.
+    split.
+    ++ rewrite extend_lookup_same.
+       rewrite extend_lookup_diff.
+       rewrite PeanoNat.Nat.eqb_neq. easy.
+       rewrite extend_lookup_same.
+       easy.
+    ++ f_equal.
+       eapply set_extensionality. intro ρ.
+       autorewrite with sets.
+       rewrite extend_lookup_diff.
+       rewrite PeanoNat.Nat.eqb_neq. easy.
+       rewrite extend_lookup_same.
+       rewrite <- intersection_assoc.
+       rewrite constrain_eq_same.
+Admitted.
+
+
+(* For ALL, we need to make a tuple of values
+   
+ *)
+Definition ALL' (Δs : list ENV) : ENV := 
+  fun ρ => 
+    let vs := (Δ2 <- Δs ;;
+                 choose_elements
+                   ('(v, Δ3) <- extract Δ2 ;;
+                     when (ρ ∈ Δ3) (ret v))) in
+    (ρ r = mkTup vs).
+
+(*                     
+Lemma bind_ret_l_list {A B} {f:A -> list B}{x} :
+  bind [x] f = f x.
+cbn. rewrite List.app_nil_r. done. Qed.
+
+Lemma bind_ret_t_list {A} {x:A}{l :list A} :
+  bind l (fun x => [x]) = l.
+cbn. 
+induction l; cbn. done.
+f_equal; auto. Qed.
+*)
+
+Lemma bcp_example : 
+  ALL' (ret (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩)) = 
+      ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
+       (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
+Proof.
+  apply set_extensionality. intros ρ.
+  autorewrite with sets.
+  unfold ALL'.
+  unfold In.
+  split.
+  + intro h. 
+    rewrite bind_ret_l in h. 
+    rewrite extract_example in h.
+    rewrite bind_ret_l in h.
+    destruct (choose_when
+                (ϕ := ρ ∈ (x ≈ ⟨ Int 0 ⟩))
+                (s := (ret (Int 0)))) as [[h1 h2]|[h1 h2]].
+    ++ rewrite choose_ret in h2.
+       rewrite h2 in h.
+       rewrite h.
+       repeat split; auto.
+    ++ rewrite h2 in h.
+       rewrite h.
+       repeat split; auto.
+  + intros. 
+    rewrite bind_ret_l.
+    rewrite extract_example.
+    rewrite bind_ret_l.
+    crunch.
+    ++ rewrite H0.
+       f_equal.
+       destruct (choose_when
+                (ϕ := ρ ∈ (x ≈ ⟨ Int 0 ⟩))
+                (s := (ret (Int 0)))) as [[h1 h2]|[h1 h2]]. 
+       -- rewrite h2.
+          rewrite choose_ret.
+          done.
+       -- autorewrite with sets in h1. 
+          done.
+    ++ rewrite H0.
+       destruct (choose_when
+                (ϕ := ρ ∈ (x ≈ ⟨ Int 0 ⟩))
+                (s := (ret (Int 0)))) as [[h1 h2]|[h1 h2]]; rewrite h2.     
+       -- autorewrite with sets in H, h1.
+          done.
+       -- done.
+Qed.
 
 Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
     match xs with 
-    | [] => ⌈ ([], Total_set) ⌉
+    | [] => ret ([], Total_set) 
     | (Δi :: rest) => 
         let failΔi '(vs, Δ) := (vs, (Total_set - Δi) ∩ Δ) in 
-        (Sets.map failΔi (combine rest)) ∪
+        (fmap failΔi (combine rest)) ∪
 
         ('(vi, Δi') <- extract Δi ;;
          let succΔi '(vs, Δ) := (vi :: vs, Δi' ∩ Δ) in
-          Sets.map succΔi (combine rest))
+          fmap succΔi (combine rest))
     end.
 
 (*
@@ -567,9 +625,9 @@ Abort.
 
 Example ex_combine2 : 
   combine ([(r ≈ x ≈ ⟨ Int 1 ⟩); (r ≈ x ≈ ⟨ Int 0 ⟩)]) = 
-    ((ρ <- (x ≈ ⟨ Int 1 ⟩) ;; ⌈ ([Int 1], ⌈ρ⌉) ⌉) ∪
-    (ρ <- (x ≈ ⟨ Int 0 ⟩) ;; ⌈ ([Int 0], ⌈ρ⌉) ⌉) ∪
-    (ρ <- (x ≈ ⟨ Int 2 ⟩) ;; ⌈ ([]     , ⌈ρ⌉) ⌉)).
+    ((ρ <- (x ≈ ⟨ Int 1 ⟩) ;; ret ([Int 1], ret ρ)) ∪
+    (ρ <- (x ≈ ⟨ Int 0 ⟩) ;; ret ([Int 0], ret ρ)) ∪
+    (ρ <- (x ≈ ⟨ Int 2 ⟩) ;; ret ([]     , ret ρ))).
 Proof.
   eapply Extensionality_Ensembles.
   split.
@@ -617,6 +675,9 @@ Definition ALL (s : list ENV) : ENV :=
      (Δ ∩ (r ≈ ⟨mkTup vs⟩)).
 *)
 
+(* ----------------------------------------- *)
+
+
 (* SPJ's version of  ALL 
 Ed[all{e}]  = [ { rho \in Env
                 | exists vs.
@@ -627,9 +688,12 @@ Ed[all{e}]  = [ { rho \in Env
               ]
 *)
 
-Lemma flat_map_nil {A B}(xs:list A) : 
-  List.flat_map (fun x => ([] : list B)) xs = [].
-induction xs. simpl. auto. simpl. auto. Qed.
+
+Lemma flat_map_nil {A B}(xs:list A) :
+  x <- xs ;; empty = (empty : list B).
+Proof.
+  induction xs. simpl. auto. simpl. auto. 
+Qed.
 
 Notation "v ≐ vs !! i" := 
   (List.nth_error vs i = Some v) (at level 80).
@@ -639,13 +703,13 @@ Opaque limitNum.
 Definition guard {A} (b : bool) (xs : list A) : list A := if b then xs else [].
 
 Lemma enumerate k : 
-   (i <- allNums;; guard (Nat.leb i k) [Int i]) = 
-   (List.map Int (enumFrom 0 (S k))).
+   (i <- allNums;; guard (Nat.leb i k) (ret (Int i))) = 
+   (fmap Int (enumFrom 0 (S k))).
 Proof.
 Admitted.
 
 Lemma nth_iterate {A}  j : forall (v : A)  (k : nat -> A), j < limitNum ->
-  (v ≐ (i <- allNums ;; [ k i ]) !! j) <-> (v = k j).
+  (v ≐ (i <- allNums ;; ret (k i)) !! j) <-> (v = k j).
 Proof.
   induction j; intros v k LT.
   + cbn.
@@ -654,78 +718,74 @@ Admitted.
 
 Lemma nth_iterate_guard {A}  j : forall (v : A)  (f : nat -> bool) (k : nat -> A),
     (j < limitNum) ->
-    (v ≐ (i <- allNums ;; guard (f i) [ k i ]) !! j) <-> (f j = true /\ v = k j).
+    (v ≐ (i <- allNums ;; guard (f i) (ret (k i))) !! j) <-> (f j = true /\ v = k j).
 Proof.
   induction j; intros v f k LT.
   + cbn.
 Admitted.
 
     
+Lemma bind_intersect {A B} (k : A -> P B) s1 s2 : 
+  (ρ <- (s1 ∩ s2) ;; k ρ) = 
+  ((ρ <- s1 ;; k ρ) ∩  (ρ <- s2 ;; k ρ)).
+Proof.
+  eapply Extensionality_Ensembles.
+  split.
+  + intros ρ ρIn. 
+    move: ρIn => [a [h1 h2]].
+    inversion h1.
+    split.
+Admitted.
+
+Lemma bind_constrain {ρ : ENV} (k : value -> ENV) v :
+ (ρ <- x ≈ ⟨ v ⟩;; k (ρ x)) = k v.
+Admitted.
+
 Definition ALL' (Δs : list ENV) : ENV := 
   fun ρ => 
     exists vs, ρ r = mkTup vs  
-         /\ forall i, i < limitNum -> forall Δ2, (Δ2 ≐ Δs !! i ) ->
+         /\ forall i, i < limitNum -> 
+           forall Δ2, (Δ2 ≐ Δs !! i ) ->
                   exists v, exists Δ3, 
                     ((v, Δ3) ∈ extract Δ2)
                     /\ (v ≐ vs !! i)
                     /\ (ρ ∈ Δ3).
 
-(* ------------------------------------------------------ *)
-(* ------  Fig 17 D-LS (using dodgy union) -------------- *)
 
-Module DLS.
-
-
-Fixpoint E (e : mini.Expr) : list ENV := 
-
-  let B (e : mini.Expr) :list ENV := 
-    Δ <- E e ;;
-    [ Δ \ mini.I e ] in
-
-  match e with 
-  | mini.DefineV _ => [ Total_set ]
-
-  | mini.Var _ => [ r ≈ evalA e ]
-  | mini.Lit _ => [ r ≈ evalA e ]
-  | mini.EPrim _ => [ r ≈ evalA e ]
-  | mini.Array es =>  [ r ≈ evalA e ]
-
-  | mini.Fail => [ ]
-
-  | mini.Choice e1 e2 => E e1 ++ E e2
-
-  | mini.Seq e1 e2 => (E e1 [\] Scope.singleton r) * (E e2)
-
-  | mini.Unify e1 e2 => E e1 * E e2  (* missing from fig *)
-
-  | mini.ApplyD e1 e2 => APP e1 e2
-
-  | mini.If3 e1 e2 e3 =>  
-
-    let Y  := mini.I e1 in 
-    let Δ1 := first (E e1) \ Scope.singleton r in
-
-     (Δ2 <- E e2 ;; [(Δ1 ∪ Δ2) \ Y])  ⩅
-     (Δ3 <- E e3 ;; [Δ3 - Δ1 \ Y])
-
-  | mini.All a => 
-       [ ALL' (B a)  ] 
-
-  | mini.One a =>  (* not quite right *)
-       [ first (E a) \ mini.I a ]
-
-  (* TODO: functions *)
-
-  | _ => [ ∅ ] 
-  end.
-
-Definition value_leb (v1 : value) (v2 : value) : bool := 
-  match v1, v2 with 
-  | Int k1, Int k2 => Nat.leb k1 k2
-  | _,_ => false
-  end.
+Lemma comprehend {A B} (ma : P A) (k : A -> P B) (ρ : B) x :
+  (x ∈ ma) -> (ρ ∈ (k x)) ->
+  (ρ ∈ (x <- ma ;; k x)).
+intros h1 h2.
+cbn. unfold bind_. exists x . split; auto.
+Qed.
 
 
+
+Definition tx : mini.Expr := x :=: 0.
+Definition SEM_tx : ENV := x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩.
+
+  
+Lemma bcp_all : 
+  ALL' [ x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩ ] = 
+      ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
+       (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
+Proof.
+  unfold ALL'.
+  eapply Extensionality_Ensembles. split.
+  + intros ρ ρIn.
+    move: ρIn => [vs [hr fi]].
+    have Lt0: 0 < limitNum. admit.
+    move: (fi 0 Lt0 (SEM_tx) ltac:(auto)) => f0.
+    move: f0 => [v [Δ3 [h1 [h2 h3]]]].
+    rewrite extract_SEM_tx in h1.
+    inversion h1. subst. clear h1. 
+    left. split. auto. simpl in h2.
+    destruct vs; inversion h2. subst.
+    destruct vs. eauto.
+    have Lt1: 1 < limitNum. admit.
+    move: (fi 1 Lt1 ∅) => f1. simpl in f1.
+(* stuck here *)    
+    
 (* The semantics of 1..x 
    [ {{r=1,x>=1}}, {{r=2,x>=2}}, ... ]
    [ {{r=i,x>=i}} | i <- [0 ..] ]
@@ -749,7 +809,7 @@ Definition all_sem : ENV :=
     exists n, rho x = Int n /\
            let l : list value := 
     (* [ i | i <- 0.., i <= rho(n) ] *)
-    i <- allNums ;; guard (value_leb (Int i) (rho x)) [Int i] in 
+    i <- allNums ;; guard (Value.leb (Int i) (rho x)) [Int i] in 
   rho r = mkTup l.
 
 
@@ -825,6 +885,59 @@ split.
   split.
   rewrite h.
 Admitted.
+
+
+(* ------------------------------------------------------ *)
+(* ------  Fig 17 D-LS (using dodgy union) -------------- *)
+
+Module DLS.
+
+
+Fixpoint E (e : mini.Expr) : list ENV := 
+
+  let B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;;
+    [ Δ \ mini.I e ] in
+
+  match e with 
+  | mini.DefineV _ => [ Total_set ]
+
+  | mini.Var _ => [ r ≈ evalA e ]
+  | mini.Lit _ => [ r ≈ evalA e ]
+  | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ]
+
+  | mini.Fail => [ ]
+
+  | mini.Choice e1 e2 => E e1 ++ E e2
+
+  | mini.Seq e1 e2 => (E e1 [\] Scope.singleton r) * (E e2)
+
+  | mini.Unify e1 e2 => E e1 * E e2  (* missing from fig *)
+
+  | mini.ApplyD e1 e2 => APP e1 e2
+
+  | mini.If3 e1 e2 e3 =>  
+
+    let Y  := mini.I e1 in 
+    let Δ1 := first (E e1) \ Scope.singleton r in
+
+     (Δ2 <- E e2 ;; [(Δ1 ∪ Δ2) \ Y])  ⩅
+     (Δ3 <- E e3 ;; [Δ3 - Δ1 \ Y])
+
+  | mini.All a => 
+       [ ALL' (B a)  ] 
+
+  | mini.One a =>  (* not quite right *)
+       [ first (E a) \ mini.I a ]
+
+  (* TODO: functions *)
+
+  | _ => [ ∅ ] 
+  end.
+
+
+
 
 End DLS.
 
@@ -1053,6 +1166,231 @@ End DSLS.
 (* -------------------------------------------------------- *)
 (* -------------------------------------------------------- *)
 (* -------------------------------------------------------- *)
+
+(* ------------------------------------------------------ *)
+(* ------  Fig 15 E-LV (uses dodgy union) --------------- *)
+
+Module ELV.
+
+Definition ALL (VS : list VAL) : VAL := 
+  squash_fold_left (liftM2 snoc) VS (ret (mkTup empty)).
+
+Fixpoint E (e :mini.Expr) (ρ:env) : list VAL := 
+  
+  let B (e : mini.Expr) (ρ : env) : list VAL  := 
+    DODGY_UNIONS
+      (ρ' <- X e ρ ;; ret (E e ρ')) 
+    in
+
+  let R (e : mini.Expr) ρ : ENV := 
+    ρ' <- X e ρ ;; 
+    when (E e ρ' <> empty) 
+    (ret ρ')
+  in
+
+  match e with 
+
+  | mini.Block e =>  B e ρ
+
+  | mini.Var _ => [ ⌈evalA e ρ⌉ ]
+  | mini.Lit _ => [ ⌈evalA e ρ⌉ ] 
+  | mini.EPrim _ => [ ⌈evalA e ρ⌉ ] 
+  | mini.Array es =>  [ ⌈evalA e ρ⌉ ] 
+
+  | mini.DefineV _ => [ ⌈ mkTup[] ⌉ ]
+
+  | mini.ApplyD e1 e2 => apply (evalA e1 ρ) (evalA e2 ρ)
+
+  | mini.Fail => []
+
+  | mini.Choice e1 e2 => CHOICE (B e1 ρ) (B e2 ρ)
+
+  | mini.Seq e1 e2 => IF2 (E e1 ρ) (E e2 ρ)
+
+  | mini.Unify e1 e2 => UNIFY (E e1 ρ) (E e2 ρ)
+
+  | mini.All e1 =>  [ ALL (B e1 ρ) ]
+
+  | mini.If3 e1 e2 e3 => 
+      let Δ  : ENV := R e1 ρ in
+      if is_Empty_set Δ then
+        B e2 ρ
+      else
+        DODGY_UNIONS ( ρ' <- Δ ;; ⌈ B e2 ρ' ⌉ )
+
+  (* TODO: functions, one *)      
+
+  | mini.Fun q eff i e1 (y,h,x) e2 =>  []
+
+  | _ => []
+
+  end.
+
+End ELV.
+
+
+(* ------------------------------------------------------ *)
+(* ------  E-LV (doesn't use dodgy union) --------------- *)
+
+Module NonDodgyELV.
+
+Definition ALL (VS : list VAL) : VAL := 
+  List.fold_left (liftM2 snoc) VS ⌈ mkTup [] ⌉.
+
+Fixpoint E (e :mini.Expr) (ρ:env) : P (list VAL) := 
+  
+  let B (e : mini.Expr) (ρ : env) : P (list VAL)  := 
+      (ρ' <- X e ρ ;; E e ρ' ) 
+    in
+
+(*
+  let R (e : mini.Expr) ρ : ENV := 
+    ρ' <- X e ρ ;; 
+    when (E e ρ' <> []) 
+    ⌈ ρ' ⌉
+  in
+*)
+
+  match e with 
+
+  | mini.Block e =>  B e ρ
+
+  | mini.Var _ => ⌈ [ ⌈evalA e ρ⌉ ] ⌉
+  | mini.Lit _ => ⌈[ ⌈evalA e ρ⌉ ] ⌉
+  | mini.EPrim _ => ⌈[ ⌈evalA e ρ⌉ ] ⌉
+  | mini.Array es =>  ⌈ [ ⌈evalA e ρ⌉ ] ⌉
+
+  | mini.DefineV _ => ⌈ [ ⌈ mkTup[] ⌉ ] ⌉
+
+  | mini.ApplyD e1 e2 => ⌈apply (evalA e1 ρ) (evalA e2 ρ) ⌉
+
+  | mini.Fail =>  ⌈[]⌉
+
+  | mini.Choice e1 e2 => CHOICE <$> (B e1 ρ) <*> (B e2 ρ)
+
+  | mini.Unify e1 e2 => UNIFY <$> (E e1 ρ) <*> (E e2 ρ)
+
+  | mini.Seq e1 e2 =>  IF2 <$> (E e1 ρ) <*> (E e2 ρ)
+
+  | mini.All e1 =>  
+      vs <- B e1 ρ ;;
+      ⌈ [ ALL vs ] ⌉
+
+(*
+  | mini.If3 e1 e2 e3 => 
+      let Δ  : ENV := R e1 ρ in
+      if is_Empty_set Δ then
+        B e2 ρ
+      else
+        DODGY_UNIONS ( ρ' <- Δ ;; ⌈ B e2 ρ' ⌉ )
+*)
+
+  (* TODO: functions, one *)      
+
+  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
+  | _ => ∅
+
+  end.
+
+
+Definition t := (x :=: common.Int 0).
+
+Example example1 :
+  E t (x |-> Int 0) ≃ ⌈ [ ⌈Int 0⌉ ] ⌉.
+Admitted.
+
+Example example2 :
+  E t (x |-> Int 1) ≃ ⌈ [ ] ⌉.
+cbn.
+split.
++ intros x xIn.
+Admitted.
+
+End NonDodgyELV.
+
+
+(* ------------------------------------------------------ *)
+(* ------  Sets of lists of values (nondodgy)------------ *)
+
+Module ESL.
+
+Definition ALL (VS : list value) : value := 
+  List.fold_left snoc VS (mkTup []).
+
+Definition apply (f : value) (v : value) : list value := 
+  match f with 
+  | Dom.Fun hs => 
+      h <- hs ;;
+      match (PFun.apply_opt _ _ Value.eqb h v) with 
+      | Some w => ret w
+      | None => empty
+      end
+  | _ => empty
+  end.
+
+
+Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) := 
+  
+  let B (e : mini.Expr) (ρ : env) : P (list value)  := 
+      (ρ' <- X e ρ ;; E e ρ' ) 
+    in
+
+(*
+  let R (e : mini.Expr) ρ : ENV := 
+    ρ' <- X e ρ ;; 
+    when (E e ρ' <> []) 
+    ⌈ ρ' ⌉
+  in
+*)
+
+  match e with 
+
+  | mini.Block e =>  B e ρ
+
+  | mini.Var _ => ⌈[ evalA e ρ ]⌉
+  | mini.Lit _ => ⌈[ evalA e ρ ]⌉
+  | mini.EPrim _ => ⌈[ evalA e ρ ]⌉
+  | mini.Array es =>  ⌈[ evalA e ρ ]⌉
+
+  | mini.DefineV _ => ⌈[  mkTup[]  ]⌉
+
+  | mini.ApplyD e1 e2 => ⌈apply (evalA e1 ρ) (evalA e2 ρ) ⌉
+
+  | mini.Fail =>  ⌈[]⌉
+
+  | mini.Choice e1 e2 => CHOICE <$> (B e1 ρ) <*> (B e2 ρ)
+
+  | mini.Unify e1 e2 => 
+      vs1 <- (E e1 ρ) ;;  (* list in first set *)
+      vs2 <- (E e2 ρ) ;;  (* list in second set *)
+      let unify (vs1 : list value) (vs2 : list value) : list value :=
+        v1 <- vs1 ;;
+        v2 <- vs2 ;; 
+        if (Value.eqb v1 v2) then [v1] else []
+      in
+      (* need to return a set of lists *)
+      ⌈ unify vs1 vs2  ⌉
+
+  | mini.Seq e1 e2 =>  
+      vs1 <- (E e1 ρ) ;;  (* list in first set *)
+      vs2 <- (E e2 ρ) ;;  (* list in second set *)
+      let seq (vs1 : list value) (vs2 : list value) : list value :=
+        v1 <- vs1 ;; (* make sure vs1 is inhabited *)
+        vs2 
+      in
+      (* need to return a set of lists *)
+      ⌈ seq vs1 vs2  ⌉
+
+  | mini.All e1 =>  
+      vs <- B e1 ρ ;;
+      ⌈ [ ALL vs ] ⌉
+
+  (* TODO: functions, one *)      
+  | mini.If3 e1 e2 e3 => ∅
+  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
+  | _ => ∅
+
+  end.
 
 
 (* -------------------------------------------------------- *)
@@ -1595,14 +1933,6 @@ Ltac eeval := match goal with
 
 Lemma not_r : forall (x r : Ident), (SetoidList.InA eq x [r] -> False) -> Nat.eqb r x = false. Admitted.
 
-Lemma hide_intersect x s1 s2 : hide x (s1 ∩ s2) ⊆ ((hide x s1) ∩ (hide x s2)).
-Proof. 
-  intros ρ [_ [[ρ' h11] h2]].
-  unfold hide.
-    split. 
-    exists ρ'. split; auto. exists ρ'. split; auto.
-Qed. 
-(* NOTE: converse is not true *)
 
 
 Lemma hide_constraint {i v} : (i ≈ fun _ => v) \ (Scope.singleton i) ≃ Total_set.

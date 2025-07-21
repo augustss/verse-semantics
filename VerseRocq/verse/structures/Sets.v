@@ -1,5 +1,6 @@
 Require Import Imports.
 
+Require Import Laws.
 
 From Stdlib Require Export Ensembles.
 From Stdlib Require Setoids.Setoid.
@@ -38,30 +39,50 @@ Definition P := Ensemble.
 (* More operations on sets *)
 Definition Total_set {A} := fun (x:A) => True.
 
-Definition map {A B} (f : A -> B) : P A -> P B := 
-  fun s => fun y => exists x, f x = y /\ (In s x).
-
-Definition filter {A} (f : A -> bool) : P A -> P A := 
-  fun s => fun x => (f x = true) /\ (In s x).
-
 (* Union of a set of sets (monadic join) *)
 Definition UNION {A} (VS : P (P A)) : P A := 
   fun v => exists V, (In VS V) /\ (In V v).
 
-(* define a set via set comprehension (monadic bind): {{ k x | x <- s }} *)
-Definition comprehension {A B} (k : A -> P B) (s : P A) : P B := 
-  fun b => exists a, (In s a) /\ (In (k a) b).
+Open Scope set_scope.
+
+Module SetNotations. 
+  Notation "⊤"  := Total_set : set_scope.
+  Notation "∅"  := Empty_set : set_scope.
+  Notation "⌈ x ⌉" := (Singleton x) : set_scope.
+  Infix "∪"  := Union (at level 90) : set_scope.
+  Infix "∩"  := Intersection (at level 90) : set_scope.
+  Infix "-"  := Setminus : set_scope.
+
+  Notation "x ∈ s"  := (In s x) (at level 90) : set_scope.
+  Notation "a ⊆ b" := (forall x, (x ∈ a) -> (x ∈ b)) (at level 90) : set_scope.
+  Notation "a ≃ b" := ((a ⊆ b) /\ (b ⊆ a)) (at level 90) : set_scope.
+
+  Notation "⨃" := UNION : set_scope.
+End SetNotations. 
+
+Import SetNotations.
+
+
+Definition map {A B} (f : A -> B) : P A -> P B := 
+  fun s => fun y => exists x, f x = y /\ (x ∈ s).
+
+Definition filter {A} (f : A -> bool) : P A -> P A := 
+  fun s => fun x => (f x = true) /\ (x ∈ s).
+
+(* define a set via set comprehension (i.e. monadic bind): {{ k x | x <- s }} *)
+Definition bind_ {A B} (k : A -> P B) (s : P A) : P B := 
+  fun b => exists a, (a ∈ s) /\ (b ∈ (k a)).
 
 (* monadic sequence (>>): requires s1 to be inhabited *)
 Definition seq {A B} (s1 : P A) (s2 : P B) := 
-  fun b => Inhabited s1 /\ In s2 b.
+  fun b => Inhabited s1 /\ (b ∈ s2).
 
 (* Total set if proposition holds, emptyset otherwise *)
 Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
 
 (* when ϕ s == guard ϕ >> s *)
 Definition when {A} (ϕ : Prop) (s : P A) : P A := 
-  fun ρ => ϕ /\ (In s ρ).
+  fun ρ => ϕ /\ (ρ ∈ s).
 
 (* if2 s1 s2 == guard (s1 = ∅) >> s *)
 Definition If2 {A B} (s1 : P A) (s3 : P B) := 
@@ -73,21 +94,32 @@ Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) :=
     (when (not (Same_set s1 Empty_set)) s3).
 
 
-Module SetNotations. 
-  Notation "⊤"  := Total_set : set_scope.
-  Notation "∅"  := Empty_set : set_scope.
-  Notation "x ∈ s"  := (In s x) (at level 90) : set_scope.
-  Notation "⌈ x ⌉" := (Singleton x) : set_scope.
-  Infix "⊆"  := Included (at level 90) : set_scope.
-  Infix "∪"  := Union (at level 90) : set_scope.
-  Infix "∩"  := Intersection (at level 90) : set_scope.
-  Infix "≃"  := Same_set (at level 90) : set_scope.
-  Infix "-"  := Setminus : set_scope.
-  Notation "⨃" := UNION : set_scope.
-End SetNotations. 
 
-Import SetNotations.
-Open Scope set_scope.
+(* P is a monad *)
+
+#[export] Instance Monad_P : Monad P :=
+  { ret  := (fun A (x : A) => Singleton x);
+     bind := fun A B x y => @bind_ A B y x
+   }.
+
+#[export] Instance Functor_P : Functor P :=
+  { fmap := fun A => @map A
+  }.
+
+#[export] Instance Applicative_P : Applicative P :=
+  { pure := @ret P _;
+     ap   := fun A B (m1 :  P (A -> B)) (m2 : P A) => 
+               bind m1 (fun x1 => 
+                            bind m2 (fun x2 => 
+                                         ret (x1 x2))) 
+  }.
+
+#[export] Instance Alternative_P : Alternative P :=
+  { empty := fun A (x:A) => False ;
+    choose := fun A (p1 p2 : P A) (y : A) => 
+                 p1 y \/ p2 y
+   }.
+
 
 (* Test cases for notations *)
 Check (1 ∈ ⊤).
@@ -166,7 +198,7 @@ Proof. unfold In. econstructor. Qed.
 
 Lemma in_singleton_sub {A}{v:A}{X} : v ∈ X -> ⌈ v ⌉ ⊆ X.
 Proof.
-  intros.  intros w wIn. inversion wIn. subst. done.
+  intros. inversion H0. subst. done.
 Qed.
 
 #[export] Hint Resolve in_singleton_sub : sets.
@@ -219,27 +251,24 @@ Qed.
 (* ----------------------------------------- *)
 
 
-Definition In : forall {A}, A -> P A -> Prop := 
-  fun {A} x p => Ensembles.In p x.
-
 Definition Forall  : forall {A} (Pr : A -> Prop), P A -> Prop := 
-  fun {A} Pr p => forall x, In x p -> Pr x.
+  fun {A} Pr p => forall x, x ∈ p -> Pr x.
 
 Definition Exists : forall {A} (Pr : A -> Prop), P A -> Prop :=
-  fun {A} Pr p => exists x, In x p /\ Pr x.
+  fun {A} Pr p => exists x, (x ∈ p) /\ Pr x.
 
 Definition  ForallT : forall {A} (Pr : A -> Type), P A -> Type := 
-  fun {A} Pr p => forall x, In x p -> Pr x.
+  fun {A} Pr p => forall x, x ∈ p -> Pr x.
 
 Definition ExistsT :  forall {A} (Pr : A -> Type), P A -> Type :=
-  fun {A} Pr p => { x & (In x p * Pr x)%type }.
+  fun {A} Pr p => { x & ((x ∈ p) * Pr x)%type }.
 
 Definition Forall_forall : forall {A} (Pr : A -> Prop) (l : P A), 
-      Forall Pr l <-> (forall x, In x l -> Pr x).
+      Forall Pr l <-> (forall x, x ∈ l -> Pr x).
 Proof. intros. unfold Forall. reflexivity. Qed.
 
 Definition Exists_exists : forall {A} (Pr : A -> Prop) (l : P A), 
-      Exists Pr l <-> (exists x, In x l /\ Pr x).
+      Exists Pr l <-> (exists x, (x ∈ l) /\ Pr x).
 Proof. intros. unfold Exists. reflexivity. Qed.
 
 
@@ -249,31 +278,75 @@ Proof. intros. unfold Exists. reflexivity. Qed.
 
 
 
-(* P is a monad *)
+(* -------------- some laws -------------- *)
 
-#[export] Instance Monad_P : Monad P :=
-  { ret  := (fun A (x : A) => ⌈ x ⌉);
-     bind := fun A B x y => @comprehension A B y x
-   }.
+Lemma bind_singleton_l {A B : Type}
+  {f : A -> P B}{a : A} :
+  bind_ f ⌈ a ⌉ = f a.
+eapply Extensionality_Ensembles.
+split. intros x xIn. inversion xIn.
+destruct H. inversion H. subst. auto.
+intros x xIn. cbv. exists a. split. 
+econstructor. auto.
+Qed.
 
-#[export] Instance Functor_P : Functor P :=
-  { fmap := fun A => @map A
-  }.
+#[export] Instance BindRetL_P : BindRetL (m:=P).
+intros A B f a. eapply bind_singleton_l.
+Qed.
 
-#[export] Instance Applicative_P : Applicative P :=
-  { pure := @ret P _;
-     ap   := fun A B (m1 :  P (A -> B)) (m2 : P A) => 
-               bind m1 (fun x1 => 
-                            bind m2 (fun x2 => 
-                                         ret (x1 x2))) 
-  }.
+Lemma bind_singleton_r  {A} {ma: P A} :
+  bind_ (fun x : A => ⌈ x ⌉) ma = ma.
+eapply Extensionality_Ensembles.
+split. intros x xIn. inversion xIn.
+destruct H. inversion H0. subst. auto.
+intros x xIn.
+exists  x. split. auto. econstructor.
+Qed.
 
-#[export] Instance Alternative_P : Alternative P :=
-  { empty := fun A (x:A) => False ;
-    choose := fun A (p1 p2 : P A) (y : A) => 
-                 p1 y \/ p2 y
-   }.
+#[export] Instance BindRetR_P : BindRetR (m:=P).
+intros A ma. eapply bind_singleton_r.
+Qed.
 
+Lemma bind_bind {A B C}{ma : P A}{f : A -> P B} {g : B -> P C} :
+bind_ g (bind_ f ma) = 
+  bind_ (fun x : A => bind_ g (f x)) ma.
+Proof.
+  unfold bind_.
+  eapply Extensionality_Ensembles.
+  split.
+  intros c cIn. 
+  destruct cIn as [b [[a [h1 h2]] h3]].
+  exists a. split; auto. exists b. split; auto.
+  intros c cIn. 
+  destruct cIn as [b [h1 [a [h2 h3]]]]. 
+  exists a. split; auto. exists b. split; auto.
+Qed.
+
+#[export] Instance BindBind_P : BindBind (m:=P).
+intros A B C ma f g.
+eapply bind_bind.
+Qed.
+
+#[export] Instance RetInv_P : RetInv (m:=P).
+intros A a1 a2 h. cbn in h.
+eapply Singleton_inv. auto.
+Qed.
+
+#[export] Instance BindRetInv_P : BindRetInv (m:=P).
+Abort.
+
+Lemma bind_singleton_fmap {A B} (f : A -> B) (ma : P A) :
+   bind_ (fun x : A => ⌈f x⌉) ma = fmap f ma.
+unfold bind_.
+eapply Extensionality_Ensembles.
+split.
++ intros x xIn. destruct xIn as [a [h1 h2]].
+  cbn. unfold map. inversion h2. exists a. split. auto.
+  auto.
++ intros b xIn. cbn in xIn.  unfold map in xIn.
+  destruct xIn as [x [h1 h2]].
+  exists x. split. auto. rewrite h1. econstructor.
+Qed.
 
 Lemma fmap_Included {A B}{f : A -> B}{s1}{s2} :
   s1 ⊆ s2 -> fmap f s1 ⊆ fmap f s2.
@@ -283,7 +356,7 @@ Proof.
   exists a. split; auto.
 Qed.
 
-
+(*
 #[export] Instance bind_Included_Proper {A B} :
   Proper (Included ==> (fun k1 k2 => forall x, Included (k1 x) (k2 x)) ==> Included) 
     (bind : P A -> (A -> P B) -> P B).
@@ -306,7 +379,7 @@ Proof.
       exists a. split. eauto. move: (S a) => [K12 K21]. eauto.
     + intros b [a [h1 h2]].
       exists a. split. eauto. move: (S a) => [K12 K21]. eauto.
-Qed.
+Qed. *)
 
 (* ------------------------------------------------------- *)
 
@@ -316,7 +389,7 @@ Qed.
 Import List.
 
 Definition mem {A} : list A -> P A :=
-  fun ls x => In x ls.
+  fun ls x => List.In x ls.
 
 Lemma mem_one_inv : forall A (h v : A),  
  h ∈ mem (v :: nil) -> h = v.
@@ -432,8 +505,10 @@ Proof.
   intros A D.
   induction D; intros X Pr SUB F.
   eauto.
-  econstructor; eauto. eapply F. eapply SUB. eauto with sets.
-  eapply IHD with (X:=X); auto. intros x xIn. eapply SUB; eauto with sets.
+  econstructor; eauto. eapply F. 
+  eapply SUB. cbn. eauto with sets.
+  eapply IHD with (X:=X); auto. 
+  intros x xIn. eapply SUB; cbn; eauto with sets. 
 Qed.
 
 Lemma mem_In : forall A (x:A) l, x ∈ mem l -> List.In x l.

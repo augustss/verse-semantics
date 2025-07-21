@@ -1,11 +1,45 @@
 Require Import Imports.
 From Stdlib Require Import Lists.List.
 
+Require Import Laws.
+
 Import ListNotations.
+
+(*
+Lemma flat_map_app {A B} (f : A -> list B) (a1 a2: list A) : 
+  flat_map f (a1 ++ a2) = flat_map f a1 ++ flat_map f a2.
+*)
+
+Lemma app_nil_inv {A} (a b : list A) :
+  a ++ b = [] -> a = [] /\ b = [].
+Proof. induction a. cbn. intros ->. done.
+cbn. intros h. inversion h. Qed.
+
+Lemma app_singleton_inv {A} (a b : list A) c : 
+   a ++ b = [c] -> ((a = [c] /\ b = []) \/ (a = [] /\ b = [c])).
+Proof. 
+  move: b.
+  induction a. move=> b eq. cbn in eq. inversion eq. 
+  right. split; auto.
+  move=> b eq. cbn in eq. inversion eq. subst.
+  apply app_nil_inv in H1. destruct H1. subst.
+  left. split. done. done.
+Qed.
+
+Lemma flat_map_map {A B} (f : A -> B) (ma : list A) :
+   flat_map (fun x : A => [f x]) ma = map f ma.
+induction ma. done.
+cbn. f_equal. Qed.
+
+(* 
+Lemma in_flat_map {A B} (b : B) (k : A -> list B) (ma : list A) :
+  In b (flat_map k ma) -> exists a : A, In a ma /\ In b (k a).
+*)
 
 (* Monad definitions *)
 
-Definition ap_List {A B} (fs : list (A -> B)) (xs : list A) : list B :=
+Definition ap_List {A B} 
+  (fs : list (A -> B)) (xs : list A) : list B :=
   (* [f x | f <- fs, x <- xs] *)
   flat_map (fun f => 
               flat_map (fun x => 
@@ -29,6 +63,47 @@ Definition ap_List {A B} (fs : list (A -> B)) (xs : list A) : list B :=
   { empty := @nil ;
     choose := @app
   }.
+
+#[export] Instance Elem_list : Elem list := 
+  { elem := fun {A} ls x => @List.In A x ls }.
+
+#[export] Instance BindRetL_list : BindRetL (m:=list).
+intros A B f a. cbn. rewrite app_nil_r. done. Qed.
+
+#[export] Instance BindRetR_list : BindRetR (m:=list).
+intros A ma. cbn. 
+induction ma; cbn. done.
+f_equal; auto. Qed.
+
+#[export] Instance BindBind_list : BindBind (m:=list).
+intros A B C ma f g.
+cbn.
+induction ma. cbn. done.
+cbn. rewrite flat_map_app. f_equal. rewrite
+  IHma. done.
+Qed.
+
+#[export] Instance RetInv_list : RetInv (m:=list).
+intros A a1 a2 h. cbn in h. inversion h. done.
+Qed.
+
+#[export] Instance BindRetInv_list : BindRetInv (m:=list).
+Abort.
+
+Lemma fmap_inv_ret :
+      forall (A B:Type) (ma :list A) (f f' :A -> B),
+        (fmap f ma) = (fmap f' ma) ->
+        forall a : A, List.In a ma -> ret (f a) = ret (f' a).
+intros A B ma f f' h.
+cbn. move: h.
+induction ma.
+cbn. done.
+cbn. intro h. inversion h. clear h.
+intros a0 [h1|h1].
++ subst. f_equal. done.
++ repeat rewrite flat_map_map in H1. 
+  specialize (IHma H1). eauto.
+Qed.
 
 (* List Library definitions (bool). *)
 

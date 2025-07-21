@@ -5,6 +5,8 @@ Require Import structures.Sets.
 Require Import structures.List.
 
 Import SetNotations.
+Open Scope set_scope.
+Open Scope monad_scope.
 
 Inductive fset (A:Type) := FSet : (list A) -> fset A.
 Arguments FSet {_}.
@@ -161,7 +163,7 @@ Lemma In_mem_Included {d:A}{D} :
     mem (singleton_fset d) ⊆ D.
 Proof.
   intros.
-  intros y yIn. destruct yIn. subst; auto. done.
+  destruct H0. subst; auto. done.
 Qed.
 
 Lemma Included_mem_In {d:A}{D} : 
@@ -180,7 +182,7 @@ Lemma mem_union_Included {D1 D2 : fset A}{w} :
  mem (union_fset D1 D2) ⊆ w.
 Proof. 
   intros.
-  rewrite union_mem. intros y yIn. induction yIn; eauto.
+  rewrite union_mem in H1. induction H1; eauto.
 Qed.
 
 Lemma nonempty_fset_union1 {E1 E2 : fset A} : 

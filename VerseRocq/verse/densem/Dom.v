@@ -117,10 +117,37 @@ Fixpoint compare (v1 : value) (v2 : value) : comparison :=
       list_compare (PFun.compare _ _ compare compare) fs1 fs2 
   end.
 
+
+
 Definition V_eq (v1 : value) (v2 : value) := 
   Value.eqb v1 v2 = true.
 Definition V_lt (v1 : value) (v2 : value) := 
   Value.compare v1 v2 = Lt.
+
+
+Lemma eqb_eq v1 v2 : Value.eqb v1 v2 = true <-> v1 = v2. Admitted.
+Lemma eqb_neq v1 v2 : Value.eqb v1 v2 = false <-> v1 <> v2. Admitted.
+
+Definition leb (v1 : value) (v2 : value) := 
+  match (Value.compare v1 v2) with 
+  | Lt => true
+  | Eq => true
+  | Gt  => false
+  end.
+
+Definition ltb (v1 : value) (v2 : value) := 
+  match (Value.compare v1 v2) with 
+  | Lt => true
+  | Eq => false
+  | Gt  => false
+  end.
+
+Definition gtb (v1 : value) (v2 : value) := 
+  match (Value.compare v1 v2) with 
+  | Lt => false
+  | Eq => false
+  | Gt  => true
+  end.
 
 Lemma value_dec ( v1 v2 : Dom.value) : 
   {v1 = v2} + { not (v1 = v2) }.
@@ -160,6 +187,8 @@ Admitted.
 
 #[export] Instance EqDec_value : EqDec Dom.value Logic.eq.
 exact Value.value_dec. Defined.
+
+
 
 (* -------------------- example primitives ------------- *)
 

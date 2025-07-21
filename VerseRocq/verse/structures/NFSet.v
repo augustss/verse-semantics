@@ -5,6 +5,8 @@ Require Import structures.Sets.
 Require Import structures.List.
 
 Import SetNotations.
+Open Scope set_scope.
+Open Scope monad_scope.
 
 (* NONEMPTY FINITE SETS *)
 

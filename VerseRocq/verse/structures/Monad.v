@@ -150,6 +150,28 @@ Module AlternativeNotation.
   Notation "f1 <|> f2" := (@choose _ _ _ f1 f2) (at level 52, left associativity).
 End AlternativeNotation.
 
+(* ---------------- mayRet ------------------- *)
+
+Class Elem@{d c} (m : Type@{d} -> Type@{c}) : Type :=
+{ elem : forall {A:Type@{d}} (ma : m A), A -> Prop }.
+
+Open Scope monad_scope.
+
+Module MonadElemNotation. 
+  Export MonadBaseNotation.
+
+  Notation "a1 ∈ ma" := (elem ma a1) (at level 40) : 
+monad_scope.
+  Notation "a ⊆ b" := (forall x, (x ∈ a) -> (x ∈ b)) 
+(at level 90) : monad_scope.
+  Notation "a ≃ b" := ((a ⊆ b) /\ (b ⊆ a)) (at level 90) : monad_scope.
+  
+End MonadElemNotation.
+
+Import MonadElemNotation.
+
+Class Extensionality_Elem (m : Type -> Type)`{Elem m} : Type := 
+{ extensionality_elem :  forall {A:Type} {a b : m A}, (a ≃ b) -> (a = b) }.
 
 (* ---------------- Instances ---------------- *)
 
