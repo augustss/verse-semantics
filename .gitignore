@@ -50,3 +50,5 @@ Machine/src/Control/Monad/.DS_Store
 *.json
 Tim/TimVerse/.vs/Verse/v17/.suo
 Tim/TimVerse/VerseReference-x64-Release
+/Tim/TimVerse/.vs/Verse/copilot-chat
+/Tim/TimVerse/VerseGrammar/x64
