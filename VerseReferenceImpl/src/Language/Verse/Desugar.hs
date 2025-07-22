@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BlockArguments #-}
@@ -7,6 +8,7 @@ module Language.Verse.Desugar
   ( desugar
   ) where
 
+import Control.Applicative  -- needed for older version of base
 import Control.Comonad
 import Control.Monad (when)
 import Control.Monad.Reader

@@ -595,10 +595,10 @@
         \rule\z@\footnotesep\ignorespaces#1\@finalstrut\strutbox}%
     \color@endgroup}}
 \def\@makefnmark{\hbox{\@textsuperscript{\normalfont\@thefnmark}}}
+\RequirePackage[bookmarksnumbered,unicode]{hyperref}
 \RequirePackage{hyperxmp}
 \let\@footnotemark@nolink\@footnotemark
 \let\@footnotetext@nolink\@footnotetext
-\RequirePackage[bookmarksnumbered,unicode]{hyperref}
 \pdfstringdefDisableCommands{%
   \def\addtocounter#1#2{}%
   \def\unskip{}%

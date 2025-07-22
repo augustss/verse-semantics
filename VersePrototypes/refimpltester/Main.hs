@@ -1,0 +1,366 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
+module Main
+  ( main
+  ) where
+--import Data.Char
+import Control.Monad
+import Control.Monad.Supply
+--import Control.Monad.Trans.Except
+--import Control.Monad.Verse (runVerseT)
+import Control.Monad.Wrong
+
+import Data.ByteString qualified as ByteString
+import Data.List
+--import Data.Maybe
+import Data.Traversable
+import qualified Options.Applicative as OA
+
+--import Language.Verse
+import qualified Language.Verse.Effect.Split as S
+import Language.Verse.Error
+import Language.Verse.Ident
+import Language.Verse.Label
+import Language.Verse.Loc
+import Language.Verse.Mode
+import Language.Verse.Parse2
+import qualified Language.Verse.Parse.Exp as P
+import qualified Language.Verse.Pos as Pos
+import qualified Language.Verse.Rewrite.Exp as R
+import qualified Language.Verse.Rewrite as R
+import Language.Verse.SimpleName
+import qualified Language.Verse.Val as V
+
+import Prettyprinter
+
+import System.Directory
+import System.FilePath
+import System.IO.Error
+
+import Test.HUnit hiding (Label)
+
+import qualified FrontEnd.Flags as F
+import qualified FrontEnd.Expr as F
+import qualified FrontEnd.Desugar
+import qualified FrontEnd.ToCore
+import Data.Scientific hiding ( normalize )
+import Data.Text(unpack)
+import qualified Core.Expr as Core
+import Core.Rule hiding ( choices )
+import Core.Rules( runtimeRules )
+import Core.Traced(term)
+import Epic.Print(prettyShow, display)
+--import Debug.Trace
+
+main :: IO ()
+main = do
+  tflg <- testArgs
+  setCurrentDirectory "../VerseReferenceImpl"  -- XXX
+  executionTest <- getTest tflg Execution $ "test" </> "execution"
+--  verificationTest <- getTest Verification $ "test" </> "verification"
+  runTestTTAndExit $ TestList [executionTest] -- , verificationTest]
+
+dumpDesugar :: Bool
+dumpDesugar = False
+
+okTest :: String -> Bool
+--okTest s | trace (show s) False = undefined
+okTest s =
+--  s == "colon/1.verse" &&
+  not ("verify/" `isInfixOf` s) &&
+  not ("var/" `isInfixOf` s) &&
+  not ("assume/" `isInfixOf` s) &&
+  not ("attributes/" `isInfixOf` s) &&
+  not ("struct/" `isInfixOf` s) &&
+  not ("class/" `isInfixOf` s) &&
+  not ("enum/" `isInfixOf` s) &&
+  not ("float/" `isInfixOf` s) &&
+  notElem s structs &&
+  notElem s modules &&
+  notElem s floats &&
+  notElem s overloads &&
+  notElem s broken &&
+  notElem s choices &&
+  notElem s diverges &&
+  notElem s state
+
+broken :: [FilePath]
+broken =
+  [ -- All these seem to be instances of the same problem.
+    "12.verse", "32.verse", "33.verse", "43.verse", "73.verse", "74.verse"
+  , "8.verse", "81.verse", "87.verse", "90.verse", "93.verse"
+  , "all/1.verse", "choice/1.verse", "choice/3.verse",
+    "unify/1.verse",
+    -- different weirdness
+    "function/13.verse",
+    -- just the wrong error message
+    "succeeds/2.verse",
+    -- annoying name clashed
+    "function/3.verse", "function/5.verse",
+    "where/1.verse", "colon/8.verse",
+    -- something is fishy with these tests
+    "diverges/1.verse", "diverges/2.verse"
+  ]
+
+structs :: [FilePath]
+structs = [ "37.verse", "92.verse", "99.verse", "arrow/3.verse", "arrow/4.verse", "leniency/1.verse" ]
+
+modules :: [FilePath]
+modules = [ "path/class.verse", "path/module.verse" ]
+
+floats :: [FilePath]
+floats = [ "45.verse", "55.verse", "56.verse", "57.verse", "string/6.verse", "string/7.verse" ]
+
+overloads :: [FilePath]
+overloads = [ "84.verse", "85.verse", "89.verse", "function/11.verse", "function/12.verse" ]
+
+choices :: [FilePath]
+choices = ["choice/4.verse", "choice/6.verse", "choice/7.verse"]
+
+diverges :: [FilePath]
+diverges = [ "diverges/3.verse" ]
+
+state :: [FilePath]
+state = [ "for/2.verse", "for/3.verse" ]
+
+getTest :: TestFlags -> Mode -> FilePath -> IO Test
+getTest tflg mode directory = do
+  filePaths <- listDirectory' directory
+  putStrLn $ "Files found: " ++ show (length filePaths)
+  let verseFiles = filter only $ filter okTest $ sort $ filter ((== ".verse") . takeExtension) filePaths
+      only s = case onlyTest tflg of
+                 Nothing -> True
+                 Just t  ->
+                   s == t || (directory </> s) == t
+  --error $ show verseFiles
+  pure . TestList $ mkTestCase tflg mode . (directory </>) <$> verseFiles
+
+evalFile :: TestFlags
+         -> Mode
+         -> FilePath
+         -> IO (Either Error (Maybe [V.FrozenVal]))
+evalFile tflg _mode verseFile = do
+--  putStrLn $ "\nfile " ++ verseFile
+  file <- ByteString.readFile verseFile
+  case parse2 verseFile file of
+    Left err -> return (Left err)
+    Right e -> pure <$> rulesEval tflg e
+
+mkTestCase :: TestFlags -> Mode -> FilePath -> Test
+mkTestCase tflg mode verseFile = TestLabel verseFile . TestCase $
+  evalFile tflg mode verseFile >>= \ case
+    Left e -> handleError e
+    Right Nothing -> handleError StuckError
+    Right (Just xs) -> do
+      let outFile = replaceExtension verseFile "out"
+      expected <- readFile outFile `catchIOError` \ e ->
+        if isDoesNotExistError e then pure "" else ioError e
+      let actual = show $ foldr (\ x z -> pretty x <> line <> z) mempty xs
+      assertEqual outFile expected actual
+  where
+    handleError e = do
+      let errFile = replaceExtension verseFile "err"
+      expected <- readFile errFile `catchIOError` \ e ->
+        if isDoesNotExistError e then pure "" else ioError e
+      let actual = show $ pretty e <> line
+      assertEqual errFile expected actual
+
+listDirectory' :: FilePath -> IO [FilePath]
+listDirectory' x = do
+  xs <- listDirectory x `catchIOError` const (pure [])
+  join <$> (for xs $ \ y -> (y:) <$> fmap (y </>) <$> listDirectory' (x </> y))
+
+--------------------------
+
+rulesEval :: TestFlags -> L (P.Exp SimpleName) -> IO (Maybe [V.FrozenVal])
+rulesEval tflg e = do
+  --print e
+  mv <- evalExpr tflg (lexp (desugar e))
+  --print v
+  --when (v /= v) $ error "???"
+  return $ toFrozen <$> mv
+
+newtype M a = M { unM :: Label -> (Label, a) }
+instance Functor M where
+  fmap f ma = M $ \ l -> case unM ma l of (l', a) -> (l', f a)
+instance Applicative M where
+  pure a = M $ \ l -> (l, a)
+  (<*>) = ap
+instance Monad M where
+  ma >>= k = M $ \ l -> case unM ma l of (l', a) -> unM (k a) l'
+instance MonadWrong Error M where
+  wrong e = error $ show e
+instance MonadSupply Label M where
+  supply = M $ \ l -> let !l' = l + 1 in (l', l)
+runM :: M a -> a
+runM (M a) = snd (a 0)
+
+desugar :: L (P.Exp SimpleName) -> L (R.Exp L Ident)
+desugar e =
+  let r = runM (R.rewrite e)
+  in  --(if dumpDesugar then trace ("\n----------\nparse=\n" ++ show e ++ "\n-----------\nrewrite=\n" ++ show r) else id)
+      r
+
+lexp :: L (R.Exp L Ident) -> F.SrcExpr
+lexp (L l e) = expToSrcExpr l e
+
+strIdent :: Loc -> String -> F.Ident
+strIdent (Loc (Pos.Pos l c _) _) s = F.Ident (F.mkLoc "?" l c) s
+
+ident :: Loc -> Ident -> F.Ident
+ident l i = strIdent l (f i)
+  where f (Name s) = unpack s
+        f (Label l) = "_" ++ show l
+
+inOp :: Loc -> Ident -> F.Ident
+inOp l s = ident l s
+
+preOp :: Loc -> Ident -> F.Ident
+preOp l s = ident l s
+
+{-
+postOp :: Loc -> Ident -> F.Ident
+postOp l s = ident l s
+-}
+
+macro :: Loc -> Ident -> F.Ident
+macro l s = ident l s
+
+expToSrcExpr :: Loc -> R.Exp L Ident -> F.SrcExpr
+expToSrcExpr l (e1 R.:=:  e2) = F.InfixOp (lexp e1) (inOp l "=")  (lexp e2)
+-- expToSrcExpr l (e1 R.:.:  e2) = F.InfixOp (lexp e1) (inOp l ".")  (lexp e2)
+expToSrcExpr l (e1 R.:|:  e2) = F.InfixOp (lexp e1) (inOp l "|")  (lexp e2)
+expToSrcExpr _ (R.List es) = F.eSeq (map lexp es)
+expToSrcExpr l (R.Where e1 e2) = F.InfixOp (lexp e1) (inOp l "where") (lexp e2)
+expToSrcExpr _ R.Fail = F.Fail
+expToSrcExpr l (R.One e) = F.Macro1 (macro l "one") [] (lexp e)
+expToSrcExpr l (R.All e) = F.Macro1 (macro l "all") [] (lexp e)
+expToSrcExpr l (R.Not e) = F.PrefixOp (preOp l "not") (lexp e)
+expToSrcExpr l (R.Verify e)    = F.Macro1 (macro l "verify") [] (lexp e)
+expToSrcExpr _ (R.Check eff e) = F.Check (refImplEffToSrcEff eff) (lexp e)
+expToSrcExpr _ (R.OfType e1 e2) = --F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
+           F.OfType (lexp e1) F.effTop (lexp e2)
+expToSrcExpr l (R.Assume e) = F.Macro1 (macro l "assume") [] (lexp e)
+-- expToSrcExpr l (R.Module e) = XXX
+-- expToSrcExpr l (R.Struct e) = XXX
+-- expToSrcExpr l (R.Class e) = XXX
+-- expToSrcExpr l (R.Inst e1 e2) = XXX
+-- expToSrcExpr l (R.Enum e) = XXX
+expToSrcExpr _ (R.IfThenElse e1 e2 e3) = F.If3 (lexp e1) (lexp e2) (lexp e3)
+expToSrcExpr _ (R.ForDo e1 e2) = F.For2 (lexp e1) (lexp e2)
+expToSrcExpr _ (R.Block e) = F.Block (lexp e)
+expToSrcExpr _ (R.BracketInvoke f a) = F.ApplyD (lexp f) (lexp a)
+expToSrcExpr _ (R.ParenInvoke f a) = F.ApplyS (lexp f) (lexp a)
+expToSrcExpr _ (R.Exists (L l i)) = F.DefineV (ident l i)
+-- expToSrcExpr _ (Forall e) = XXX
+-- expToSrcExpr _ (Alloc2 ) = XXX
+-- expToSrcExpr _ (Alloc3 ) = XXX
+expToSrcExpr l (R.Set (L l' x) e) = F.Set (F.Variable (ident l' x)) (ident l "=") (lexp e)
+expToSrcExpr _ (R.Tuple es) = F.Tuple (map lexp es)
+expToSrcExpr _ (R.Truth e) = F.Truth (lexp e)
+expToSrcExpr _ (R.Int i) = F.Lit (F.LInt i)
+expToSrcExpr _ (R.Float f) = F.Lit (F.LRat (fromFloatDigits f) (show f))
+expToSrcExpr _ (R.Char c) = F.Lit (F.LChar (toEnum (fromEnum c)))
+expToSrcExpr _ (R.Char32 c) = F.Lit (F.LChar c)
+expToSrcExpr _ (R.Lam e1 oc eff e2) = F.Function ap (lexp e1) rs (lexp e2)
+  where
+    ap = case oc of { R.O -> F.Open; R.C -> F.Closed }
+    rs = refImplEffToSrcEff eff
+expToSrcExpr l (R.InfixColonEqual _ q (L l' x) e) | ok q = F.InfixOp (F.Variable (ident l' x)) (inOp l ":=") (lexp e)
+  where ok R.Var = False
+        ok _ = True
+expToSrcExpr l (R.PrefixColon e) = F.PrefixOp (preOp l ":") (lexp e)
+expToSrcExpr l (R.MixfixArrowColonEqual (L lx x) (L ly y) e) = F.InfixOp lhs (ident l ":=") (lexp e)
+  where lhs = F.InfixOp (F.Variable (ident lx x)) (strIdent l "->") (F.Variable (ident ly y))
+expToSrcExpr l (R.Name n) = F.Variable (ident l n)
+-- expToSrcExpr QualName
+expToSrcExpr _ (R.IfArchetypeName _ e1 e2) | x1 == x2 = x1
+  where x1 = lexp e1; x2 = lexp e2
+expToSrcExpr _ (R.IfArchetypeName _ _ e2) = lexp e2
+-- expToSrcExpr Domain
+expToSrcExpr _ e = error $ "expToSrcExpr: unimp " ++ show (pretty e) ++ "\n" ++ show e
+
+refImplEffToSrcEff :: S.Effect -> F.Eff
+refImplEffToSrcEff S.Fails    = F.effFails
+refImplEffToSrcEff S.Succeeds = F.effSucceeds
+refImplEffToSrcEff S.Decides  = F.effDecides
+
+toFrozen :: Core.Expr -> [V.FrozenVal]
+toFrozen (Core.Lit (Core.LInt i)) = pure $ V.FrozenVal (Just (V.Int i))
+toFrozen (Core.Lit (Core.LRat i _)) = pure $ V.FrozenVal (Just (V.Rational $ toRational i))
+toFrozen (Core.Lit (Core.LChar i)) = pure $ V.FrozenVal (Just (V.Char (toEnum (fromEnum i))))
+toFrozen (Core.Tup vs) = do fs <- mapM toFrozen vs; pure $ V.FrozenVal (Just (V.Tuple fs))
+toFrozen (Core.Tru v) = do f <- toFrozen v; pure $ V.FrozenVal (Just (V.Truth f))
+toFrozen (e1 Core.:|: e2) = toFrozen e1 ++ toFrozen e2
+toFrozen (Core.Fail) = []
+toFrozen e = error $ "toFrozen: " ++ prettyShow e
+
+isOKResult :: Core.Expr -> Bool
+isOKResult (Core.Lit _) = True
+isOKResult (Core.Tup es) = all isOKResult es
+isOKResult (Core.Tru e) = isOKResult e
+isOKResult (e1 Core.:|: e2) = isOKResult e1 && isOKResult e2
+isOKResult (Core.Fail) = True
+isOKResult _ = False
+
+--------------
+
+srcToCore :: F.Flags -> Bool -> F.SrcExpr -> IO Core.Expr
+srcToCore flags add_verification e = do
+  when dumpDesugar $
+    putStrLn $ "\n-------------\ne=\n" ++ prettyShow e
+  e1 <- FrontEnd.Desugar.desugar flags add_verification e
+  when dumpDesugar $
+    putStrLn $ "\n-------------\ne1=\n" ++ prettyShow e1
+  e2 <- FrontEnd.ToCore.convertToCore flags e1
+  when dumpDesugar $
+    putStrLn $ "\n-------------\ne2=\n" ++ prettyShow e2
+  let e3 = Core.prep e2
+  return e3
+
+evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Core.Expr)
+evalExpr tflg e = do
+  ce <- srcToCore F.defaultFlags Prelude.False e
+  let (r, tr) = normalize steps (everywhere runtimeRules) ce
+      v = term tr
+      steps = 20000
+  when (showTrace tflg) $ do
+    putStrLn "Trace is:"
+    display tr
+
+  case r of
+    NormOK | isOKResult v -> return (Just v)
+           | otherwise -> return Nothing
+    NormExpired -> do
+      putStrLn "*** Ran out of fuel"
+      return Nothing
+    NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
+
+data TestFlags = TestFlags
+  { onlyTest       :: !(Maybe String)      -- run only this test
+  , showTrace      :: !Bool                -- Show traces
+  }
+  deriving (Show)
+
+testArgs :: IO TestFlags
+-- Parse the TestFlags from the command line
+testArgs = do
+  let prf = OA.prefs OA.disambiguate
+  t <- OA.customExecParser prf $ OA.info (testFlags OA.<**> OA.helper)
+             ( OA.fullDesc
+            <> OA.progDesc "Run RI tests"
+            <> OA.header "tests - testing RI"
+             )
+  pure t
+
+testFlags :: OA.Parser TestFlags
+testFlags = TestFlags
+  <$> OA.optional (OA.strOption
+         ( OA.long "only-test"
+        <> OA.metavar "TEST"
+        <> OA.help "Run only test named TEST" ))
+  <*> OA.switch
+      (  OA.long "trace"
+      <> OA.help "Print rewrite traces"
+      )

@@ -1,0 +1,115 @@
+% ----------------------------------------------------
+%
+%        Denotational semantics: Plan A
+%
+%         Was: desugaring.ltx
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}
+$$
+% ------------- Syntax of Mini Verse ---------------
+\begin{array}{l}
+\textbf{Syntax of Mini Verse} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}l}
+  \text{Simple values}    & a & ::= & |x| \vb |o| \vb |k| \vb  |arr (a_0, xdots, a_n)|  \hspace{5mm} \text{Can add strings, floats...} \\
+  \text{Wrappings}   & |hw| & ::= & |wrapemp| \vb |y:== apply1N h x| \\
+  \text{Expressions} & e & ::= & |a| \vb e_1; e_2
+     \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail| \\
+     && \vb & |apply1N a_1 a_2| \vb |lamH q fx i e_1 hw e_2| \\
+  && \vb & |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
+  && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
+\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x t|; no |x:=e|; no |where|; and lambda changes form}}
+\end{array} \\
+\\
+% ------------- Desugaring ---------------
+\begin{array}{@@{}l@@{\,}r@@{\;\;}c@@{\;\;}l@@{\;}l}
+  \text{Inputs} & |wu| & ::= & |mkwu dr u| \\
+  & |dr| & ::= & \multicolumn{2}{l}{|drdom |  \vb |drrng fx|
+     \hspace{1cm} \text{|drdom| for domain, |drrng fx| for range}} \\
+                & |u|  & ::= & |wrapemp| \vb |x| \\[2mm]
+
+\rulename{watom}      & |SS wu a| & = & |wu `ueq` a| \\
+\rulename{wwild}    & |SS wu _| & = & |wu `ueq` (defintro x; x)| \\
+% \rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
+\rulename{wapp}    & |SS wu (apply1N t_1 t_2)|
+  & = & |defintro (f x); f == SS wuinit t_1; x == SS wuinit t_2; wu `ueq` apply1N f x| \\
+\rulename{wfor}   & |SS wu (fordo t_1 t_2)|
+   & = & |wu `ueq` fordo (SS wuinit t_1) (SS wuinit t_2)| \\
+\rulename{wone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
+\rulename{wall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
+\rulename{wfail}   & |SS wu fail| & = & |fail| \\
+
+% Choice: do we want to push wu into the branches or not?
+% \rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` (SS wuinit t_1 `choice` SS wuinit t_2)| \\
+\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |SS wu t_1 `choice` SS wu t_2| \\
+
+\rulename{wunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
+\rulename{wsemi}\asktim   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
+\rulename{wwhere}   & |SS wu (t_1 where t_2)| & = & |defintro r; r == (SS wu t_1); (SS wuinit t_2); r| \\
+\multicolumn{2}{@@{}l}{\rulename{wif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
+ & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
+\rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
+\rulename{wsquig}   & |SS (mkwu dr u) (squig x t)|
+  & = & |(mkwu dr u) `ueq` x; SS (mkwu dr x) t| \\
+% \rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
+\rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
+\rulename{wcol1}\asktim   & |SS (mkwu dr wrapemp) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
+\rulename{wcol2}   & |SS (mkwu drdom x) (: t)| & = & |apply1N ((SS wuinit t)) x| \\
+\rulename{wcol3}   & |SS (mkwu (drrng fx) x) (: t)| & = & |oftypefx x fx (SS wuinit t)| \\
+\rulename{wopq}\asktim  & |SS (mkwu (drrng fx_2) u) (oftypefx t_1 fx_1 t_2)|
+    & = & |oftypefx (SS (mkwu drdom u) t_1) (andeffects fx_1 fx_2) (SS wuinit t_2)| \\
+\rulename{wtru1} & |SS (mkwu dr wrapemp) (truth t)|
+   & = & |defintro x; x == SS (mkwu dr wrapemp) t; truth x| & \text{|x| fresh} \\
+\rulename{wtru2} & |SS (mkwu dr x) (truth t)|
+   & = & |defintro (y z); truth y == x; z == SS (mkwu dr (wrape y)) t; truth z| & \text{|y,z| fresh} \\
+\rulename{wtup1}   & |SS (mkwu dr wrapemp) (array (t_1, xdots, t_n))|
+  & = & |defintro (z_1 xdots z_n); z_1 == (SS (mkwu dr wrapemp) t_1); xdots; z_n = SS (mkwu dr wrapemp) t_n;| & \text{|z_i| fresh}\\
+  &&&   |arr( z_1, xdots, z_n)| \\
+\rulename{wtup2}   & |SS (mkwu dr x) (array (t_1, xdots, t_n))|
+ & = & |defintro (z_1 xdots z_n, y_1 xdots y_n); arr(y_1, xdots, y_n) == x;| & \text{|y_i, z_i| fresh}\\
+ &&&  |z_1 == SS (mkwu dr (wrape y_1)) t_1; xdots; z_n == SS (mkwu dr (wrape y_n)) t_n;| \\
+ &&&  |arr( z_1, xdots, z_n)| \\
+\rulename{wfun1} \asktim   & |SS (mkwu dr wrapemp) (functionOCX closed t_1 fx t_2)|
+   & = & |lamH closed fx i (SS (mkwu drdom (wrape i)) t_1) wrapemp
+                    (SS (mkwu (drrng fx) wrapemp) t_2)| & \text{|i| fresh} \\
+\rulename{wfun2}   & |SS (mkwu dr h) (functionOCX closed t_1 fx t_2)|
+& = & \begin{array}[t]{@@{}l}
+  |apply1N isFun h;| \\
+  |lamHv closed fx i
+         (defintro x; x = SS (mkwu drdom i) t_1) (y :== apply1N h x)
+         (SS (mkwu (drrng fx) y) t_2)|
+  \end{array} & \text{|i,x| fresh}
+\end{array} \\[1mm]
+\textbf{Auxiliary functions} \\
+\hspace{3cm}
+\begin{array}{@@{}l@@{\;\;}r@@{\;\;}c@@{\;\;}ll}
+\rulename{wp1} & |(mkwu dr wrapemp) `ueq`  e| & = & |e| \\
+\rulename{wp2} \asktim & |(mkwu drdom x) `ueq`  e| & = & |x == e| \\
+\rulename{wp3} \asktim & |(mkwu (drrng fx) x)) `ueq`  e|
+ & = & |oftypefx x empty ((lam i (i == e)))| & \text{$|i| \not\in |freevars e|$}
+
+% K is not needed now we have the three-place lambda
+% \\[2mm]
+% & |checkfun open f e| & = & |emptytup| \\
+% & |checkfun closed f e| & = & |lamOC closed x (apply1N f x) (x == SS wuinit e)|
+\end{array}
+\end{array}
+$$
+\caption{Desugaring Essential Verse to Mini Verse} \label{fig:wrapping} \label{fig:mini-verse}
+\end{figure}
+
+Key points about \Cref{fig:wrapping}, the Essential-Verse-to-Mini-Verse wrapping step:
+\begin{itemize}
+\item Essential Verse has |(t_1 where t_2)| as well as |(t_1 ; t_2)|.  We can't flip the
+  order without risking getting choices in the wrong order.  But aft
+er the wrapping
+  step we can replace |where| by ordering ``|;|'', because we have by then
+  feed |u| into |t_1| rather than |t_2|, which is the key difference.
+\end{itemize}
