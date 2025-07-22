@@ -33,24 +33,6 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
-Ltac inv H := inversion H; try subst; clear H.
-
-Ltac crunch :=
-  repeat match goal with
-          | [ H : exists X, _ |- _ ] => destruct H
-          | [ H : _ /\ _ |- _ ] => destruct H
-          | [ H : _ \/ _ |- _ ] => destruct H
-          | [ |- _ /\ _ ] => split
-          end.
-
-Lemma set_extensionality {A} (s1 s2 : P A) :
-  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
-Proof.
-  intros h.
-  eapply Extensionality_Ensembles.
-  split. intros x. rewrite h. done. intros x. rewrite h. done.
-Qed.
-
 
 Lemma empty_empty {A}(x : A) : 
   (∅  ≃ (∅ : P A)) = True.
@@ -62,10 +44,6 @@ Admitted.
 
 Lemma union_empty_l {A}(s1 s2 : P A) : 
   ((s1 ∪ s2)  ≃ (∅ : P A)) = ((s1 ≃ ∅) /\ (s2 ≃ ∅)).
-Admitted.
-
-Lemma intersection_empty_l {A}(s1 s2 : P A) : 
-  ((s1 ∩ s2)  ≃ (∅ : P A)) = ((s1 ≃ ∅) \/ (s2 ≃ ∅)).
 Admitted.
 
 Lemma not_false : 
@@ -94,6 +72,7 @@ Lemma true_or a :
 Admitted.
 *)
 
+(*
 Lemma when_and {A} (s1 s2 : Prop) (s : P A) : 
   when (s1 /\ s2) s = when s1 (when s2 s).
 Proof.
@@ -101,6 +80,7 @@ Proof.
   eapply set_extensionality. intros a.
   unfold In. tauto.
 Qed.
+*)
 
 Lemma when_true {A} (s : P A) : when True s = s.
 Admitted.
@@ -108,13 +88,6 @@ Admitted.
 Lemma when_false {A} (s : P A) : when False s = ∅.
 Admitted.
 
-Lemma Union_empty_r {A} (s : P A) : 
-  (s ∪ ∅) = s.
-Admitted.
-
-Lemma Union_empty_l {A} (s : P A) : 
-  (∅ ∪ s) = s.
-Admitted.
 
 #[export] Hint Resolve
   @when_true @when_false 
@@ -124,87 +97,12 @@ Admitted.
 #[export] Hint Rewrite 
   @empty_empty
   @ret_empty_l
-  @union_empty_l
   @intersection_empty_l
   @not_true
   @not_false
   @when_true @when_false
   @Union_empty_r
   @Union_empty_l : sets.
-
-
-Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
-  (ρ ∈ (x <- ma ;; k x)) <->
-  (exists x, (x ∈ ma) /\ (ρ ∈ (k x))).
-Proof. cbn. unfold bind_. cbn. reflexivity. Qed.
-
-Lemma in_ret {A} (x y :A) :
-  x ∈ (ret y : P A) <-> x = y.
-Proof.     
-  cbn. split. intros h1; inversion h1. done.
-  intros h. subst. done.
-Qed.
-
-Lemma in_intersection {A} (x : A) s1 s2 :
-  x ∈ (s1 ∩ s2) <-> (x ∈ s1) /\ (x ∈ s2).
-Proof.
-  split. intros h1; inversion h1. split; done.
-  intros [h1 h2]; econstructor; eauto.
-Qed.
-
-Lemma in_union {A} (x : A) s1 s2 :
-  x ∈ (s1 ∪ s2) <-> (x ∈ s1) \/ (x ∈ s2).
-Proof.
-  split. intros [h1|h1]; [left; auto| right; auto].
-  intros [h1|h1];  [left; auto| right; auto].
-Qed.
-
-#[export] Hint Rewrite @in_bind @in_ret @in_intersection @in_union : sets.
-
-Lemma intersection_assoc
-     : forall (A : Type) (l m n : P A), 
-    (l ∩ (m ∩ n)) = ((l ∩ m) ∩ n).
-Admitted.
-Lemma union_assoc
-     : forall (A : Type) (l m n : P A), 
-    (l ∪ (m ∪ n)) = ((l ∪ m) ∪ n).
-Admitted.
-
-
-
-
-Lemma bind_union {A B} (s1 s2 : P A) (k : A -> P B) :
-  (bind (s1 ∪ s2) k) = ((bind s1 k) ∪ (bind s2 k)).
-Proof.
-  apply set_extensionality. intros ρ.
-  autorewrite with sets.
-  split.
-  + intro h.
-    crunch.
-    inv H.
-    left. eexists. split; eauto.
-    right. eexists. split; eauto.
-  + intro h. crunch.
-    eexists. split; eauto. left. auto.
-    eexists. split; eauto. right. auto.
-Qed.
-
-#[export] Hint Rewrite @bind_union : sets.
-
-Lemma bind_intersection {A B} (s1 s2 : P A) (k : A -> P B) :
-  (bind (s1 ∩ s2) k) ⊆ ((bind s1 k) ∩ (bind s2 k)).
-Proof.
-  intros ρ.
-  autorewrite with sets.
-  intro h.
-  crunch.
-  inv H.
-  eexists. split; eauto.
-  inv H.
-  eexists. split; eauto.
-Qed. (* converse is not true. *)
-
-
 
 (* ---------------------------------------------- *)
 
@@ -554,6 +452,8 @@ Ltac set_crunch :=
         inv H; crunch
     | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
         inv H; crunch
+    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
+        inv H; crunch
     | [ H : ?ρ ∈ ∅ |- _ ] =>
         inv H
       end.
@@ -644,6 +544,7 @@ Definition ALL (Δs : list ENV) : ENV :=
     (ρ r = mkTup vs).
 *)
 
+(* This operation is liftM2 snoc *)
 Notation "({++})" := (fun (VS : P (list value)) (V : VAL) => 
     vs <- VS ;; 
     v  <- V  ;;
@@ -652,6 +553,11 @@ Infix "{++}" := (({++})) (at level 40) : set_scope.
    
 Definition Unions (xs : list VAL) : P (list value) := 
   squash_fold_left ({++}) xs (ret nil).
+
+Lemma If3_empty {A B} (s2 s3 : P B) : 
+  @If3 A B ∅ s2 s3 = s3.
+Proof.
+Admitted.
 
 Lemma If3_ret {A B} v (s2 s3 : P B) : 
   If3 (ret v : P A) s2 s3 = s2.
@@ -674,7 +580,7 @@ Proof.
     unfold when.
 Abort.
 
-(* Hint Rewrite @If3_ret : sets. *)
+#[export] Hint Rewrite @If3_empty @If3_ret : sets. 
 
 Example UnionsExample :
   Unions [  ret (Int 0) ; ret  (Int 1) ] = 
@@ -686,11 +592,6 @@ repeat rewrite If3_ret.
 repeat rewrite bind_ret_l.
 cbn. done.
 Qed.
-
-
-Lemma inhabited_is_true {A:Prop} : A -> (A = True).
-intro h. eapply propositional_extensionality.
-tauto. Qed.
 
 Lemma Unions_two_example :
   Unions [ ret (Int 0) ∪ ret (Int 1) ] = 
@@ -751,15 +652,198 @@ Definition ALL2 (Δs : list ENV) : ENV :=
       let VS : list VAL := 
                  (Δ2 <- Δs ;;
                   ret ('(v, D3) <- extract Δ2 ;;
-                                  when (ρ ∈ D3) (ret v)))in
+                                  when (ρ ∈ D3) (ret v))) in
       (vs ∈ Unions VS) /\
       (ρ r = mkTup vs).
+
+(* 
+
+From SPJ
+
+E[all{e}] =
+   [ { rho ∈ Env 
+     | vs ∈ Unions [ { v | (v,D') ∈ extract (r,D), rho ∈ D' }
+                   | D ∈ D[e] ]
+     , rho(r) = tup vs } ]
+
+E[one{e}] =
+   [ { rho ∈ Env 
+   | (v:_) ∈ pick(squash[ { v | (v,D') ∈ extract (r,D), rho ∈ D' }
+                              | D ∈ D[e] ])
+   , rho(r) = v } ]
+
+*)
+
+(* The set of results in Δ that could be produced by environments 
+   consistent with ρ *)
+Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
+  '(v, Δ') <- extract Δ ;; when (ρ ∈ Δ') (ret v).
+
+Definition ALL3 (Δs : list ENV) : ENV := 
+  fun ρ => exists vs,
+      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
+      (ρ r = mkTup vs).
+        
+
+(* return the set containing just the first element of xs, or emptyset
+  if xs is nil. *)
+Definition head_of {A} (xs : list A) : A -> Prop := 
+  match xs with 
+  | nil => ∅
+  | v :: _ => ⌈ v ⌉
+  end.
+
+Definition ONE (Δs : list ENV) : ENV := 
+  fun ρ => exists vs,
+      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
+      (ρ r ∈ head_of vs).
+
+Lemma fmap_ret {A B} (f : A -> B) (x: A) :
+        f <$> (ret x : list A) = ret (f x).
+cbn. done.
+Qed.
+
+Hint Rewrite @fmap_ret : sets.
+
+Lemma bcp_example : 
+  ALL3 (ret (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩)) = 
+      ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
+       (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
+Proof.
+  unfold ALL3.
+  apply set_extensionality. intros ρ.
+  unfold consistent_results, In.
+  autorewrite with sets.
+  rewrite extract_example.
+  rewrite bind_ret_l.
+  split.
+  + intro h. set_crunch.
+    inv H. 
+    ++ inv H1.
+       set_crunch.
+       inv H1.
+       unfold when in H. cbn in H.
+       rewrite H3.
+       cbn in H0.
+       left. split; eauto.
+    ++ inv H1. inv H2. 
+       right. split; auto.
+       intro h.
+       have hh: ((x ≈ ⟨ Int 0 ⟩) ρ) = True.
+       { unfold constrain_eq, In. 
+         rewrite h. 
+         apply propositional_extensionality. tauto. }
+       rewrite hh in H.
+       cbn in H.
+       autorewrite with sets in H. done.
+  + intro h. inv h.
+    ++ set_crunch. 
+       exists [Int 0].
+       split; auto.
+       cbn. unfold constrain_eq. rewrite H1.
+       left.
+       have hh: (Int 0 = Int 0) = True. { apply propositional_extensionality. tauto. }
+       rewrite hh.
+       autorewrite with sets.
+       rewrite bind_singleton_l.
+       rewrite bind_singleton_l.
+       cbn. eapply in_singleton.
+    ++ exists nil.
+       cbn. 
+       set_crunch.
+       unfold constrain_ne,In in H0.
+       have hh: ((x ≈ ⟨ Int 0 ⟩) ρ) = False.
+       { unfold constrain_eq. 
+         eapply propositional_extensionality. tauto. }
+       rewrite hh. 
+       autorewrite with sets.
+       eapply in_singleton.
+       auto.
+Qed.
+
+(* one { 0 | 1 } = [ {{ r = 0 }} ]     *)
+(* one { x = 0 } = [ {{ r = x = 0 }} ] *)
+(* one { x = 0 | x = 1 } = [ {{ r=x=0 }} union {{r=x=1}} ] *)
+
+Definition D0 : ENV := r ≈ ⟨ Int 0 ⟩.
+Definition D1 : ENV := r ≈ ⟨ Int 1 ⟩.
+Definition Dx v : ENV := x ≈ ⟨ v ⟩ ∩ r ≈ ⟨ v ⟩.
+
+
+Lemma extract_D0 : 
+  extract D0 = ret ( Int 0, Total_set ). 
+Admitted.
+Lemma extract_D1 :
+  extract D1 = ret (Int 1 , Total_set).
+Admitted.
+
+Lemma ONE_example1 : ONE [ D0 ; D1 ] = D0.
+Proof.
+  unfold ONE.
+  apply set_extensionality. intros ρ.
+  unfold consistent_results, In.
+  unfold fmap, Functor_list,ListDef.map.
+  rewrite extract_D0. rewrite extract_D1.
+  rewrite bind_ret_l.
+  autorewrite with sets.
+  rewrite bind_ret_l.
+  autorewrite with sets.
+  split.
+  + intros h. set_crunch.
+    inv H. 
+    autorewrite with sets in H1.
+    set_crunch.
+    inv H0. 
+    unfold D0, constrain_eq. done.
+    autorewrite with sets in H1. inv H1.
+  + unfold D0. 
+    intro h. inv h.
+    exists [ Int 0 ; Int 1].
+    rewrite H0.
+    split.
+    cbn.
+    autorewrite with sets.
+    repeat rewrite bind_singleton_l.
+    eapply in_singleton. cbn.
+    eapply in_singleton.
+Qed.
+
+
+Lemma ONE_example2 : 
+  ONE [ Dx (Int 0) ] = Dx (Int 0).
+Admitted.
+
+Lemma bind_when {A B} ϕ (s : P A) (k : A -> P B) : 
+  (bind_ k (when ϕ s)) = (⟨ϕ⟩ ∩ (bind_ k s)).
+Proof.
+Admitted.
+
+Lemma If3_when_ret {A B} (k : A) ϕ (s2 s3 : P B): 
+  If3 (when ϕ (ret k)) s2 s3 = ((⟨ϕ⟩ ∩ s2) ∪ (⟨not ϕ⟩ ∩ s3)).
+Admitted.
+
+Lemma ONE_example3 : 
+  ONE [ Dx (Int 0) ; Dx (Int 1) ] = (Dx (Int 0) ∪ Dx (Int 1)).
+Proof.
+  unfold ONE, Dx, consistent_results.
+  apply set_extensionality. intros ρ.
+  unfold In.
+  unfold fmap, Functor_list, List.map.
+  repeat rewrite extract_example.
+  repeat rewrite bind_ret_l.
+  split.
+  + intros h. set_crunch.
+    unfold Unions in H.
+    cbn in H.
+    repeat rewrite If3_when_ret in H.
+    inv H.
+    ++ 
+Admitted.    
 
 
 Lemma ALL_two_example :
   ALL2 (ret (r ≈ ⟨Int 0⟩ ∪ (r ≈ ⟨Int 1⟩))) = 
       (r ≈ ⟨mkTup [Int 0]⟩ ∪ (r ≈ ⟨mkTup [Int 1]⟩)).
-Proof.
   apply set_extensionality. intros ρ.
   autorewrite with sets.
   unfold ALL2.
@@ -780,61 +864,6 @@ Proof.
 Qed.
 
 
-Lemma bcp_example : 
-  ALL2 (ret (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩)) = 
-      ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
-       (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
-Proof.
-  apply set_extensionality. intros ρ.
-  autorewrite with sets.
-  unfold ALL2. unfold In.
-  rewrite bind_ret_l.
-  rewrite extract_example.
-  rewrite bind_ret_l.
-  unfold when.
-  split.
-  + intro h. set_crunch.
-    inv H. 
-    ++ inv H1.
-       set_crunch.
-       cbn in H0.
-       inv H2. inv H3.
-       inv H1.
-       rewrite H3.
-       left. auto.
-    ++ inv H1. inv H2. rewrite H0.
-       right. split; auto.
-       intro h.
-       cbn in H.
-       destruct H as [H _].
-       specialize (H (Int 0)).
-       unfold In in H.
-       have k: ∅ (Int 0).
-       eapply H. split. cbv. eapply h.
-       eapply in_singleton. inversion k.
-  + intro h. set_crunch.
-    ++ exists [Int 0].
-       split; auto.
-       cbn. unfold constrain_eq. rewrite H.
-       left.
-       cbv.
-       split.
-       intro h.
-       crunch.
-       have k: ∅ (Int 0).
-       eapply H1. split; auto. eapply in_singleton.
-       inv k.
-       exists nil. split; eauto. eapply in_singleton.
-       exists (Int 0). repeat split; auto.
-    ++ exists nil.
-       cbn. 
-       split; auto.
-       cbv.
-       right. unfold In.
-       split. split.
-       intros. crunch. assert False. eapply H. eauto. done.
-       intros. inv H1. eapply in_singleton.
-Qed.
 
 
 Lemma conflict_example : 
@@ -855,6 +884,7 @@ Proof.
   split.
   + intro h. crunch.
     exists x0. split; auto.
+Abort.
     
 
 (* The semantics of 1..x 

@@ -272,12 +272,6 @@ Definition Exists_exists : forall {A} (Pr : A -> Prop) (l : P A),
 Proof. intros. unfold Exists. reflexivity. Qed.
 
 
-
-(* ----------------------------------------- *)
-
-
-
-
 (* -------------- some laws -------------- *)
 
 Lemma bind_singleton_l {A B : Type}
@@ -598,3 +592,105 @@ Proof.
 Admitted.
 
 
+
+Lemma set_extensionality {A} (s1 s2 : P A) :
+  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
+Proof.
+  intros h.
+  eapply Extensionality_Ensembles.
+  split. intros x. rewrite h. done. intros x. rewrite h. done.
+Qed.
+
+Lemma Union_empty_r {A} (s : P A) : 
+  (s ∪ ∅) = s.
+Admitted.
+
+Lemma Union_empty_l {A} (s : P A) : 
+  (∅ ∪ s) = s.
+Admitted.
+
+Lemma intersection_empty_l {A}(s2 : P A) : 
+  (∅ ∩ s2) = ∅.
+Admitted.
+
+Lemma intersection_empty_r {A}(s2 : P A) : 
+  (s2 ∩ ∅) = ∅.
+Admitted.
+
+
+#[export] Hint Rewrite 
+  @intersection_empty_l
+  @intersection_empty_r
+  @Union_empty_r
+  @Union_empty_l : sets.
+
+Import MonadNotation.
+
+Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
+  (ρ ∈ (x <- ma ;; k x)) <->
+  (exists x, (x ∈ ma) /\ (ρ ∈ (k x))).
+Proof. cbn. unfold bind_. cbn. reflexivity. Qed.
+
+Lemma in_ret {A} (x y :A) :
+  x ∈ (ret y : P A) <-> x = y.
+Proof.     
+  cbn. split. intros h1; inversion h1. done.
+  intros h. subst. done.
+Qed.
+
+Lemma in_intersection {A} (x : A) s1 s2 :
+  x ∈ (s1 ∩ s2) <-> (x ∈ s1) /\ (x ∈ s2).
+Proof.
+  split. intros h1; inversion h1. split; done.
+  intros [h1 h2]; econstructor; eauto.
+Qed.
+
+Lemma in_union {A} (x : A) s1 s2 :
+  x ∈ (s1 ∪ s2) <-> (x ∈ s1) \/ (x ∈ s2).
+Proof.
+  split. intros [h1|h1]; [left; auto| right; auto].
+  intros [h1|h1];  [left; auto| right; auto].
+Qed.
+
+#[export] Hint Rewrite @in_bind @in_ret @in_intersection @in_union : sets.
+
+Lemma bind_union {A B} (s1 s2 : P A) (k : A -> P B) :
+  (bind (s1 ∪ s2) k) = ((bind s1 k) ∪ (bind s2 k)).
+Proof.
+  apply set_extensionality. intros ρ.
+  autorewrite with sets.
+  split.
+  + intro h.
+    crunch.
+    inv H.
+    left. eexists. split; eauto.
+    right. eexists. split; eauto.
+  + intro h. crunch.
+    eexists. split; eauto. left. auto.
+    eexists. split; eauto. right. auto.
+Qed.
+
+#[export] Hint Rewrite @bind_union : sets.
+
+Lemma bind_intersection {A B} (s1 s2 : P A) (k : A -> P B) :
+  (bind (s1 ∩ s2) k) ⊆ ((bind s1 k) ∩ (bind s2 k)).
+Proof.
+  intros ρ.
+  autorewrite with sets.
+  intro h.
+  crunch.
+  inv H.
+  eexists. split; eauto.
+  inv H.
+  eexists. split; eauto.
+Qed. (* NB: converse is not true. *)
+
+
+Lemma intersection_assoc
+     : forall (A : Type) (l m n : P A), 
+    (l ∩ (m ∩ n)) = ((l ∩ m) ∩ n).
+Admitted.
+Lemma union_assoc
+     : forall (A : Type) (l m n : P A), 
+    (l ∪ (m ∪ n)) = ((l ∪ m) ∪ n).
+Admitted.
