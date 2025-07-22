@@ -66,3 +66,5 @@ Spec/densem-koen.tex
 *.glob
 *.vos
 *.vok
+/Tim/TimVerse/VerseGrammar/x64
+/Tim/TimVerse/.vs/Verse/copilot-chat
