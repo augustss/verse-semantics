@@ -222,7 +222,7 @@
 %format upsilon = "\upsilon"
 %format colonequals = "\colonequals"
 %format dollar = "\$"
-%format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\," b
+%format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\{" b "\}"
 %format forb (a) b = "\textbf{for}(" a ")\{" b "\}"
 
 %format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
@@ -683,9 +683,11 @@
 
 %% ----------- DPS Verse -------------
 %format scope (op) = "\{" op "\}"
-%format dpslam x (dom) (rng) rngvar = "\lambda" x ".(" dom ")\{" rng "\}(" rngvar ")"
+%format dpslam q (fx)(i)(e1)(hw)(e2)y = "\lambda_{" q "}\langle" fx "\rangle" i ".(" e1 ")(" hw ")\{" e2 "\}(" y ")"
 %format nop = "\textbf{nop}"
-%format dpsall op y = allKW "\{ op \}(" y ")"
+%format dpsall (op) y = allKW "\{" op "\}(" y ")"
+%format dpsone (op) y = oneKW "\{" op "\}(" y ")"
+%format dpsfor (op1) (op2) y = forKW "(" op1 ")\{" op2 "\}(" y ")"
 
 %% Translation from Mini Verse to DPS Verse
 %format DpsT (e) r = "\mathcal{T}\llbracket" e "\rrbracket{}" r

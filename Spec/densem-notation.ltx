@@ -44,7 +44,7 @@ $$
 &  \semapp{A}{|x|}\rho & = & \rho(x) \\
 &  \semapp{A}{|k|}\rho & = & k \\
 &  \semapp{A}{|o|}\rho & = & \semap{O}{o} \\
-&  \semapp{A}{|truth a|}\rho & = & ?? \\
+&  \semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
 &  \semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
 
 \text{Primitive ops} &   \semap{O}{|o|} & : & \Val \\
@@ -61,12 +61,12 @@ $$
 \text{Extract result} & \extractE & : & \ENV \rightarrow \powerset{\Val, \ENV} \\
 & \extractE(\EV) & = & \{ (v, \hideE(\RES, \EV'))
                       \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(\RES)=v \} \} \\[1mm]
-& \combineE & : & \seq{ \ENV } \rightarrow \powerset{\seq{\Val}, \ENV}
-     \hspace{1cm} \text{Not quite right yet??} \\
-& \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
-     \{  & ([ v_0, \mydots, v_n ],\, \EV_0 \intersectE \mydots \intersectE \EV_n) \\
-     \vb & (v_0,\EV_0) \in \extractE(s_0), \mydots, (v_n,\EV_n) \in \extractE(s_n) \}
- \end{array} \\
+% & \combineE & : & \seq{ \ENV } \rightarrow \powerset{\seq{\Val}, \ENV}
+%      \hspace{1cm} \text{Not quite right yet??} \\
+% & \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
+%      \{  & ([ v_0, \mydots, v_n ],\, \EV_0 \intersectE \mydots \intersectE \EV_n) \\
+%      \vb & (v_0,\EV_0) \in \extractE(s_0), \mydots, (v_n,\EV_n) \in \extractE(s_n) \}
+% \end{array} \\
 \end{array}\\[2mm]
 
 \textbf{Notation for sets and sequences} \\
