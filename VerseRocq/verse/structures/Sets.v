@@ -6,18 +6,9 @@ From Stdlib Require Export Ensembles.
 From Stdlib Require Setoids.Setoid.
 From Stdlib Require Lists.List.
 
-(* Representing sets by their characteristic functions. 
+Require Import structures.Logical.
 
-   This is a wrapper for `Ensembles` from the Coq standard library.
-
-   It includes notations, Relation classes instances, and a bridge to 
-   finite sets represented by lists.
-
-*)
-
-(* Inspired by 
-   https://github.com/jsiek/denotational_semantics/agda/SetsAsPredicates.agda *)
-
+(* Representing sets by their characteristic functions.  *)
 
 Declare Scope set_scope.
 Delimit Scope set_scope with Ensemble.
@@ -40,27 +31,34 @@ Definition P := Ensemble.
 Definition Total_set {A} := fun (x:A) => True.
 
 (* Union of a set of sets (monadic join) *)
-Definition UNION {A} (VS : P (P A)) : P A := 
+Definition join {A} (VS : P (P A)) : P A := 
   fun v => exists V, (In VS V) /\ (In V v).
 
 Open Scope set_scope.
 
+Locate "/\".
+
 Module SetNotations. 
-  Notation "⊤"  := Total_set : set_scope.
   Notation "∅"  := Empty_set : set_scope.
-  Notation "⌈ x ⌉" := (Singleton x) : set_scope.
-  Infix "∪"  := Union (at level 90) : set_scope.
-  Infix "∩"  := Intersection (at level 90) : set_scope.
+  Notation "{{ x }}" := (Singleton x) : set_scope.
+  Infix "∪"  := Union (at level 60) : set_scope.
+  Infix "∩"  := Intersection (at level 60) : set_scope.
   Infix "-"  := Setminus : set_scope.
+  Notation "x ∈ s" := (In s x) (at level 65) : set_scope.
+  Notation "a ⊆ b" := (Included a b) (at level 70) : set_scope.
+  Notation "a ≃ b" := (Same_set a b) (at level 70) : set_scope.
 
-  Notation "x ∈ s"  := (In s x) (at level 90) : set_scope.
-  Notation "a ⊆ b" := (forall x, (x ∈ a) -> (x ∈ b)) (at level 90) : set_scope.
-  Notation "a ≃ b" := ((a ⊆ b) /\ (b ⊆ a)) (at level 90) : set_scope.
-
-  Notation "⨃" := UNION : set_scope.
+  Notation "⨃" := join : set_scope.
 End SetNotations. 
 
 Import SetNotations.
+
+
+(* Test cases for notations *)
+Check (1 ∈ {{ 1 }} ∪ {{2}} /\ 2 ∈ {{ 2 }}).
+Check (∅ ⊆ {{ 1 }} \/ {{ 1 }} ⊆ {{ 2 }} ∩ {{3}} ).
+Check (∅ ∪ {{ 1 }}).
+Check (∅ ∪ {{ 1 }} ≃ ∅).
 
 
 Definition map {A B} (f : A -> B) : P A -> P B := 
@@ -70,7 +68,7 @@ Definition filter {A} (f : A -> bool) : P A -> P A :=
   fun s => fun x => (f x = true) /\ (x ∈ s).
 
 (* define a set via set comprehension (i.e. monadic bind): {{ k x | x <- s }} *)
-Definition bind_ {A B} (k : A -> P B) (s : P A) : P B := 
+Definition bind {A B} (s : P A) (k : A -> P B)  : P B := 
   fun b => exists a, (a ∈ s) /\ (b ∈ (k a)).
 
 (* monadic sequence (>>): requires s1 to be inhabited *)
@@ -86,47 +84,80 @@ Definition when {A} (ϕ : Prop) (s : P A) : P A :=
 
 (* if2 s1 s2 == guard (s1 = ∅) >> s *)
 Definition If2 {A B} (s1 : P A) (s3 : P B) := 
-  (when (~ (Same_set s1 Empty_set)) s3).
+  (when (~ (s1 ≃ ∅)) s3).
 
 Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
-  Union 
-    (when (Same_set s1 Empty_set) s2) 
-    (when (not (Same_set s1 Empty_set)) s3).
+  (when (not (s1 ≃ ∅)) s2) ∪ (when (s1 ≃ ∅) s3).
+
+(* ------------------------------------------------------------- *)
+
+Lemma set_extensionality {A} (s1 s2 : P A) :
+  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
+Proof.
+  intros h.
+  eapply Extensionality_Ensembles.
+  split. intros x. rewrite h. done. intros x. rewrite h. done.
+Qed.
+
+Ltac set_ext x := (apply set_extensionality; intros x).
+
+(* ------------------------------------------------------------- *)
+(* Simplification rules *)
+
+Create HintDb set_simpl.
+
+Lemma bind_union {A B} (s1 s2 : P A) (k : A -> P B) :
+  (bind (s1 ∪ s2) k) = ((bind s1 k) ∪ (bind s2 k)).
+Proof.
+  set_ext ρ.
+  split.
+  + intro h. inv h. crunch. inv H.
+    left. eexists. split; eauto.
+    right. eexists. split; eauto.
+  + intro h. inv h; inv H; crunch.
+    eexists. split; eauto. left. auto.
+    eexists. split; eauto. right. auto.
+Qed.
+
+#[export] Hint Rewrite @bind_union : sets.
 
 
+
+(* ------------------------------------------------------------- *)
 
 (* P is a monad *)
 
 #[export] Instance Monad_P : Monad P :=
-  { ret  := (fun A (x : A) => Singleton x);
-     bind := fun A B x y => @bind_ A B y x
+  { ret  := @Singleton;
+    bind := @bind
    }.
 
 #[export] Instance Functor_P : Functor P :=
-  { fmap := fun A => @map A
+  { fmap := @map
   }.
 
+Definition ap := fun {A B} (m1 :  P (A -> B)) (m2 : P A) => 
+                   bind m1 (fun x1 => 
+                              bind m2 (fun x2 => 
+                                         ret (x1 x2))).
+
 #[export] Instance Applicative_P : Applicative P :=
-  { pure := @ret P _;
-     ap   := fun A B (m1 :  P (A -> B)) (m2 : P A) => 
-               bind m1 (fun x1 => 
-                            bind m2 (fun x2 => 
-                                         ret (x1 x2))) 
+  { pure := @Singleton;
+     ap  := @ap 
   }.
 
 #[export] Instance Alternative_P : Alternative P :=
-  { empty := fun A (x:A) => False ;
-    choose := fun A (p1 p2 : P A) (y : A) => 
-                 p1 y \/ p2 y
+  { empty := @Empty_set ;
+    choose := @Union
    }.
 
 
-(* Test cases for notations *)
-Check (1 ∈ ⊤).
-Check (1 ∈ ⌈ 1 ⌉).
-Check (∅ ⊆ ⌈ 1 ⌉).
-Check (∅ ∪ ⌈ 1 ⌉).
-Check (∅ ∪ ⌈ 1 ⌉ ≃ ∅).
+(* ------------------------------------------------------------- *)
+
+
+
+
+
 
 
 (* A proposition that a set is inhabited. Due to the restrictions
@@ -593,13 +624,6 @@ Admitted.
 
 
 
-Lemma set_extensionality {A} (s1 s2 : P A) :
-  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
-Proof.
-  intros h.
-  eapply Extensionality_Ensembles.
-  split. intros x. rewrite h. done. intros x. rewrite h. done.
-Qed.
 
 Lemma Union_empty_r {A} (s : P A) : 
   (s ∪ ∅) = s.
@@ -654,23 +678,6 @@ Qed.
 
 #[export] Hint Rewrite @in_bind @in_ret @in_intersection @in_union : sets.
 
-Lemma bind_union {A B} (s1 s2 : P A) (k : A -> P B) :
-  (bind (s1 ∪ s2) k) = ((bind s1 k) ∪ (bind s2 k)).
-Proof.
-  apply set_extensionality. intros ρ.
-  autorewrite with sets.
-  split.
-  + intro h.
-    crunch.
-    inv H.
-    left. eexists. split; eauto.
-    right. eexists. split; eauto.
-  + intro h. crunch.
-    eexists. split; eauto. left. auto.
-    eexists. split; eauto. right. auto.
-Qed.
-
-#[export] Hint Rewrite @bind_union : sets.
 
 Lemma bind_intersection {A B} (s1 s2 : P A) (k : A -> P B) :
   (bind (s1 ∩ s2) k) ⊆ ((bind s1 k) ∩ (bind s2 k)).
