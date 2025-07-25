@@ -3,12 +3,21 @@ From Stdlib Require Import Lists.List.
 
 Require Import Laws.
 
+Import FunctorNotation.
+Import MonadNotation.
 Import ListNotations.
+
+
+Create HintDb list_simpl.
+
+Ltac list_simpl := autorewrite with list_simpl.
 
 (*
 Lemma flat_map_app {A B} (f : A -> list B) (a1 a2: list A) : 
   flat_map f (a1 ++ a2) = flat_map f a1 ++ flat_map f a2.
 *)
+
+#[export] Hint Rewrite flat_map_app : list_simpl.
 
 Lemma app_nil_inv {A} (a b : list A) :
   a ++ b = [] -> a = [] /\ b = [].
@@ -31,10 +40,16 @@ Lemma flat_map_map {A B} (f : A -> B) (ma : list A) :
 induction ma. done.
 cbn. f_equal. Qed.
 
+#[export] Hint Rewrite @flat_map_map : list_simpl.
+
+
 (* 
 Lemma in_flat_map {A B} (b : B) (k : A -> list B) (ma : list A) :
   In b (flat_map k ma) -> exists a : A, In a ma /\ In b (k a).
 *)
+
+#[export] Hint Rewrite in_flat_map : list_simpl.
+
 
 (* Monad definitions *)
 
@@ -227,3 +242,14 @@ Definition take1 {A} (xs : list A) : list A :=
   | h :: _ => [ h ] 
   | [] => [] 
   end.
+
+
+
+
+Lemma fmap_ret {A B} (f : A -> B) (x: A) :
+        f <$> (ret x : list A) = ret (f x).
+cbn. done.
+Qed.
+
+#[export] Hint Rewrite @fmap_ret : list_simpl.
+

@@ -10,6 +10,11 @@ Require Import structures.Logical.
 
 (* Representing sets by their characteristic functions.  *)
 
+
+Create HintDb set_simpl.
+
+Ltac set_simpl := autorewrite with set_simpl.
+
 Declare Scope set_scope.
 Delimit Scope set_scope with Ensemble.
 Bind Scope set_scope with Ensemble.
@@ -27,22 +32,17 @@ Arguments Setminus {_}.
 
 Definition P := Ensemble.
 
-(* More operations on sets *)
-Definition Total_set {A} := fun (x:A) => True.
-
 (* Union of a set of sets (monadic join) *)
 Definition join {A} (VS : P (P A)) : P A := 
   fun v => exists V, (In VS V) /\ (In V v).
 
 Open Scope set_scope.
 
-Locate "/\".
-
 Module SetNotations. 
   Notation "∅"  := Empty_set : set_scope.
-  Notation "{{ x }}" := (Singleton x) : set_scope.
-  Infix "∪"  := Union (at level 60) : set_scope.
-  Infix "∩"  := Intersection (at level 60) : set_scope.
+  Notation "⌈ x ⌉" := (Singleton x) : set_scope.
+  Infix "∪"  := Union (at level 60, right associativity) : set_scope.
+  Infix "∩"  := Intersection (at level 60, right associativity) : set_scope.
   Infix "-"  := Setminus : set_scope.
   Notation "x ∈ s" := (In s x) (at level 65) : set_scope.
   Notation "a ⊆ b" := (Included a b) (at level 70) : set_scope.
@@ -53,13 +53,14 @@ End SetNotations.
 
 Import SetNotations.
 
-
 (* Test cases for notations *)
-Check (1 ∈ {{ 1 }} ∪ {{2}} /\ 2 ∈ {{ 2 }}).
-Check (∅ ⊆ {{ 1 }} \/ {{ 1 }} ⊆ {{ 2 }} ∩ {{3}} ).
-Check (∅ ∪ {{ 1 }}).
-Check (∅ ∪ {{ 1 }} ≃ ∅).
+Check (1 ∈ ⌈ 1  ⌉ ∪ ⌈2 ⌉ /\ 2 ∈ ⌈ 2  ⌉).
+Check (∅ ⊆ ⌈ 1  ⌉ \/ ⌈ 1  ⌉ ⊆ ⌈ 2  ⌉ ∩ ⌈3 ⌉ ).
+Check (∅ ∪ ⌈ 1  ⌉).
+Check (∅ ∪ ⌈ 1  ⌉ ≃ ∅).
 
+(** More operations on sets *)
+Definition Total_set {A} := fun (x:A) => True.
 
 Definition map {A B} (f : A -> B) : P A -> P B := 
   fun s => fun y => exists x, f x = y /\ (x ∈ s).
@@ -67,7 +68,8 @@ Definition map {A B} (f : A -> B) : P A -> P B :=
 Definition filter {A} (f : A -> bool) : P A -> P A := 
   fun s => fun x => (f x = true) /\ (x ∈ s).
 
-(* define a set via set comprehension (i.e. monadic bind): {{ k x | x <- s }} *)
+(* define a set via set comprehension (i.e. monadic bind): 
+   {{ k x | x <- s }} *)
 Definition bind {A B} (s : P A) (k : A -> P B)  : P B := 
   fun b => exists a, (a ∈ s) /\ (b ∈ (k a)).
 
@@ -82,12 +84,14 @@ Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
 Definition when {A} (ϕ : Prop) (s : P A) : P A := 
   fun ρ => ϕ /\ (ρ ∈ s).
 
-(* if2 s1 s2 == guard (s1 = ∅) >> s *)
-Definition If2 {A B} (s1 : P A) (s3 : P B) := 
-  (when (~ (s1 ≃ ∅)) s3).
+(* if2 s1 s2 == guard (s1 = ∅) >> s 
+   returns s2 when s1 is not empty. otherwise emptyset *)
+Definition If2 {A B} (s1 : P A) (s2 : P B) := 
+  (when (~ (s1 ≃ ∅)) s2).
 
+(* returns s2 when s1 is not empty. otherwise returns s3 *)
 Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
-  (when (not (s1 ≃ ∅)) s2) ∪ (when (s1 ≃ ∅) s3).
+  (when (~ (s1 ≃ ∅)) s2) ∪ (when (s1 ≃ ∅) s3).
 
 (* ------------------------------------------------------------- *)
 
@@ -100,27 +104,6 @@ Proof.
 Qed.
 
 Ltac set_ext x := (apply set_extensionality; intros x).
-
-(* ------------------------------------------------------------- *)
-(* Simplification rules *)
-
-Create HintDb set_simpl.
-
-Lemma bind_union {A B} (s1 s2 : P A) (k : A -> P B) :
-  (bind (s1 ∪ s2) k) = ((bind s1 k) ∪ (bind s2 k)).
-Proof.
-  set_ext ρ.
-  split.
-  + intro h. inv h. crunch. inv H.
-    left. eexists. split; eauto.
-    right. eexists. split; eauto.
-  + intro h. inv h; inv H; crunch.
-    eexists. split; eauto. left. auto.
-    eexists. split; eauto. right. auto.
-Qed.
-
-#[export] Hint Rewrite @bind_union : sets.
-
 
 
 (* ------------------------------------------------------------- *)
@@ -152,29 +135,224 @@ Definition ap := fun {A B} (m1 :  P (A -> B)) (m2 : P A) =>
    }.
 
 
+
 (* ------------------------------------------------------------- *)
+(** Simplification rules (set operators) *)
+
+Import FunctorNotation.
+Import MonadNotation.
+
+
+(* singleton *)
+
+Lemma map_singleton {A B} (f : A -> B) (a : A) :
+  (map f ⌈ a ⌉) = ⌈ f a ⌉.
+Admitted.
+
+Lemma bind_singleton_l {A B : Type}
+  {f : A -> P B}{a : A} :
+  bind ⌈ a ⌉ f = f a.
+eapply Extensionality_Ensembles.
+split. intros x xIn. inversion xIn.
+destruct H. inversion H. subst. auto.
+intros x xIn. cbv. exists a. split. 
+econstructor. auto.
+Qed.
+
+Lemma bind_singleton_r  {A} {ma: P A} :
+  bind ma (fun x : A => ⌈ x ⌉) = ma.
+eapply Extensionality_Ensembles.
+split. intros x xIn. inversion xIn.
+destruct H. inversion H0. subst. auto.
+intros x xIn.
+exists  x. split. auto. econstructor.
+Qed.
+
+Lemma bind_singleton_fmap {A B} (f : A -> B) (ma : P A) :
+   bind ma (fun x : A => ⌈f x⌉) = map f ma.
+unfold bind.
+eapply Extensionality_Ensembles.
+split.
++ intros x xIn. destruct xIn as [a [h1 h2]].
+  cbn. unfold map. inversion h2. exists a. split. auto.
+  auto.
++ intros b xIn. cbn in xIn.  unfold map in xIn.
+  destruct xIn as [x [h1 h2]].
+  exists x. split. auto. rewrite h1. econstructor.
+Qed.
+
+#[export] Hint Rewrite @map_singleton @bind_singleton_r @bind_singleton_l @bind_singleton_fmap : set_simpl.
+
+(* intersection *)
+
+Lemma all_intersect {A} (s : P A) : 
+  (Total_set ∩ s) = s.
+Proof.
+  eapply Extensionality_Ensembles.
+  split. intros x xIn. inversion xIn. auto.
+  split. cbv. auto. auto.
+Qed.
+
+Lemma intersect_all {A} (s : P A) : (s ∩ Total_set) = s.
+  eapply Extensionality_Ensembles.
+  split. intros x xIn. inversion xIn. auto.
+  split; cbv; auto. 
+Qed.
+
+Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  
+Admitted.
+
+Lemma intersection_empty_l {A}(s2 : P A) : 
+  (∅ ∩ s2) = ∅.
+Admitted.
+
+Lemma intersection_empty_r {A}(s2 : P A) : 
+  (s2 ∩ ∅) = ∅.
+Admitted.
+
+Lemma intersection_assoc
+     : forall (A : Type) (l m n : P A), 
+    ((l ∩ m) ∩ n) = (l ∩ (m ∩ n)).
+Admitted.
+
+
+#[export] Hint Rewrite @all_intersect @intersect_all @Intersection_same @intersection_empty_l @intersection_empty_r @intersection_assoc : set_simpl.
+
+(* union *)
+
+Lemma union_assoc
+     : forall (A : Type) (l m n : P A), 
+    ((l ∪ m) ∪ n) = (l ∪ (m ∪ n)).
+Admitted.
+
+
+Lemma union_same {A:Type}{E : P A} : (E ∪ E) = E.
+Proof.
+  eapply Extensionality_Ensembles.  
+  split. intros x h. inversion h; auto.
+  intros x h. left. auto.
+Qed.
+
+Lemma Union_empty_r {A} (s : P A) : 
+  (s ∪ ∅) = s.
+Admitted.
+
+Lemma Union_empty_l {A} (s : P A) : 
+  (∅ ∪ s) = s.
+Admitted.
+
+Lemma map_union {A B} (f : A -> B) (s1 : P A) (s2 : P A) :
+  (map f (s1 ∪ s2)) = ((map f s1) ∪ (map f s2)).
+Proof.
+  unfold Sets.map.
+  eapply Extensionality_Ensembles.
+  split.
+  - intros x [a [h1 h2]]. subst. inversion h2. subst.
+    left. exists a. split; auto.
+    right. exists a. split; auto.
+  - intros b1 h1. 
+    inversion h1. subst. clear h1.
+    + move: H => [ y [h2 h3]]. subst.
+      exists y. split; auto. left. auto.
+    + move: H => [ y [h2 h3]]. subst.
+      exists y. split; auto. right. auto.
+Qed.
+
+Lemma bind_union {A B} (s1 s2 : P A) (k : A -> P B) :
+  (bind (s1 ∪ s2) k) = ((bind s1 k) ∪ (bind s2 k)).
+Proof.
+  set_ext ρ.
+  split.
+  + intro h. inv h. crunch. inv H.
+    left. eexists. split; eauto.
+    right. eexists. split; eauto.
+  + intro h. inv h; inv H; crunch.
+    eexists. split; eauto. left. auto.
+    eexists. split; eauto. right. auto.
+Qed.
 
 
 
+#[export] Hint Rewrite @union_same @Union_empty_r @Union_empty_l @map_union @bind_union @union_assoc : set_simpl.
+
+(* setminus *)
+
+Lemma SetMinus_empty {A} (s : P A) : s - ∅ = s. Admitted.
+
+#[export] Hint Rewrite @SetMinus_empty : set_simpl.
+
+(* bind *)
+
+Lemma bind_bind {A B C}{ma : P A}{f : A -> P B} {g : B -> P C} :
+bind (bind ma f) g = 
+  bind ma (fun x : A => bind (f x) g).
+Proof.
+  unfold bind.
+  eapply Extensionality_Ensembles.
+  split.
+  intros c cIn. 
+  destruct cIn as [b [[a [h1 h2]] h3]].
+  exists a. split; auto. exists b. split; auto.
+  intros c cIn. 
+  destruct cIn as [b [h1 [a [h2 h3]]]]. 
+  exists a. split; auto. exists b. split; auto.
+Qed.
+
+
+#[export] Hint Rewrite @bind_bind : set_simpl.
+
+
+(* join *)
+
+Lemma join_empty {A} (W : P (P A)) : (⨃ (∅ ∪ W )) = (⨃ W).
+Admitted.
+
+Lemma join_Singleton {A} (V : P A) W : (⨃ (⌈V ⌉ ∪ W )) = (V ∪ ⨃ W).
+Proof.
+eapply Extensionality_Ensembles.
+split.
+- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
+  inversion h1. subst. inversion H. subst. left. auto.
+  right.  exists v. split; eauto.
+- intros x xIn. inversion xIn. subst.
+  exists V. split; auto. left. econstructor.
+  cbv in H. move: H => [w [h1 h2]].
+  exists w. split. right. eauto. eauto.
+Qed.
+
+#[export] Hint Rewrite @join_empty @join_Singleton : set_simpl.
+
+Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
+  (ρ ∈ (x <- ma ;; k x)) <->
+  (exists x, (x ∈ ma) /\ (ρ ∈ (k x))).
+Proof. cbn. unfold bind. cbn. reflexivity. Qed.
+
+Lemma in_ret {A} (x y :A) :
+  x ∈ (ret y : P A) <-> x = y.
+Proof.     
+  cbn. split. intros h1; inversion h1. done.
+  intros h. subst. done.
+Qed.
+
+Lemma in_intersection {A} (x : A) s1 s2 :
+  x ∈ (s1 ∩ s2) <-> (x ∈ s1) /\ (x ∈ s2).
+Proof.
+  split. intros h1; inversion h1. split; done.
+  intros [h1 h2]; econstructor; eauto.
+Qed.
+
+Lemma in_union {A} (x : A) s1 s2 :
+  x ∈ (s1 ∪ s2) <-> (x ∈ s1) \/ (x ∈ s2).
+Proof.
+  split. intros [h1|h1]; [left; auto| right; auto].
+  intros [h1|h1];  [left; auto| right; auto].
+Qed.
+
+#[export] Hint Rewrite @in_bind @in_ret @in_intersection @in_union : set_simpl.
 
 
 
-
-(* A proposition that a set is inhabited. Due to the restrictions
-   of Coq, the witness cannot be extracted except to produce a 
-   proof of a different proposition. *)
-Definition nonempty {A} : P A -> Prop := @Inhabited A.
-
-(* This is in Type so that we can extract the witness *)
-Definition nonemptyT {A} (s : P A) : Type := {x : A & x ∈ s}.
-
-Arguments nonempty {_}.
-Arguments nonemptyT {_}.
-
-Lemma nonemptyT_nonempty {A}{S : P A} : 
-  nonemptyT S -> nonempty S.
-Proof. intros h. destruct h. econstructor; eauto. Qed.
-
+(* ------------------------------------------------------------- *)
 
 (* Relation classes *)
 
@@ -216,8 +394,44 @@ Proof.
   split; intro x; eauto.
 Qed.
 
+Lemma fmap_Included {A B}{f : A -> B}{s1}{s2} :
+  s1 ⊆ s2 -> fmap f s1 ⊆ fmap f s2.
+Proof. 
+  cbv.
+  intros h x [a [h1 h2]]. 
+  exists a. split; auto.
+Qed.
+
+
+#[export] Instance bind_Included_Proper {A B} :
+  Proper (Included ==> (fun k1 k2 => forall x, Included (k1 x) (k2 x)) ==> Included) 
+    (bind : P A -> (A -> P B) -> P B).
+Proof.
+  intros m1 m2 R k1 k2 S.
+  cbv.
+  intros x [a [h1 h2]].
+  exists a. split; eauto. eapply R; eauto. eapply S; eauto.
+Qed.
+
+#[export] Instance bind_Same_set_Proper {A B} :
+  Proper (Same_set ==> (fun k1 k2 => forall x, Same_set (k1 x) (k2 x)) ==> Same_set) 
+    (bind : P A -> (A -> P B) -> P B).
+Proof.
+    intros m1 m2 R k1 k2 S.
+    unfold bind, Monad_P.
+    move: R => [M12 M21].
+    split. 
+    + intros b [a [h1 h2]].
+      exists a. split. eauto. move: (S a) => [K12 K21]. eauto.
+    + intros b [a [h1 h2]].
+      exists a. split. eauto. move: (S a) => [K12 K21]. eauto.
+Qed.
+
+
 (* ----------------------------------------- *)
 
+(* These facts are not useful as simplifications, but are still 
+   facts about the various operations *)
 
 (* facts about singleton sets *)
 
@@ -225,22 +439,30 @@ Lemma in_singleton {A:Type} {v : A} :
   v ∈ ⌈ v ⌉.
 Proof. unfold In. econstructor. Qed.
 
-#[export] Hint Resolve in_singleton : sets.
+#[export] Hint Resolve @in_singleton : sets.
+
+Lemma in_singleton' {A} (x y : A) : x = y -> x ∈ ⌈ y ⌉.
+Proof. intros. subst. eapply in_singleton. Qed.
 
 Lemma in_singleton_sub {A}{v:A}{X} : v ∈ X -> ⌈ v ⌉ ⊆ X.
 Proof.
-  intros. inversion H0. subst. done.
+  intros. intros x xIn. inv xIn. done.
 Qed.
 
 #[export] Hint Resolve in_singleton_sub : sets.
 
-Lemma Singleton_inv A (x y : A) : ⌈ x ⌉ = ⌈ y ⌉ -> x = y.
-Proof.  intros h. 
-        have k: (x ∈ ⌈ x ⌉ <-> x ∈ ⌈ y ⌉). rewrite h.
-        tauto.
-        move: k => [h1 h2].
-        specialize (h1 ltac:(eauto with sets)). inversion h1. auto.
+Lemma Singleton_inv A (x y : A) : ⌈ x ⌉ = ⌈ y ⌉ <-> x = y.
+Proof.  
+  split.
+  intros h. 
+  have k: (x ∈ ⌈ x ⌉ <-> x ∈ ⌈ y ⌉). rewrite h.
+  tauto.
+  move: k => [h1 h2].
+  specialize (h1 ltac:(eauto with sets)). inversion h1. auto.
+  intro h. subst. auto.
 Qed.
+
+#[export] Hint Rewrite Singleton_inv : set_simpl.
 
 (* Facts about union *)
 
@@ -251,14 +473,6 @@ Lemma sub_union_right {A} (X Y : P A) : Y ⊆ (X ∪ Y).
 Proof. intros x I. eapply Union_intror; eauto. Qed.
 
 #[export] Hint Resolve sub_union_left sub_union_right : sets.
-
-Lemma union_idem {A:Type}{E : P A} : (E ∪ E) ≃ E.
-Proof.
-  split. intros x h. inversion h; auto.
-  intros x h. left. auto.
-Qed.
-
-#[export] Hint Resolve union_idem : sets.
 
 Lemma union_left {A}{X Y Z: P A} : X ⊆ Z -> Y ⊆ Z -> X ∪ Y ⊆ Z.
 Proof. intros h1 h2.
@@ -278,6 +492,38 @@ Qed.
 
 #[export] Hint Resolve union_left_inv1 union_left_inv2 : sets.
 
+
+Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
+Admitted.
+
+Lemma not_Singleton_empty : forall A B (x:B), ⌈ x ⌉ ≃ ∅ -> A.
+Admitted.
+
+Lemma Singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. 
+Admitted.
+
+
+Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
+
+Lemma Intersection_commutes {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1). Admitted.
+
+Lemma bind_intersection {A B} (s1 s2 : P A) (k : A -> P B) :
+  (bind (s1 ∩ s2) k) ⊆ ((bind s1 k) ∩ (bind s2 k)).
+Proof.
+  intros ρ.
+  set_simpl.
+  intro h.
+  crunch.
+  inv H.
+  eexists. split; eauto.
+  inv H.
+  eexists. split; eauto.
+Qed. (* NB: converse is not true. *)
+
+
+Lemma SetMinusUnion {A} (s1 s2 s3 : P A) : s1 - (s2 ∪ s3) = (s1 - s2) - s3.
+Proof. 
+Admitted.
 
 (* ----------------------------------------- *)
 
@@ -303,48 +549,15 @@ Definition Exists_exists : forall {A} (Pr : A -> Prop) (l : P A),
 Proof. intros. unfold Exists. reflexivity. Qed.
 
 
-(* -------------- some laws -------------- *)
+(* -------------- some monad laws -------------- *)
 
-Lemma bind_singleton_l {A B : Type}
-  {f : A -> P B}{a : A} :
-  bind_ f ⌈ a ⌉ = f a.
-eapply Extensionality_Ensembles.
-split. intros x xIn. inversion xIn.
-destruct H. inversion H. subst. auto.
-intros x xIn. cbv. exists a. split. 
-econstructor. auto.
-Qed.
 
 #[export] Instance BindRetL_P : BindRetL (m:=P).
 intros A B f a. eapply bind_singleton_l.
 Qed.
 
-Lemma bind_singleton_r  {A} {ma: P A} :
-  bind_ (fun x : A => ⌈ x ⌉) ma = ma.
-eapply Extensionality_Ensembles.
-split. intros x xIn. inversion xIn.
-destruct H. inversion H0. subst. auto.
-intros x xIn.
-exists  x. split. auto. econstructor.
-Qed.
-
 #[export] Instance BindRetR_P : BindRetR (m:=P).
 intros A ma. eapply bind_singleton_r.
-Qed.
-
-Lemma bind_bind {A B C}{ma : P A}{f : A -> P B} {g : B -> P C} :
-bind_ g (bind_ f ma) = 
-  bind_ (fun x : A => bind_ g (f x)) ma.
-Proof.
-  unfold bind_.
-  eapply Extensionality_Ensembles.
-  split.
-  intros c cIn. 
-  destruct cIn as [b [[a [h1 h2]] h3]].
-  exists a. split; auto. exists b. split; auto.
-  intros c cIn. 
-  destruct cIn as [b [h1 [a [h2 h3]]]]. 
-  exists a. split; auto. exists b. split; auto.
 Qed.
 
 #[export] Instance BindBind_P : BindBind (m:=P).
@@ -357,54 +570,6 @@ intros A a1 a2 h. cbn in h.
 eapply Singleton_inv. auto.
 Qed.
 
-#[export] Instance BindRetInv_P : BindRetInv (m:=P).
-Abort.
-
-Lemma bind_singleton_fmap {A B} (f : A -> B) (ma : P A) :
-   bind_ (fun x : A => ⌈f x⌉) ma = fmap f ma.
-unfold bind_.
-eapply Extensionality_Ensembles.
-split.
-+ intros x xIn. destruct xIn as [a [h1 h2]].
-  cbn. unfold map. inversion h2. exists a. split. auto.
-  auto.
-+ intros b xIn. cbn in xIn.  unfold map in xIn.
-  destruct xIn as [x [h1 h2]].
-  exists x. split. auto. rewrite h1. econstructor.
-Qed.
-
-Lemma fmap_Included {A B}{f : A -> B}{s1}{s2} :
-  s1 ⊆ s2 -> fmap f s1 ⊆ fmap f s2.
-Proof. 
-  cbv.
-  intros h x [a [h1 h2]]. 
-  exists a. split; auto.
-Qed.
-
-(*
-#[export] Instance bind_Included_Proper {A B} :
-  Proper (Included ==> (fun k1 k2 => forall x, Included (k1 x) (k2 x)) ==> Included) 
-    (bind : P A -> (A -> P B) -> P B).
-Proof.
-  intros m1 m2 R k1 k2 S.
-  cbv.
-  intros x [a [h1 h2]].
-  exists a. split; eauto. eapply R; eauto. eapply S; eauto.
-Qed.
-
-#[export] Instance bind_Same_set_Proper {A B} :
-  Proper (Same_set ==> (fun k1 k2 => forall x, Same_set (k1 x) (k2 x)) ==> Same_set) 
-    (bind : P A -> (A -> P B) -> P B).
-Proof.
-    intros m1 m2 R k1 k2 S.
-    unfold bind, Monad_P.
-    move: R => [M12 M21].
-    split. 
-    + intros b [a [h1 h2]].
-      exists a. split. eauto. move: (S a) => [K12 K21]. eauto.
-    + intros b [a [h1 h2]].
-      exists a. split. eauto. move: (S a) => [K12 K21]. eauto.
-Qed. *)
 
 (* ------------------------------------------------------- *)
 
@@ -421,13 +586,6 @@ Lemma mem_one_inv : forall A (h v : A),
 Proof. 
   intros. cbn in H. destruct H; try done.
 Qed. 
-
-(* E≢[]⇒nonempty-mem *)
-Lemma nonnil_nonempty_mem : forall{T}{E : list T}, E <> nil -> nonemptyT (mem E).
-Proof. intros. destruct E; cbv. done.
-       econstructor.
-       econstructor. eauto.
-Qed.
 
 Lemma mem_head {A} a (V : list A) :
    a ∈ mem (a :: V).
@@ -511,9 +669,6 @@ Proof.
     -- done.
 Qed.
 
-
-
-
 Lemma Forall_mem {A}{V : list A}{Pr} : List.Forall Pr V -> Sets.Forall Pr (mem V).
 Proof.
   induction V; intro h; intros y yIn. 
@@ -543,161 +698,6 @@ Proof. intros. induction l. cbv in H. done.
 
 
 
-Lemma in_singleton' {A} (x y : A) : x = y -> x ∈ ⌈ y ⌉.
-Proof. intros. subst. eapply in_singleton. Qed.
-
-
-Lemma all_intersect {A} (s : P A) : (Total_set ∩ s) = s.
-Proof.
-  eapply Extensionality_Ensembles.
-  split. intros x xIn. inversion xIn. auto.
-  split. cbv. auto. auto.
-Qed.
-
-Lemma intersect_all {A} (s : P A) : (s ∩ Total_set) = s.
-  eapply Extensionality_Ensembles.
-  split. intros x xIn. inversion xIn. auto.
-  split; cbv; auto. 
-Qed.
-
-Lemma Union_empty {A} (V : P A) : (∅ ∪ V) = V.
-Admitted.
-
-Lemma empty_Union {A} (V : P A) : (∅ ∪ V) = V.
-Admitted.
-
-Lemma map_union {A B} (f : A -> B) (s1 : P A) (s2 : P A) :
-  (Sets.map f (s1 ∪ s2)) = ((Sets.map f s1) ∪ (Sets.map f s2)).
-Proof.
-  unfold Sets.map.
-  eapply Extensionality_Ensembles.
-  split.
-  - intros x [a [h1 h2]]. subst. inversion h2. subst.
-    left. exists a. split; auto.
-    right. exists a. split; auto.
-  - intros b1 h1. 
-    inversion h1. subst. clear h1.
-    + move: H => [ y [h2 h3]]. subst.
-      exists y. split; auto. left. auto.
-    + move: H => [ y [h2 h3]]. subst.
-      exists y. split; auto. right. auto.
-Qed.
-
-Lemma map_singleton {A B} (f : A -> B) (a : A) :
-  (Sets.map f ⌈ a ⌉) = ⌈ f a ⌉.
-Admitted.
-
-
-Lemma UNION_empty {A} (W : P (P A)) : (⨃ (∅ ∪ W )) = (⨃ W).
-Admitted.
-
-Lemma UNION_Singleton {A} (V : P A) W : (⨃ (⌈V ⌉ ∪ W )) = (V ∪ ⨃ W).
-Proof.
-eapply Extensionality_Ensembles.
-split.
-- intros x xIn. cbv in xIn. move: xIn => [v [h1 h2]].
-  inversion h1. subst. inversion H. subst. left. auto.
-  right.  exists v. split; eauto.
-- intros x xIn. inversion xIn. subst.
-  exists V. split; auto. left. eapply in_singleton.
-  cbv in H. move: H => [w [h1 h2]].
-  exists w. split. right. eauto. eauto.
-Qed.
-
-Lemma empty_is_empty {A} : forall (S : P A), S = ∅ -> forall x, not (x ∈ S).
-Admitted.
-
-Lemma not_Singleton_empty : forall A B (x:B), ⌈ x ⌉ ≃ ∅ -> A.
-Admitted.
-Lemma Singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. 
-Admitted.
-
-
-Lemma Intersection_same {A}{v:P A} : (v ∩ v) = v.  Admitted.
-Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
-Lemma Intersection_commutes {A}{v1 v2:P A} : (v1 ∩ v2) = (v2 ∩ v1). Admitted.
-
-Lemma SetMinus_empty {A} (s : P A) : s - ∅ = s. Admitted.
-Lemma SetMinusUnion {A} (s1 s2 s3 : P A) : s1 - (s2 ∪ s3) = (s1 - s2) - s3.
-Proof. 
-Admitted.
 
 
 
-
-Lemma Union_empty_r {A} (s : P A) : 
-  (s ∪ ∅) = s.
-Admitted.
-
-Lemma Union_empty_l {A} (s : P A) : 
-  (∅ ∪ s) = s.
-Admitted.
-
-Lemma intersection_empty_l {A}(s2 : P A) : 
-  (∅ ∩ s2) = ∅.
-Admitted.
-
-Lemma intersection_empty_r {A}(s2 : P A) : 
-  (s2 ∩ ∅) = ∅.
-Admitted.
-
-
-#[export] Hint Rewrite 
-  @intersection_empty_l
-  @intersection_empty_r
-  @Union_empty_r
-  @Union_empty_l : sets.
-
-Import MonadNotation.
-
-Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
-  (ρ ∈ (x <- ma ;; k x)) <->
-  (exists x, (x ∈ ma) /\ (ρ ∈ (k x))).
-Proof. cbn. unfold bind_. cbn. reflexivity. Qed.
-
-Lemma in_ret {A} (x y :A) :
-  x ∈ (ret y : P A) <-> x = y.
-Proof.     
-  cbn. split. intros h1; inversion h1. done.
-  intros h. subst. done.
-Qed.
-
-Lemma in_intersection {A} (x : A) s1 s2 :
-  x ∈ (s1 ∩ s2) <-> (x ∈ s1) /\ (x ∈ s2).
-Proof.
-  split. intros h1; inversion h1. split; done.
-  intros [h1 h2]; econstructor; eauto.
-Qed.
-
-Lemma in_union {A} (x : A) s1 s2 :
-  x ∈ (s1 ∪ s2) <-> (x ∈ s1) \/ (x ∈ s2).
-Proof.
-  split. intros [h1|h1]; [left; auto| right; auto].
-  intros [h1|h1];  [left; auto| right; auto].
-Qed.
-
-#[export] Hint Rewrite @in_bind @in_ret @in_intersection @in_union : sets.
-
-
-Lemma bind_intersection {A B} (s1 s2 : P A) (k : A -> P B) :
-  (bind (s1 ∩ s2) k) ⊆ ((bind s1 k) ∩ (bind s2 k)).
-Proof.
-  intros ρ.
-  autorewrite with sets.
-  intro h.
-  crunch.
-  inv H.
-  eexists. split; eauto.
-  inv H.
-  eexists. split; eauto.
-Qed. (* NB: converse is not true. *)
-
-
-Lemma intersection_assoc
-     : forall (A : Type) (l m n : P A), 
-    (l ∩ (m ∩ n)) = ((l ∩ m) ∩ n).
-Admitted.
-Lemma union_assoc
-     : forall (A : Type) (l m n : P A), 
-    (l ∪ (m ∪ n)) = ((l ∪ m) ∪ n).
-Admitted.

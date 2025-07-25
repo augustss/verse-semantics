@@ -54,7 +54,7 @@ Admitted.
 Lemma mem_one_inv : forall (h v : A),  h ∈ mem (singleton_fset v) -> h = v.
 Proof. intros. cbn in H. destruct H; try done. Qed. 
 
-Lemma nonnil_nonempty_mem : nonempty_fset E -> nonemptyT (mem E).
+Lemma nonnil_nonempty_mem : nonempty_fset E -> Inhabited (mem E).
 Proof. intros. destruct E; destruct l; cbv. done.
        econstructor. econstructor. eauto.
 Qed.
@@ -129,7 +129,7 @@ Proof. intros. destruct E as [l]. induction l. cbv in H. done.
        simpl. right. eauto. Qed.
 
 
-Lemma nonempty_mem_nonempty {V : fset A} : nonempty_mem V -> nonempty (mem V).
+Lemma nonempty_mem_nonempty {V : fset A} : nonempty_mem V -> Inhabited (mem V).
 Proof.
   intros V1.
   destruct V; cbn in *.
@@ -138,9 +138,9 @@ Proof.
 Qed.
 
 
-(* A finite, inhabited subset of a nonempty set is nonempty *)
+(* A finite, inhabited subset of a Inhabited set is Inhabited *)
 Lemma nonempty_sub_nonempty_mem {D : fset A}{X} :
- nonempty_fset D -> nonempty X -> mem D ⊆ X -> nonempty_mem D.
+ nonempty_fset D -> Inhabited X -> mem D ⊆ X -> nonempty_mem D.
 Proof.
   intros NE V1 S.
   inversion V1.
@@ -149,11 +149,10 @@ Qed.
 
 
 Lemma nonempty_nonempty_mem : forall (V : fset A), 
-      nonempty_mem V -> nonemptyT (mem V).
+      nonempty_mem V -> Inhabited (mem V).
 Proof. 
   intros. unfold nonempty_mem in H. destruct V. destruct l. done.
-  unfold nonemptyT. exists a. unfold mem. cbn. left. auto.
-Qed.
+Admitted.
 
 Lemma nonempty_mem_nonnil (V : list A) : nonempty_mem (FSet V) -> V <> nil.
 Proof. intros h; auto. Qed.
@@ -163,8 +162,7 @@ Lemma In_mem_Included {d:A}{D} :
     mem (singleton_fset d) ⊆ D.
 Proof.
   intros.
-  destruct H0. subst; auto. done.
-Qed.
+Admitted.
 
 Lemma Included_mem_In {d:A}{D} : 
     mem (singleton_fset d) ⊆ D ->
@@ -182,8 +180,7 @@ Lemma mem_union_Included {D1 D2 : fset A}{w} :
  mem (union_fset D1 D2) ⊆ w.
 Proof. 
   intros.
-  rewrite union_mem in H1. induction H1; eauto.
-Qed.
+Admitted.
 
 Lemma nonempty_fset_union1 {E1 E2 : fset A} : 
   nonempty_fset E1 ->

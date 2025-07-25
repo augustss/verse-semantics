@@ -34,16 +34,18 @@ Open Scope env_scope.
 Open Scope set_scope.
 
 
+
+
 Lemma empty_empty {A}(x : A) : 
-  (∅  ≃ (∅ : P A)) = True.
+  (∅ ≃ (∅ : P A)) = True.
 Admitted.
 
 Lemma ret_empty_l {A}(x : A) : 
-  (ret x  ≃ (∅ : P A)) = False.
+  (ret x ≃ (∅ : P A)) = False.
 Admitted.
 
 Lemma union_empty_l {A}(s1 s2 : P A) : 
-  ((s1 ∪ s2)  ≃ (∅ : P A)) = ((s1 ≃ ∅) /\ (s2 ≃ ∅)).
+  ((s1 ∪ s2) ≃ (∅ : P A)) = ((s1 ≃ ∅) /\ (s2 ≃ ∅)).
 Admitted.
 
 Lemma not_false : 
@@ -90,9 +92,7 @@ Admitted.
 
 
 #[export] Hint Resolve
-  @when_true @when_false 
-  @Union_empty_r
-  @Union_empty_l : sets.
+  @when_true @when_false : sets.
 
 #[export] Hint Rewrite 
   @empty_empty
@@ -102,7 +102,7 @@ Admitted.
   @not_false
   @when_true @when_false
   @Union_empty_r
-  @Union_empty_l : sets.
+  @Union_empty_l : set_simpl.
 
 (* ---------------------------------------------- *)
 
@@ -137,6 +137,37 @@ Definition rs : Scope.t := Scope.singleton r.
 Notation "⟅ r ⟆" := (Scope.singleton r).
 (* another variable (1) *)
 Definition x := mini.Test.x.
+Definition y := mini.Test.y.
+
+
+(* This is a bit of a hack. For examples, we special case the variables
+   x,y, and y. *)
+
+Ltac rewrite_env := 
+  repeat match goal with 
+    | [ |- context[ (?x |-> ?v , ?rho) ?x ] ] => 
+        rewrite extend_lookup_same
+    | [ |- context[ (x |-> ?v , ?rho) r ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (y |-> ?v , ?rho) r ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (r |-> ?v , ?rho) x ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (r |-> ?v , ?rho) y ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (y |-> ?v , ?rho) x ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (x |-> ?v , ?rho) y ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+  end.
+
+
 
 (* -------------- atomic expressions  ---------------- *)
 
@@ -228,7 +259,7 @@ Definition Pointwise_Unions {A} : list (list (P A)) -> list (P A) :=
 Definition DODGY_UNIONS {A} (VVS : P (list (P A))) : list (P A) := 
   i <- allNums ;;
   let VS : P (P A) := fmap (fun VS => List.nth i VS ∅) VVS in
-  [ UNION VS ].
+  [ ⨃ VS ].
 
 (* -------------- tuples and application ------ *)
 
@@ -302,6 +333,15 @@ Definition hide_list (xs : Scope.t) (Δs : list ENV) : list ENV :=
 Definition envs_difference (Δ1 : ENV) (xs : Scope.t) (Δ2 : ENV) : ENV :=
   Δ1 - (hide xs Δ2).
 
+(* The set of all environments that extend rho with arbitrary 
+   definitions for the variables declared in e. 
+*)
+Definition X (e : mini.Expr) (ρ : env) : ENV :=
+  hide (mini.I e) (ret ρ).
+
+Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
+  UNIFY (hide_list (Scope.singleton r) d1) d2.
+
 (* ------  Notation ----------------------------------------- *)
 
 Infix "≈" := constrain_eq (at level 60).
@@ -315,24 +355,41 @@ Infix "⩅" := pointwise_union (at level 70).
 Infix "*" := UNIFY.
 
 
-(* The set of all environments that extend rho with arbitrary 
-   definitions for the variables declared in e. 
-*)
-Definition X (e : mini.Expr) (ρ : env) : ENV :=
-  ret ρ \ mini.I e .
+(* ---- theory about constrain/hide/If3 ------------------  *)
 
-Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
-  (d1 [\] (Scope.singleton r)) * d2.
+Ltac set_crunch :=
+    crunch ; repeat match goal with 
+    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh "ρ" in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh "ρ" in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (ret ?v) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ∅ |- _ ] =>
+        inv H
+      end.
 
 
-(* theory about constrain/hide *)
+
 Lemma in_constrain_eq (ρ : env) (x:Ident) k :
   ρ ∈ (x ≈ k) <-> ρ x = k ρ.
 split. intro h. inversion h. done.
 intro h. unfold constrain_eq. done.
 Qed.
 
-Hint Rewrite in_constrain_eq : sets.
+Hint Rewrite in_constrain_eq : set_simpl.
 
 Lemma constrain_eq_same {r v} : 
   (r ≈ ⟨ v ⟩ ∩ r ≈ ⟨ v ⟩) = (r ≈ ⟨ v ⟩).
@@ -343,8 +400,7 @@ Proof.
   tauto.
 Qed.
 
-Hint Rewrite @constrain_eq_same : sets.
-
+Hint Rewrite @constrain_eq_same : set_simpl.
 
 Lemma constrain_eq_intersection {r v1 v2} : 
   (r ≈ ⟨ v1 ⟩ ∩ r ≈ ⟨ v2 ⟩) = 
@@ -375,7 +431,7 @@ split.
  + intros ρ ρIn. inversion ρIn.
 Qed.
 
-Hint Rewrite Empty_set_hide : sets.
+Hint Rewrite Empty_set_hide : set_simpl.
 
 Lemma Total_set_hide (s : Scope.t) : Total_set \ s = Total_set.
 unfold hide. 
@@ -385,7 +441,7 @@ split.
  + intros ρ ρIn. exists ρ. split; auto.
 Qed.
  
-Hint Rewrite Total_set_hide : sets.
+Hint Rewrite Total_set_hide : set_simpl.
 
 Lemma constrain_eq_hide_same r k : 
   ((r ≈ ⟨k⟩) \ ⟅r⟆) = Total_set.
@@ -406,7 +462,7 @@ split.
   done.
 Qed.
 
-Hint Rewrite constrain_eq_hide_same : sets.
+Hint Rewrite constrain_eq_hide_same : set_simpl.
 
 Lemma constrain_eq_hide_diff x y k : 
   x <> y ->
@@ -422,7 +478,7 @@ eapply set_extensionality. intro ρ.
 split.  
 Admitted.
 
-Hint Rewrite constrain_eq_hide_two : sets.
+Hint Rewrite constrain_eq_hide_two : set_simpl.
 
 Lemma hide_intersect x s1 s2 : hide x (s1 ∩ s2) ⊆ ((hide x s1) ∩ (hide x s2)).
 Proof. 
@@ -434,126 +490,6 @@ Qed.
 (* NOTE: converse is not true *)
 
 
-Ltac set_crunch :=
-    crunch ; repeat match goal with 
-    | [ H : ?ρ ∈ (bind ?ma ?k) |- _ ] =>
-        let ρ1 := fresh "ρ" in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (bind_ ?k ?ma) |- _ ] =>
-        let ρ1 := fresh "ρ" in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (ret ?v) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ∅ |- _ ] =>
-        inv H
-      end.
-
-(* --- semantics of ALL for dest passing --------- *)
-
-(* find all environments in Δ such that ρ(r) = v, then hide r *)
-
-Definition extract (Δ : ENV) : P (value * ENV) := 
-  ρ <- Δ ;;
-  ret ( ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆ ).
-
-
-Lemma extract_one {v} : 
-  extract (r ≈ ⟨ v ⟩) = ret (v, Total_set).
-Proof. 
-eapply set_extensionality. intro ρ.
-unfold extract. 
-autorewrite with sets.
-split.
-- move=>h.
-  set_crunch.
-  autorewrite with sets.
-  f_equal.
-- destruct ρ as [w Δ].
-  intro h. inv h.
-  exists (r |-> v).
-  autorewrite with sets.
-  done.
-Qed.
-
-Ltac rewrite_env := 
-  repeat match goal with 
-    | [ |- context[ (?x |-> ?v , ?rho) ?x ] ] => 
-        rewrite extend_lookup_same
-    | [ |- context[ (x |-> ?v , ?rho) r ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-    | [ |- context[ (r |-> ?v , ?rho) x ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-  end.
-
-
-Lemma extract_example {k} :
-  extract (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
-    ret (k, x ≈ ⟨ k ⟩).
-Proof.
-  unfold extract.
-  eapply set_extensionality. intros [v Δ].
-  autorewrite with sets.
-  split.
-  + intros h. 
-    set_crunch.
-    repeat rewrite H1.  clear H1.
-    f_equal.
-    rewrite <- intersection_assoc.
-    autorewrite with sets.
-    done.
-  + intro h. inv h.
-    exists (x |-> k, r |-> k).
-    autorewrite with sets.
-    rewrite_env.
-    rewrite <- intersection_assoc.
-    autorewrite with sets.
-    tauto.
-Qed.
-
-
-Lemma extract_two :
-  extract (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
-    (ret (Int 0, Total_set) ∪ ret (Int 1, Total_set)).
-Admitted.
-
-
-(* For ALL, we need to make a tuple of values
-   THIS VERSION IS NOT CORRECT
- *)
-(*
-Definition ALL (Δs : list ENV) : ENV := 
-  fun ρ => 
-    let vs := (Δ2 <- Δs ;;
-                 choose_elements
-                   ('(v, Δ3) <- extract Δ2 ;;
-                     when (ρ ∈ Δ3) (ret v))) in
-
- 
-    (ρ r = mkTup vs).
-*)
-
-(* This operation is liftM2 snoc *)
-Notation "({++})" := (fun (VS : P (list value)) (V : VAL) => 
-    vs <- VS ;; 
-    v  <- V  ;;
-    ret (vs ++ [v])) : set_scope.
-Infix "{++}" := (({++})) (at level 40) : set_scope.
-   
-Definition Unions (xs : list VAL) : P (list value) := 
-  squash_fold_left ({++}) xs (ret nil).
-
 Lemma If3_empty {A B} (s2 s3 : P B) : 
   @If3 A B ∅ s2 s3 = s3.
 Proof.
@@ -563,7 +499,7 @@ Lemma If3_ret {A B} v (s2 s3 : P B) :
   If3 (ret v : P A) s2 s3 = s2.
 Proof.
   unfold If3. 
-  autorewrite with sets.
+  set_simpl.
   done.
 Qed.
 
@@ -572,15 +508,119 @@ Lemma If3_union {A B} (s1 s1' : P A)
   If3 (s1 ∪ s1') s2 s3 = If3 s1 s2 (If3 s1' s2 s3).
 Proof.
   unfold If3. 
-  autorewrite with sets.
   apply set_extensionality. intros b.
-  autorewrite with sets.
+  set_simpl.
   split.
   + intro h. set_crunch.
     unfold when.
 Abort.
 
-#[export] Hint Rewrite @If3_empty @If3_ret : sets. 
+#[export] Hint Rewrite @If3_empty @If3_ret : set_simpl. 
+
+
+
+
+(* --- semantics of ALL / ONE for dest passing --------- *)
+
+(* find all environments in Δ such that ρ(r) = v, then hide r *)
+
+Definition extract (Δ : ENV) : P (value * ENV) := 
+  ρ <- Δ ;;
+  ret ( ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆ ).
+
+(* This operation is liftM2 snoc *)
+Notation "({++})" := (fun (VS : P (list value)) (V : VAL) => 
+    vs <- VS ;; 
+    v  <- V  ;;
+    ret (vs ++ [v])) : set_scope.
+Infix "{++}" := (({++})) (at level 40) : set_scope.
+   
+(* pick_squash *)
+Definition Unions (xs : list VAL) : P (list value) := 
+  squash_fold_left ({++}) xs (ret nil).
+
+(* SPJs definition. More concise version below *)
+Definition ALL' (Δs : list ENV) : ENV := 
+  fun ρ => 
+    exists vs, 
+      let VS : list VAL := 
+                 (Δ2 <- Δs ;;
+                  ret ('(v, D3) <- extract Δ2 ;;
+                                  when (ρ ∈ D3) (ret v))) in
+      (vs ∈ Unions VS) /\
+      (ρ r = mkTup vs).
+
+(* The set of results in Δ that could be produced by environments 
+   consistent with ρ *)
+Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
+  '(v, Δ') <- extract Δ ;; when (ρ ∈ Δ') (ret v).
+
+Definition ALL (Δs : list ENV) : ENV := 
+  fun ρ => exists vs,
+      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
+      (ρ r = mkTup vs).
+        
+
+(* return the set containing just the first element of xs, or emptyset
+  if xs is nil. *)
+Definition head_of {A} (xs : list A) : A -> Prop := 
+  match xs with 
+  | nil => ∅
+  | v :: _ => ⌈ v ⌉
+  end.
+
+Definition ONE (Δs : list ENV) : ENV := 
+  fun ρ => exists vs,
+      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
+      (ρ r ∈ head_of vs).
+
+
+(* ---------- examples / theory about extract / Unions ------------- *)
+
+
+Lemma extract_one {v} : 
+  extract (r ≈ ⟨ v ⟩) = ret (v, Total_set).
+Proof. 
+eapply set_extensionality. intro ρ.
+unfold extract. 
+set_simpl.
+split.
+- move=>h.
+  set_crunch.
+  set_simpl.
+  f_equal.
+- destruct ρ as [w Δ].
+  intro h. inv h.
+  exists (r |-> v).
+  set_simpl.
+  done.
+Qed.
+
+Lemma extract_example {k} :
+  extract (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
+    ret (k, x ≈ ⟨ k ⟩).
+Proof.
+  unfold extract.
+  eapply set_extensionality. intros [v Δ].
+  set_simpl.
+  split.
+  + intros h. 
+    set_crunch.
+    repeat rewrite H1.  clear H1.
+    f_equal.
+    set_simpl.
+    done.
+  + intro h. inv h.
+    exists (x |-> k, r |-> k).
+    set_simpl.
+    rewrite_env.
+    tauto.
+Qed.
+
+Lemma extract_two :
+  extract (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
+    (ret (Int 0, Total_set) ∪ ret (Int 1, Total_set)).
+Admitted.
 
 Example UnionsExample :
   Unions [  ret (Int 0) ; ret  (Int 1) ] = 
@@ -601,119 +641,20 @@ Proof.
   unfold squash_fold_left.
   unfold List.fold_left.
   repeat rewrite bind_ret_l.
-  autorewrite with sets.
+  set_simpl.
   repeat rewrite bind_ret_l.
   cbn.
 Admitted.
 
-(* Observation:
-   UNION is where we drop ordering 
-
-ALL (Ds)  = [ { rho \in Env
-                | tup(vs) ∈ {rho(r)}
-               let vs ∈ UNION [ { v | rho' ∈ D2, let v= rho'(r), rho=rho' (ignoring r) }
-                                 | D2 <- Ds ]
-                }
-              ]
-
-
- *)
-
-(*
-Definition ALL1 (Δs : list ENV) : ENV := 
-  fun ρ => 
-    exists vs,
-      vs <- UNION (Δ2 <- Δs ;;
-                      ret (fun v => exists ρ',
-                             (ρ' ∈ Δ2) /\
-                             (v = ρ' r) /\
-                               forall x, x <> r -> ρ x = ρ' r)) ;;
-    (ρ r = mkTup vs).
-*)
-
-(* 
-
-
-Ed[all{e}]  = [ { rho \in Env
-                | vs ∈ UNION (SQUASH [ { v | (v,D3) ∈ extract(r,D2), rho ∈ D3 }
-                                     | D2 <- Ed[e] ])
-                , tup(vs) = rho(r) }
-
-*)
-
-
-(* ALL (x=0 | x=1) = { {r=<0>,x=0} 
-                       {r=<1>},x=1} {r=<>,x=2} } *)
-
-
-Definition ALL2 (Δs : list ENV) : ENV := 
-  fun ρ => 
-    exists vs, 
-      let VS : list VAL := 
-                 (Δ2 <- Δs ;;
-                  ret ('(v, D3) <- extract Δ2 ;;
-                                  when (ρ ∈ D3) (ret v))) in
-      (vs ∈ Unions VS) /\
-      (ρ r = mkTup vs).
-
-(* 
-
-From SPJ
-
-E[all{e}] =
-   [ { rho ∈ Env 
-     | vs ∈ Unions [ { v | (v,D') ∈ extract (r,D), rho ∈ D' }
-                   | D ∈ D[e] ]
-     , rho(r) = tup vs } ]
-
-E[one{e}] =
-   [ { rho ∈ Env 
-   | (v:_) ∈ pick(squash[ { v | (v,D') ∈ extract (r,D), rho ∈ D' }
-                              | D ∈ D[e] ])
-   , rho(r) = v } ]
-
-*)
-
-(* The set of results in Δ that could be produced by environments 
-   consistent with ρ *)
-Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
-  '(v, Δ') <- extract Δ ;; when (ρ ∈ Δ') (ret v).
-
-Definition ALL3 (Δs : list ENV) : ENV := 
-  fun ρ => exists vs,
-      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
-      (ρ r = mkTup vs).
-        
-
-(* return the set containing just the first element of xs, or emptyset
-  if xs is nil. *)
-Definition head_of {A} (xs : list A) : A -> Prop := 
-  match xs with 
-  | nil => ∅
-  | v :: _ => ⌈ v ⌉
-  end.
-
-Definition ONE (Δs : list ENV) : ENV := 
-  fun ρ => exists vs,
-      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
-      (ρ r ∈ head_of vs).
-
-Lemma fmap_ret {A B} (f : A -> B) (x: A) :
-        f <$> (ret x : list A) = ret (f x).
-cbn. done.
-Qed.
-
-Hint Rewrite @fmap_ret : sets.
-
 Lemma bcp_example : 
-  ALL3 (ret (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩)) = 
+  ALL (ret (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩)) = 
       ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
        (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
 Proof.
-  unfold ALL3.
+  unfold ALL.
   apply set_extensionality. intros ρ.
   unfold consistent_results, In.
-  autorewrite with sets.
+  list_simpl.
   rewrite extract_example.
   rewrite bind_ret_l.
   split.
@@ -735,7 +676,7 @@ Proof.
          apply propositional_extensionality. tauto. }
        rewrite hh in H.
        cbn in H.
-       autorewrite with sets in H. done.
+       autorewrite with set_simpl in H. done.
   + intro h. inv h.
     ++ set_crunch. 
        exists [Int 0].
@@ -744,10 +685,8 @@ Proof.
        left.
        have hh: (Int 0 = Int 0) = True. { apply propositional_extensionality. tauto. }
        rewrite hh.
-       autorewrite with sets.
-       rewrite bind_singleton_l.
-       rewrite bind_singleton_l.
-       cbn. eapply in_singleton.
+       set_simpl.
+       reflexivity.
     ++ exists nil.
        cbn. 
        set_crunch.
@@ -756,7 +695,7 @@ Proof.
        { unfold constrain_eq. 
          eapply propositional_extensionality. tauto. }
        rewrite hh. 
-       autorewrite with sets.
+       set_simpl.
        eapply in_singleton.
        auto.
 Qed.
@@ -785,25 +724,22 @@ Proof.
   unfold fmap, Functor_list,ListDef.map.
   rewrite extract_D0. rewrite extract_D1.
   rewrite bind_ret_l.
-  autorewrite with sets.
-  rewrite bind_ret_l.
-  autorewrite with sets.
+  set_simpl.
   split.
   + intros h. set_crunch.
     inv H. 
-    autorewrite with sets in H1.
-    set_crunch.
+    autorewrite with set_simpl in H1.
+    cbn in H1. subst.
     inv H0. 
     unfold D0, constrain_eq. done.
-    autorewrite with sets in H1. inv H1.
+    autorewrite with set_simpl in H1. inv H1.
   + unfold D0. 
     intro h. inv h.
     exists [ Int 0 ; Int 1].
     rewrite H0.
     split.
     cbn.
-    autorewrite with sets.
-    repeat rewrite bind_singleton_l.
+    set_simpl.
     eapply in_singleton. cbn.
     eapply in_singleton.
 Qed.
@@ -814,7 +750,7 @@ Lemma ONE_example2 :
 Admitted.
 
 Lemma bind_when {A B} ϕ (s : P A) (k : A -> P B) : 
-  (bind_ k (when ϕ s)) = (⟨ϕ⟩ ∩ (bind_ k s)).
+  (bind (when ϕ s) k) = (⟨ϕ⟩ ∩ (bind s k)).
 Proof.
 Admitted.
 
@@ -842,18 +778,20 @@ Admitted.
 
 
 Lemma ALL_two_example :
-  ALL2 (ret (r ≈ ⟨Int 0⟩ ∪ (r ≈ ⟨Int 1⟩))) = 
+  ALL (ret (r ≈ ⟨Int 0⟩ ∪ (r ≈ ⟨Int 1⟩))) = 
       (r ≈ ⟨mkTup [Int 0]⟩ ∪ (r ≈ ⟨mkTup [Int 1]⟩)).
   apply set_extensionality. intros ρ.
-  autorewrite with sets.
-  unfold ALL2.
+  set_simpl.
+  unfold ALL.
   unfold In.
-  rewrite bind_ret_l.
+  list_simpl.
+Admitted.
+(*
   rewrite extract_two.
   rewrite bind_union.
   repeat rewrite bind_ret_l.
   replace (Total_set ρ) with True; try easy.
-  autorewrite with sets.
+  set_simpl.
   rewrite Unions_two_example.
   split.
   + intro h. crunch.
@@ -914,7 +852,7 @@ Definition all_sem : ENV :=
   rho r = mkTup l.
 
 
-
+*)
 
 Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
     match xs with 
@@ -928,21 +866,6 @@ Fixpoint combine (xs : list ENV) : P (list value * ENV) :=
           fmap succΔi (combine rest))
     end.
 
-(*
-Definition combine : list ENV -> P (list value * ENV) := 
-  List.fold_right 
-    (fun Δ VSS => 
-       '(vi, Δi) <- extract Δ ;;
-       fun '(vs, Δ) => 
-           (* on success, add the extracted vi and 
-              intersect with the set.
-            *)
-           ((vi :: vs, Δi ∩ Δ) ∈ VSS) \/
-           (* on failure, don't add the extracted value
-              and intersect with its complement *)
-           ((vs, (Total_set - Δi) ∩ Δ) ∈ VSS))
-    (fun '(vs,Δ) => vs = nil).
-*)
 Notation "r ≈ x ≈ ⟨ k ⟩" := ((r ≈ ⟪ x ⟫) ∩ (x ≈ ⟨ k ⟩)).
 
 Definition ex1 : ENV := (r ≈ x ≈ ⟨ Int 1 ⟩).
@@ -952,7 +875,13 @@ cbn.   done. Qed.
 
 Example ex_combine1 : combine [ r ≈ ⟨ Int 1 ⟩ ] = ⌈ ([Int 1], Total_set ) ⌉.
 Proof.
-cbn. 
+  unfold combine.
+  set_simpl.
+  set_ext bb. destruct bb as [v Δ].
+  set_simpl.
+  split.
+  - intro h.
+    set_crunch. 
 Abort.
 
 
@@ -988,195 +917,10 @@ Abort.
        right.
 Abort. *)
 
-(* simon's new version *)
-(* 
-Definition combine2 (Δs : list ENV) : P (list value * ENV) := 
-  fun '(vs, Δ) => 
-    (* D is the set of environments such that vs 
-         is the list of values gotten from the elements of 
-         Δs that contain ρ *)
-    Δ = { ρ | vs = 
-
-  List.fold_right 
-    (fun Δ VSS => 
-       '(vi, Δi) <- extract Δ ;;
-       fun '(vs, Δs) => (vi :: vs, Δi ∩ Δs) ∈ VSS)
-    (fun _ => False).
-
-Definition ALL (s : list ENV) : ENV := 
-  '( vs, Δ ) <- combine s ;;
-     (Δ ∩ (r ≈ ⟨mkTup vs⟩)).
-*)
-
-(* ----------------------------------------- *)
-
-
-(* SPJ's version of  ALL 
-Ed[all{e}]  = [ { rho \in Env
-                | exists vs.
-                        vs = [ v | D2:ENV <- Ed[e]
-                                  , (v,D3) ∈ extract(D2)   -- nonconstructive
-                                  , rho ∈ D3 ]
-                , rho(r) = tup(vs) }
-              ]
-*)
-
-
-Lemma flat_map_nil {A B}(xs:list A) :
-  x <- xs ;; empty = (empty : list B).
-Proof.
-  induction xs. simpl. auto. simpl. auto. 
-Qed.
-
-Notation "v ≐ vs !! i" := 
-  (List.nth_error vs i = Some v) (at level 80).
-
-Opaque limitNum.
-
-Definition guard {A} (b : bool) (xs : list A) : list A := if b then xs else [].
-
-Lemma enumerate k : 
-   (i <- allNums;; guard (Nat.leb i k) (ret (Int i))) = 
-   (fmap Int (enumFrom 0 (S k))).
-Proof.
-Admitted.
-
-Lemma nth_iterate {A}  j : forall (v : A)  (k : nat -> A), j < limitNum ->
-  (v ≐ (i <- allNums ;; ret (k i)) !! j) <-> (v = k j).
-Proof.
-  induction j; intros v k LT.
-  + cbn.
-Admitted.
-
-
-Lemma nth_iterate_guard {A}  j : forall (v : A)  (f : nat -> bool) (k : nat -> A),
-    (j < limitNum) ->
-    (v ≐ (i <- allNums ;; guard (f i) (ret (k i))) !! j) <-> (f j = true /\ v = k j).
-Proof.
-  induction j; intros v f k LT.
-  + cbn.
-Admitted.
-
-    
-Lemma bind_intersect {A B} (k : A -> P B) s1 s2 : 
-  (ρ <- (s1 ∩ s2) ;; k ρ) = 
-  ((ρ <- s1 ;; k ρ) ∩  (ρ <- s2 ;; k ρ)).
-Proof.
-  eapply Extensionality_Ensembles.
-  split.
-  + intros ρ ρIn. 
-    move: ρIn => [a [h1 h2]].
-    inversion h1.
-    split.
-Admitted.
-
-Lemma bind_constrain {ρ : ENV} (k : value -> ENV) v :
- (ρ <- x ≈ ⟨ v ⟩;; k (ρ x)) = k v.
-Admitted.
-
-Definition ALL' (Δs : list ENV) : ENV := 
-  fun ρ => 
-    exists vs, ρ r = mkTup vs  
-         /\ forall i, i < limitNum -> 
-           forall Δ2, (Δ2 ≐ Δs !! i ) ->
-                  exists v, exists Δ3, 
-                    ((v, Δ3) ∈ extract Δ2)
-                    /\ (v ≐ vs !! i)
-                    /\ (ρ ∈ Δ3).
-
-
-Lemma comprehend {A B} (ma : P A) (k : A -> P B) (ρ : B) x :
-  (x ∈ ma) -> (ρ ∈ (k x)) ->
-  (ρ ∈ (x <- ma ;; k x)).
-intros h1 h2.
-cbn. unfold bind_. exists x . split; auto.
-Qed.
-
-
-
-Definition tx : mini.Expr := x :=: 0.
-Definition SEM_tx : ENV := x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩.
-    
-
-
-
-Lemma Extensionality_list {A} ( vs1 vs2 : list A) : 
-  (forall i, forall v, (v ≐ vs1 !! i) <-> v ≐ vs2 !! i) -> vs1 = vs2.
-Proof.
-  move: vs2.
-  induction vs1; intros vs2 X; destruct vs2. done.
-  + specialize (X 0 a). cbn in X. destruct X. 
-    specialize (H0 ltac:(auto)). discriminate.
-  + specialize (X 0 a). cbn in X. destruct X. 
-    specialize (H ltac:(auto)). discriminate.
-  + move: (X 0 a) => Y. cbn in Y. destruct Y.
-    specialize (H ltac:(auto)). inversion H. 
-    f_equal. eapply IHvs1. intros i v.
-    specialize (X (1 + i) v). cbn in X. done.
-Qed.
-
-
-Require Import Psatz.
-
-
-Example ALL_sem : ALL' sem = all_sem.
-unfold ALL', all_sem.
-eapply Extensionality_Ensembles.
-split.
-- intros ρ xIn. 
-  move: xIn => [vs [h1 h2]].
-  unfold Ensembles.In. 
-  exists (length vs).
-  split.
-  + admit.
-  + 
-  rewrite h1.
-  f_equal.
-  eapply Extensionality_list.
-  intros i v.
-  have LTi: i < limitNum. admit.
-  remember (fun ρ => (ρ r = Int i) /\ exists k, (ρ x = Int k) /\ k >= i) as ρi.
-  have h: (ρi ≐ sem !! i).
-  { unfold sem. rewrite nth_iterate. auto. auto. }
-  specialize (h2 i LTi ρi h).
-  move: h2 => [vi [Δ3 [h3 [h4 h5]]]].
-  rewrite nth_iterate_guard; auto.
-  rewrite Heqρi in h3. cbn in h3. rewrite h3 in h5.
-  move: h5 => [ ρ' [k1 k2]]. inversion k1. subst. clear k1.
-  inversion H. clear H. move: H2 => [k [EQ LE]].
-  inversion H0. clear H0. clear h.
-  have NE: ~ Scope.In x (Scope.singleton r). admit.
-  specialize (k2 x NE).
-  rewrite k2.
-  rewrite EQ. cbn.
-  rewrite PeanoNat.Nat.leb_le. 
-  split.
-  ++ move => h5. split.
-    lia.
-    rewrite H1 in H.
-    rewrite -> h4 in h5. inversion h5. subst. auto.
-  ++ intros [m1 m2]. 
-    subst. rewrite H1 in h4. done.
-- intros ρ h1. unfold Ensembles.In in h1.
-  move: h1 => [n [Ex h1]].
-  rewrite Ex in h1. unfold value_leb in h1.
-  rewrite enumerate in h1.
-  unfold Ensembles.In.
-  eexists. split. eauto.
-  intros i LTi Δ2 h.
-  unfold sem in h.
-  rewrite nth_iterate in h. auto.
-  eexists.
-  eexists.
-  split.
-  rewrite h.
-Admitted.
-
-
 (* ------------------------------------------------------ *)
 (* ------  Fig 17 D-LS (using dodgy union) -------------- *)
 
-Module DLS.
+Module DLS_OLD.
 
 
 Fixpoint E (e : mini.Expr) : list ENV := 
@@ -1223,9 +967,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   end.
 
 
-
-
-End DLS.
+End DLS_OLD.
 
 (* ----------- non-dodgy dest passing style -------------- *)
 
@@ -1234,7 +976,7 @@ End DLS.
    Otherwise, it is the same as the DLS semantics. 
 *)
 
-Module NonDodgy. 
+Module DLS. 
 
 (* Given a list of ENVs,  E{a}[0] ... E{a}[n]
 
@@ -1296,8 +1038,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
       [ ALL (E a) \ mini.I a ] 
 
   | mini.One a => 
-      let (success, avoid) := try (mini.I a) (E a) in
-      [ first success \ mini.I a ]
+      [ ONE (E a) \ mini.I a ]
 
   (* TODO: functions *)
 
@@ -1316,11 +1057,62 @@ Proof.
   2 : { cbn. auto. } 
   rewrite -> List.app_nil_r.
   replace (SEQ success ([] [\] mini.I a)) with ([] : list ENV).
-  2: { cbn. generalize (success [\] Scope.singleton r). 
-       induction l; cbn; auto. } 
+  2: { cbn. admit. } 
   rewrite -> List.app_nil_l. auto.
-Qed.
+Admitted.
 
+
+End DLS.
+
+(*
+Module D2LS.
+
+Fixpoint E (e : mini.Expr) : list ENV := 
+
+  let B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;; [Δ \ mini.I e] 
+  in
+  let V (e : mini.Expr) : list (P (value * ENV)) := 
+    Δ <- B e ;; [extract Δ] 
+  in
+
+  match e with 
+  | mini.DefineV _ => [ Total_set ]
+
+  | mini.Unify (mini.Var z) (mini.Var w) => 
+      [ z ≈ evalA (mini.Var w) ]
+
+  | mini.Unify (mini.Var z) (mini.Lit w) => [ r ≈ evalA (mini.Lit w) ]
+(*   | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ] *)
+
+  | mini.Fail => []  
+
+  | mini.Choice e1 e2 => E e1 ++ E e2
+
+  | mini.Seq e1 e2 => 
+      (E e1 * E e2) 
+
+
+  | mini.Unify (mini.Var z) (mini.ApplyD a1 a2) => 
+      APP e1 e2
+
+  | mini.If3 a b c =>  []
+
+  | mini.All a => 
+      [ ALL (E a) \ mini.I a ] 
+
+  | mini.One a => 
+      [ ONE (E a) \ mini.I a ]
+
+  (* TODO: functions *)
+
+  | _ => [ ] 
+  end.
+
+
+End D2LS.
+*)
 
 (* ----------- dest passing style Fig 20 ----------------- *)
 
@@ -1365,6 +1157,8 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
   | _ => fun _ => False
 
   end.
+
+Module DSLS.
 
 (* ---------------------------------------------------- *)
 

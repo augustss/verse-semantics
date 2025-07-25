@@ -54,15 +54,14 @@ Lemma mem_Forall: forall {A : Type} {E : nfset A} {Pr : A -> Prop}, Sets.Forall 
 Lemma Forall_mem: forall {A : Type} {E : nfset A} {Pr : A -> Prop}, Forall_nfset Pr E -> Sets.Forall Pr (mem E). Admitted.
 Lemma Forall_sub_mem: forall {A : Type} {E : nfset A} (X : P A) (Pr : A -> Prop), mem E ⊆ X -> Sets.Forall Pr X -> Forall_nfset Pr E. Admitted.
 
-Lemma nonempty_mem_singleton: forall {A : Type}, nfset A -> forall x : A, nonempty (mem (singleton_nfset x)). Admitted.
-Lemma nonemptyT_mem: forall {A : Type} {E : nfset A}, nonemptyT (mem E). Admitted.
-Lemma nonempty_mem: forall {A : Type} {V : nfset A}, nonempty (mem V). Admitted.
+Lemma nonempty_mem_singleton: forall {A : Type}, nfset A -> forall x : A, Inhabited (mem (singleton_nfset x)). Admitted.
+Lemma nonempty_mem: forall {A : Type} {V : nfset A}, Inhabited (mem V). Admitted.
 
 
 #[export] Hint Resolve 
   Reflexive_Equal_nfset Reflexive_Included_nfset
   mem_In mem_union mem_union_Included mem_singleton Forall_mem Forall_sub_mem 
-  In_mem nonempty_mem_singleton nonemptyT_mem nonempty_mem : core.
+  In_mem nonempty_mem_singleton  nonempty_mem : core.
 
 
 Lemma nfset_induction {A} (Pr : nfset A -> Prop) : 
