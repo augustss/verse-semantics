@@ -131,6 +131,8 @@ Definition is_Empty_set {A} (s : P A) : bool :=
 Definition VAL := P value.
 Definition ENV := P env.
 
+Import mini.MiniNotation.
+
 (* distinguished result variable (0) *)
 Definition r : Ident := mini.Test.r.
 Definition rs : Scope.t := Scope.singleton r.
@@ -138,6 +140,19 @@ Notation "⟅ r ⟆" := (Scope.singleton r).
 (* another variable (1) *)
 Definition x := mini.Test.x.
 Definition y := mini.Test.y.
+
+(* Koen's encoding of if
+if e1 e2 e3 =
+  exists y; 
+  y = one{ (e1; z=⟨⟩) | z=0 }@z;
+  (y=⟨⟩; e2) | (y=0; e3)
+*)
+
+Definition koen_if e1 e2 e3 : mini.Expr := 
+  mini.DefineV y :>:
+  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
+  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
+
 
 
 (* This is a bit of a hack. For examples, we special case the variables
@@ -218,11 +233,37 @@ Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) :=
 Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
   (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
 
-Definition If2 {A B} := fun (s1 : P A) (s3 : P B) => when (~ (s1 ≃ ∅)) s3.
+Definition SEQ {A} (S1 : P A) (S2 : P A) := 
+  s1 <- S1 ;; S2.
 
-Definition If3 {A B} := fun (s1 : P A) (s2 s3 : P B) => 
-  when (~ (s1 ≃ ∅)) s2 ∪ when (s1 ≃ ∅) s3.
+(* TODO: This is equivalent to: (s1 <- S1 ;; s2 <- S2 ;; ret s2) *)
+Definition If2 {A B} := fun (s1 : P A) (s3 : P B) => when (Inhabited s1) s3.
 
+Lemma If2_SEQ {A} (S1 S2 : P A) : 
+  If2 S1 S2 = SEQ S1 S2.
+Proof.
+  unfold If2, when, SEQ.
+  set_ext s.
+  split.
+  + intro h. 
+    destruct h as [h1 h2].
+    inv h1.
+    eapply in_bind.
+    exists x0. split; auto. 
+  + intro h. destruct h as [s1 [h1 h2]].
+    split. econstructor. eauto.
+    auto.
+Qed.
+
+Definition If3 {A B} := fun (S1 : P A) (S2 S3 : P B) => 
+   (s1 <- S1 ;; S2) ∪ (s1 <- Total_set - S1 ;; S2).
+
+(* (s1 <- S1 ;; S2) ∪ (s1 <- Total_set - S1 ;; S2)  *)
+(*
+Definition If3 {A B} := fun (S1 : P A) (s2 s3 : P B) => 
+  when (Inhabited S1) s2 ∪ when (S1 ≃ ∅) s3.
+*)
+ 
 Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 
 (* left to right squash, doesn't require axiom, but cannot 
@@ -402,6 +443,22 @@ Qed.
 
 Hint Rewrite @constrain_eq_same : set_simpl.
 
+Lemma constrain_self {x} : 
+  (x ≈ ⟪ x ⟫) = Total_set.
+Proof.
+  eapply set_extensionality; intros y.
+  split; intro h; try done.
+Qed.
+
+Lemma constrain_self_imposs {x} : 
+  (x ≉ ⟪ x ⟫) = ∅.
+Proof.
+  eapply set_extensionality; intros y.
+  split; intro h; try done.
+Qed.
+
+Hint Rewrite @constrain_self  @constrain_self_imposs : set_simpl.
+
 Lemma constrain_eq_intersection {r v1 v2} : 
   (r ≈ ⟨ v1 ⟩ ∩ r ≈ ⟨ v2 ⟩) = 
   if Value.eqb v1 v2 then 
@@ -573,6 +630,7 @@ Definition ONE (Δs : list ENV) : ENV :=
   fun ρ => exists vs,
       (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
       (ρ r ∈ head_of vs).
+
 
 
 (* ---------- examples / theory about extract / Unions ------------- *)
@@ -1062,6 +1120,258 @@ Proof.
 Admitted.
 
 
+(* 
+
+if e1 e2 e3 =
+  exists y; 
+  y = one{ (e1; z=⟨⟩) | z=0 }@z;
+  (y=⟨⟩; e2) | (y=0; e3)
+
+koen_if =
+  fun e1 e2 e3 : mini.Expr =>
+  ∃ y :>: 
+  y :=: mini.One (e1 :>: r :=: mini.Array [] :|: r :=: 0) :>: 
+  y :=: mini.Array [] :>: e2 :|: y :=: 0 :>: e3
+*)
+
+(*
+= [ D ⋂ GOOD | D ∈ Ed[e2] ] ++
+  [ D \ GOOD | D ∈ Ed[e3] ]
+where
+  GOOD :: ENV = UNIONLIST (map hide(r) Ed[e1])
+
+*)
+
+Lemma E_Var (i:Ident) : E i = [ fun ρ => ρ r = ρ i ]. reflexivity. Qed.
+Lemma E_One e : E (mini.One e) = [ ONE (E e) \ mini.I e ]. reflexivity. Qed.
+Lemma E_Choice e1 e2 : E (e1 :|: e2) = (E e1) ++ (E e2). reflexivity. Qed.
+Lemma E_Seq e1 e2 : E (e1 :>: e2) = (E e1 [\] ⟅r⟆) * E e2. reflexivity. Qed.
+Lemma E_Unify e1 e2 : E (e1 :=: e2) = E e1 * E e2. reflexivity. Qed.
+
+Create HintDb E.
+Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
+
+
+(* Ed[ e1; r=<> ] = [ hide(r) D1 ∩ {{ r=<> }} | D1 <- E[e1] ] *)
+Lemma part1 e1 : E (e1 :>: r :=: mini.Array []) = 
+                fmap (fun D1 => hide_r D1 ∩ (r ≈ ⟨mkTup []⟩)) (E e1).
+Proof.
+  cbn.
+  rewrite List.flat_map_map.
+  set_simpl.
+  rewrite List.map_map.
+  auto.
+Qed.
+
+(*
+Ed[ (e1; r=<>) | r=0 ] = [ hide_r D1 \cap {{r=<>}} | D1 <- E[e1] ] ++ [ {{r=0}} ] 
+*)
+Lemma part2 e1 : E ( (e1 :>: r :=: mini.Array []) :|: r :=: 0) = 
+                fmap (fun D1 => hide_r D1 ∩ (r ≈ ⟨mkTup []⟩)) (E e1) ++ [ r ≈ ⟨Int 0⟩ ].
+rewrite E_Choice. 
+rewrite part1.
+cbn. set_simpl. done.
+Qed.
+
+(* ---- y = one{ (e1; z=<>) | z=0}@z -------------
+  Ed[ y = one{(e1; z=<>) | z=0}@z ]
+
+= [ { rho | v =<>,  
+      if rho ∈ UNIONLIST (map hide(z) E[e1])   # UNIONLIST :: [ENV] -> ENV, union them all
+               = 0,   otherwise
+     , rho y = v } ]
+*)
+
+Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.
+unfold hide. 
+set_ext ρ.
+Admitted.
+
+Hint Rewrite hide_nothing : set_simpl.
+
+Definition UNIONLIST : list ENV -> ENV := 
+  List.fold_right Union ∅.
+
+Lemma intersect_Setminus {A} (S : P A) : S ∩ (Total_set - S) = ∅.
+  set_ext s. unfold Total_set, Setminus. rewrite in_intersection.
+  intuition. inv H1. done. inv H. done. Qed.
+
+(* SCW: I think this needs an axiom that set membership is decidable. *)
+Lemma union_Setminus {A} (S : P A) : (S ∪ (Total_set - S)) = Total_set.
+  set_ext s. unfold Total_set, Setminus. rewrite in_union.
+  unfold In. split. auto. 
+Admitted.
+
+Hint Rewrite @intersect_Setminus @union_Setminus : set_simpl.
+
+Lemma distrib_union_l (S S1 S2 : ENV) : S ∪ (S1 ∩ S2) = (S ∪ S1) ∩ (S ∪ S2).
+Admitted.
+Lemma distrib_union_r (S S1 S2 : ENV) : (S1 ∩ S2) ∪ S = (S1 ∪ S) ∩ (S2 ∪ S).
+Admitted.
+
+(* SCW this is NOT true. These are only true up to squashing. *)
+Lemma disjoint_append (S1 S2 S3 : ENV) : 
+ [(S1 ∩ S2) ∪ (Total_set - S1 ∩ S3)] = [S1 ∩ S2] ++ [Total_set - S1 ∩ S3].
+Proof.
+  rewrite distrib_union_l.
+Admitted.
+
+Lemma if3_rhoIn (S1 S2 S3 : ENV) :
+  [ (fun ρ => if3 (ρ ∈ S1) (ρ ∈ S2) (ρ ∈ S3)) ] = 
+  [(S1 ∩ S2) ∪ (Total_set - S1 ∩ S3)].
+Proof.
+  unfold if3.
+  replace (fun ρ : env => ρ ∈ S1 /\ ρ ∈ S2 \/ ~ ρ ∈ S1 /\ ρ ∈ S3) with 
+          ((fun ρ => ρ ∈ S1 /\ ρ ∈ S2) ∪ (fun ρ => ~ ρ ∈ S1 /\ ρ ∈ S3)).
+  2: { set_ext ρ. rewrite in_union. intuition. }
+  replace (fun ρ => ρ ∈ S1 /\ ρ ∈ S2) with (S1 ∩ S2).
+  2: { set_ext ρ. rewrite in_intersection. intuition. inv H. auto. inv H. auto. } 
+  replace (fun ρ => ~ ρ ∈ S1 /\ ρ ∈ S3) with (Total_set - S1 ∩ S3).
+  2: { set_ext ρ. rewrite in_intersection. unfold In.
+       intuition. inv H0. done. unfold Total_set, Setminus. intuition. }
+  done.
+Qed.
+
+Lemma Unions_app : 
+  forall xs ys, Unions (xs ++ ys) = xs' <- (Unions xs) ;; ys' <- (Unions ys) ;; ret (xs' ++ ys') .
+Proof. 
+  induction xs.
+  + intros ys. cbn. 
+    set_simpl.
+    reflexivity.
+  + intros ys.
+Admitted.
+
+
+Lemma when_is_true A ϕ (S : P A) :
+  ϕ -> when ϕ S = S. 
+Admitted.
+
+Lemma part3 e1 : 
+    E (y :=: mini.One ((e1 :>: r :=: mini.Array []) :|: r :=: 0)) = 
+      let GOOD := UNIONLIST (List.map hide_r (E e1)) in
+      [ (GOOD ∩ (y ≈ ⟨mkTup []⟩)) ∪ ((Total_set - GOOD) ∩ (y ≈ ⟨Int 0⟩)) ].
+Proof.
+  rewrite E_Unify.
+  rewrite E_One.
+  rewrite part2.
+  rewrite hide_nothing.
+  rewrite E_Var.
+  unfold UNIFY. rewrite bind_ret_l. rewrite bind_ret_l. unfold ret, Monad_list.
+  remember ((fun D2 : ENV => hide_r D2 ∩ r ≈ ⟨ mkTup [] ⟩) <$> E e1 ++ [r ≈ ⟨ Int 0 ⟩]) as Δs.
+  unfold fmap, Functor_list in HeqΔs.
+
+  rewrite <- if3_rhoIn.
+
+  unfold ONE.
+  f_equal.
+  set_ext ρ. rewrite in_intersection. unfold In.
+  remember  (consistent_results ρ <$> Δs) as S.
+  rewrite HeqΔs in HeqS.
+  unfold fmap, Functor_list in HeqS.
+  rewrite List.map_app in HeqS.
+  rewrite List.map_map in HeqS.
+  unfold consistent_results in HeqS.
+  have RW: forall {A B} (f : A -> B) x, List.map f [x] = [f x]. cbn. auto.
+  rewrite RW in HeqS.
+  rewrite extract_one in HeqS.
+  autorewrite with set_simpl in HeqS.
+
+  replace (fun x : ENV => x0 <- extract (hide_r x ∩ r ≈ ⟨ mkTup [] ⟩);; 
+                       (let (v, Δ') := x0 in when (ρ ∈ Δ') (ret v)))
+     with (fun x : ENV => when (ρ ∈ hide_r x) (ret (mkTup []))) 
+  in HeqS.
+  2: { 
+    apply functional_extensionality. intro Δ1.
+    unfold extract.
+    admit.
+  } 
+  subst.
+  rewrite Unions_app.
+  remember ((xs' <- Unions (ListDef.map (fun x0 : ENV => when (ρ ∈ hide_r x0) (ret (mkTup []))) (E e1));; ys' <- Unions [ret (Int 0)];; ret (xs' ++ ys'))) as S.
+  have Unions_singleton: forall v, Unions [ret v] = ⌈[v]⌉. { 
+    intro v. cbn. repeat rewrite bind_singleton_l. unfold If3. cbn.
+    set_simpl. done. }
+  rewrite Unions_singleton in HeqS.
+  split.
+  + intros h. set_crunch. subst.
+    rewrite H in H1. destruct x0. inv H1. inv H1.
+    inv H0.
+    set_crunch.
+    rewrite Unions_singleton in H1. inv H1.
+    unfold constrain_eq.
+    destruct x1. 
+    ++ inv H4.
+       replace (List.map (fun x : ENV => when (ρ ∈ hide_r x) (ret (mkTup []))) (E e1))
+         with (List.map (fun x => when (ρ ∈ x) (ret (mkTup []))) (List.map hide_r (E e1)))
+       in H0. 2: { rewrite List.map_map. auto. }
+       right. split; auto.
+       intro h.
+       remember (ListDef.map hide_r (E e1)) as VS.
+       move: H0 h.
+       clear.
+       move: ρ.
+       induction VS; intro ρ.
+       - cbn. done.
+       - intros. 
+         replace (a :: VS) with ([a] ++ VS) in H0. 2: { auto. } 
+         rewrite List.map_app in H0.
+         rewrite Unions_app in H0.
+         set_crunch.
+         destruct ρ0. 2: {  inv H3. } 
+         destruct ρ1. 2: { inv H3. } 
+         cbn in h. inv h.
+         -- cbn in H. rewrite If3_when_ret in H.
+            autorewrite with set_simpl in H.
+            cbn in H.
+            inv H. set_crunch.
+            rewrite when_is_true in H4; auto. 
+            autorewrite with set_simpl in H4. inversion H4.
+            autorewrite with set_simpl in H2. set_crunch.
+            unfold In in H. done.
+         -- apply IHVS in H0. done. auto.
+    ++ inv H4.
+Admitted.
+
+(* y = one{ (e1; z=<>) | z=0}@z; (y=⟨⟩; e2) | (y=0; e3)  
+  [ GOOD ⋂ {{y=<>}} ⋂ D | D ∈ Ed[e2] ] ++
+  [ BAD ⋂ {{y=0}}   ⋂ D  | D ∈ Ed[e3] ]
+*)
+
+Lemma part4 e1 e2 e3 : 
+  E (y :=: mini.One (e1 :>: r :=: mini.Array [] :|: r :=: 0) 
+       :>: 
+    ((y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3))) = 
+  let GOOD := UNIONLIST (List.map hide_r (E e1)) in
+  let BAD  := Total_set - GOOD in 
+  (fmap (fun D => GOOD ∩ (y ≈ ⟨mkTup []⟩) ∩ D) (E e2)) ++
+  (fmap (fun D => BAD  ∩ (y ≈ ⟨Int 0⟩) ∩ D) (E e3)).
+Proof.
+  rewrite E_Seq.
+  rewrite part3.
+  rewrite E_Choice.
+  repeat rewrite E_Seq.
+  repeat rewrite E_Unify.
+  repeat rewrite E_Var.
+  cbn.
+  remember (UNIONLIST (ListDef.map hide_r (E e1))) as GOOD.
+  remember (Total_set - GOOD) as BAD.
+  repeat rewrite flat_map_map.
+  repeat rewrite List.app_nil_r.
+  repeat rewrite List.map_app.
+  repeat rewrite List.map_map.
+  f_equal.
+  + have: ListDef.map (fun x0 : Ensemble env => (GOOD ∩ y ≈ ⟨ mkTup [] ⟩ \ ⟅ r ⟆) ∩ ((fun ρ : Ident -> value => ρ r = ρ y) ∩ r ≈ ⟨ Int 0 ⟩ \ ⟅ r ⟆) ∩ x0) (E e3) = [].
+    { replace  (fun x0 : Ensemble env => (GOOD ∩ y ≈ ⟨ mkTup [] ⟩ \ ⟅ r ⟆) ∩ ((fun ρ : Ident -> value => ρ r = ρ y) ∩ r ≈ ⟨ Int 0 ⟩ \ ⟅ r ⟆) ∩ x0) (E e3)  with (fun D => ∅).
+
+Lemma simons_example e1 e2 e3 :
+  E (koen_if e1 e2 e3) = 
+    let GOOD := UNIONLIST (List.map hide_r (E e1)) in
+    (fmap (fun D => D ∩ GOOD) (E e2)) ++ 
+    (fmap (fun D => D - GOOD) (E e3)).
+Proof.
+  unfold koen_if.
+
 End DLS.
 
 (*
@@ -1281,7 +1591,7 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
 
   | mini.ApplyD e1 e2 => apply (evalA e1 ρ) (evalA e2 ρ)
 
-  | mini.Fail => []
+  | mini.Fail => [ ∅ ]
 
   | mini.Choice e1 e2 => CHOICE (B e1 ρ) (B e2 ρ)
 
