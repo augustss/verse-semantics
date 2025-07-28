@@ -209,7 +209,12 @@ $$
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
-  \semapsub{E}{d}{|if3 e_1 e_2 e_3|} } & = & ???? \\
+  \semapsub{E}{d}{|if3 op_1 op_2 op_3|} }
+& = & [ \hideE(\semapp{I}{|op_1|}, \EV \cap \EV_1)
+  \vb \EV \in \semapsub{B}{t}{op_2} ] \append \\
+& & & [ \EV \setminus \EV_1 \vb
+        \vb \EV \in \semapsub{B}{t}{op_3} ] \\
+&&& \text{where}\; \EV_1 = \unionListE( \semapsub{E}{t}{op_1}  )\\[1mm]
 
 %  ------ ALL --------------
 \rulename{dall} & \semapsub{E}{t}{|r == dpsall op y|}
@@ -246,5 +251,5 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics: plan (D2-LS)} \label{fig:d-ls2}
+\caption{Denotational semantics: plan (D-LS2)} \label{fig:d-ls2}
 \end{figure}
