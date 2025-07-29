@@ -1,6 +1,6 @@
 module ENV2 where
-
-import Data.List( group, sort, intercalate, transpose, (\\) )
+import Control.Monad(zipWithM)
+import Data.List( group, sort, intercalate, transpose, (\\), replicate )
 
 ----------------------------------------------------------------------------------------
 
@@ -29,7 +29,18 @@ type FUN = [PartialFun]
 
 instance Show Value where
   show (Int k)   = show k
-  show (Fun fun) = show fun
+  show (Fun fun) = showFUN fun
+
+showFUN :: FUN -> String
+showFUN f | Just xs <- getTuple f = "<" ++ intercalate "," (map show xs) ++ ">"
+          | otherwise = show f
+
+getTuple :: FUN -> Maybe [Value]
+getTuple = zipWithM get [0..]
+  where
+    get :: Value -> ENV -> Maybe Value
+    get i (OR [YES [x :=: Value vx, y :=: Value vy]]) | x == funx && y == funy && vx == i = Just vy
+    get _ _ = Nothing
 
 instance Num Value where
   fromInteger k = Int k
@@ -40,7 +51,13 @@ instance Num Value where
   (+)    = error "(+) on Value"
   (-)    = error "(-) on Value"
 
-type PartialFun = ENV -- with just two variables x and y!
+instance Enum Value where
+  toEnum i = Int (toInteger i)
+  fromEnum (Int i) = fromInteger i
+  enumFrom (Int i) = map Int (enumFrom i)
+  enumFromTo (Int i) (Int j) = map Int (enumFromTo i j)
+
+type PartialFun = ENV -- with just two variables $x and $y!
 
 apply :: PartialFun -> Ident -> Ident -> ENV
 apply h x y =
@@ -73,6 +90,7 @@ neg (x :/=: t) = x :=: t
 add :: CONSTR -> [CONSTR] -> Maybe [CONSTR]
 add constr cs0 = normConstr constr
  where
+  norm :: Thing -> [CONSTR] -> Thing
   norm (Value v) _  = Value v
   norm t         [] = t
   norm (Ident x) ((y :=: t):cs)
@@ -201,6 +219,9 @@ OR as /\ OR bs = disj [ a &&& b | a <- as, b <- bs ]
 (\/) :: ENV -> ENV -> ENV
 OR as \/ OR bs = disj (as ++ bs)
 
+(\\\) :: ENV -> ENV -> ENV
+x \\\ y = x /\ compl y
+
 (.=) :: Ident -> Value -> ENV
 x .= v = OR [ YES [x :=: Value v] ]
 
@@ -250,11 +271,17 @@ data Expr
   | Expr :>: Expr
   | Expr :|: Expr
   | If Expr Expr Expr
+  | If2 Expr Expr Expr
+  | If3 Expr Expr Expr
   | All Expr
   | Exi Ident
   | Scope Expr
   | Ident :@: Ident
  deriving ( Eq, Ord, Show )
+
+infixr 1 :>:
+infix  2 :=
+infixr 3 :|:
 
 instance Num Expr where
   fromInteger k = Con k
@@ -272,6 +299,8 @@ vars (x := e)     = x : vars e
 vars (e1 :>: e2)  = vars e1 ++ vars e2
 vars (e1 :|: e2)  = vars e1 ++ vars e2
 vars (If e e1 e2) = vars e ++ vars e1 ++ vars e2
+vars (If2 e e1 e2) = vars e ++ vars e1 ++ vars e2
+vars (If3 e e1 e2) = vars e ++ vars e1 ++ vars e2
 vars (Exi x)      = [x]
 vars (Scope e)    = vars e
 vars (f :@: x)    = [f,x]
@@ -337,7 +366,7 @@ sem (e1 :>: e2) r =
   u = fresh (r : vars e1 ++ vars e2)
 
 sem (e1 :|: e2) r =
-  sem e1 r ++ sem e2 r
+  sem (Scope e1) r ++ sem (Scope e2) r
 
 sem (If e1 e2 e3) r =
   squash $
@@ -352,6 +381,20 @@ sem (If e1 e2 e3) r =
   z  = fresh (r : vars (If e1 e2 e3))
   ys = exis e1
 
+sem (If2 e1 e2 e3) r =
+  [ hides (exis e1) (d /\ d1) | d <- sem (Scope e2) r ] ++
+  [ d \\\ d1 | d <- sem (Scope e3) r ]
+ where
+  d1 = hide z $ bigUnion $ sem e1 z
+  z  = fresh (r : vars (If e1 e2 e3))
+  
+sem (If3 e1 e2 e3) r =
+  
+  undefined
+ where
+  d1 = hide z $ bigUnion $ sem e1 z
+  z  = fresh (r : vars (If e1 e2 e3))
+  
 sem (Exi x) r =
   [ univ ]
 
@@ -367,17 +410,44 @@ sem (f :@: x) r =
   | fun <- funs
   ]
 
+{-
 funs :: [FUN]
-funs = [ [ funx .= 0 /\ funy .= 1
+funs = [ -- <1, 0>
+         [ funx .= 0 /\ funy .= 1
          , funx .= 1 /\ funy .= 0
          ]
-       , [ funx .= 0 /\ funy .= 7
+       , -- <0>
+         [ funx .= 0 /\ funy .= 0
          ]
-       , [ funx .= 0 /\ funy .= 1
+       , -- <1>
+         [ funx .= 0 /\ funy .= 1
+         ]
+       , -- <2>
+         [ funx .= 0 /\ funy .= 2
+         ]
+       , -- <7>
+         [ funx .= 0 /\ funy .= 7
+         ]
+       , -- <1,2>
+         [ funx .= 0 /\ funy .= 1
+         , funx .= 1 /\ funy .= 2
+         ]
+       , -- <0,1>
+         [ funx .= 0 /\ funy .= 0
+         , funx .= 1 /\ funy .= 1
+         ]
+       , -- <1,2,3>
+         [ funx .= 0 /\ funy .= 1
          , funx .= 1 /\ funy .= 2
          , funx .= 2 /\ funy .= 3
          ]
        ]
+-}
+funs :: [FUN]
+funs = [ f | i <- [0..5]  -- up to 5-tuples
+           , f <- map tup $ sequence $ replicate i [0..7]
+       ]
+  where tup xys = [ funx .= x /\ funy .= y | (x, y) <- zip [0..] xys ]
 
 squash :: [ENV] -> [ENV]
 squash envs = [ env | env <- envs, env /= empty ]
@@ -424,7 +494,8 @@ r = Id "r"
 
 ex1 = Tup [x, y]
 ex2 = (z := ex1) :>: (z :@: x)
-ex3 = (y := If (x := 1) 5 7) :>: (y := 7)
+ex3   = (y := If  (x := 1) 5 7) :>: (y := 7)
+ex3_2 = (y := If2 (x := 1) 5 7) :>: (y := 7)
 ex4 = All ((x := 1) :|: (y := 7))
 
 ----------------------------------------------------------------------------------------
@@ -443,3 +514,14 @@ uinsert x (y:ys) = case x `compare` y of
 
 
 
+ex5   = All (Exi x :>: If  (x:=0) (1:|:2) (3:|:4:|:5))
+ex5_2 = All (Exi x :>: If2 (x:=0) (1:|:2) (3:|:4:|:5))
+ex6   = Scope (Exi x :>: If  ((x:=0):|:(x:=0)) 1 5)
+ex6_2 = Scope (Exi x :>: If2 ((x:=0):|:(x:=0)) 1 5)
+ex7   = Scope (Exi x :>: If  ((x:=0):|:(x:=0)) (Var x) 5)
+ex7_2 = Scope (Exi x :>: If2 ((x:=0):|:(x:=0)) (Var x) 5)
+ex8   = Scope (Exi x :>: x:=0 :>: Exi y :>: If  ((x:=0 :>: y:=1):|:(x:=0 :>: y:=2)) (Var y) 5)
+ex8_2 = Scope (Exi x :>: x:=0 :>: Exi y :>: If2 ((x:=0 :>: y:=1):|:(x:=0 :>: y:=2)) (Var y) 5)
+
+ex9 =   Scope (Exi x :>: x:=0 :>: If  ((x:=0):|:(x:=0)) 1 5)
+ex9_2 = Scope (Exi x :>: x:=0 :>: If2 ((x:=0):|:(x:=0)) 1 5)
