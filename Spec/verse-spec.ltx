@@ -127,6 +127,27 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \fi
 \input{densem-notation}
 
+Design variants:
+\begin{itemize}
+\item \textbf{(E-LS)}: expression-style, list of sets of values.
+  \begin{itemize}
+  \item $\semappsub{E}{e}{|e|} : \Env \rightarrow \seq{ \VAL }$
+  \item \Cref{fig:e-lv1} and \Cref{fig:e-lv2}
+    \end{itemize}
+
+\item \textbf{(D-LS)}: dps-style, list of sets of environments.
+  \begin{itemize}
+  \item $\semapsub{E}{d}{|e|} r : \seq{ \ENV }$
+  \item \Cref{fig:d-ls1} and \Cref{fig:d-ls2}
+    \end{itemize}
+
+\item \textbf{(D-SLS)}: dps-style, sets of lists of sets of environments.
+  \begin{itemize}
+  \item $\semapsub{E}{d}{|e|} r : \powersetnp{\seq{ \ENV }}$
+  \item \Cref{fig:d-sls1} and \Cref{fig:d-sls2}
+    \end{itemize}
+\end{itemize}
+
 % -------------------------------------------------------------
 %               E-LS: expression-style sequences of sets
 % -------------------------------------------------------------

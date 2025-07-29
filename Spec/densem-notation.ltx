@@ -70,11 +70,14 @@ $$
 \end{array}\\[2mm]
 
 \textbf{Notation for sets and sequences} \\
-\begin{array}{l@@{\,}c@@{\,}ll}
+\begin{array}{r@@{\,}c@@{\,}ll}
   |[e_1,xdots,e_n]| & : & \seq{A} & \text{Sequence of items} \\
   |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension}, \\
   |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\[2mm]
 
+  \seqE & : & \powerset{A} \rightarrow \powerset{A} \rightarrow \powerset{A} \\
+  s_1 \seqE s_1 & = & \{ a_2 \vb a_1 \in s_1, a_2 \in s_2 \} \\
+    & = & \textbf{if} \, (s_1 = \{\}) \, \textbf{then} \, \{\} \, \textbf{else} \, s_2 \\[1mm]
   \dodgyunion & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}}
             & \text{``Dodgy union''} \\
   |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]|
