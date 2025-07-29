@@ -5,8 +5,12 @@ Require Import Laws.
 From Stdlib Require Export Ensembles.
 From Stdlib Require Setoids.Setoid.
 From Stdlib Require Lists.List.
+From Stdlib Require Import Sets.Classical_sets.
 
+
+(* 
 Require Import structures.Logical.
+*)
 
 (* Representing sets by their characteristic functions.  *)
 
@@ -74,8 +78,11 @@ Definition bind {A B} (s : P A) (k : A -> P B)  : P B :=
   fun b => exists a, (a ∈ s) /\ (b ∈ (k a)).
 
 (* monadic sequence (>>): requires s1 to be inhabited *)
-Definition seq {A B} (s1 : P A) (s2 : P B) := 
-  fun b => Inhabited s1 /\ (b ∈ s2).
+Definition seq {A B} (S1 : P A) (S2 : P B) := 
+  bind S1 (fun _ => S2).
+(* equivalent to:
+  fun b => Inhabited s1 /\ (b ∈ s2)
+*)
 
 (* Total set if proposition holds, emptyset otherwise *)
 Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
@@ -86,14 +93,13 @@ Definition when {A} (ϕ : Prop) (s : P A) : P A :=
 
 (* if2 s1 s2 == guard (s1 = ∅) >> s 
    returns s2 when s1 is not empty. otherwise emptyset *)
-Definition If2 {A B} (s1 : P A) (s2 : P B) := 
-  (when (~ (s1 ≃ ∅)) s2).
+Definition If2 {A B} (s1 : P A) (s2 : P B) := seq s1 s2.
 
 (* returns s2 when s1 is not empty. otherwise returns s3 *)
 Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
-  (when (~ (s1 ≃ ∅)) s2) ∪ (when (s1 ≃ ∅) s3).
+  (seq s1 s2) ∪ (seq (Setminus Total_set s1) s3).
 
-(* ------------------------------------------------------------- *)
+(* ----------------------------------------------------- *)
 
 Lemma set_extensionality {A} (s1 s2 : P A) :
   (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).

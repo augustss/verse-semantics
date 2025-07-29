@@ -6,6 +6,7 @@ Import ssreflect.
 
 From Stdlib Require Import Logic.PropExtensionality.
 From Stdlib Require Import Logic.FunctionalExtensionality.
+From Stdlib Require Import Sets.Classical_sets.
 
 Require Import syntax.common.
 Require syntax.mini.
@@ -33,9 +34,7 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
-
-
-
+(*
 Lemma empty_empty {A}(x : A) : 
   (∅ ≃ (∅ : P A)) = True.
 Admitted.
@@ -55,7 +54,7 @@ Admitted.
 Lemma not_true : 
   (~ True) = False.
 Admitted.
-
+*)
 (*
 Lemma false_and a : 
   (False /\ a) = True.
@@ -83,7 +82,7 @@ Proof.
   unfold In. tauto.
 Qed.
 *)
-
+(*
 Lemma when_true {A} (s : P A) : when True s = s.
 Admitted.
 
@@ -103,6 +102,7 @@ Admitted.
   @when_true @when_false
   @Union_empty_r
   @Union_empty_l : set_simpl.
+*)
 
 (* ---------------------------------------------- *)
 
@@ -126,6 +126,15 @@ Definition is_Empty_set {A} (s : P A) : bool :=
   | left _ => true | right _ => false 
   end.
 
+Lemma Any_minus_empty {A} (s : P A) : s - ∅ = s.
+set_ext x.
+split.
+intro h. inversion h. done.
+intro h. econstructor. auto. intro j. inv j.
+Qed.
+
+#[export] Hint Rewrite @Any_minus_empty : set_simpl.
+
 (* --------------------------------------------------- *)
 
 Definition VAL := P value.
@@ -148,6 +157,7 @@ if e1 e2 e3 =
   (y=⟨⟩; e2) | (y=0; e3)
 *)
 
+(* Translated to DPS style, with distinguished result r *)
 Definition koen_if e1 e2 e3 : mini.Expr := 
   mini.DefineV y :>:
   y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
@@ -233,16 +243,13 @@ Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) :=
 Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
   (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
 
-Definition SEQ {A} (S1 : P A) (S2 : P A) := 
-  s1 <- S1 ;; S2.
-
-(* TODO: This is equivalent to: (s1 <- S1 ;; s2 <- S2 ;; ret s2) *)
+(* TODO: This is equivalent to: (s1 <- S1 ;; S2) *)
 Definition If2 {A B} := fun (s1 : P A) (s3 : P B) => when (Inhabited s1) s3.
 
 Lemma If2_SEQ {A} (S1 S2 : P A) : 
-  If2 S1 S2 = SEQ S1 S2.
+  If2 S1 S2 = seq S1 S2.
 Proof.
-  unfold If2, when, SEQ.
+  unfold If2, when, seq.
   set_ext s.
   split.
   + intro h. 
@@ -256,7 +263,7 @@ Proof.
 Qed.
 
 Definition If3 {A B} := fun (S1 : P A) (S2 S3 : P B) => 
-   (s1 <- S1 ;; S2) ∪ (s1 <- Total_set - S1 ;; S2).
+   (s1 <- S1 ;; S2) ∪ (when (S1 = ∅) S3).
 
 (* (s1 <- S1 ;; S2) ∪ (s1 <- Total_set - S1 ;; S2)  *)
 (*
@@ -342,6 +349,8 @@ Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV :=
             /\ List.nth_error hs i = Some h 
             /\ List.In (evalA e2 ρ , ρ r ) h.
 
+(* This is a bit dodgy by using the iteration over all numbers. 
+   We need to iterate only over each partial function *)
 Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV := 
   i <- allNums ;;
   ret (APPi e1 e2 i).
@@ -500,6 +509,23 @@ Qed.
  
 Hint Rewrite Total_set_hide : set_simpl.
 
+Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.
+unfold hide. 
+eapply Extensionality_Ensembles.
+split.
+ + intros ρ ρIn. 
+   move: ρIn => [ρ' [h1 h2]]. 
+   have EQ: (ρ = ρ').
+   eapply functional_extensionality. intro x.
+   eapply h2.
+   intro h. inv h. subst. done.
+ + intros ρ ρIn.
+   exists ρ. split; auto.
+Qed.
+
+Hint Rewrite hide_nothing : set_simpl.
+
+
 Lemma constrain_eq_hide_same r k : 
   ((r ≈ ⟨k⟩) \ ⟅r⟆) = Total_set.
 eapply set_extensionality. intro ρ.
@@ -547,18 +573,32 @@ Qed.
 (* NOTE: converse is not true *)
 
 
+Lemma bind_empty {A B}(k : A -> P B) : Sets.bind ∅ k = ∅.
+unfold Sets.bind.
+set_ext s.
+split; intros h; set_crunch.
+inv h. inv H. inv H0.
+Qed.
+
+#[export] Hint Rewrite @bind_empty : set_simpl.
+
 Lemma If3_empty {A B} (s2 s3 : P B) : 
   @If3 A B ∅ s2 s3 = s3.
 Proof.
-Admitted.
+  unfold If3.
+  cbn. set_simpl.
+  unfold when.
+  set_ext z.
+  split. intro h. inv h. auto.
+  intro h. split; auto.
+Qed.
 
 Lemma If3_ret {A B} v (s2 s3 : P B) : 
   If3 (ret v : P A) s2 s3 = s2.
 Proof.
-  unfold If3. 
+  unfold If3, when. 
   set_simpl.
-  done.
-Qed.
+Admitted.
 
 Lemma If3_union {A B} (s1 s1' : P A)
   (s2 s3 : P B) : 
@@ -721,6 +761,8 @@ Proof.
     ++ inv H1.
        set_crunch.
        inv H1.
+Admitted.
+(*
        unfold when in H. cbn in H.
        rewrite H3.
        cbn in H0.
@@ -756,7 +798,7 @@ Proof.
        set_simpl.
        eapply in_singleton.
        auto.
-Qed.
+Qed. *)
 
 (* one { 0 | 1 } = [ {{ r = 0 }} ]     *)
 (* one { x = 0 } = [ {{ r = x = 0 }} ] *)
@@ -788,6 +830,8 @@ Proof.
     inv H. 
     autorewrite with set_simpl in H1.
     cbn in H1. subst.
+Admitted.
+(*
     inv H0. 
     unfold D0, constrain_eq. done.
     autorewrite with set_simpl in H1. inv H1.
@@ -801,7 +845,7 @@ Proof.
     eapply in_singleton. cbn.
     eapply in_singleton.
 Qed.
-
+*)
 
 Lemma ONE_example2 : 
   ONE [ Dx (Int 0) ] = Dx (Int 0).
@@ -911,6 +955,7 @@ Definition all_sem : ENV :=
 
 
 *)
+
 
 Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
     match xs with 
@@ -1027,14 +1072,8 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 
 End DLS_OLD.
 
-(* ----------- non-dodgy dest passing style -------------- *)
 
-(* This version avoids the dodgy union by providing an 
-   ordering for the branch of if expressions.
-   Otherwise, it is the same as the DLS semantics. 
-*)
-
-Module DLS. 
+(* Tim's version of IF *)
 
 (* Given a list of ENVs,  E{a}[0] ... E{a}[n]
 
@@ -1054,6 +1093,37 @@ Fixpoint try (xs : Scope.t) (Δs : list ENV) : list ENV * ENV :=
   let step := fun '(envs, avoid) Δi => 
                 (envs ++ [Δi - avoid], avoid ∪ (Δi \ xs)) in
   List.fold_left step Δs ([],∅).
+
+Definition IF_TIM xs S1 S2 S3 := 
+    let (success, avoid) := try xs S1 in 
+     (SEQ success (S2 [\] xs)) ++
+     (SEQ [Total_set - avoid] S3).
+
+(* Simon's version of If *)
+
+Definition UNIONLIST : list ENV -> ENV := 
+  List.fold_right Union ∅.
+
+Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
+    let GOOD := UNIONLIST (List.map hide_r S1) in
+    (fmap (fun D => D ∩ GOOD) S2) ++ 
+    (fmap (fun D => D - GOOD) S3).
+
+(* E [if (x=1|x=2) { x } { 0 }] = [ {r=1,x=1} | {r=2,x=2} | {r=0,x<>1,2} *)
+
+Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
+
+(* ----------- non-dodgy dest passing style -------------- *)
+
+(* This version avoids the dodgy union by providing an 
+   ordering for the branch of if expressions.
+   Otherwise, it is the same as the DLS semantics. 
+*)
+
+Module DLS. 
+
+
+
 
 Fixpoint E (e : mini.Expr) : list ENV := 
 
@@ -1182,12 +1252,6 @@ Qed.
      , rho y = v } ]
 *)
 
-Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.
-unfold hide. 
-set_ext ρ.
-Admitted.
-
-Hint Rewrite hide_nothing : set_simpl.
 
 Definition UNIONLIST : list ENV -> ENV := 
   List.fold_right Union ∅.
