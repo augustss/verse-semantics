@@ -126,14 +126,37 @@ Definition is_Empty_set {A} (s : P A) : bool :=
   | left _ => true | right _ => false 
   end.
 
-Lemma Any_minus_empty {A} (s : P A) : s - ∅ = s.
+Lemma any_minus_empty {A} (s : P A) : s - ∅ = s.
 set_ext x.
 split.
 intro h. inversion h. done.
 intro h. econstructor. auto. intro j. inv j.
 Qed.
 
-#[export] Hint Rewrite @Any_minus_empty : set_simpl.
+#[export] Hint Rewrite @any_minus_empty : set_simpl.
+
+Ltac set_crunch :=
+    crunch ; repeat match goal with 
+    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh "ρ" in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh "ρ" in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (ret ?v) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ∅ |- _ ] =>
+        inv H
+      end.
+
 
 (* --------------------------------------------------- *)
 
@@ -243,7 +266,7 @@ Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) :=
 Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
   (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
 
-(* TODO: This is equivalent to: (s1 <- S1 ;; S2) *)
+(* TODO: This is equivalent to: (s1 <- S1 ;; S2), i.e. seq *)
 Definition If2 {A B} := fun (s1 : P A) (s3 : P B) => when (Inhabited s1) s3.
 
 Lemma If2_SEQ {A} (S1 S2 : P A) : 
@@ -255,12 +278,7 @@ Proof.
   + intro h. 
     destruct h as [h1 h2].
     inv h1.
-    eapply in_bind.
-    exists x0. split; auto. 
-  + intro h. destruct h as [s1 [h1 h2]].
-    split. econstructor. eauto.
-    auto.
-Qed.
+Admitted.
 
 Definition If3 {A B} := fun (S1 : P A) (S2 S3 : P B) => 
    (s1 <- S1 ;; S2) ∪ (when (S1 = ∅) S3).
@@ -406,31 +424,6 @@ Infix "*" := UNIFY.
 
 
 (* ---- theory about constrain/hide/If3 ------------------  *)
-
-Ltac set_crunch :=
-    crunch ; repeat match goal with 
-    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
-        let ρ1 := fresh "ρ" in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (bind ?ma ?k) |- _ ] =>
-        let ρ1 := fresh "ρ" in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (ret ?v) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ∅ |- _ ] =>
-        inv H
-      end.
-
 
 
 Lemma in_constrain_eq (ρ : env) (x:Ident) k :
@@ -632,8 +625,16 @@ Notation "({++})" := (fun (VS : P (list value)) (V : VAL) =>
     ret (vs ++ [v])) : set_scope.
 Infix "{++}" := (({++})) (at level 40) : set_scope.
    
+Definition Head (V : P (list value)) : VAL := 
+  vs <- V ;;
+  match vs with 
+  | v :: _ => ⌈ v ⌉
+  | _ => ∅
+  end. 
+
+
 (* pick_squash *)
-Definition Unions (xs : list VAL) : P (list value) := 
+Definition squash_pick (xs : list VAL) : P (list value) := 
   squash_fold_left ({++}) xs (ret nil).
 
 (* SPJs definition. More concise version below *)
@@ -644,7 +645,7 @@ Definition ALL' (Δs : list ENV) : ENV :=
                  (Δ2 <- Δs ;;
                   ret ('(v, D3) <- extract Δ2 ;;
                                   when (ρ ∈ D3) (ret v))) in
-      (vs ∈ Unions VS) /\
+      (vs ∈ squash_pick VS) /\
       (ρ r = mkTup vs).
 
 (* The set of results in Δ that could be produced by environments 
@@ -654,26 +655,23 @@ Definition consistent_results (ρ : env) (Δ : ENV) : VAL :=
 
 Definition ALL (Δs : list ENV) : ENV := 
   fun ρ => exists vs,
-      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
+      (vs ∈ squash_pick (consistent_results ρ <$> Δs)) /\
       (ρ r = mkTup vs).
         
 
 (* return the set containing just the first element of xs, or emptyset
   if xs is nil. *)
-Definition head_of {A} (xs : list A) : A -> Prop := 
+Definition head_of {A} (xs : list A) : P A := 
   match xs with 
   | nil => ∅
   | v :: _ => ⌈ v ⌉
   end.
 
 Definition ONE (Δs : list ENV) : ENV := 
-  fun ρ => exists vs,
-      (vs ∈ Unions (consistent_results ρ <$> Δs)) /\
-      (ρ r ∈ head_of vs).
+  fun ρ => 
+      (ρ r ∈ head_of (squash_pick (consistent_results ρ <$> Δs))).
 
-
-
-(* ---------- examples / theory about extract / Unions ------------- *)
+(* ---------- examples / theory about extract / squash_pick ------------- *)
 
 
 Lemma extract_one {v} : 
@@ -685,6 +683,7 @@ set_simpl.
 split.
 - move=>h.
   set_crunch.
+  inv H.
   set_simpl.
   f_equal.
 - destruct ρ as [w Δ].
@@ -720,10 +719,10 @@ Lemma extract_two :
     (ret (Int 0, Total_set) ∪ ret (Int 1, Total_set)).
 Admitted.
 
-Example UnionsExample :
-  Unions [  ret (Int 0) ; ret  (Int 1) ] = 
+Example squash_pickExample :
+  squash_pick [  ret (Int 0) ; ret  (Int 1) ] = 
     ((ret [ Int 0 ; Int 1 ])).
-unfold Unions.
+unfold squash_pick.
 unfold squash_fold_left.
 unfold List.fold_left.
 repeat rewrite If3_ret.
@@ -731,11 +730,11 @@ repeat rewrite bind_ret_l.
 cbn. done.
 Qed.
 
-Lemma Unions_two_example :
-  Unions [ ret (Int 0) ∪ ret (Int 1) ] = 
+Lemma squash_pick_two_example :
+  squash_pick [ ret (Int 0) ∪ ret (Int 1) ] = 
          (ret [ Int 0 ] ∪ ret [ Int 1 ]).
 Proof.
-  unfold Unions.
+  unfold squash_pick.
   unfold squash_fold_left.
   unfold List.fold_left.
   repeat rewrite bind_ret_l.
@@ -871,7 +870,7 @@ Proof.
   repeat rewrite bind_ret_l.
   split.
   + intros h. set_crunch.
-    unfold Unions in H.
+    unfold squash_pick in H.
     cbn in H.
     repeat rewrite If3_when_ret in H.
     inv H.
@@ -894,7 +893,7 @@ Admitted.
   repeat rewrite bind_ret_l.
   replace (Total_set ρ) with True; try easy.
   set_simpl.
-  rewrite Unions_two_example.
+  rewrite squash_pick_two_example.
   split.
   + intro h. crunch.
     inv H; inv H1. left; auto. right; auto.
@@ -1296,8 +1295,8 @@ Proof.
   done.
 Qed.
 
-Lemma Unions_app : 
-  forall xs ys, Unions (xs ++ ys) = xs' <- (Unions xs) ;; ys' <- (Unions ys) ;; ret (xs' ++ ys') .
+Lemma squash_pick_app : 
+  forall xs ys, squash_pick (xs ++ ys) = xs' <- (squash_pick xs) ;; ys' <- (squash_pick ys) ;; ret (xs' ++ ys') .
 Proof. 
   induction xs.
   + intros ys. cbn. 
@@ -1351,18 +1350,18 @@ Proof.
     admit.
   } 
   subst.
-  rewrite Unions_app.
-  remember ((xs' <- Unions (ListDef.map (fun x0 : ENV => when (ρ ∈ hide_r x0) (ret (mkTup []))) (E e1));; ys' <- Unions [ret (Int 0)];; ret (xs' ++ ys'))) as S.
-  have Unions_singleton: forall v, Unions [ret v] = ⌈[v]⌉. { 
+  rewrite squash_pick_app.
+  remember ((xs' <- squash_pick (ListDef.map (fun x0 : ENV => when (ρ ∈ hide_r x0) (ret (mkTup []))) (E e1));; ys' <- squash_pick [ret (Int 0)];; ret (xs' ++ ys'))) as S.
+  have squash_pick_singleton: forall v, squash_pick [ret v] = ⌈[v]⌉. { 
     intro v. cbn. repeat rewrite bind_singleton_l. unfold If3. cbn.
     set_simpl. done. }
-  rewrite Unions_singleton in HeqS.
+  rewrite squash_pick_singleton in HeqS.
   split.
   + intros h. set_crunch. subst.
     rewrite H in H1. destruct x0. inv H1. inv H1.
     inv H0.
     set_crunch.
-    rewrite Unions_singleton in H1. inv H1.
+    rewrite squash_pick_singleton in H1. inv H1.
     unfold constrain_eq.
     destruct x1. 
     ++ inv H4.
@@ -1380,7 +1379,7 @@ Proof.
        - intros. 
          replace (a :: VS) with ([a] ++ VS) in H0. 2: { auto. } 
          rewrite List.map_app in H0.
-         rewrite Unions_app in H0.
+         rewrite squash_pick_app in H0.
          set_crunch.
          destruct ρ0. 2: {  inv H3. } 
          destruct ρ1. 2: { inv H3. } 
