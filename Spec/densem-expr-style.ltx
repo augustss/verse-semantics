@@ -23,7 +23,6 @@
 \newcommand{\applyf}{\textbf{applyf}}
 \newcommand{\applys}{\textbf{applys}}
 \newcommand{\squash}{\textbf{squash}}
-\newcommand{\trim}{\textbf{squashTail}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
 \newcommand{\combine}{\textbf{comb}}
@@ -59,7 +58,8 @@ $$
     [ s_1 \seqE s_2 \vb
       |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
 
-  \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\semapp{B}{e}{\rho})) \, ] \\[1mm]
+  \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\semapp{B}{e}{\rho})) \, ] \\
+  \EE{|one e|}{\rho} & = & [ \, \headE (\squash (\semapp{B}{e}{\rho})) \, ] \\[1mm]
 
   \EE{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
@@ -74,7 +74,7 @@ $$
 \multicolumn{3}{@@{}l}{\EE{|lamH q fx i (x :== e_1) (y :== apply1N h x) e_2|}{\rho}} \\
 \multicolumn{3}{l}{
   = \left\{
-  \begin{array}{ll} \multicolumn{2}{l}{ \trim([
+  \begin{array}{ll} \multicolumn{2}{l}{ \squashTailE([
     \{ f \hspace{-0.5em}
     \begin{array}[t]{l@@{\;}l}
     || & f \inb \Value, \forall v \inb \Value . \\
@@ -115,48 +115,22 @@ $$
     \end{array}
     \end{array} \\
  \quad \textbf{otherwise} : False
+\end{array}\\
+\\
+\textbf{Auxiliary functions} \\
+\begin{array}{lcll}
+
+  \apply & : & (\Value \times \Value) \rightarrow [\VAL] \\
+  \apply(Fun(hs),v) & = & \squashTailE([ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ]) & \text{All elts will be singleton or empty} \\
+  \apply(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
+
+  \tupsE & : & [\VAL] \rightarrow \VAL \\
+  \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \inb s_n \}
 \end{array}
 \end{array}
 $$
 \caption{Denotational semantics: plan (E-LS)}
 \label{fig:e-lv1}
-\end{figure}
-
-
-\begin{figure}
-$$
-\begin{array}{lcll}
-%  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
-%  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
-  \apply & : & (\Value \times \Value) \rightarrow [\VAL] \\
-  \apply(Fun(hs),v) & = & \trim([ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ]) & \text{All elts will be singleton or empty} \\
-  \apply(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
-
-  \tupE & : & [\Val] \rightarrow \Val \\
-  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i |<-| 0 \mydots n ] \\
-  \tupsE & : & [\VAL] \rightarrow \VAL \\
-  \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \inb s_n \} \\[1mm]
-
-  \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \squash(xs) & = & [ x \, || \, x |<-| xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
-
-  \trim & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \trim(xs) & = & xs \text{ with trailing \{\} removed} \\
-
-%%\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
-%%\semopen{|open|}{(G)} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
-%%\semopen{|closed|}{(G)} & = & G \\[1mm]
-
-% \succeeds & : & \myset{[\myset{\Value}]} \rightarrow Bool \\
-% \succeeds(s) & = & \multicolumn{2}{l}{\text{if all sequences in $s$ have a non-empty element}} \\[1mm]
-
-\bigcap[] & = & \mempty \\
-\bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
-
-\end{array}
-$$
-\caption{Auxiliary functions for plan (E-LS)}
-\label{fig:e-lv2}
 \end{figure}
 
 \newcommand{\newfcn}{\Value \hookrightarrow \Value}

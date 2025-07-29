@@ -75,7 +75,7 @@ $
             \,] \\
    \semapp{E}{\eblock{e}}{\rho} & = & \semapp{D}{e}{\rho} \\
 
-   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \trim \{ f
+   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \squashTailE \{ f
 
      \begin{array}[t]{@@{\;}l@@{\;}l}
        || & f \inb \Fun \\
@@ -143,7 +143,7 @@ $
   \eapps{\cdot}{\cdot} & : & \VAL \times \VAL \rightarrow \seq{\VAL} \\
   \eapps{s_1}{s_2} & = & \hat{\bigcup}\{ \apply(f, a) \, || \, f \inb s_1, a \inb s_2 \} \\
   \eequ{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \eequ{w_1}{w_2} & = & \trim([ s_1 \cap s_2\; ||\; |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
+  \eequ{w_1}{w_2} & = & \squashTailE([ s_1 \cap s_2\; ||\; |s_1 <-| w_1, \; |s_2 <-| w_w ]) \\
   \eseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow \seq{\VAL} \\
   \eseq{w_q}{w_2} & = & [ |if s_1 = {} then {} else s_2| \; || \; |s_1 <-| w_1,\; |s_2 <-| w_2 ] \\
   \inseq{\cdot}{\cdot} & : & \seq{\VAL} \times \seq{\VAL} \rightarrow Bool \\
@@ -200,7 +200,7 @@ $
             \,] \\
    \semapp{M}{\eblock{e}}{u}{\rho} & = & \semapp{L}{e}{u}{\rho} \\
 
-   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \trim \{ f
+   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \squashTailE \{ f
 
      \begin{array}[t]{@@{\;}l@@{\;}l}
        || & f \inb \Fun \\

@@ -152,7 +152,6 @@ Design variants:
 %               E-LS: expression-style sequences of sets
 % -------------------------------------------------------------
 
-\ifeverything
 \clearpage \newpage
 \section{Denotational semantics: expression style}
 \input{densem-expr-style}
@@ -162,19 +161,23 @@ Design variants:
 % -------------------------------------------------------------
 
 \clearpage \newpage
-\section{Denotational semantics: DPS (Koen style)}
-\fi
+\section{Denotational semantics: destination passing style}
 \input{densem-koen}
-\ifeverything
+
+% -------------------------------------------------------------
+%               S-LS: Essential Verse
+% -------------------------------------------------------------
+
+\clearpage \newpage
+\section{Denotational semantics: Essential Verse}
+\input{densem-ess}
 
 % -------------------------------------------------------------
 %               D-SLS: DPS-style: sets of sequences of sets
 % -------------------------------------------------------------
-\begin{comment}
 \clearpage \newpage
 \section{Denotational semantics: DPS (sets of sequences of sets)}
 \input{densem-set-seq-set}
-\end{comment}
 
 % -------------------------------------------------------------
 %               Denotational semantics: destination style
@@ -192,6 +195,5 @@ Design variants:
 \clearpage \newpage
 \section{Denotational semantics: Plan A}
 \input{verse-densem-planA}
-\fi
 
 \end{document}

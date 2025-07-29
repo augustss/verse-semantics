@@ -10,7 +10,7 @@
 %include forall.fmt
 %include ../LaTex/calculus.fmt
 
-\begin{figure}[h]
+\begin{figure}
 $$
 \begin{array}{l}
 \textbf{Syntax of Mini Verse}\ \ \ifeverything\text{(copied from \Cref{fig:mini-verse})}\fi \\
@@ -56,7 +56,9 @@ $$
 \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
 &  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
 \text{Hiding} & \hideE & : & \powerset{\Ident + \RES} \rightarrow \ENV \rightarrow \ENV \\
-& \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
+& \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
+ & \hideEs & : & \powerset{\Ident + \RES} \rightarrow \seq{\ENV} \rightarrow \seq{\ENV} \\
+& \hideEs(xs, s) & = & [\; \hideE(xs,\EV) \vb \EV \in s \; ]\\[1mm]
 
 \text{Extract result} & \extractE & : & \ENV \rightarrow \powerset{\Val, \ENV} \\
 & \extractE(\EV) & = & \{ (v, \hideE(\RES, \EV'))
@@ -67,17 +69,43 @@ $$
 %      \{  & ([ v_0, \mydots, v_n ],\, \EV_0 \intersectE \mydots \intersectE \EV_n) \\
 %      \vb & (v_0,\EV_0) \in \extractE(s_0), \mydots, (v_n,\EV_n) \in \extractE(s_n) \}
 % \end{array} \\
-\end{array}\\[2mm]
+\end{array}
 
-\textbf{Notation for sets and sequences} \\
-\begin{array}{r@@{\,}c@@{\,}ll}
+\end{array}
+$$
+\caption{Denotational semantics: shared syntax, domains, functions}\label{fig:densem-notation}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\textbf{Sequences} \\
+\begin{array}{r@@{\;}c@@{\;}ll}
   |[e_1,xdots,e_n]| & : & \seq{A} & \text{Sequence of items} \\
-  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension}, \\
+  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension} \\
   |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\[2mm]
+\end{array}\\
+\\
+
+\textbf{Sets} \\
+\begin{array}{r@@{\;}c@@{\;}ll}
+  \unionListE & : & \seq{\powerset{A}} \rightarrow \powerset{A} \\
+  \unionListE(ss) & = & \text{set-union of elements of $ss$} \\
+  \squashE & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \\
+  \squashE(ss) & = & [ s \vb s |<-| ss, s \not= \{ \} ] \\
+  \squashTailE & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \\
+  \squashTailE(xs) & = & xs \text{ with trailing \{\} removed} \\[1mm]
+  \pickE & : & [\powerset{A}] \rightarrow \powersetnp{[A]} \\
+  \pickE[s_0, \mydots, s_n] & = & [ [v_0, \mydots, v_n]  \vb \forall 0 \leq i \leq n.\; v_i \in s_i ] \\[1mm]
+  \headE & : & [\powerset{A}] \rightarrow \powerset{A} \\
+  \headE[] & = & \{ \} \\
+  \headE(s:\_) & = & s \\[1mm]
 
   \seqE & : & \powerset{A} \rightarrow \powerset{A} \rightarrow \powerset{A} \\
-  s_1 \seqE s_1 & = & \{ a_2 \vb a_1 \in s_1, a_2 \in s_2 \} \\
+  s_1 \seqE s_2 & = & \{ a_2 \vb a_1 \in s_1, a_2 \in s_2 \} \\
     & = & \textbf{if} \, (s_1 = \{\}) \, \textbf{then} \, \{\} \, \textbf{else} \, s_2 \\[1mm]
+  \prodE & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \\
+  s_1 \prodE s_2 & = & [\; \EV_1 \cap \EV_2 \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 \; ] \\[1mm]
   \dodgyunion & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}}
             & \text{``Dodgy union''} \\
   |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]|
@@ -87,8 +115,7 @@ $$
                           & \hat{\cup} \text{ extended to sets}\\
   \hat{\bigcup} & = & \cdots \\[2mm]
 \end{array}
-
 \end{array}
 $$
-\caption{Denotational semantics: shared syntax, domains, functions}\label{fig:densem-notation}
+\caption{Sets and sequences}\label{fig:densem-sets-and-seqs}
 \end{figure}
