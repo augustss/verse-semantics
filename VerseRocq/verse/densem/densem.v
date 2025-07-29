@@ -18,15 +18,16 @@ Require Import structures.Laws.
 
 Require Import densem.Dom.
 Require Import densem.tenv.  (* environments are total *)
+Require Import densem.envSet. (* ENV , hide, constraints *)
 
 Import mini.MiniNotation.
-Import FunctorNotation.
-Import ApplicativeNotation.
-Import MonadNotation.
 Import SetNotations.
+Import SetMonadNotation.
 Import List.ListNotations.
+Import ListMonadNotation.
 Import EnvNotation.
-Import AlternativeNotation.
+Import ENVNotation.
+
 
 Open Scope monad_scope.
 Open Scope list_scope.
@@ -106,6 +107,7 @@ Admitted.
 
 (* ---------------------------------------------- *)
 
+
 (* This axiom is BAD. But convenient for now.... *)
 Axiom choose_elements  : forall {A} (s : P A), list A.
 
@@ -126,42 +128,12 @@ Definition is_Empty_set {A} (s : P A) : bool :=
   | left _ => true | right _ => false 
   end.
 
-Lemma any_minus_empty {A} (s : P A) : s - ∅ = s.
-set_ext x.
-split.
-intro h. inversion h. done.
-intro h. econstructor. auto. intro j. inv j.
-Qed.
-
-#[export] Hint Rewrite @any_minus_empty : set_simpl.
-
-Ltac set_crunch :=
-    crunch ; repeat match goal with 
-    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
-        let ρ1 := fresh "ρ" in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (bind ?ma ?k) |- _ ] =>
-        let ρ1 := fresh "ρ" in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (ret ?v) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ∅ |- _ ] =>
-        inv H
-      end.
-
-
 (* --------------------------------------------------- *)
 
 Definition VAL := P value.
-Definition ENV := P env.
+
+
+
 
 Import mini.MiniNotation.
 
@@ -247,18 +219,18 @@ Definition SUCCEED {A} : list (P A) := ret Total_set.
 Definition FAIL {A} : list (P A) := ret ∅.
 
 Definition CHOICE {A} (d1 : list A) (d2: list A) : list A := 
-  d1 <|> d2.
+  d1 ++ d2.
 
 Definition UNIFY {A} (d1 : list (P A)) (d2: list (P A)) : list (P A) := 
   ρ1 <- d1 ;;
   ρ2 <- d2 ;;
-  ret (ρ1 ∩ ρ2).
+  [ρ1 ∩ ρ2].
 
 Definition MINUS {A} (d1 : list (P A)) (d2: list (P A)) : 
   list (P A) := 
   ρ1 <- d1 ;;
   ρ2 <- d2 ;;
-  ret (ρ1 - ρ2).
+  [ρ1 - ρ2].
 
 Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) := 
   (~ ϕ1 /\ ϕ3).
@@ -275,19 +247,10 @@ Proof.
   unfold If2, when, seq.
   set_ext s.
   split.
-  + intro h. 
-    destruct h as [h1 h2].
-    inv h1.
+  + intro h. inv h. 
+    inv H.
 Admitted.
 
-Definition If3 {A B} := fun (S1 : P A) (S2 S3 : P B) => 
-   (s1 <- S1 ;; S2) ∪ (when (S1 = ∅) S3).
-
-(* (s1 <- S1 ;; S2) ∪ (s1 <- Total_set - S1 ;; S2)  *)
-(*
-Definition If3 {A B} := fun (S1 : P A) (s2 s3 : P B) => 
-  when (Inhabited S1) s2 ∪ when (S1 ≃ ∅) s3.
-*)
  
 Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 
@@ -308,6 +271,7 @@ Definition squash {A} (xs : list(P A)) : list (P A) :=
   List.filter is_Empty_set xs.
 
 
+
 (* --------- dodgy union ----------- *)
 (* elementwise union of sequences, missing elements are ∅s.  *)
 Fixpoint pointwise_union {A} (VS : list (P A)) (WS : list (P A)) : 
@@ -326,6 +290,9 @@ Definition DODGY_UNIONS {A} (VVS : P (list (P A))) : list (P A) :=
   i <- allNums ;;
   let VS : P (P A) := fmap (fun VS => List.nth i VS ∅) VVS in
   [ ⨃ VS ].
+
+Infix "⩅" := pointwise_union (at level 70).
+Infix "*" := UNIFY.
 
 (* -------------- tuples and application ------ *)
 
@@ -372,266 +339,31 @@ Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV :=
 Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV := 
   i <- allNums ;;
   ret (APPi e1 e2 i).
-  
-(* ------ auxiliary definitions for ENV and list ENV ------ *)
-
-
-(* Constrain a variable to be equal to a particular value.
-   All other mappings in the environment are unconstrained. 
-   x ≈ f
-*)
-Definition constrain_eq (x : Ident) (f : env -> value) : ENV := 
-  fun ρ => ρ x = f ρ.
-Definition constrain_ne (x : Ident) (f : env -> value) : ENV := 
-  fun ρ => not (ρ x = f ρ).
-
-(* Generalize all of the xs to be anything *)
-(* "Envs Drop Variables" Δ \ xs *)
-Definition hide (xs : Scope.t) (Δ : ENV) : ENV := 
-  fun ρ => exists ρ', (ρ' ∈ Δ) /\ forall x, ~ (Scope.In x xs) -> (ρ x = ρ' x).
-
-(* just generalize r *)
-Definition hide_r : ENV -> ENV := hide (Scope.singleton r).
-
-(* Generalize all of the xs to be anything *)
-(* Envss Drop Variables Δs [\] xs *)
-Definition hide_list (xs : Scope.t) (Δs : list ENV) : list ENV := 
-  fmap (hide xs) Δs.
-
-Definition envs_difference (Δ1 : ENV) (xs : Scope.t) (Δ2 : ENV) : ENV :=
-  Δ1 - (hide xs Δ2).
-
-(* The set of all environments that extend rho with arbitrary 
-   definitions for the variables declared in e. 
-*)
-Definition X (e : mini.Expr) (ρ : env) : ENV :=
-  hide (mini.I e) (ret ρ).
 
 Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
   UNIFY (hide_list (Scope.singleton r) d1) d2.
-
-(* ------  Notation ----------------------------------------- *)
-
-Infix "≈" := constrain_eq (at level 60).
-Infix "≉" := constrain_ne (at level 60).
-Notation "⟨ n ⟩" := (fun ρ => n) (at level 40).
-Notation "⟪ x ⟫" := (fun ρ => ρ x) (at level 40).
-Notation "Δ \ xs" := (hide xs Δ) (at level 70).
-Notation "Δ [\] xs" := (hide_list xs Δ) (at level 70).
-Notation "es \{ xs } fs" := (envs_difference es xs fs) (at level 40).
-Infix "⩅" := pointwise_union (at level 70).
-Infix "*" := UNIFY.
-
-
-(* ---- theory about constrain/hide/If3 ------------------  *)
-
-
-Lemma in_constrain_eq (ρ : env) (x:Ident) k :
-  ρ ∈ (x ≈ k) <-> ρ x = k ρ.
-split. intro h. inversion h. done.
-intro h. unfold constrain_eq. done.
-Qed.
-
-Hint Rewrite in_constrain_eq : set_simpl.
-
-Lemma constrain_eq_same {r v} : 
-  (r ≈ ⟨ v ⟩ ∩ r ≈ ⟨ v ⟩) = (r ≈ ⟨ v ⟩).
-Proof.
-  eapply set_extensionality; intros x.
-  rewrite in_intersection.
-  repeat rewrite in_constrain_eq. 
-  tauto.
-Qed.
-
-Hint Rewrite @constrain_eq_same : set_simpl.
-
-Lemma constrain_self {x} : 
-  (x ≈ ⟪ x ⟫) = Total_set.
-Proof.
-  eapply set_extensionality; intros y.
-  split; intro h; try done.
-Qed.
-
-Lemma constrain_self_imposs {x} : 
-  (x ≉ ⟪ x ⟫) = ∅.
-Proof.
-  eapply set_extensionality; intros y.
-  split; intro h; try done.
-Qed.
-
-Hint Rewrite @constrain_self  @constrain_self_imposs : set_simpl.
-
-Lemma constrain_eq_intersection {r v1 v2} : 
-  (r ≈ ⟨ v1 ⟩ ∩ r ≈ ⟨ v2 ⟩) = 
-  if Value.eqb v1 v2 then 
-    (r ≈ ⟨v1⟩)
-  else 
-    ∅.
-Proof.
-  destruct (Value.eqb v1 v2) eqn:EV;
-   [rewrite Value.eqb_eq in EV; subst|
-    rewrite Value.eqb_neq in EV].
-    + eapply set_extensionality; intros x.
-    rewrite in_intersection.
-    rewrite in_constrain_eq. tauto.
-    + eapply set_extensionality; intros x.  
-      subst.
-      rewrite in_intersection.
-      repeat rewrite in_constrain_eq.
-      split; try done.
-      intros [h1 h2]; congruence.
-Qed.
-
-Lemma Empty_set_hide (s : Scope.t) : ∅ \ s = ∅.
-unfold hide. 
-eapply Extensionality_Ensembles.
-split.
- + intros ρ ρIn. inversion ρIn. inversion H. done.
- + intros ρ ρIn. inversion ρIn.
-Qed.
-
-Hint Rewrite Empty_set_hide : set_simpl.
-
-Lemma Total_set_hide (s : Scope.t) : Total_set \ s = Total_set.
-unfold hide. 
-eapply Extensionality_Ensembles.
-split.
- + intros ρ ρIn. done.
- + intros ρ ρIn. exists ρ. split; auto.
-Qed.
- 
-Hint Rewrite Total_set_hide : set_simpl.
-
-Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.
-unfold hide. 
-eapply Extensionality_Ensembles.
-split.
- + intros ρ ρIn. 
-   move: ρIn => [ρ' [h1 h2]]. 
-   have EQ: (ρ = ρ').
-   eapply functional_extensionality. intro x.
-   eapply h2.
-   intro h. inv h. subst. done.
- + intros ρ ρIn.
-   exists ρ. split; auto.
-Qed.
-
-Hint Rewrite hide_nothing : set_simpl.
-
-
-Lemma constrain_eq_hide_same r k : 
-  ((r ≈ ⟨k⟩) \ ⟅r⟆) = Total_set.
-eapply set_extensionality. intro ρ.
-unfold hide.
-split.
-+ intro h. done.
-+ intros _. 
-  exists (r |-> k, ρ).
-  split.
-  rewrite in_constrain_eq.
-  rewrite extend_lookup_same.
-  done.
-  intros y h.
-  rewrite Scope.singleton_spec in h.
-  rewrite extend_lookup_diff.
-  rewrite PeanoNat.Nat.eqb_neq. easy.
-  done.
-Qed.
-
-Hint Rewrite constrain_eq_hide_same : set_simpl.
-
-Lemma constrain_eq_hide_diff x y k : 
-  x <> y ->
-  ((x ≈ ⟨k⟩) \ ⟅y⟆) = (x ≈ ⟨k⟩).
-intro NE.
-eapply set_extensionality. intro ρ.
-Admitted.
-
-Lemma constrain_eq_hide_two k1 k2  :
-  (x ≈ ⟨ k1 ⟩ ∩ r ≈ ⟨ k2 ⟩) \ ⟅ r ⟆ = (x ≈ ⟨ k1 ⟩).
-Proof.
-eapply set_extensionality. intro ρ.
-split.  
-Admitted.
-
-Hint Rewrite constrain_eq_hide_two : set_simpl.
-
-Lemma hide_intersect x s1 s2 : hide x (s1 ∩ s2) ⊆ ((hide x s1) ∩ (hide x s2)).
-Proof. 
-  intros ρ [_ [[ρ' h11] h2]].
-  unfold hide.
-    split. 
-    exists ρ'. split; auto. exists ρ'. split; auto.
-Qed. 
-(* NOTE: converse is not true *)
-
-
-Lemma bind_empty {A B}(k : A -> P B) : Sets.bind ∅ k = ∅.
-unfold Sets.bind.
-set_ext s.
-split; intros h; set_crunch.
-inv h. inv H. inv H0.
-Qed.
-
-#[export] Hint Rewrite @bind_empty : set_simpl.
-
-Lemma If3_empty {A B} (s2 s3 : P B) : 
-  @If3 A B ∅ s2 s3 = s3.
-Proof.
-  unfold If3.
-  cbn. set_simpl.
-  unfold when.
-  set_ext z.
-  split. intro h. inv h. auto.
-  intro h. split; auto.
-Qed.
-
-Lemma If3_ret {A B} v (s2 s3 : P B) : 
-  If3 (ret v : P A) s2 s3 = s2.
-Proof.
-  unfold If3, when. 
-  set_simpl.
-Admitted.
-
-Lemma If3_union {A B} (s1 s1' : P A)
-  (s2 s3 : P B) : 
-  If3 (s1 ∪ s1') s2 s3 = If3 s1 s2 (If3 s1' s2 s3).
-Proof.
-  unfold If3. 
-  apply set_extensionality. intros b.
-  set_simpl.
-  split.
-  + intro h. set_crunch.
-    unfold when.
-Abort.
-
-#[export] Hint Rewrite @If3_empty @If3_ret : set_simpl. 
-
-
-
 
 (* --- semantics of ALL / ONE for dest passing --------- *)
 
 (* find all environments in Δ such that ρ(r) = v, then hide r *)
 
 Definition extract (Δ : ENV) : P (value * ENV) := 
-  ρ <- Δ ;;
+  ρ ⭅ Δ ;;
   ret ( ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆ ).
 
 (* This operation is liftM2 snoc *)
 Notation "({++})" := (fun (VS : P (list value)) (V : VAL) => 
-    vs <- VS ;; 
-    v  <- V  ;;
-    ret (vs ++ [v])) : set_scope.
+    vs ⭅ VS ;; 
+    v  ⭅ V  ;;
+    ⌈ vs ++ [v]⌉) : set_scope.
 Infix "{++}" := (({++})) (at level 40) : set_scope.
    
 Definition Head (V : P (list value)) : VAL := 
-  vs <- V ;;
+  vs ⭅ V ;;
   match vs with 
   | v :: _ => ⌈ v ⌉
   | _ => ∅
   end. 
-
 
 (* pick_squash *)
 Definition squash_pick (xs : list VAL) : P (list value) := 
@@ -643,15 +375,15 @@ Definition ALL' (Δs : list ENV) : ENV :=
     exists vs, 
       let VS : list VAL := 
                  (Δ2 <- Δs ;;
-                  ret ('(v, D3) <- extract Δ2 ;;
-                                  when (ρ ∈ D3) (ret v))) in
+                  ['(v, D3) ⭅ extract Δ2 ;;
+                                  when (ρ ∈ D3) ⌈ v ⌉]) in
       (vs ∈ squash_pick VS) /\
       (ρ r = mkTup vs).
 
 (* The set of results in Δ that could be produced by environments 
    consistent with ρ *)
 Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
-  '(v, Δ') <- extract Δ ;; when (ρ ∈ Δ') (ret v).
+  '(v, Δ') ⭅ extract Δ ;; when (ρ ∈ Δ') (ret v).
 
 Definition ALL (Δs : list ENV) : ENV := 
   fun ρ => exists vs,
@@ -669,7 +401,7 @@ Definition head_of {A} (xs : list A) : P A :=
 
 Definition ONE (Δs : list ENV) : ENV := 
   fun ρ => 
-      (ρ r ∈ head_of (squash_pick (consistent_results ρ <$> Δs))).
+      (ρ r ∈ Head (squash_pick (consistent_results ρ <$> Δs))).
 
 (* ---------- examples / theory about extract / squash_pick ------------- *)
 
@@ -686,12 +418,14 @@ split.
   inv H.
   set_simpl.
   f_equal.
+Admitted.
+(*
 - destruct ρ as [w Δ].
   intro h. inv h.
   exists (r |-> v).
   set_simpl.
   done.
-Qed.
+Qed. *)
 
 Lemma extract_example {k} :
   extract (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
@@ -701,8 +435,9 @@ Proof.
   eapply set_extensionality. intros [v Δ].
   set_simpl.
   split.
-  + intros h. 
-    set_crunch.
+  + intros h.
+Admitted.
+(*    set_crunch.
     repeat rewrite H1.  clear H1.
     f_equal.
     set_simpl.
@@ -712,7 +447,7 @@ Proof.
     set_simpl.
     rewrite_env.
     tauto.
-Qed.
+Qed. *)
 
 Lemma extract_two :
   extract (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
@@ -725,8 +460,7 @@ Example squash_pickExample :
 unfold squash_pick.
 unfold squash_fold_left.
 unfold List.fold_left.
-repeat rewrite If3_ret.
-repeat rewrite bind_ret_l.
+set_simpl.
 cbn. done.
 Qed.
 
@@ -737,9 +471,7 @@ Proof.
   unfold squash_pick.
   unfold squash_fold_left.
   unfold List.fold_left.
-  repeat rewrite bind_ret_l.
   set_simpl.
-  repeat rewrite bind_ret_l.
   cbn.
 Admitted.
 
@@ -752,6 +484,8 @@ Proof.
   apply set_extensionality. intros ρ.
   unfold consistent_results, In.
   list_simpl.
+Admitted.
+(*
   rewrite extract_example.
   rewrite bind_ret_l.
   split.
@@ -760,8 +494,6 @@ Proof.
     ++ inv H1.
        set_crunch.
        inv H1.
-Admitted.
-(*
        unfold when in H. cbn in H.
        rewrite H3.
        cbn in H0.
@@ -822,13 +554,10 @@ Proof.
   unfold consistent_results, In.
   unfold fmap, Functor_list,ListDef.map.
   rewrite extract_D0. rewrite extract_D1.
-  rewrite bind_ret_l.
   set_simpl.
   split.
-  + intros h. set_crunch.
-    inv H. 
-    autorewrite with set_simpl in H1.
-    cbn in H1. subst.
+  + unfold Head. intros h.
+    inv h.
 Admitted.
 (*
     inv H0. 
@@ -867,14 +596,11 @@ Proof.
   unfold In.
   unfold fmap, Functor_list, List.map.
   repeat rewrite extract_example.
-  repeat rewrite bind_ret_l.
+  set_simpl.
   split.
   + intros h. set_crunch.
-    unfold squash_pick in H.
-    cbn in H.
-    repeat rewrite If3_when_ret in H.
-    inv H.
-    ++ 
+    unfold Head, squash_pick in h.
+    cbn in h.
 Admitted.    
 
 
@@ -954,18 +680,20 @@ Definition all_sem : ENV :=
 
 
 *)
+(* This character C-X 8 ret U+2A3E *)
 
+(* Infix "⨾" := seq (at level 20). *)
 
 Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
     match xs with 
-    | [] => ret ([], Total_set) 
+    | [] => ⌈ ([], Total_set) ⌉
     | (Δi :: rest) => 
         let failΔi '(vs, Δ) := (vs, (Total_set - Δi) ∩ Δ) in 
-        (fmap failΔi (combine rest)) ∪
+        (Sets.map failΔi (combine rest)) ∪
 
-        ('(vi, Δi') <- extract Δi ;;
+        ('(vi, Δi') ⭅ extract Δi ;;
          let succΔi '(vs, Δ) := (vi :: vs, Δi' ∩ Δ) in
-          fmap succΔi (combine rest))
+          Sets.map succΔi (combine rest))
     end.
 
 Notation "r ≈ x ≈ ⟨ k ⟩" := ((r ≈ ⟪ x ⟫) ∩ (x ≈ ⟨ k ⟩)).
@@ -989,9 +717,9 @@ Abort.
 
 Example ex_combine2 : 
   combine ([(r ≈ x ≈ ⟨ Int 1 ⟩); (r ≈ x ≈ ⟨ Int 0 ⟩)]) = 
-    ((ρ <- (x ≈ ⟨ Int 1 ⟩) ;; ret ([Int 1], ret ρ)) ∪
-    (ρ <- (x ≈ ⟨ Int 0 ⟩) ;; ret ([Int 0], ret ρ)) ∪
-    (ρ <- (x ≈ ⟨ Int 2 ⟩) ;; ret ([]     , ret ρ))).
+    ((ρ ⭅ (x ≈ ⟨ Int 1 ⟩) ;; ⌈ ([Int 1], ret ρ)⌉) ∪
+    (ρ ⭅ (x ≈ ⟨ Int 0 ⟩) ;; ⌈ ([Int 0], ret ρ)⌉) ∪
+    (ρ ⭅ (x ≈ ⟨ Int 2 ⟩) ;; ⌈([]     , ret ρ)⌉)).
 Proof.
   eapply Extensionality_Ensembles.
   split.
@@ -1102,6 +830,8 @@ Definition IF_TIM xs S1 S2 S3 :=
 
 Definition UNIONLIST : list ENV -> ENV := 
   List.fold_right Union ∅.
+
+Definition hide_r := hide (Scope.singleton r).
 
 Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
     let GOOD := UNIONLIST (List.map hide_r S1) in
@@ -1255,29 +985,12 @@ Qed.
 Definition UNIONLIST : list ENV -> ENV := 
   List.fold_right Union ∅.
 
-Lemma intersect_Setminus {A} (S : P A) : S ∩ (Total_set - S) = ∅.
-  set_ext s. unfold Total_set, Setminus. rewrite in_intersection.
-  intuition. inv H1. done. inv H. done. Qed.
-
-(* SCW: I think this needs an axiom that set membership is decidable. *)
-Lemma union_Setminus {A} (S : P A) : (S ∪ (Total_set - S)) = Total_set.
-  set_ext s. unfold Total_set, Setminus. rewrite in_union.
-  unfold In. split. auto. 
-Admitted.
-
-Hint Rewrite @intersect_Setminus @union_Setminus : set_simpl.
-
-Lemma distrib_union_l (S S1 S2 : ENV) : S ∪ (S1 ∩ S2) = (S ∪ S1) ∩ (S ∪ S2).
-Admitted.
-Lemma distrib_union_r (S S1 S2 : ENV) : (S1 ∩ S2) ∪ S = (S1 ∪ S) ∩ (S2 ∪ S).
-Admitted.
-
 (* SCW this is NOT true. These are only true up to squashing. *)
 Lemma disjoint_append (S1 S2 S3 : ENV) : 
  [(S1 ∩ S2) ∪ (Total_set - S1 ∩ S3)] = [S1 ∩ S2] ++ [Total_set - S1 ∩ S3].
 Proof.
   rewrite distrib_union_l.
-Admitted.
+Abort.
 
 Lemma if3_rhoIn (S1 S2 S3 : ENV) :
   [ (fun ρ => if3 (ρ ∈ S1) (ρ ∈ S2) (ρ ∈ S3)) ] = 
@@ -1296,7 +1009,10 @@ Proof.
 Qed.
 
 Lemma squash_pick_app : 
-  forall xs ys, squash_pick (xs ++ ys) = xs' <- (squash_pick xs) ;; ys' <- (squash_pick ys) ;; ret (xs' ++ ys') .
+  forall xs ys, squash_pick (xs ++ ys) = 
+             xs' ⭅ (squash_pick xs) ;; 
+             ys' ⭅ (squash_pick ys) ;; 
+             ⌈ xs' ++ ys' ⌉ .
 Proof. 
   induction xs.
   + intros ys. cbn. 
@@ -1306,39 +1022,70 @@ Proof.
 Admitted.
 
 
-Lemma when_is_true A ϕ (S : P A) :
-  ϕ -> when ϕ S = S. 
+
+(* = 
+   Ed[ y = one{(e1; z=<>) | z=0}@z ]
+   = [ { rho | v  = tup[],  if rho ∈ UNIONLIST (map hide(z) E[e1]) 
+                  = 0,      otherwise
+             , rho y = v } ]
+*)
+
+Ltac reIn ρ := 
+  match goal with [|- context[?x ρ]] => replace (x ρ) with (ρ ∈ x);[|auto] end.
+
+
+Lemma squash_pick_nil : squash_pick [] = ⌈ [] ⌉. Admitted.
+Lemma squash_pick_cons V VS : squash_pick (V :: VS) = 
+         If3 V 
+             (v ⭅ V ;; vs ⭅ squash_pick VS ;; ⌈ v :: vs ⌉)
+             (squash_pick VS). Admitted.
+Lemma squash_pick_singleton v : squash_pick [ ⌈ v ⌉ ] = ⌈ [v] ⌉.  
+  rewrite squash_pick_cons.
+  unfold If3.
+  repeat rewrite bind_ret_l.
+  rewrite squash_pick_nil.
+  set_simpl. 
 Admitted.
+
+Lemma if3_union: forall (S1 S1' : Prop) (S2 S3 : Prop),  
+                if3 (S1 \/ S1') S2 S3 = if3 S1 S2 (if3 S1' S2 S3).
+Proof.
+ intros. unfold if3. 
+ apply propositional_extensionality. tauto. Qed.
 
 Lemma part3 e1 : 
     E (y :=: mini.One ((e1 :>: r :=: mini.Array []) :|: r :=: 0)) = 
       let GOOD := UNIONLIST (List.map hide_r (E e1)) in
-      [ (GOOD ∩ (y ≈ ⟨mkTup []⟩)) ∪ ((Total_set - GOOD) ∩ (y ≈ ⟨Int 0⟩)) ].
+      [ (GOOD ∩ (r ≈ y ≈ ⟨mkTup []⟩)) 
+      ∪ ((Total_set - GOOD) ∩ (r ≈ y ≈ ⟨Int 0⟩)) ].
 Proof.
   rewrite E_Unify.
   rewrite E_One.
   rewrite part2.
   rewrite hide_nothing.
   rewrite E_Var.
-  unfold UNIFY. rewrite bind_ret_l. rewrite bind_ret_l. unfold ret, Monad_list.
-  remember ((fun D2 : ENV => hide_r D2 ∩ r ≈ ⟨ mkTup [] ⟩) <$> E e1 ++ [r ≈ ⟨ Int 0 ⟩]) as Δs.
-  unfold fmap, Functor_list in HeqΔs.
+  unfold UNIFY.
+  remember (fmap (fun D2 : ENV => hide_r D2 ∩ r ≈ ⟨ mkTup [] ⟩) (E e1) ++ [r ≈ ⟨ Int 0 ⟩]) as Δs.
 
   rewrite <- if3_rhoIn.
+  remember (UNIONLIST (List.map hide_r (E e1))) as GOOD.
 
   unfold ONE.
+
   f_equal.
-  set_ext ρ. rewrite in_intersection. unfold In.
+  set_ext ρ. rewrite in_intersection. 
+
+  unfold In. 
   remember  (consistent_results ρ <$> Δs) as S.
   rewrite HeqΔs in HeqS.
   unfold fmap, Functor_list in HeqS.
   rewrite List.map_app in HeqS.
   rewrite List.map_map in HeqS.
+  rewrite list_map_singleton in HeqS.
   unfold consistent_results in HeqS.
-  have RW: forall {A B} (f : A -> B) x, List.map f [x] = [f x]. cbn. auto.
-  rewrite RW in HeqS.
   rewrite extract_one in HeqS.
   autorewrite with set_simpl in HeqS.
+  rewrite when_is_true in HeqS; [unfold Total_set;done|].
 
   replace (fun x : ENV => x0 <- extract (hide_r x ∩ r ≈ ⟨ mkTup [] ⟩);; 
                        (let (v, Δ') := x0 in when (ρ ∈ Δ') (ret v)))
@@ -1352,20 +1099,18 @@ Proof.
   subst.
   rewrite squash_pick_app.
   remember ((xs' <- squash_pick (ListDef.map (fun x0 : ENV => when (ρ ∈ hide_r x0) (ret (mkTup []))) (E e1));; ys' <- squash_pick [ret (Int 0)];; ret (xs' ++ ys'))) as S.
-  have squash_pick_singleton: forall v, squash_pick [ret v] = ⌈[v]⌉. { 
-    intro v. cbn. repeat rewrite bind_singleton_l. unfold If3. cbn.
-    set_simpl. done. }
+
   rewrite squash_pick_singleton in HeqS.
+  
   split.
   + intros h. set_crunch. subst.
-    rewrite H in H1. destruct x0. inv H1. inv H1.
-    inv H0.
-    set_crunch.
-    rewrite squash_pick_singleton in H1. inv H1.
-    unfold constrain_eq.
-    destruct x1. 
-    ++ inv H4.
-       replace (List.map (fun x : ENV => when (ρ ∈ hide_r x) (ret (mkTup []))) (E e1))
+    rewrite H in H0. 
+    rewrite squash_pick_singleton in H0. 
+    unfold Head in H0. inv H0. set_crunch.
+    destruct ρ0. 
+    ++ (* squash_pick fails *) 
+      inv H1.
+      replace (List.map (fun x : ENV => when (ρ ∈ hide_r x) (ret (mkTup []))) (E e1))
          with (List.map (fun x => when (ρ ∈ x) (ret (mkTup []))) (List.map hide_r (E e1)))
        in H0. 2: { rewrite List.map_map. auto. }
        right. split; auto.
@@ -1373,6 +1118,7 @@ Proof.
        remember (ListDef.map hide_r (E e1)) as VS.
        move: H0 h.
        clear.
+       (* need to prove that it fails *)
        move: ρ.
        induction VS; intro ρ.
        - cbn. done.
@@ -1393,7 +1139,39 @@ Proof.
             autorewrite with set_simpl in H2. set_crunch.
             unfold In in H. done.
          -- apply IHVS in H0. done. auto.
-    ++ inv H4.
+       - unfold constrain_eq. split; auto. unfold In. done.
+    ++ (* squash pick succeeds *)
+      inv H1.
+      remember (E e1) as VS.
+      clear HeqVS.
+      induction VS as [|W WS].
+      - inv H0.
+      - cbn.
+        rewrite squash_pick_cons in H0.
+        have CL: (ρ ∈ hide_r W) \/ ~(ρ ∈ hide_r W). admit.
+        destruct CL.
+        -- (* first one works *) 
+          clear IHWS.
+          rewrite when_is_true in H0; auto.
+          rewrite bind_ret_l in H0.
+          autorewrite with set_simpl in H0.
+          set_crunch.
+          replace ((hide_r W ∪ UNIONLIST (ListDef.map hide_r WS)) ρ) with
+            ((ρ ∈ hide_r W) \/ (ρ ∈ UNIONLIST (ListDef.map hide_r WS))). 2: { admit. } 
+          rewrite if3_union.
+          unfold if3. left. split. auto. split; eauto. 
+          rewrite H4. unfold constrain_eq. unfold In. done.
+      -- (* first one doesn't *)
+        rewrite when_is_false in H0; auto.
+        autorewrite with set_simpl in H0.
+        move: (IHWS H0) => ih. clear IHWS H0.
+        replace ((hide_r W ∪ UNIONLIST (ListDef.map hide_r WS)) ρ) with
+            ((ρ ∈ hide_r W) \/ (ρ ∈ UNIONLIST (ListDef.map hide_r WS))). 2: { admit. } 
+        rewrite if3_union.
+        unfold if3.
+        right.
+        split. auto.
+        left. unfold if3 in ih.
 Admitted.
 
 (* y = one{ (e1; z=<>) | z=0}@z; (y=⟨⟩; e2) | (y=0; e3)  

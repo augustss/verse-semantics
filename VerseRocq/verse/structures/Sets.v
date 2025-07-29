@@ -6,11 +6,8 @@ From Stdlib Require Export Ensembles.
 From Stdlib Require Setoids.Setoid.
 From Stdlib Require Lists.List.
 From Stdlib Require Import Sets.Classical_sets.
-
-
-(* 
-Require Import structures.Logical.
-*)
+From Stdlib Require Import Logic.PropExtensionality.
+From Stdlib Require Import Logic.FunctionalExtensionality.
 
 (* Representing sets by their characteristic functions.  *)
 
@@ -18,6 +15,8 @@ Require Import structures.Logical.
 Create HintDb set_simpl.
 
 Ltac set_simpl := autorewrite with set_simpl.
+Tactic Notation "set_simpl" "in" hyp(H) :=
+  autorewrite with set_simpl in H.
 
 Declare Scope set_scope.
 Delimit Scope set_scope with Ensemble.
@@ -36,10 +35,6 @@ Arguments Setminus {_}.
 
 Definition P := Ensemble.
 
-(* Union of a set of sets (monadic join) *)
-Definition join {A} (VS : P (P A)) : P A := 
-  fun v => exists V, (In VS V) /\ (In V v).
-
 Open Scope set_scope.
 
 Module SetNotations. 
@@ -51,8 +46,6 @@ Module SetNotations.
   Notation "x ∈ s" := (In s x) (at level 65) : set_scope.
   Notation "a ⊆ b" := (Included a b) (at level 70) : set_scope.
   Notation "a ≃ b" := (Same_set a b) (at level 70) : set_scope.
-
-  Notation "⨃" := join : set_scope.
 End SetNotations. 
 
 Import SetNotations.
@@ -72,6 +65,10 @@ Definition map {A B} (f : A -> B) : P A -> P B :=
 Definition filter {A} (f : A -> bool) : P A -> P A := 
   fun s => fun x => (f x = true) /\ (x ∈ s).
 
+(* Union of a set of sets (monadic join) *)
+Definition join {A} (VS : P (P A)) : P A := 
+  fun v => exists V, (In VS V) /\ (In V v).
+
 (* define a set via set comprehension (i.e. monadic bind): 
    {{ k x | x <- s }} *)
 Definition bind {A B} (s : P A) (k : A -> P B)  : P B := 
@@ -87,9 +84,8 @@ Definition seq {A B} (S1 : P A) (S2 : P B) :=
 (* Total set if proposition holds, emptyset otherwise *)
 Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
 
-(* when ϕ s == guard ϕ >> s *)
-Definition when {A} (ϕ : Prop) (s : P A) : P A := 
-  fun ρ => ϕ /\ (ρ ∈ s).
+(* when ϕ s == guard ϕ ∩ s *)
+Definition when {A} (ϕ : Prop) (s : P A) : P A := guard ϕ ∩ s.
 
 (* if2 s1 s2 == guard (s1 = ∅) >> s 
    returns s2 when s1 is not empty. otherwise emptyset *)
@@ -97,7 +93,25 @@ Definition If2 {A B} (s1 : P A) (s2 : P B) := seq s1 s2.
 
 (* returns s2 when s1 is not empty. otherwise returns s3 *)
 Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
-  (seq s1 s2) ∪ (seq (Setminus Total_set s1) s3).
+  (seq s1 s2) ∪ (seq (Total_set - s1) s3).
+
+Module SetMonadNotation.
+  (* LLeftArrow *)
+  Infix "<$>" := map (at level 52, left associativity) : set_scope.
+  Notation "x ⭅ c1 ;; c2" := (@bind _ _ c1 (fun x => c2))
+    (at level 61, c1 at next level, right associativity) : set_scope.
+  Notation "' pat ⭅ c1 ;; c2" :=
+    (@bind _ _ c1 (fun x => match x with pat => c2 end))
+    (at level 61, pat pattern, c1 at next level, right associativity) : set_scope.
+  (* \fcmp *)
+  Notation "a ⨾ b"  := (seq a b) (at level 70) : set_scope.
+  (* \bigcupdot *)
+  Notation "⨃" := join : set_scope.
+End SetMonadNotation.
+
+Import SetMonadNotation.
+
+Check (x ⭅ ⌈ 1 ⌉ ;; ⌈ x ⌉).
 
 (* ----------------------------------------------------- *)
 
@@ -140,20 +154,46 @@ Definition ap := fun {A B} (m1 :  P (A -> B)) (m2 : P A) =>
     choose := @Union
    }.
 
-
-
 (* ------------------------------------------------------------- *)
 (** Simplification rules (set operators) *)
 
-Import FunctorNotation.
-Import MonadNotation.
+Ltac clean_up := match goal with
+  | [ H : context[⌈ ?a ⌉ ?x] |- _ ] => replace (⌈ a⌉x) with (x ∈ ⌈a⌉) in H 
+end.
+
+
+Ltac set_crunch :=
+    crunch ; repeat match goal with 
+    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh ρ in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (map ?f ?s) |- _ ] =>
+        let ρ1 := fresh ρ in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
+        inv H; crunch
+    | [ H : ⌈?v ⌉ ?ρ |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (If3 ?e1 ?e2 ?e3) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ∅ |- _ ] =>
+        inv H
+      end.
 
 
 (* singleton *)
 
 Lemma map_singleton {A B} (f : A -> B) (a : A) :
-  (map f ⌈ a ⌉) = ⌈ f a ⌉.
-Admitted.
+  map f ⌈ a ⌉ = ⌈ f a ⌉.
+set_ext b.
+split.
+intro h. set_crunch. econstructor; eauto.
+intro h. set_crunch. exists a. split; eauto. econstructor; eauto.
+Qed.
 
 Lemma bind_singleton_l {A B : Type}
   {f : A -> P B}{a : A} :
@@ -283,11 +323,35 @@ Qed.
 
 (* setminus *)
 
-Lemma SetMinus_empty {A} (s : P A) : s - ∅ = s. Admitted.
+Lemma any_minus_empty {A} (s : P A) : s - ∅ = s.
+set_ext x.
+split.
+intro h. inversion h. done.
+intro h. econstructor. auto. intro j. inv j.
+Qed.
 
-#[export] Hint Rewrite @SetMinus_empty : set_simpl.
+Lemma any_minus_all {A} (s : P A) : s - Total_set = ∅.
+set_ext x.
+Admitted.
+
+
+#[export] Hint Rewrite @any_minus_empty @any_minus_all : set_simpl.
+
+
 
 (* bind *)
+
+
+
+Lemma bind_empty {A B}(k : A -> P B) : Sets.bind ∅ k = ∅.
+unfold Sets.bind.
+set_ext s.
+split; intros h; set_crunch.
+inv h. inv H. inv H0.
+Qed.
+
+#[export] Hint Rewrite @bind_empty : set_simpl.
+
 
 Lemma bind_bind {A B C}{ma : P A}{f : A -> P B} {g : B -> P C} :
 bind (bind ma f) g = 
@@ -329,32 +393,85 @@ Qed.
 #[export] Hint Rewrite @join_empty @join_Singleton : set_simpl.
 
 Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
-  (ρ ∈ (x <- ma ;; k x)) <->
+  (ρ ∈ (x ⭅ ma ;; k x)) =
   (exists x, (x ∈ ma) /\ (ρ ∈ (k x))).
 Proof. cbn. unfold bind. cbn. reflexivity. Qed.
 
 Lemma in_ret {A} (x y :A) :
-  x ∈ (ret y : P A) <-> x = y.
+  (x ∈ (ret y : P A)) = (x = y).
 Proof.     
-  cbn. split. intros h1; inversion h1. done.
+  cbn. 
+  eapply propositional_extensionality.
+  split. intros h1; inversion h1. done.
   intros h. subst. done.
 Qed.
 
 Lemma in_intersection {A} (x : A) s1 s2 :
-  x ∈ (s1 ∩ s2) <-> (x ∈ s1) /\ (x ∈ s2).
+  (x ∈ (s1 ∩ s2)) = ((x ∈ s1) /\ (x ∈ s2)).
 Proof.
-  split. intros h1; inversion h1. split; done.
+  eapply propositional_extensionality.
+  split. 
+  intros h1; inversion h1. split; done.
   intros [h1 h2]; econstructor; eauto.
 Qed.
 
 Lemma in_union {A} (x : A) s1 s2 :
-  x ∈ (s1 ∪ s2) <-> (x ∈ s1) \/ (x ∈ s2).
+  (x ∈ (s1 ∪ s2)) = ((x ∈ s1) \/ (x ∈ s2)).
 Proof.
+  eapply propositional_extensionality.  
   split. intros [h1|h1]; [left; auto| right; auto].
   intros [h1|h1];  [left; auto| right; auto].
 Qed.
 
-#[export] Hint Rewrite @in_bind @in_ret @in_intersection @in_union : set_simpl.
+#[export] Hint Rewrite @in_ret @in_intersection @in_union : set_simpl.
+
+Lemma intersect_Setminus {A} (S : P A) : S ∩ (Total_set - S) = ∅.
+  set_ext s. unfold Total_set, Setminus. rewrite in_intersection.
+  intuition. inv H1. done. inv H. done. Qed.
+
+(* SCW: I think this needs an axiom that set membership is decidable. *)
+Lemma union_Setminus {A} (S : P A) : (S ∪ (Total_set - S)) = Total_set.
+  set_ext s. unfold Total_set, Setminus. rewrite in_union.
+  unfold In. split. auto. 
+Admitted.
+
+#[export] Hint Rewrite @intersect_Setminus @union_Setminus : set_simpl.
+
+
+
+Lemma If3_empty {A B} (s2 s3 : P B) : 
+  @If3 A B ∅ s2 s3 = s3.
+Proof.
+  unfold If3.
+  cbn. set_simpl.
+  unfold when.
+  set_ext z.
+  split. intro h. inv h. inv H. set_crunch.
+  inv H. set_crunch. auto.
+  intro h.
+  (* exists a ∈ Total_set : P A or not *)
+Admitted.
+
+Lemma If3_ret {A B} v (s2 s3 : P B) : 
+  If3 (ret v : P A) s2 s3 = s2.
+Proof.
+  unfold If3, when. 
+  set_simpl.
+Admitted.
+
+Lemma If3_union {A B} (s1 s1' : P A)
+  (s2 s3 : P B) : 
+  If3 (s1 ∪ s1') s2 s3 = If3 s1 s2 (If3 s1' s2 s3).
+Proof.
+  unfold If3. 
+  apply set_extensionality. intros b.
+  set_simpl.
+  split.
+  + intro h. set_crunch.
+    unfold when.
+Abort.
+
+#[export] Hint Rewrite @If3_empty @If3_ret : set_simpl. 
 
 
 
@@ -519,16 +636,19 @@ Proof.
   intros ρ.
   set_simpl.
   intro h.
-  crunch.
-  inv H.
+  set_crunch.
   eexists. split; eauto.
-  inv H.
   eexists. split; eauto.
 Qed. (* NB: converse is not true. *)
 
 
 Lemma SetMinusUnion {A} (s1 s2 s3 : P A) : s1 - (s2 ∪ s3) = (s1 - s2) - s3.
 Proof. 
+Admitted.
+
+Lemma distrib_union_l {A} (S S1 S2 : P A) : S ∪ (S1 ∩ S2) = (S ∪ S1) ∩ (S ∪ S2).
+Admitted.
+Lemma distrib_union_r {A} (S S1 S2 : P A) : (S1 ∩ S2) ∪ S = (S1 ∪ S) ∩ (S2 ∪ S).
 Admitted.
 
 (* ----------------------------------------- *)
@@ -703,6 +823,19 @@ Proof. intros. induction l. cbv in H. done.
        simpl. right. eauto. Qed.
 
 
+
+Lemma when_is_true A ϕ (S : P A) :
+  ϕ -> when ϕ S = S. 
+Admitted.
+
+
+Lemma when_is_false A ϕ (S : P A) :
+  ~ ϕ -> when ϕ S = ∅. 
+unfold when, guard. intro h.
+set_ext a. 
+split; intro h1; set_crunch. 
+unfold Ensembles.In in H. done.
+Qed.
 
 
 

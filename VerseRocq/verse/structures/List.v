@@ -3,21 +3,30 @@ From Stdlib Require Import Lists.List.
 
 Require Import Laws.
 
-Import FunctorNotation.
-Import MonadNotation.
 Import ListNotations.
-
 
 Create HintDb list_simpl.
 
-Ltac list_simpl := autorewrite with list_simpl.
+Module ListMonadNotation.
+  Infix "<$>" := List.map (at level 52, left associativity) : list_scope.
+  Notation "x <- c1 ;; c2" := (@List.flat_map _ _ (fun x => c2) c1)
+    (at level 61, c1 at next level, right associativity) : list_scope.
+  Notation "' pat <- c1 ;; c2" :=
+    (@List.flat_map _ _ (fun x => match x with pat => c2 end) c1)
+    (at level 61, pat pattern, c1 at next level, right associativity) : list_scope.
+End ListMonadNotation.
 
-(*
-Lemma flat_map_app {A B} (f : A -> list B) (a1 a2: list A) : 
-  flat_map f (a1 ++ a2) = flat_map f a1 ++ flat_map f a2.
-*)
+Import ListMonadNotation.
+
+
+
+Ltac list_simpl := autorewrite with list_simpl.
+Tactic Notation "list_simpl" "in" hyp(H) :=
+  autorewrite with list_simpl in H.
 
 #[export] Hint Rewrite flat_map_app : list_simpl.
+#[export] Hint Rewrite map_map : list_simpl.
+#[export] Hint Rewrite map_id : list_simpl.
 
 Lemma app_nil_inv {A} (a b : list A) :
   a ++ b = [] -> a = [] /\ b = [].
@@ -243,11 +252,8 @@ Definition take1 {A} (xs : list A) : list A :=
   | [] => [] 
   end.
 
-
-
-
 Lemma fmap_ret {A B} (f : A -> B) (x: A) :
-        f <$> (ret x : list A) = ret (f x).
+        f <$> [x] = [f x].
 cbn. done.
 Qed.
 
