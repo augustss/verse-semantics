@@ -1,0 +1,75 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}
+$$
+% ------------- Denotational semantics of Essential Verse ---------------
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+ & \semess{S}{u}{v}{t} & : & [ \ENV ] \\
+\rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \{ \rho \in \Env \vb \rho(u) = \rho(v) \} ] \\
+\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \{ \rho \in \Env \vb \rho(u) = \rho(v) = \semapp{A}{a}{\rho} \} ] \\
+\rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  [ \{ \rho \in \Env \vb \rho(x) = \rho(v) \} ] \prodE \semess{S}{u}{v}{t} \\
+\rulename{ssquig} &  \semess{S}{u}{v}{|squig x t|} & = &
+   [ \{ \rho \in \Env \vb \rho(x) = \rho(u) \} ] \prodE \semess{S}{u}{v}{t} \\
+\rulename{stype} &  \semess{S}{u}{v}{|:a|} & = &
+  [ \; \{ \rho \in \Env \vb \semapp{A}{a}{\rho} = Fun(hs), \fpr{\rho(u)}{\rho(v)} \in hs[i] \}
+    \vb  i |<-| 0.. \; ] \\
+\rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & [ ] \\
+\rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
+ & = & \semess{B}{u}{v}{t_1} \append \semess{B}{u}{v}{t_2}  \\
+\rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
+& = &  \semess{S}{u}{v}{t_1} \prodE \semess{S}{u}{v}{t_2}  \\
+\rulename{dseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
+& = &  \hideEs( \{p,q\}, \semess{S}{p}{q}{t_1})\; \prodE \;\semess{S}{u}{v}{t_2} \hspace{5mm} \text{$p,q \not\in \freevars{t_1}$}\\
+\rulename{dapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+ & = & \begin{array}[t]{@@{}l@@{\;}l}
+  [ & \{ \rho \in \Env \vb \rho(u)=\rho(v), \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(v)}) \in hs[i] \} \\
+    |vbar| &  i |<-| 0\mydots \; ]
+  \end{array} \\
+
+%  ------ IF --------------
+\multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
+  \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} } & = & ???? \\
+
+
+%  ------ ALL --------------
+\rulename{sall} & \semess{S}{u}{v}{|all t|}
+& = & [ \, \begin{array}[t]{@@{}l@@{\;}l}
+           \{ & \rho \in \Env \\
+             \vb & vs \in \pickE (\squashE
+             \begin{array}[t]{@@{}l@@{\;}l}
+               [ & \{ v \vb (v,\EV') \in \extractE(q,\hideE(p,\EV)), \rho \in \EV' \} \\
+               \vb & \EV \in \semess{S}{p}{q}{|t|} \; ]) \hspace{5mm} p,q \not\in \freevars{t}
+               \end{array} \\
+           , & \rho(u) = \rho(v) = \tupE(vs) \} \, ]
+           \end{array} \\
+
+%  ------ ONE --------------
+\rulename{sone} & \semess{S}{u}{v}{|one t|}
+& = & [ \, \begin{array}[t]{@@{}l@@{\;}l}
+           \{ & \rho \in \Env \\
+             \vb & vs \in \pickE (\squashE
+             \begin{array}[t]{@@{}l@@{\;}l}
+               [ & \{ v \vb (v,\EV') \in \extractE(q,\hideE(p,\EV)), \rho \in \EV' \} \\
+               \vb & \EV \in \semess{S}{p}{q}{|t|} \; ]) \hspace{5mm} p,q \not\in \freevars{t}
+               \end{array} \\
+           , & \rho(u) = \rho(v) = \tupE(vs) \} \, ]
+           \end{array} \\
+
+% -------- LAMBDA ------------
+\rulename{dlam} &
+\multicolumn{3}{l}{\semess{S}{u}{v}{|functionOCX q t_1 fx t_2|}} \\
+  & & = & ??? \\
+\\
+
+& \semess{B}{u}{v}{|t|} & : & \seq{ \ENV } \\
+& \semess{B}{u}{v}{|t|} & = & \hideEs(\semapp{I}{|t|}, \semess{S}{u}{v}{t})
+\end{array}
+\end{array}
+$$
+\caption{Denotational semantics of Essential Verse: plan (S-LS)} \label{fig:s-ls}
+\end{figure}
