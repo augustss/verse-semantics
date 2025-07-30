@@ -7,7 +7,15 @@ Import ListNotations.
 
 Create HintDb list_simpl.
 
+Definition ap {A B} 
+  (fs : list (A -> B)) (xs : list A) : list B :=
+  (* [f x | f <- fs, x <- xs] *)
+  flat_map (fun f => 
+              flat_map (fun x => 
+                          (f x :: nil)) xs) fs.
 Module ListMonadNotation.
+  Infix "<$>" := List.map (at level 52, left associativity) : list_scope.
+  Infix "<*>" := List.ap  (at level 52, left associativity) : list_scope.
   Notation "x <- c1 ;; c2" := (@List.flat_map _ _ (fun x => c2) c1)
     (at level 61, c1 at next level, right associativity) : list_scope.
   Notation "' pat <- c1 ;; c2" :=
@@ -60,13 +68,6 @@ Lemma in_flat_map {A B} (b : B) (k : A -> list B) (ma : list A) :
 
 
 (* Monad definitions *)
-
-Definition ap_List {A B} 
-  (fs : list (A -> B)) (xs : list A) : list B :=
-  (* [f x | f <- fs, x <- xs] *)
-  flat_map (fun f => 
-              flat_map (fun x => 
-                          (f x :: nil)) xs) fs.
   
 
 #[export] Instance Functor_list : Functor list :=
@@ -79,7 +80,7 @@ Definition ap_List {A B}
 
 #[export] Instance Applicative_list : Applicative list :=
 { pure := fun _ x => x :: nil;
-  ap   := @ap_List
+  ap   := @List.ap
 }.
 
 #[export] Instance Alternative_list : Alternative list :=
@@ -294,4 +295,4 @@ Proof.
   cbn. f_equal. auto.
 Qed.
 
-#[export] Hint Rewrite @bind_map : list_simpl.
+#[export] Hint Rewrite @map_singleton : list_simpl.

@@ -1,5 +1,7 @@
 Require Import Imports.
 
+
+
 From Stdlib Require Lists.List.
 From Stdlib Require Import Classes.EquivDec.
 Import ssreflect.
@@ -35,6 +37,8 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
+Notation "r ≈ x ≈ ⟨ k ⟩" := ((r ≈ ⟪ x ⟫) ∩ (x ≈ ⟨ k ⟩)).
+
 (* ---------------------------------------------- *)
 
 (* This axiom is BAD. But convenient for now.... *)
@@ -45,6 +49,35 @@ Definition is_Empty_set {A} (s : P A) : bool :=
   match empty_dec s with 
   | left _ => true | right _ => false 
   end.
+
+
+Ltac set_crunch :=
+    crunch ; repeat match goal with 
+    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh ρ in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (Sets.seq ?s1 ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (Sets.map ?f ?s) |- _ ] =>
+        let ρ1 := fresh ρ in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
+        inv H; crunch
+    | [ H : ⌈?v ⌉ ?ρ |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?x ≉ ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (hide ?s ?S) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ∅ |- _ ] =>
+        inv H
+      end.
 
 (* --------------------------------------------------- *)
 
@@ -62,7 +95,7 @@ Definition y := mini.Test.y.
 
 
 (* This is a bit of a hack. For examples, we special case the variables
-   x,y, and y. *)
+   x,y, and y when simplifying environment lookups *)
 
 Ltac rewrite_env := 
   repeat match goal with 
@@ -113,7 +146,7 @@ Fixpoint evalA (e : mini.Expr) (ρ : env) : value :=
   | _ => Dom.Int 0
   end.
 
-(* ------- operations on lists of sets ---------- *)
+(* ------- operations on lists of sets and sets of lists ------ *)
 
 Definition SUCCEED {A} : list (P A) := [Total_set]. 
 
@@ -135,6 +168,48 @@ Definition MINUS {A} (d1 : list (P A)) (d2: list (P A)) :
  
 Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 
+Infix "*" := UNIFY.
+
+(* --------- pick/sequence ----------- *)
+
+Definition Cons {A} := (fun (V : P A) (VS : P (list A)) => 
+    v  ⭅ V  ;;  vs ⭅ VS ;; ⌈ v :: vs⌉).
+
+(* This operation is liftM2 snoc *)
+Definition Snoc {A} := (fun (VS : P (list A)) (V : P A) => 
+    vs ⭅ VS ;;  v  ⭅ V  ;; ⌈ vs ++ [v]⌉).
+   
+
+(* The set of all first elements from a list. *)
+(*   {{ v | (v :: _) <- V }}   *)
+Definition Head {A} (V : P (list A)) : P A := 
+  vs ⭅ V ;;
+  match vs with 
+  | v :: _ => ⌈ v ⌉
+  | _ => ∅
+  end. 
+
+
+Fixpoint pick {A} (xs : list (P A)) : P (list A) := 
+  match xs with 
+  | nil => ⌈ [] ⌉
+  | V :: VS => v  ⭅ V ;; vs ⭅ pick VS ;; ⌈ v :: vs⌉ 
+  end.
+
+(* pick / 
+   this is the list instance of 'sequence' from Haskell's Traversable class *)
+Fixpoint pickl {A} (xs : list (list A)) : list (list A) := 
+  match xs with 
+  | nil => [ [] ]
+  | V :: VS =>  v <- V ;; vs <- pickl VS ;; [ v :: vs ] 
+  end.
+
+(* ------------- squash -------------- *)
+
+(* squash using axiom *)
+Definition squash {A} (xs : list(P A)) : list (P A) := 
+  x <- xs ;; if is_Empty_set x then [x] else [].
+
 (* left to right squash, doesn't require axiom, but cannot 
    produce a list.
    fold_left allows us to use snoc in the definition of ALL
@@ -147,11 +222,15 @@ Definition squash_fold_left {A B} (f : P A -> P B -> P A) :
 Definition first {A} (VS : list (P A)) : P A := 
   squash_fold_left (fun xs x => x) VS ∅.
 
-(* squash using axiom *)
-Definition squash {A} (xs : list(P A)) : list (P A) := 
-  List.filter is_Empty_set xs.
-
-
+(* squashing and picking at the same time *)
+(* doesn't require axiom *)
+Fixpoint squash_pick {A} (xs : list (P A)) : P (list A) := 
+  match xs with 
+  | nil => ⌈ [] ⌉
+  | V :: VS => If3 V  
+               (Cons V (squash_pick VS))
+               (squash_pick VS)
+  end.
 
 (* --------- dodgy union ----------- *)
 (* elementwise union of sequences, missing elements are ∅s.  *)
@@ -173,7 +252,6 @@ Definition DODGY_UNIONS {A} (VVS : P (list (P A))) : list (P A) :=
   [ ⨃ VS ].
 
 Infix "⩅" := pointwise_union (at level 70).
-Infix "*" := UNIFY.
 
 (* -------------- tuples and application ------ *)
 
@@ -193,10 +271,10 @@ Definition apply (f : value) (v : value) : list VAL :=
   | Dom.Fun hs => 
       h <- hs ;;
       match (PFun.apply_opt _ _ Value.eqb h v) with 
-      | Some w => ret (ret w)
-      | None => empty 
+      | Some w => [⌈w⌉]
+      | None => []
       end
-  | _ => empty
+  | _ => []
   end.
 
 (* Two different versions of application. Arguments must be atomic, 
@@ -221,45 +299,291 @@ Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV :=
   i <- allNums ;;
   ret (APPi e1 e2 i).
 
-Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
-  UNIFY (hide_list (Scope.singleton r) d1) d2.
-
 (* --- semantics of ALL / ONE for dest passing --------- *)
 
 (* find all environments in Δ such that ρ(r) = v, then hide r *)
 
-Definition extract (Δ : ENV) : P (value * ENV) := 
+(* {{  (v, Δ') | ρ ∈ Δ , v = ρ.r, Δ' = (Δ ∩ {{ r = v }}) \ r  }} *)
+Definition extract r (Δ : ENV) : P (value * ENV) := 
   ρ ⭅ Δ ;;
   ret ( ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆ ).
 
-(* This operation is liftM2 snoc *)
-Definition Cons := (fun (V : VAL) (VS : P (list value))  => 
-    v  ⭅ V  ;;
-    vs ⭅ VS ;; 
-    ⌈ v :: vs⌉).
+(* The set of results in Δ that could be produced by environments 
+   consistent with ρ *)
+(* {{ v | (v , Δ') ∈ extract Δ , ρ ∈ Δ ' }} *)
+Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
+  '(v, Δ') ⭅ extract r Δ ;; when (ρ ∈ Δ') ⌈v⌉.
 
-Definition Snoc := (fun (VS : P (list value)) (V : VAL) => 
-    vs ⭅ VS ;; 
-    v  ⭅ V  ;;
-    ⌈ vs ++ [v]⌉).
-   
-Definition Head (V : P (list value)) : VAL := 
-  vs ⭅ V ;;
-  match vs with 
-  | v :: _ => ⌈ v ⌉
-  | _ => ∅
-  end. 
+Definition ALL (Δs : list ENV) : ENV := 
+  fun ρ => exists vs,
+      (vs ∈ squash_pick (List.map (consistent_results ρ) Δs)) /\
+      (ρ r = mkTup vs).
+       
+Definition ONE (Δs : list ENV) : ENV := 
+  fun ρ => 
+      (ρ r ∈ Head (squash_pick (List.map (consistent_results ρ) Δs))).
 
-(* pick_squash *)
-Fixpoint squash_pick (xs : list VAL) : P (list value) := 
-  match xs with 
-  | nil => ⌈ [] ⌉
-  | V :: VS => If3 V  
-               (Cons V (squash_pick VS))
-               (squash_pick VS)
+(* --- other definitions --------- *)
+
+Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
+  (d1 [\] ⟅ r ⟆) * d2.
+
+(* This character C-X 8 ret U+2A3E,  or \fcmp  *)
+(* Infix "⨾" := seq (at level 70, left associativity) : list_scope. *)
+
+
+(* The semantics of 0..x 
+   [ {{r=1,x>=1}}, {{r=2,x>=2}}, ... ]
+   [ {{r=i,x>=i}} | i <- [0 ..] ]
+
+ *)
+Definition enumTo x : list ENV := 
+  i <- allNums ;;
+  [ (fun ρ => (ρ r = Int i) /\ exists n, (ρ x = Int n) /\ n >= i) ].
+
+Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
+    match xs with 
+    | [] => ⌈ ([], Total_set) ⌉
+    | (Δi :: rest) => 
+        let failΔi '(vs, Δ) := (vs, (Total_set - Δi) ∩ Δ) in 
+        (Sets.map failΔi (combine rest)) ∪
+
+        ('(vi, Δi') ⭅ extract r Δi ;;
+         let succΔi '(vs, Δ) := (vi :: vs, Δi' ∩ Δ) in
+          Sets.map succΔi (combine rest))
+    end.
+
+
+(* ----- semantics of IF ------------ *)
+
+(* Tim's version of IF *)
+
+(* Given a list of ENVs,  E{a}[0] ... E{a}[n]
+
+   If any of these succeed, we want to take the first one.
+   So, we will produce a list of environments, where the first one 
+   is the first one, but the second needs to know that the 
+   first one failed. So we use set difference to subtract the first 
+   set from the second.
+
+   NB: not sure what is going on with hiding here.
+
+ ([E{a}[0]                                      ]             + 
+  [E{a}[1] \{xs} E{a}[0]                        ]             + … +
+  [E{a}[n] \{xs} E{a}[0] \{xs} … \{xs} E{a}[n-1]])
+*)
+Fixpoint try (xs : Scope.t) (Δs : list ENV) : list ENV * ENV := 
+  let step := fun '(envs, avoid) Δi => 
+                (envs ++ [Δi - avoid], avoid ∪ (Δi \ xs)) in
+  List.fold_left step Δs ([],∅).
+
+Definition IF_TIM xs S1 S2 S3 := 
+    let (success, avoid) := try xs S1 in 
+     (SEQ success (S2 [\] xs)) ++
+     (SEQ [Total_set - avoid] S3).
+
+
+(* Koen's encoding of if *)
+
+(*
+if e1 e2 e3 =
+  exists y; 
+  y = one{ (e1; z=⟨⟩) | z=0 }@z;
+  (y=⟨⟩; e2) | (y=0; e3)
+*)
+
+(* Translated to DPS style, with distinguished result r *)
+Definition koen_if e1 e2 e3 : mini.Expr := 
+  mini.DefineV y :>:
+  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
+  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
+
+Definition IF_KOEN (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
+  SEQ [ONE( SEQ S1 [r ≈ ⟨mkTup []⟩] ++ [r≈⟨Int 0⟩])]
+      (SEQ [y≈⟨mkTup[]⟩] S2) ++ (SEQ [y ≈⟨Int 0⟩] S3).
+
+(* Simon's version of If *)
+
+Definition UNIONLIST : list ENV -> ENV := 
+  List.fold_right Union ∅.
+
+Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
+    let GOOD := UNIONLIST (S1 [\] ⟅ r ⟆) in
+    (List.map (fun D => D ∩ GOOD) S2) ++ 
+    (List.map (fun D => D - GOOD) S3).
+
+(* E [if (x=1|x=2) { x } { 0 }] = [ {r=1,x=1} | {r=2,x=2} | {r=0,x<>1,2} *)
+
+
+Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
+
+(* ----------- non-dodgy dest passing style -------------- *)
+
+Module D_LS. 
+
+Fixpoint E (e : mini.Expr) : list ENV := 
+
+  let B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;; [Δ \ mini.I e] 
+  in
+  let V (e : mini.Expr) : list (P (value * ENV)) := 
+    Δ <- B e ;; [extract r Δ] 
+  in
+
+  match e with 
+  | mini.DefineV _ => [ Total_set ]
+
+  | mini.Var _ => [ r ≈ evalA e ]
+  | mini.Lit _ => [ r ≈ evalA e ]
+  | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ]
+
+  | mini.Fail => []  
+
+  | mini.Choice e1 e2 => E e1 ++ E e2
+
+  | mini.Unify e1 e2 => 
+      E e1 * E e2
+
+  | mini.Seq e1 e2 => 
+      (E e1 [\] Scope.singleton r) * (E e2) 
+
+  | mini.ApplyD e1 e2 => APP e1 e2
+
+  | mini.If3 a b c =>  
+
+    let xs := mini.I a in 
+    let (success, avoid) := try xs (E a) in 
+
+     (SEQ success (E b [\] xs)) ++
+     (SEQ [Total_set - avoid] (E c))
+
+
+  | mini.All a => 
+      [ ALL (E a) \ mini.I a ] 
+
+  | mini.One a => 
+      [ ONE (E a) \ mini.I a ]
+
+  (* TODO: functions *)
+
+  | _ => [ ] 
   end.
 
-Lemma squash_pick_singleton v : 
+End D_LS.
+
+Module D_LS_Theory.
+
+Import D_LS.
+
+Lemma E_Var (i:Ident) : E i = [ fun ρ => ρ r = ρ i ]. reflexivity. Qed.
+Lemma E_One e : E (mini.One e) = [ ONE (E e) \ mini.I e ]. reflexivity. Qed.
+Lemma E_Choice e1 e2 : E (e1 :|: e2) = (E e1) ++ (E e2). reflexivity. Qed.
+Lemma E_Seq e1 e2 : E (e1 :>: e2) = (E e1 [\] ⟅r⟆) * E e2. reflexivity. Qed.
+Lemma E_Unify e1 e2 : E (e1 :=: e2) = E e1 * E e2. reflexivity. Qed.
+
+Create HintDb E.
+Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
+
+(* if(a){b}else{c} <=> if(a){b}else{:false} | if(a){:false}else{c} *)
+Lemma opinionated_if a b c: 
+  E(mini.If3 a b c) =  E( mini.If3 a b mini.Fail :|: mini.If3 a mini.Fail c).
+Proof. 
+  unfold E. fold E.
+  destruct (try (mini.I a) (E a)) as [success avoid].
+  replace (SEQ [Total_set - avoid] []) with ([] : list ENV).
+  2 : { cbn. auto. } 
+  rewrite -> List.app_nil_r.
+  replace (SEQ success ([] [\] mini.I a)) with ([] : list ENV).
+  2: { cbn. unfold SEQ, UNIFY. cbn.
+       admit. } 
+  rewrite -> List.app_nil_l. auto.
+Admitted.
+
+
+(* 
+
+if e1 e2 e3 =
+  exists y; 
+  y = one{ (e1; z=⟨⟩) | z=0 }@z;
+  (y=⟨⟩; e2) | (y=0; e3)
+
+koen_if =
+  fun e1 e2 e3 : mini.Expr =>
+  ∃ y :>: 
+  y :=: mini.One (e1 :>: r :=: mini.Array [] :|: r :=: 0) :>: 
+  y :=: mini.Array [] :>: e2 :|: y :=: 0 :>: e3
+*)
+
+(*
+= [ D ⋂ GOOD | D ∈ Ed[e2] ] ++
+  [ D \ GOOD | D ∈ Ed[e3] ]
+where
+  GOOD :: ENV = UNIONLIST (map hide(r) Ed[e1])
+
+*)
+
+End D_LS_Theory.
+
+
+(* ------------------------------------------------------ *)
+(* ------  Fig 17 D-LS (using dodgy union) -------------- *)
+
+Module DLS_OLD.
+
+
+Fixpoint E (e : mini.Expr) : list ENV := 
+
+  let B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;;
+    [ Δ \ mini.I e ] in
+
+  match e with 
+  | mini.DefineV _ => [ Total_set ]
+
+  | mini.Var _ => [ r ≈ evalA e ]
+  | mini.Lit _ => [ r ≈ evalA e ]
+  | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ]
+
+  | mini.Fail => [ ]
+
+  | mini.Choice e1 e2 => E e1 ++ E e2
+
+  | mini.Seq e1 e2 => (E e1 [\] Scope.singleton r) * (E e2)
+
+  | mini.Unify e1 e2 => E e1 * E e2  (* missing from fig *)
+
+  | mini.ApplyD e1 e2 => APP e1 e2
+
+  | mini.If3 e1 e2 e3 =>  
+
+    let Y  := mini.I e1 in 
+    let Δ1 := first (E e1) \ Scope.singleton r in
+
+     (Δ2 <- E e2 ;; [(Δ1 ∪ Δ2) \ Y])  ⩅
+     (Δ3 <- E e3 ;; [Δ3 - Δ1 \ Y])
+
+  | mini.All a => 
+       [ ALL (B a)  ] 
+
+  | mini.One a =>  (* not quite right *)
+       [ first (E a) \ mini.I a ]
+
+  (* TODO: functions *)
+
+  | _ => [ ∅ ] 
+  end.
+
+
+End DLS_OLD.
+
+
+
+
+(* ---- examples / theory about extract / squash_pick ----- *)
+
+Lemma squash_pick_singleton {A} (v : A) : 
   squash_pick [ ⌈ v ⌉ ] = ⌈ [v] ⌉.  
   cbn.
   set_simpl.
@@ -284,43 +608,9 @@ Proof.
   unfold List.fold_left.
 Admitted.
 
-(* SPJs definition. More concise version below *)
-Definition ALL' (Δs : list ENV) : ENV := 
-  fun ρ => 
-    exists vs, 
-      let VS : list VAL := 
-                 (Δ2 <- Δs ;;
-                  ['(v, D3) ⭅ extract Δ2 ;;
-                                  when (ρ ∈ D3) ⌈ v ⌉]) in
-      (vs ∈ squash_pick VS) /\
-      (ρ r = mkTup vs).
-
-(* The set of results in Δ that could be produced by environments 
-   consistent with ρ *)
-Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
-  '(v, Δ') ⭅ extract Δ ;; when (ρ ∈ Δ') ⌈v⌉.
-
-Definition ALL (Δs : list ENV) : ENV := 
-  fun ρ => exists vs,
-      (vs ∈ squash_pick (List.map (consistent_results ρ) Δs)) /\
-      (ρ r = mkTup vs).
-       
-Definition ONE (Δs : list ENV) : ENV := 
-  fun ρ => 
-      (ρ r ∈ Head (squash_pick 
-                     (List.map (consistent_results ρ) Δs))).
-
-(* ---- examples / theory about extract / squash_pick ----- *)
-
-Ltac set_crunch := 
-  repeat (Sets.set_crunch ; 
-   match goal with 
-   | [ H : ?x ∈ (?y ≈ ?v) |- _ ] => inv H; crunch
-
-   end).
 
 Lemma extract_one {v} : 
-  extract (r ≈ ⟨ v ⟩) = ⌈ (v, Total_set) ⌉.
+  extract r (r ≈ ⟨ v ⟩) = ⌈ (v, Total_set) ⌉.
 Proof. 
 eapply set_extensionality. intro ρ.
 unfold extract. 
@@ -338,7 +628,7 @@ split.
 Qed. 
 
 Lemma extract_example {k} :
-  extract (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
+  extract r (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
     ⌈ (k, x ≈ ⟨ k ⟩) ⌉.
 Proof.
   unfold extract.
@@ -361,13 +651,10 @@ Proof.
 Qed. 
 
 Lemma extract_two :
-  extract (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
+  extract r (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
     (ret (Int 0, Total_set) ∪ ret (Int 1, Total_set)).
 Admitted.
 
-Ltac unfoldIn :=  match goal with 
-    | [ |- context[?ρ ∈ (fun ρ0 => @?f ρ0)] ] => 
-  replace (ρ ∈ (fun ρ0 => f ρ0)) with (f ρ);[|auto] end.
 
 Lemma bcp_example : 
   ALL [x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩] = 
@@ -550,315 +837,6 @@ Proof.
 Abort.
     
 
-(* The semantics of 1..x 
-   [ {{r=1,x>=1}}, {{r=2,x>=2}}, ... ]
-   [ {{r=i,x>=i}} | i <- [0 ..] ]
-
- *)
-Definition sem : list ENV := 
-  i <- allNums ;;
-  [ (fun ρ => (ρ r = Int i) /\ exists n, (ρ x = Int n) /\ n >= i) ].
-
-(* The semantics that we want for all{1..n} 
-
-   ==  [ { rho | rho(r) = tup[ i | i <- 0.., rho(n) >= i ]  } ]     ←- the answer we want
-
-   =?= [ UNION { {{r=tup[1,..k], n=k}} | k \in Z } ] 
-*)
-
-
-(* This is "the answer we want" *)
-Definition all_sem : ENV := 
-  fun rho => 
-    exists n, rho x = Int n /\
-           let l : list value := 
-    (* [ i | i <- 0.., i <= rho(n) ] *)
-    i <- allNums ;; guard (Value.leb (Int i) (rho x)) [Int i] in 
-  rho r = mkTup l.
-
-
-*)
-(* This character C-X 8 ret U+2A3E *)
-
-(* Infix "⨾" := seq (at level 20). *)
-
-Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
-    match xs with 
-    | [] => ⌈ ([], Total_set) ⌉
-    | (Δi :: rest) => 
-        let failΔi '(vs, Δ) := (vs, (Total_set - Δi) ∩ Δ) in 
-        (Sets.map failΔi (combine rest)) ∪
-
-        ('(vi, Δi') ⭅ extract Δi ;;
-         let succΔi '(vs, Δ) := (vi :: vs, Δi' ∩ Δ) in
-          Sets.map succΔi (combine rest))
-    end.
-
-Notation "r ≈ x ≈ ⟨ k ⟩" := ((r ≈ ⟪ x ⟫) ∩ (x ≈ ⟨ k ⟩)).
-
-Definition ex1 : ENV := (r ≈ x ≈ ⟨ Int 1 ⟩).
-
-Example ex_combine0 : combine [] = ⌈ ([], Total_set) ⌉.
-cbn.   done. Qed.
-
-Example ex_combine1 : combine [ r ≈ ⟨ Int 1 ⟩ ] = ⌈ ([Int 1], Total_set ) ⌉.
-Proof.
-  unfold combine.
-  set_simpl.
-  set_ext bb. destruct bb as [v Δ].
-  set_simpl.
-  split.
-  - intro h.
-    set_crunch. 
-Abort.
-
-
-Example ex_combine2 : 
-  combine ([(r ≈ x ≈ ⟨ Int 1 ⟩); (r ≈ x ≈ ⟨ Int 0 ⟩)]) = 
-    ((ρ ⭅ (x ≈ ⟨ Int 1 ⟩) ;; ⌈ ([Int 1], ret ρ)⌉) ∪
-    (ρ ⭅ (x ≈ ⟨ Int 0 ⟩) ;; ⌈ ([Int 0], ret ρ)⌉) ∪
-    (ρ ⭅ (x ≈ ⟨ Int 2 ⟩) ;; ⌈([]     , ret ρ)⌉)).
-Proof.
-  eapply Extensionality_Ensembles.
-  split.
-  + intros v vIn.
-    destruct v as [v Δ].
-    cbn in vIn.
-Abort.
-(*
-    move: vIn => [[w1 Δ1] [h1 h2]].
-    cbn in h2.  
-    move: h2 => [h2|h2].
-    move: h2 => [[w2 Δ2] [h2 h3]].
-    { destruct h3. try done. try done. }
-    move: h2 => [[w3 Δ3] [h3 h4]].
-    destruct h4. try done.  subst.
-    cbn. right. admit.
-  + intros v vIn.
-    destruct v as [v Δ].
-    cbn in vIn.
-    move: vIn => [[w1 Δ1] h2|h2].
-    ++ move: h2 => [[w2 Δ2] h3|h3].
-       move: h3 => [ρ [h4 h5]].
-       inversion h5. subst. clear h5.
-       exists (Int 1, x ≈ ⟨ Int 1 ⟩). split. admit.
-       right.
-Abort. *)
-
-(* ------------------------------------------------------ *)
-(* ------  Fig 17 D-LS (using dodgy union) -------------- *)
-
-Module DLS_OLD.
-
-
-Fixpoint E (e : mini.Expr) : list ENV := 
-
-  let B (e : mini.Expr) :list ENV := 
-    Δ <- E e ;;
-    [ Δ \ mini.I e ] in
-
-  match e with 
-  | mini.DefineV _ => [ Total_set ]
-
-  | mini.Var _ => [ r ≈ evalA e ]
-  | mini.Lit _ => [ r ≈ evalA e ]
-  | mini.EPrim _ => [ r ≈ evalA e ]
-  | mini.Array es =>  [ r ≈ evalA e ]
-
-  | mini.Fail => [ ]
-
-  | mini.Choice e1 e2 => E e1 ++ E e2
-
-  | mini.Seq e1 e2 => (E e1 [\] Scope.singleton r) * (E e2)
-
-  | mini.Unify e1 e2 => E e1 * E e2  (* missing from fig *)
-
-  | mini.ApplyD e1 e2 => APP e1 e2
-
-  | mini.If3 e1 e2 e3 =>  
-
-    let Y  := mini.I e1 in 
-    let Δ1 := first (E e1) \ Scope.singleton r in
-
-     (Δ2 <- E e2 ;; [(Δ1 ∪ Δ2) \ Y])  ⩅
-     (Δ3 <- E e3 ;; [Δ3 - Δ1 \ Y])
-
-  | mini.All a => 
-       [ ALL' (B a)  ] 
-
-  | mini.One a =>  (* not quite right *)
-       [ first (E a) \ mini.I a ]
-
-  (* TODO: functions *)
-
-  | _ => [ ∅ ] 
-  end.
-
-
-End DLS_OLD.
-
-
-(* Tim's version of IF *)
-
-(* Given a list of ENVs,  E{a}[0] ... E{a}[n]
-
-   If any of these succeed, we want to take the first one.
-   So, we will produce a list of environments, where the first one 
-   is the first one, but the second needs to know that the 
-   first one failed. So we use set difference to subtract the first 
-   set from the second.
-
-   NB: not sure what is going on with hiding here.
-
- ([E{a}[0]                                      ]             + 
-  [E{a}[1] \{xs} E{a}[0]                        ]             + … +
-  [E{a}[n] \{xs} E{a}[0] \{xs} … \{xs} E{a}[n-1]])
-*)
-Fixpoint try (xs : Scope.t) (Δs : list ENV) : list ENV * ENV := 
-  let step := fun '(envs, avoid) Δi => 
-                (envs ++ [Δi - avoid], avoid ∪ (Δi \ xs)) in
-  List.fold_left step Δs ([],∅).
-
-Definition IF_TIM xs S1 S2 S3 := 
-    let (success, avoid) := try xs S1 in 
-     (SEQ success (S2 [\] xs)) ++
-     (SEQ [Total_set - avoid] S3).
-
-(* Simon's version of If *)
-
-Definition UNIONLIST : list ENV -> ENV := 
-  List.fold_right Union ∅.
-
-Definition hide_r := hide (Scope.singleton r).
-
-Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
-    let GOOD := UNIONLIST (List.map hide_r S1) in
-    (fmap (fun D => D ∩ GOOD) S2) ++ 
-    (fmap (fun D => D - GOOD) S3).
-
-(* E [if (x=1|x=2) { x } { 0 }] = [ {r=1,x=1} | {r=2,x=2} | {r=0,x<>1,2} *)
-
-
-(* Koen's encoding of if
-if e1 e2 e3 =
-  exists y; 
-  y = one{ (e1; z=⟨⟩) | z=0 }@z;
-  (y=⟨⟩; e2) | (y=0; e3)
-*)
-
-(* Translated to DPS style, with distinguished result r *)
-Definition koen_if e1 e2 e3 : mini.Expr := 
-  mini.DefineV y :>:
-  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
-  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
-
-
-Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
-
-(* ----------- non-dodgy dest passing style -------------- *)
-
-(* This version avoids the dodgy union by providing an 
-   ordering for the branch of if expressions.
-   Otherwise, it is the same as the DLS semantics. 
-*)
-
-Module DLS. 
-
-Fixpoint E (e : mini.Expr) : list ENV := 
-
-  let B (e : mini.Expr) :list ENV := 
-    Δ <- E e ;; [Δ \ mini.I e] 
-  in
-  let V (e : mini.Expr) : list (P (value * ENV)) := 
-    Δ <- B e ;; [extract Δ] 
-  in
-
-  match e with 
-  | mini.DefineV _ => [ Total_set ]
-
-  | mini.Var _ => [ r ≈ evalA e ]
-  | mini.Lit _ => [ r ≈ evalA e ]
-  | mini.EPrim _ => [ r ≈ evalA e ]
-  | mini.Array es =>  [ r ≈ evalA e ]
-
-  | mini.Fail => []  
-
-  | mini.Choice e1 e2 => E e1 ++ E e2
-
-  | mini.Seq e1 e2 => 
-      (E e1 [\] Scope.singleton r) * (E e2) 
-
-  | mini.Unify e1 e2 => 
-      E e1 * E e2
-
-  | mini.ApplyD e1 e2 => APP e1 e2
-
-  | mini.If3 a b c =>  
-
-    let xs := mini.I a in 
-    let (success, avoid) := try xs (E a) in 
-
-     (SEQ success (E b [\] xs)) ++
-     (SEQ [Total_set - avoid] (E c))
-
-  | mini.All a => 
-      [ ALL (E a) \ mini.I a ] 
-
-  | mini.One a => 
-      [ ONE (E a) \ mini.I a ]
-
-  (* TODO: functions *)
-
-  | _ => [ ] 
-  end.
-
-
-
-(* if(a){b}else{c} <=> if(a){b}else{:false} | if(a){:false}else{c} *)
-Lemma opinionated_if a b c: 
-  E(mini.If3 a b c) =  E( mini.If3 a b mini.Fail :|: mini.If3 a mini.Fail c).
-Proof. 
-  unfold E. fold E.
-  destruct (try (mini.I a) (E a)) as [success avoid].
-  replace (SEQ [Total_set - avoid] []) with ([] : list ENV).
-  2 : { cbn. auto. } 
-  rewrite -> List.app_nil_r.
-  replace (SEQ success ([] [\] mini.I a)) with ([] : list ENV).
-  2: { cbn. admit. } 
-  rewrite -> List.app_nil_l. auto.
-Admitted.
-
-
-(* 
-
-if e1 e2 e3 =
-  exists y; 
-  y = one{ (e1; z=⟨⟩) | z=0 }@z;
-  (y=⟨⟩; e2) | (y=0; e3)
-
-koen_if =
-  fun e1 e2 e3 : mini.Expr =>
-  ∃ y :>: 
-  y :=: mini.One (e1 :>: r :=: mini.Array [] :|: r :=: 0) :>: 
-  y :=: mini.Array [] :>: e2 :|: y :=: 0 :>: e3
-*)
-
-(*
-= [ D ⋂ GOOD | D ∈ Ed[e2] ] ++
-  [ D \ GOOD | D ∈ Ed[e3] ]
-where
-  GOOD :: ENV = UNIONLIST (map hide(r) Ed[e1])
-
-*)
-
-Lemma E_Var (i:Ident) : E i = [ fun ρ => ρ r = ρ i ]. reflexivity. Qed.
-Lemma E_One e : E (mini.One e) = [ ONE (E e) \ mini.I e ]. reflexivity. Qed.
-Lemma E_Choice e1 e2 : E (e1 :|: e2) = (E e1) ++ (E e2). reflexivity. Qed.
-Lemma E_Seq e1 e2 : E (e1 :>: e2) = (E e1 [\] ⟅r⟆) * E e2. reflexivity. Qed.
-Lemma E_Unify e1 e2 : E (e1 :=: e2) = E e1 * E e2. reflexivity. Qed.
-
-Create HintDb E.
-Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
 
 
 (* Ed[ e1; r=<> ] = [ hide(r) D1 ∩ {{ r=<> }} | D1 <- E[e1] ] *)
