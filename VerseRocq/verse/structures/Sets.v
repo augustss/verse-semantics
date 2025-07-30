@@ -87,17 +87,17 @@ Definition guard {A} (ϕ : Prop) : P A := fun _ => ϕ.
 (* when ϕ s == guard ϕ ∩ s *)
 Definition when {A} (ϕ : Prop) (s : P A) : P A := guard ϕ ∩ s.
 
-(* if2 s1 s2 == guard (s1 = ∅) >> s 
+(* if2 s1 s2 == guard (not (s1 = ∅)) >> s 
    returns s2 when s1 is not empty. otherwise emptyset *)
 Definition If2 {A B} (s1 : P A) (s2 : P B) := seq s1 s2.
 
 (* returns s2 when s1 is not empty. otherwise returns s3 *)
 Definition If3 {A B} (s1 : P A) (s2 : P B) (s3 : P B) := 
-  (seq s1 s2) ∪ (seq (Total_set - s1) s3).
+  (seq s1 s2) ∪ (guard (s1 = ∅) ∩ s3).
+
 
 Module SetMonadNotation.
   (* LLeftArrow *)
-  Infix "<$>" := map (at level 52, left associativity) : set_scope.
   Notation "x ⭅ c1 ;; c2" := (@bind _ _ c1 (fun x => c2))
     (at level 61, c1 at next level, right associativity) : set_scope.
   Notation "' pat ⭅ c1 ;; c2" :=
@@ -167,6 +167,8 @@ Ltac set_crunch :=
     | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
         let ρ1 := fresh ρ in
         move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (seq ?s1 ?s2) |- _ ] =>
+        inv H; crunch
     | [ H : ?ρ ∈ (map ?f ?s) |- _ ] =>
         let ρ1 := fresh ρ in
         move: H => [ρ1 H]; crunch
@@ -444,20 +446,39 @@ Lemma If3_empty {A B} (s2 s3 : P B) :
 Proof.
   unfold If3.
   cbn. set_simpl.
-  unfold when.
   set_ext z.
-  split. intro h. inv h. inv H. set_crunch.
-  inv H. set_crunch. auto.
+  split. intro h. inv h. inv H. set_crunch. 
+  inv H. auto. 
   intro h.
-  (* exists a ∈ Total_set : P A or not *)
+  right.
+  split. unfold guard. unfold In. auto. auto.
+Qed.
+
+Lemma Singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. 
 Admitted.
 
-Lemma If3_ret {A B} v (s2 s3 : P B) : 
-  If3 (ret v : P A) s2 s3 = s2.
+Lemma If3_nonempty {A B} (s1 : P A)(s2 s3 : P B) : 
+  Inhabited s1 ->
+  @If3 A B s1 s2 s3 = s2.
 Proof.
-  unfold If3, when. 
-  set_simpl.
-Admitted.
+  intro h1.
+  unfold If3.
+  unfold guard.
+  set_ext b.
+  split.
+  + set_simpl. intro h. set_crunch. auto.
+    inv H. 
+    apply Inhabited_not_empty in h1.
+    contradiction.
+  + intro h. left. inv h1. exists x. split; auto.    
+Qed.
+
+Lemma If3_ret {A B} v (s2 s3 : P B) : 
+  If3 (⌈ v ⌉ : P A) s2 s3 = s2.
+Proof.
+  eapply If3_nonempty.
+  eexists. econstructor; eauto.
+Qed.
 
 Lemma If3_union {A B} (s1 s1' : P A)
   (s2 s3 : P B) : 
@@ -468,7 +489,11 @@ Proof.
   set_simpl.
   split.
   + intro h. set_crunch.
-    unfold when.
+    ++ inv H.
+       left. exists x. eauto.
+       right.
+       split.
+       unfold guard.
 Abort.
 
 #[export] Hint Rewrite @If3_empty @If3_ret : set_simpl. 
@@ -621,10 +646,6 @@ Admitted.
 
 Lemma not_Singleton_empty : forall A B (x:B), ⌈ x ⌉ ≃ ∅ -> A.
 Admitted.
-
-Lemma Singleton_not_empty {A}{v:A} : ⌈ v ⌉ <> ∅. 
-Admitted.
-
 
 Lemma Intersection_diff {A}{v1 v2:A} : v1 <> v2 -> (⌈v1⌉ ∩ ⌈v2⌉) = ∅. Admitted.
 

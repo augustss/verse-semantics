@@ -8,7 +8,6 @@ Import ListNotations.
 Create HintDb list_simpl.
 
 Module ListMonadNotation.
-  Infix "<$>" := List.map (at level 52, left associativity) : list_scope.
   Notation "x <- c1 ;; c2" := (@List.flat_map _ _ (fun x => c2) c1)
     (at level 61, c1 at next level, right associativity) : list_scope.
   Notation "' pat <- c1 ;; c2" :=
@@ -91,16 +90,43 @@ Definition ap_List {A B}
 #[export] Instance Elem_list : Elem list := 
   { elem := fun {A} ls x => @List.In A x ls }.
 
+Lemma bind_singleton_l {A B} (v:A) (k : A -> list B): 
+  List.flat_map k [v] = k v.
+cbn. rewrite app_nil_r. done. Qed.
+
+Hint Rewrite @bind_singleton_l : list_simpl.
+
 #[export] Instance BindRetL_list : BindRetL (m:=list).
 intros A B f a. cbn. rewrite app_nil_r. done. Qed.
+
+Lemma bind_singleton_r {A} (l: list A) (v:A): 
+  List.flat_map (fun v => [v]) l = l.
+cbn. 
+induction l; cbn. done.
+f_equal; auto. Qed.
+
+Hint Rewrite @bind_singleton_r : list_simpl.
 
 #[export] Instance BindRetR_list : BindRetR (m:=list).
 intros A ma. cbn. 
 induction ma; cbn. done.
 f_equal; auto. Qed.
 
+Lemma bind_bind {A B C}
+  (ma : list A)
+  (f : A -> list B)
+  (g : B -> list C) :
+  x <- (x <- ma;; f x);; g x = x <- ma;; x <- f x;; g x.
+induction ma. cbn. done.
+cbn. rewrite flat_map_app. f_equal. rewrite
+  IHma. done.
+Qed.
+
+#[export] Hint Rewrite @bind_bind : list_simpl.
+
 #[export] Instance BindBind_list : BindBind (m:=list).
 intros A B C ma f g.
+unfold bind, Monad_list.
 cbn.
 induction ma. cbn. done.
 cbn. rewrite flat_map_app. f_equal. rewrite
@@ -252,10 +278,20 @@ Definition take1 {A} (xs : list A) : list A :=
   | [] => [] 
   end.
 
-Lemma fmap_ret {A B} (f : A -> B) (x: A) :
-        f <$> [x] = [f x].
+Lemma map_singleton {A B} (f : A -> B) (x: A) :
+        List.map f [x] = [f x].
 cbn. done.
 Qed.
 
-#[export] Hint Rewrite @fmap_ret : list_simpl.
+#[export] Hint Rewrite @map_singleton : list_simpl.
 
+Lemma bind_map {A B C} (g : B -> list C) (f : A -> B)(xs:list A) :
+  List.flat_map g (List.map f xs) = 
+   List.flat_map (fun x => g (f x)) xs.
+Proof.
+  induction xs.
+  cbn. done.
+  cbn. f_equal. auto.
+Qed.
+
+#[export] Hint Rewrite @bind_map : list_simpl.

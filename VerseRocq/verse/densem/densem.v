@@ -35,91 +35,9 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
-(*
-Lemma empty_empty {A}(x : A) : 
-  (∅ ≃ (∅ : P A)) = True.
-Admitted.
-
-Lemma ret_empty_l {A}(x : A) : 
-  (ret x ≃ (∅ : P A)) = False.
-Admitted.
-
-Lemma union_empty_l {A}(s1 s2 : P A) : 
-  ((s1 ∪ s2) ≃ (∅ : P A)) = ((s1 ≃ ∅) /\ (s2 ≃ ∅)).
-Admitted.
-
-Lemma not_false : 
-  (~ False) = True.
-Admitted.
-
-Lemma not_true : 
-  (~ True) = False.
-Admitted.
-*)
-(*
-Lemma false_and a : 
-  (False /\ a) = True.
-Admitted.
-
-Lemma true_and a : 
-  (True /\ a) = a.
-Admitted.
-
-Lemma false_or a : 
-  (False \/ a) = a.
-Admitted.
-
-Lemma true_or a : 
-  (True /\ a) = True.
-Admitted.
-*)
-
-(*
-Lemma when_and {A} (s1 s2 : Prop) (s : P A) : 
-  when (s1 /\ s2) s = when s1 (when s2 s).
-Proof.
-  unfold when. 
-  eapply set_extensionality. intros a.
-  unfold In. tauto.
-Qed.
-*)
-(*
-Lemma when_true {A} (s : P A) : when True s = s.
-Admitted.
-
-Lemma when_false {A} (s : P A) : when False s = ∅.
-Admitted.
-
-
-#[export] Hint Resolve
-  @when_true @when_false : sets.
-
-#[export] Hint Rewrite 
-  @empty_empty
-  @ret_empty_l
-  @intersection_empty_l
-  @not_true
-  @not_false
-  @when_true @when_false
-  @Union_empty_r
-  @Union_empty_l : set_simpl.
-*)
-
 (* ---------------------------------------------- *)
 
-
 (* This axiom is BAD. But convenient for now.... *)
-Axiom choose_elements  : forall {A} (s : P A), list A.
-
-Axiom choose_empty : 
-  forall {A}, choose_elements ∅ = ([] : list A).
-Axiom choose_ret : 
-  forall {A}{v}, choose_elements (ret v) = ([v] : list A).
-Axiom choose_when : forall {A} {ϕ} {s:P A},
-  (ϕ     /\ choose_elements (when ϕ s) = 
-             choose_elements s) \/
-  (not ϕ /\ choose_elements (when ϕ s) = []).
-
 Axiom empty_dec : forall {A} (s : P A), 
     { s ≃ ∅ } + { ~ (s ≃ ∅) }.
 
@@ -132,9 +50,6 @@ Definition is_Empty_set {A} (s : P A) : bool :=
 
 Definition VAL := P value.
 
-
-
-
 Import mini.MiniNotation.
 
 (* distinguished result variable (0) *)
@@ -144,20 +59,6 @@ Notation "⟅ r ⟆" := (Scope.singleton r).
 (* another variable (1) *)
 Definition x := mini.Test.x.
 Definition y := mini.Test.y.
-
-(* Koen's encoding of if
-if e1 e2 e3 =
-  exists y; 
-  y = one{ (e1; z=⟨⟩) | z=0 }@z;
-  (y=⟨⟩; e2) | (y=0; e3)
-*)
-
-(* Translated to DPS style, with distinguished result r *)
-Definition koen_if e1 e2 e3 : mini.Expr := 
-  mini.DefineV y :>:
-  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
-  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
-
 
 
 (* This is a bit of a hack. For examples, we special case the variables
@@ -214,9 +115,9 @@ Fixpoint evalA (e : mini.Expr) (ρ : env) : value :=
 
 (* ------- operations on lists of sets ---------- *)
 
-Definition SUCCEED {A} : list (P A) := ret Total_set. 
+Definition SUCCEED {A} : list (P A) := [Total_set]. 
 
-Definition FAIL {A} : list (P A) := ret ∅.
+Definition FAIL {A} : list (P A) := [].
 
 Definition CHOICE {A} (d1 : list A) (d2: list A) : list A := 
   d1 ++ d2.
@@ -231,26 +132,6 @@ Definition MINUS {A} (d1 : list (P A)) (d2: list (P A)) :
   ρ1 <- d1 ;;
   ρ2 <- d2 ;;
   [ρ1 - ρ2].
-
-Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) := 
-  (~ ϕ1 /\ ϕ3).
-
-Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
-  (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
-
-(* TODO: This is equivalent to: (s1 <- S1 ;; S2), i.e. seq *)
-Definition If2 {A B} := fun (s1 : P A) (s3 : P B) => when (Inhabited s1) s3.
-
-Lemma If2_SEQ {A} (S1 S2 : P A) : 
-  If2 S1 S2 = seq S1 S2.
-Proof.
-  unfold If2, when, seq.
-  set_ext s.
-  split.
-  + intro h. inv h. 
-    inv H.
-Admitted.
-
  
 Definition IF2 {A B} : list (P A) -> list (P B) -> list (P B) := liftM2 If2.
 
@@ -352,11 +233,15 @@ Definition extract (Δ : ENV) : P (value * ENV) :=
   ret ( ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆ ).
 
 (* This operation is liftM2 snoc *)
-Notation "({++})" := (fun (VS : P (list value)) (V : VAL) => 
+Definition Cons := (fun (V : VAL) (VS : P (list value))  => 
+    v  ⭅ V  ;;
+    vs ⭅ VS ;; 
+    ⌈ v :: vs⌉).
+
+Definition Snoc := (fun (VS : P (list value)) (V : VAL) => 
     vs ⭅ VS ;; 
     v  ⭅ V  ;;
-    ⌈ vs ++ [v]⌉) : set_scope.
-Infix "{++}" := (({++})) (at level 40) : set_scope.
+    ⌈ vs ++ [v]⌉).
    
 Definition Head (V : P (list value)) : VAL := 
   vs ⭅ V ;;
@@ -366,8 +251,38 @@ Definition Head (V : P (list value)) : VAL :=
   end. 
 
 (* pick_squash *)
-Definition squash_pick (xs : list VAL) : P (list value) := 
-  squash_fold_left ({++}) xs (ret nil).
+Fixpoint squash_pick (xs : list VAL) : P (list value) := 
+  match xs with 
+  | nil => ⌈ [] ⌉
+  | V :: VS => If3 V  
+               (Cons V (squash_pick VS))
+               (squash_pick VS)
+  end.
+
+Lemma squash_pick_singleton v : 
+  squash_pick [ ⌈ v ⌉ ] = ⌈ [v] ⌉.  
+  cbn.
+  set_simpl.
+  unfold Cons. set_simpl.
+  done.
+Qed.
+
+Example squash_pickExample :
+  squash_pick [  ⌈ (Int 0) ⌉ ; ⌈ (Int 1) ⌉ ] = 
+    (⌈ [ Int 0 ; Int 1 ] ⌉).
+cbn. set_simpl.
+unfold Cons. set_simpl.
+done.
+Qed.
+
+Lemma squash_pick_two_example :
+  squash_pick [ ⌈ (Int 0) ⌉ ∪ ⌈ (Int 1) ⌉ ] = 
+               (⌈ [ Int 0 ] ⌉ ∪ ⌈ [ Int 1 ] ⌉).
+Proof.
+  cbn. set_simpl.
+  unfold squash_fold_left.
+  unfold List.fold_left.
+Admitted.
 
 (* SPJs definition. More concise version below *)
 Definition ALL' (Δs : list ENV) : ENV := 
@@ -383,31 +298,29 @@ Definition ALL' (Δs : list ENV) : ENV :=
 (* The set of results in Δ that could be produced by environments 
    consistent with ρ *)
 Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
-  '(v, Δ') ⭅ extract Δ ;; when (ρ ∈ Δ') (ret v).
+  '(v, Δ') ⭅ extract Δ ;; when (ρ ∈ Δ') ⌈v⌉.
 
 Definition ALL (Δs : list ENV) : ENV := 
   fun ρ => exists vs,
-      (vs ∈ squash_pick (consistent_results ρ <$> Δs)) /\
+      (vs ∈ squash_pick (List.map (consistent_results ρ) Δs)) /\
       (ρ r = mkTup vs).
-        
-
-(* return the set containing just the first element of xs, or emptyset
-  if xs is nil. *)
-Definition head_of {A} (xs : list A) : P A := 
-  match xs with 
-  | nil => ∅
-  | v :: _ => ⌈ v ⌉
-  end.
-
+       
 Definition ONE (Δs : list ENV) : ENV := 
   fun ρ => 
-      (ρ r ∈ Head (squash_pick (consistent_results ρ <$> Δs))).
+      (ρ r ∈ Head (squash_pick 
+                     (List.map (consistent_results ρ) Δs))).
 
-(* ---------- examples / theory about extract / squash_pick ------------- *)
+(* ---- examples / theory about extract / squash_pick ----- *)
 
+Ltac set_crunch := 
+  repeat (Sets.set_crunch ; 
+   match goal with 
+   | [ H : ?x ∈ (?y ≈ ?v) |- _ ] => inv H; crunch
+
+   end).
 
 Lemma extract_one {v} : 
-  extract (r ≈ ⟨ v ⟩) = ret (v, Total_set).
+  extract (r ≈ ⟨ v ⟩) = ⌈ (v, Total_set) ⌉.
 Proof. 
 eapply set_extensionality. intro ρ.
 unfold extract. 
@@ -415,104 +328,87 @@ set_simpl.
 split.
 - move=>h.
   set_crunch.
-  inv H.
   set_simpl.
   f_equal.
-Admitted.
-(*
 - destruct ρ as [w Δ].
   intro h. inv h.
   exists (r |-> v).
   set_simpl.
   done.
-Qed. *)
+Qed. 
 
 Lemma extract_example {k} :
   extract (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
-    ret (k, x ≈ ⟨ k ⟩).
+    ⌈ (k, x ≈ ⟨ k ⟩) ⌉.
 Proof.
   unfold extract.
   eapply set_extensionality. intros [v Δ].
   set_simpl.
   split.
   + intros h.
-Admitted.
-(*    set_crunch.
-    repeat rewrite H1.  clear H1.
+    inv h.
+    set_crunch.
+    inv H.
+    repeat rewrite H2.  clear H2.
     f_equal.
     set_simpl.
-    done.
+    rewrite constrain_eq_hide_two. done. done.
   + intro h. inv h.
     exists (x |-> k, r |-> k).
     set_simpl.
     rewrite_env.
-    tauto.
-Qed. *)
+    rewrite constrain_eq_hide_two. done. done.
+Qed. 
 
 Lemma extract_two :
   extract (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
     (ret (Int 0, Total_set) ∪ ret (Int 1, Total_set)).
 Admitted.
 
-Example squash_pickExample :
-  squash_pick [  ret (Int 0) ; ret  (Int 1) ] = 
-    ((ret [ Int 0 ; Int 1 ])).
-unfold squash_pick.
-unfold squash_fold_left.
-unfold List.fold_left.
-set_simpl.
-cbn. done.
-Qed.
-
-Lemma squash_pick_two_example :
-  squash_pick [ ret (Int 0) ∪ ret (Int 1) ] = 
-         (ret [ Int 0 ] ∪ ret [ Int 1 ]).
-Proof.
-  unfold squash_pick.
-  unfold squash_fold_left.
-  unfold List.fold_left.
-  set_simpl.
-  cbn.
-Admitted.
+Ltac unfoldIn :=  match goal with 
+    | [ |- context[?ρ ∈ (fun ρ0 => @?f ρ0)] ] => 
+  replace (ρ ∈ (fun ρ0 => f ρ0)) with (f ρ);[|auto] end.
 
 Lemma bcp_example : 
-  ALL (ret (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩)) = 
+  ALL [x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩] = 
       ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
        (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
 Proof.
   unfold ALL.
   apply set_extensionality. intros ρ.
-  unfold consistent_results, In.
+  unfoldIn.
+  unfold consistent_results.
   list_simpl.
-Admitted.
-(*
   rewrite extract_example.
-  rewrite bind_ret_l.
+  set_simpl.
+  unfold squash_pick.
+  remember (when (ρ ∈ x ≈ ⟨ Int 0 ⟩) ⌈ Int 0 ⌉) as ϕ.
   split.
-  + intro h. set_crunch.
+  + intro h. 
+    crunch.
+    unfold If3 in H.
     inv H. 
-    ++ inv H1.
-       set_crunch.
-       inv H1.
-       unfold when in H. cbn in H.
+    ++ Sets.set_crunch.
+       unfold Cons in H1.
+       Sets.set_crunch.
+       inv H2.
        rewrite H3.
-       cbn in H0.
        left. split; eauto.
-    ++ inv H1. inv H2. 
+    ++ unfold when, guard in H1.
+       Sets.set_crunch.       
+       inv H.
+       have F: ⟨ ρ ∈ x ≈ ⟨ Int 0 ⟩ ⟩ = ∅. admit.
        right. split; auto.
        intro h.
-       have hh: ((x ≈ ⟨ Int 0 ⟩) ρ) = True.
-       { unfold constrain_eq, In. 
-         rewrite h. 
-         apply propositional_extensionality. tauto. }
-       rewrite hh in H.
-       cbn in H.
-       autorewrite with set_simpl in H. done.
+       admit.       
   + intro h. inv h.
     ++ set_crunch. 
        exists [Int 0].
        split; auto.
-       cbn. unfold constrain_eq. rewrite H1.
+       cbn. unfold constrain_eq. 
+Admitted.
+(*
+rewrite H1.
        left.
        have hh: (Int 0 = Int 0) = True. { apply propositional_extensionality. tauto. }
        rewrite hh.
@@ -541,10 +437,10 @@ Definition Dx v : ENV := x ≈ ⟨ v ⟩ ∩ r ≈ ⟨ v ⟩.
 
 
 Lemma extract_D0 : 
-  extract D0 = ret ( Int 0, Total_set ). 
+  extract D0 = ⌈ ( Int 0, Total_set ) ⌉. 
 Admitted.
 Lemma extract_D1 :
-  extract D1 = ret (Int 1 , Total_set).
+  extract D1 = ⌈ (Int 1 , Total_set) ⌉.
 Admitted.
 
 Lemma ONE_example1 : ONE [ D0 ; D1 ] = D0.
@@ -555,13 +451,15 @@ Proof.
   unfold fmap, Functor_list,ListDef.map.
   rewrite extract_D0. rewrite extract_D1.
   set_simpl.
+  unfold squash_pick.
+  unfold Head.
   split.
-  + unfold Head. intros h.
+  + intros h.
     inv h.
+    inv H.
 Admitted.
-(*
-    inv H0. 
-    unfold D0, constrain_eq. done.
+(*    inv H0. 
+    unfold D0, constrain_eq. 
     autorewrite with set_simpl in H1. inv H1.
   + unfold D0. 
     intro h. inv h.
@@ -840,6 +738,21 @@ Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
 
 (* E [if (x=1|x=2) { x } { 0 }] = [ {r=1,x=1} | {r=2,x=2} | {r=0,x<>1,2} *)
 
+
+(* Koen's encoding of if
+if e1 e2 e3 =
+  exists y; 
+  y = one{ (e1; z=⟨⟩) | z=0 }@z;
+  (y=⟨⟩; e2) | (y=0; e3)
+*)
+
+(* Translated to DPS style, with distinguished result r *)
+Definition koen_if e1 e2 e3 : mini.Expr := 
+  mini.DefineV y :>:
+  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
+  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
+
+
 Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
 
 (* ----------- non-dodgy dest passing style -------------- *)
@@ -850,9 +763,6 @@ Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
 *)
 
 Module DLS. 
-
-
-
 
 Fixpoint E (e : mini.Expr) : list ENV := 
 
@@ -953,14 +863,13 @@ Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
 
 (* Ed[ e1; r=<> ] = [ hide(r) D1 ∩ {{ r=<> }} | D1 <- E[e1] ] *)
 Lemma part1 e1 : E (e1 :>: r :=: mini.Array []) = 
-                fmap (fun D1 => hide_r D1 ∩ (r ≈ ⟨mkTup []⟩)) (E e1).
+        List.map (fun D1 => hide_r D1 ∩ (r ≈ ⟨mkTup []⟩)) (E e1).
 Proof.
   cbn.
-  rewrite List.flat_map_map.
+  unfold hide_r. unfold hide_list. unfold UNIFY.
+  list_simpl.
   set_simpl.
-  rewrite List.map_map.
-  auto.
-Qed.
+Admitted.
 
 (*
 Ed[ (e1; r=<>) | r=0 ] = [ hide_r D1 \cap {{r=<>}} | D1 <- E[e1] ] ++ [ {{r=0}} ] 
@@ -992,6 +901,12 @@ Proof.
   rewrite distrib_union_l.
 Abort.
 
+Definition if2 (ϕ1 : Prop) (ϕ3 : Prop) := 
+  (~ ϕ1 /\ ϕ3).
+
+Definition if3 (ϕ1 : Prop) (ϕ2 : Prop) (ϕ3 : Prop) := 
+  (ϕ1 /\ ϕ2) \/ (~ ϕ1 /\ ϕ3).
+
 Lemma if3_rhoIn (S1 S2 S3 : ENV) :
   [ (fun ρ => if3 (ρ ∈ S1) (ρ ∈ S2) (ρ ∈ S3)) ] = 
   [(S1 ∩ S2) ∪ (Total_set - S1 ∩ S3)].
@@ -1019,7 +934,33 @@ Proof.
     set_simpl.
     reflexivity.
   + intros ys.
+    cbn.
+    have h: ((Inhabited a) \/ (a = ∅)). admit.
+    inv h.
+    ++ repeat rewrite If3_nonempty; auto.
+       rewrite IHxs.
+       unfold Cons.
+       set_simpl.
+       f_equal.
+       apply functional_extensionality. intro v.
+       set_simpl.
+       f_equal.
+       apply functional_extensionality. intro vs.
+       rewrite Sets.bind_bind.
+       rewrite Sets.bind_singleton_l.
+       f_equal.
+       apply functional_extensionality. intro ws.
+       set_simpl.
+       done.
+    ++ repeat rewrite If3_empty; auto.
 Admitted.
+
+
+
+
+Lemma list_map_singleton {A B} (f:A -> B)(v:A) : 
+  List.map f [v] = [f v].
+Proof. auto. Qed.
 
 
 
@@ -1029,23 +970,6 @@ Admitted.
                   = 0,      otherwise
              , rho y = v } ]
 *)
-
-Ltac reIn ρ := 
-  match goal with [|- context[?x ρ]] => replace (x ρ) with (ρ ∈ x);[|auto] end.
-
-
-Lemma squash_pick_nil : squash_pick [] = ⌈ [] ⌉. Admitted.
-Lemma squash_pick_cons V VS : squash_pick (V :: VS) = 
-         If3 V 
-             (v ⭅ V ;; vs ⭅ squash_pick VS ;; ⌈ v :: vs ⌉)
-             (squash_pick VS). Admitted.
-Lemma squash_pick_singleton v : squash_pick [ ⌈ v ⌉ ] = ⌈ [v] ⌉.  
-  rewrite squash_pick_cons.
-  unfold If3.
-  repeat rewrite bind_ret_l.
-  rewrite squash_pick_nil.
-  set_simpl. 
-Admitted.
 
 Lemma if3_union: forall (S1 S1' : Prop) (S2 S3 : Prop),  
                 if3 (S1 \/ S1') S2 S3 = if3 S1 S2 (if3 S1' S2 S3).
@@ -1065,6 +989,8 @@ Proof.
   rewrite hide_nothing.
   rewrite E_Var.
   unfold UNIFY.
+  list_simpl.
+
   remember (fmap (fun D2 : ENV => hide_r D2 ∩ r ≈ ⟨ mkTup [] ⟩) (E e1) ++ [r ≈ ⟨ Int 0 ⟩]) as Δs.
 
   rewrite <- if3_rhoIn.
@@ -1076,7 +1002,7 @@ Proof.
   set_ext ρ. rewrite in_intersection. 
 
   unfold In. 
-  remember  (consistent_results ρ <$> Δs) as S.
+  remember  (List.map (consistent_results ρ) Δs) as S.
   rewrite HeqΔs in HeqS.
   unfold fmap, Functor_list in HeqS.
   rewrite List.map_app in HeqS.
@@ -1084,12 +1010,12 @@ Proof.
   rewrite list_map_singleton in HeqS.
   unfold consistent_results in HeqS.
   rewrite extract_one in HeqS.
-  autorewrite with set_simpl in HeqS.
+  set_simpl in HeqS.
   rewrite when_is_true in HeqS; [unfold Total_set;done|].
 
-  replace (fun x : ENV => x0 <- extract (hide_r x ∩ r ≈ ⟨ mkTup [] ⟩);; 
-                       (let (v, Δ') := x0 in when (ρ ∈ Δ') (ret v)))
-     with (fun x : ENV => when (ρ ∈ hide_r x) (ret (mkTup []))) 
+  replace (fun x : ENV => x0 ⭅ extract (hide_r x ∩ r ≈ ⟨ mkTup [] ⟩);; 
+                       (let (v, Δ') := x0 in when (ρ ∈ Δ') (⌈v⌉)))
+     with (fun x : ENV => when (ρ ∈ hide_r x) (⌈mkTup []⌉)) 
   in HeqS.
   2: { 
     apply functional_extensionality. intro Δ1.
@@ -1098,24 +1024,30 @@ Proof.
   } 
   subst.
   rewrite squash_pick_app.
-  remember ((xs' <- squash_pick (ListDef.map (fun x0 : ENV => when (ρ ∈ hide_r x0) (ret (mkTup []))) (E e1));; ys' <- squash_pick [ret (Int 0)];; ret (xs' ++ ys'))) as S.
 
-  rewrite squash_pick_singleton in HeqS.
+  cbn.
+  rewrite If3_nonempty. econstructor;econstructor; eauto.
+  unfold Cons. set_simpl.
   
   split.
-  + intros h. set_crunch. subst.
+  + intros h. crunch. 
     rewrite H in H0. 
-    rewrite squash_pick_singleton in H0. 
-    unfold Head in H0. inv H0. set_crunch.
-    destruct ρ0. 
+    unfold Head in H0. 
+    set_simpl in H0.
+    inv H0; crunch.
+    inv H1; crunch.
+    set_simpl in H1.
+    destruct x0. 
     ++ (* squash_pick fails *) 
       inv H1.
-      replace (List.map (fun x : ENV => when (ρ ∈ hide_r x) (ret (mkTup []))) (E e1))
-         with (List.map (fun x => when (ρ ∈ x) (ret (mkTup []))) (List.map hide_r (E e1)))
-       in H0. 2: { rewrite List.map_map. auto. }
-       right. split; auto.
+      cbn in H2. inv H2.
+
+       right. split; auto. 
+       2: { unfold constrain_eq. split. unfoldIn. done.
+            unfoldIn. done. }
        intro h.
-       remember (ListDef.map hide_r (E e1)) as VS.
+
+       remember (E e1) as VS.
        move: H0 h.
        clear.
        (* need to prove that it fails *)
@@ -1126,38 +1058,43 @@ Proof.
          replace (a :: VS) with ([a] ++ VS) in H0. 2: { auto. } 
          rewrite List.map_app in H0.
          rewrite squash_pick_app in H0.
-         set_crunch.
-         destruct ρ0. 2: {  inv H3. } 
-         destruct ρ1. 2: { inv H3. } 
+         inv H0; crunch.
+         rewrite List.map_singleton in H.
+         cbn in H.
+         inv H0; crunch.
+         destruct x0. 2: { inv H1. } 
+         destruct x1. 2: { inv H1. } 
          cbn in h. inv h.
-         -- cbn in H. rewrite If3_when_ret in H.
+         -- rewrite when_is_true in H; auto.
+            rewrite If3_nonempty in H. econstructor; econstructor; eauto.
+            unfold Cons in H.
             autorewrite with set_simpl in H.
-            cbn in H.
-            inv H. set_crunch.
-            rewrite when_is_true in H4; auto. 
-            autorewrite with set_simpl in H4. inversion H4.
-            autorewrite with set_simpl in H2. set_crunch.
-            unfold In in H. done.
+            inv H.
          -- apply IHVS in H0. done. auto.
-       - unfold constrain_eq. split; auto. unfold In. done.
     ++ (* squash pick succeeds *)
-      inv H1.
+      inv H1. clear H3.
       remember (E e1) as VS.
       clear HeqVS.
+      cbn in H2. inv H2.
       induction VS as [|W WS].
       - inv H0.
       - cbn.
-        rewrite squash_pick_cons in H0.
+        cbn in H0.
         have CL: (ρ ∈ hide_r W) \/ ~(ρ ∈ hide_r W). admit.
         destruct CL.
         -- (* first one works *) 
           clear IHWS.
           rewrite when_is_true in H0; auto.
-          rewrite bind_ret_l in H0.
-          autorewrite with set_simpl in H0.
-          set_crunch.
+          rewrite If3_nonempty in H0. econstructor; econstructor; eauto.
+          unfold Cons in H0.
+          set_simpl in H0.
+          inv H0; crunch.
+          inv H0; crunch.
+          clear H2.
+
           replace ((hide_r W ∪ UNIONLIST (ListDef.map hide_r WS)) ρ) with
-            ((ρ ∈ hide_r W) \/ (ρ ∈ UNIONLIST (ListDef.map hide_r WS))). 2: { admit. } 
+            ((ρ ∈ hide_r W) \/ (ρ ∈ UNIONLIST (ListDef.map hide_r WS))). 2: { unfold In. admit. } 
+                                                                      
           rewrite if3_union.
           unfold if3. left. split. auto. split; eauto. 
           rewrite H4. unfold constrain_eq. unfold In. done.
@@ -1171,7 +1108,18 @@ Proof.
         unfold if3.
         right.
         split. auto.
-        left. unfold if3 in ih.
+        unfold if3 in ih.
+        inv ih; crunch. left. split. auto. auto.
+        right. split. auto. auto.
+ + intro h.
+   unfold if3 in h.
+   destruct h.
+   ++ (* ρ in UNIONLIST (E e1 \ r) *)
+     crunch.
+     inv H0. inv H1. done.
+     inv H0. inv H1. inv H2.
+     unfold Head.
+     set_simpl.
 Admitted.
 
 (* y = one{ (e1; z=<>) | z=0}@z; (y=⟨⟩; e2) | (y=0; e3)  
@@ -1179,14 +1127,22 @@ Admitted.
   [ BAD ⋂ {{y=0}}   ⋂ D  | D ∈ Ed[e3] ]
 *)
 
+Lemma UNIONLIST_hide VS s :
+  UNIONLIST (VS [\] s) = ((UNIONLIST VS) \ s).
+induction VS.
+cbn. set_simpl. done.
+cbn. set_simpl. f_equal.
+auto.
+Qed.
+
 Lemma part4 e1 e2 e3 : 
   E (y :=: mini.One (e1 :>: r :=: mini.Array [] :|: r :=: 0) 
        :>: 
     ((y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3))) = 
   let GOOD := UNIONLIST (List.map hide_r (E e1)) in
   let BAD  := Total_set - GOOD in 
-  (fmap (fun D => GOOD ∩ (y ≈ ⟨mkTup []⟩) ∩ D) (E e2)) ++
-  (fmap (fun D => BAD  ∩ (y ≈ ⟨Int 0⟩) ∩ D) (E e3)).
+  (List.map (fun D => GOOD ∩ (y ≈ ⟨mkTup []⟩) ∩ D) (E e2)) ++
+  (List.map (fun D => BAD  ∩ (y ≈ ⟨Int 0⟩) ∩ D) (E e3)).
 Proof.
   rewrite E_Seq.
   rewrite part3.
@@ -1202,16 +1158,44 @@ Proof.
   repeat rewrite List.map_app.
   repeat rewrite List.map_map.
   f_equal.
-  + have: ListDef.map (fun x0 : Ensemble env => (GOOD ∩ y ≈ ⟨ mkTup [] ⟩ \ ⟅ r ⟆) ∩ ((fun ρ : Ident -> value => ρ r = ρ y) ∩ r ≈ ⟨ Int 0 ⟩ \ ⟅ r ⟆) ∩ x0) (E e3) = [].
-    { replace  (fun x0 : Ensemble env => (GOOD ∩ y ≈ ⟨ mkTup [] ⟩ \ ⟅ r ⟆) ∩ ((fun ρ : Ident -> value => ρ r = ρ y) ∩ r ≈ ⟨ Int 0 ⟩ \ ⟅ r ⟆) ∩ x0) (E e3)  with (fun D => ∅).
-
-Lemma simons_example e1 e2 e3 :
-  E (koen_if e1 e2 e3) = 
-    let GOOD := UNIONLIST (List.map hide_r (E e1)) in
-    (fmap (fun D => D ∩ GOOD) (E e2)) ++ 
-    (fmap (fun D => D - GOOD) (E e3)).
-Proof.
-  unfold koen_if.
+  - f_equal.
+    apply functional_extensionality. intro D.
+    set_simpl.
+    set_ext ρ.
+    split.
+    ++ set_simpl.
+       intros [h1 h2].
+       inv h2. inv H. inv H1. inv H. inv H3. inv H1.
+       have NI: ~ Scope.In y ⟅ r ⟆. { admit. }
+       move: (H2 y ltac:(eauto))=> NY.
+       repeat split; try congruence.
+       inv h1.
+       -- unfold hide in H. inv H. 
+          inv H1.
+          inv H.
+          unfold constrain_eq in H6. inv H6. inv H. inv H7.
+          rewrite UNIONLIST_hide in H1. inv H1. crunch.
+          rewrite UNIONLIST_hide. unfold hide.
+          exists x2. split; auto. intros z zIn. rewrite H5; auto.
+       -- unfold hide in H. inv H. crunch.
+          inv H. unfold constrain_eq in H6.
+          inv H6. inv H. inv H7.
+          rewrite <- H1 in H6; auto.
+          rewrite H2 in H6; auto.
+          rewrite <- H3 in H6.
+          rewrite H4 in H6.
+          inv H6.
+    ++ set_simpl. 
+       intro h. inv h. inv H0.
+       split.
+       left.
+       rewrite  UNIONLIST_hide.
+       unfold hide. unfoldIn.
+       rewrite UNIONLIST_hide in H.
+       unfold hide in H. destruct H as [ρ' H].
+       inv H.
+       exists (r |-> mkTup [], ρ). repeat split.
+Admitted.
 
 End DLS.
 
@@ -1275,7 +1259,7 @@ Definition map2 {A B} : (A -> B) -> (P (list A)) -> (P (list B)) :=
 Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
   let B (e : mini.Expr) : P (list ENV)  :=
-    (fmap (hide (mini.I e))) <$> (E e)
+    List.map (fmap (hide (mini.I e))) (E e)
   in
 
   match e with 
@@ -1293,7 +1277,7 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 
   | mini.Fail => ⌈ FAIL ⌉
 
-  | mini.Choice e1 e2 => CHOICE <$> B e1 <*> B e2
+  | mini.Choice e1 e2 => List.map CHOICE (B e1) <*> B e2
 
   | mini.Seq e1 e2 => SEQ <$> E e1 <*> E e2
 

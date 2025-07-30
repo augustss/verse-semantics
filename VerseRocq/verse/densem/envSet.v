@@ -47,7 +47,7 @@ Definition hide (xs : Scope.t) (Δ : ENV) : ENV :=
 (* Generalize all of the xs to be anything *)
 (* Envss Drop Variables Δs [\] xs *)
 Definition hide_list (xs : Scope.t) (Δs : list ENV) : list ENV := 
-  fmap (hide xs) Δs.
+  List.map (hide xs) Δs.
 
 Definition envs_difference (Δ1 : ENV) (xs : Scope.t) (Δ2 : ENV) : ENV :=
   Δ1 - (hide xs Δ2).
