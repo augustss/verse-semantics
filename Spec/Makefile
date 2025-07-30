@@ -6,8 +6,8 @@ PAPERSRC = $(PAPERTEX) ../LaTex/calculus.fmt ../LaTex/verse-macros.tex verse-spe
            verse-source.tex ess-to-mini.tex mini-to-core.tex verse-rules.tex \
            densem-expr-style.tex densem-dps-style.tex densem-koen.tex \
            verse-densem-planA.tex densem-notation.tex \
-           densem-ess.tex
-#           densem-set-seq-set.tex
+           densem-ess.tex \
+           densem-set-seq-set.tex
 
 $(PAPER).pdf: $(PAPERSRC)
 	$(LATEX) $(PAPER)
