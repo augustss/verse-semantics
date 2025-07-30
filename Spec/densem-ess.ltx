@@ -25,7 +25,7 @@ $$
 \rulename{dseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
 & = &  \hideEs( \{p,q\}, \semess{S}{p}{q}{t_1})\; \prodE \;\semess{S}{u}{v}{t_2} \hspace{5mm} \text{$p,q \not\in \freevars{t_1}$}\\
 \rulename{dapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
- & = &  [ \conBrack{\conEq{u}{v}} ] \prodE \semess{F}{a_2}{v}{a_1} \\
+ & = &  [ \conBrack{\conEq{u}{v}} ] \prodE \semess{F}{a_2}{v}{a_1} \\[1mm]
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
@@ -34,11 +34,16 @@ $$
   \vb \EV \in \semess{B}{u}{v}{t_2} \; ] |++| \\
 & & & [ \; \EV \setminus \EV_1
       \vb \EV \in \semess{B}{u}{v}{t_3} \; ] \\
-&&& \text{where}\; \EV_1 = \unionListE(\hideE(\{p,q\}, \semess{S}{p}{q}{t_1}))\\
+&&& \text{where}\; \EV_1 : \ENV = \unionListE(\hideE(\{p,q\}, \semess{S}{p}{q}{t_1}))\\[1mm]
 
 %  ------ FOR --------------
 \rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}
-  & = & [ \; \hideE( \semapp{I}{t_1}, \allE(s, v, SS) \vb S |<-| SS_2 \;] \\
+& = & [ \; \hideE( \semapp{I}{t_1}, \allE(s, v, S)) \vb S |<-| SS_2 \;] \\
+& & \multicolumn{2}{l}{\text{where}} \\
+& & & SS_1,SS_2 :: \seq{\seq{\ENV}} \\
+&&& SS_1 = [ \; \mapE(\cap \EV,\; \semess{B}{r}{s}{t_2})
+            \vb \EV |<-| \squashE(\hideE(\{p,q\},\semess{S}{p}{q}{t_1})) \; ] \\
+&&& SS_2 = \pickE(SS_1)\\[1mm]
 
 %  ------ ALL --------------
 \rulename{sall} & \semess{S}{u}{v}{|all t|}
@@ -70,10 +75,10 @@ $$
 & \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}} \vb i |<-| 0.. \; ] \\
 \\
 & \allE & : & \Ident \rightarrow \Ident \rightarrow [\ENV] \rightarrow \ENV \\
-& \allE(q,r,ds) & = & \begin{array}[t]{@@{}l@@{\;}l}
+& \allE(q,r,S) & = & \begin{array}[t]{@@{}l@@{\;}l}
            \{ & \rho \in \Env \\
              \vb & ws \in \pickE (\squashE
-               [ \; \{ w \vb (w,\EV') \in \extractE(q,\EV), \rho \in \EV' \} \vb \EV \in ds \; ]) \\
+               [ \; \{ w \vb (w,\EV') \in \extractE(q,\EV), \rho \in \EV' \} \vb \EV \in S \; ]) \\
            , & \rho(r) = \tupE(ws) \; \}
            \end{array} \\
 \end{array}

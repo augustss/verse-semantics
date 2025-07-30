@@ -42,9 +42,9 @@ $$
   \semapsub{E}{c}{|if3 e_1 e_2 e_3|} }r
 & = & \bigcup \begin{array}[t]{@@{}l@@{\,}l}
   \{      & \begin{array}[t]{@@{}l}
-               \mapE(\lambda \EV.\, \hideE(Y,\EV \cap \EV_1),  \; \semapsub{E}{c}{e_2})
+               \mapEs(\lambda \EV.\, \hideE(Y,\EV \cap \EV_1),  \; \semapsub{E}{c}{e_2})
                   \; \cup \\
-                  \mapE(\lambda \EV.\, \EV \setminus (\hideE(Y,\EV_1)), \; \semapsub{E}{c}{e_3} )
+                  \mapEs(\lambda \EV.\, \EV \setminus (\hideE(Y,\EV_1)), \; \semapsub{E}{c}{e_3} )
            \end{array}
   \\
       |vbar|  & s_1 \in \semapsub{E}{c}{e_1}, \EV \in \unionEL( s_1 ) \; \}
@@ -59,7 +59,7 @@ $$
 \\
 
 & \semapp{B}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
-& \semapp{B}{|e|} & = & \mapE( \lambda \EV. \, \hideE(\semapp{I}{|e|}, \EV),\; \semapsub{E}{c}{e})
+& \semapp{B}{|e|} & = & \mapEs( \lambda \EV. \, \hideE(\semapp{I}{|e|}, \EV),\; \semapsub{E}{c}{e})
 \end{array}
 \end{array}
 $$
@@ -77,8 +77,8 @@ $$
    \unionEL( [] ) & = & \{ \} \\
    \unionEL( \EV : S ) & = & \EV \cup \unionEL(S) \\ [1mm]
 
- \mapE & : & (\ENV \rightarrow \ENV) \rightarrow \powersetnp {\seq{ \ENV }} \rightarrow \powersetnp {\seq{ \ENV }} \\
-   \mapE(f, S) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in S \; \} \\[1mm]
+ \mapEs & : & (\ENV \rightarrow \ENV) \rightarrow \powersetnp {\seq{ \ENV }} \rightarrow \powersetnp {\seq{ \ENV }} \\
+   \mapEs(f, S) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in S \; \} \\[1mm]
 
 \end{array}
 $$
