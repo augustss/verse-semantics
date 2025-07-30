@@ -278,15 +278,53 @@ library verse-libs
 library verse-parser
     import:           general-libs
     hs-source-dirs:   parser
+    default-language: GHC2021
     exposed-modules:
-                      Parser.Expr
-                      Parser.Error
-                      Parser.Parser
-                      Parser.OpParser
+            Data.Fix
+            Data.IntMap.Lazy.Extras
+            Data.IntMap.Strict.Extras
+            Control.Monad.Extras
+            Control.Monad.Ref
+            Control.Monad.Supply
+            Control.Monad.Verse
+            Control.Monad.Wrong
+            Language.Verse.Access
+            Language.Verse.Contract
+            Language.Verse.Desugar
+            Language.Verse.Desugar.Exp
+            Language.Verse.Effect.Split
+            Language.Verse.Error
+            Language.Verse.Eval
+            Language.Verse.Ident
+            Language.Verse.Indent
+            Language.Verse.Intrinsic
+            Language.Verse.Label
+            Language.Verse.Loc
+            Language.Verse.Mode
+            Language.Verse.Exp
+            Language.Verse.Path
+            Language.Verse.Pos
+            Language.Verse.Rewrite
+            Language.Verse.Rewrite.Exp
+            Language.Verse.SimpleName
+            Language.Verse.Token
+            Language.Verse.Val
+            Parser.Verse
     other-modules:
 
     build-depends: parser-combinators
                  , verse-libs
+                 , optparse-applicative
+                 , prettyprinter
+                 , comonad
+                 , semigroupoids
+                 , text
+                 , unordered-containers
+                 , bytestring
+                 , transformers
+                 , hashable
+                 , parsec
+                 , filepath
 
 test-suite verse-parser-test
     import:           general-libs
@@ -301,9 +339,11 @@ test-suite verse-parser-test
 
     other-modules: Paths_VersePrototypes
     build-depends: base
-                 , megaparsec
+                 , bytestring
                  , containers
-                 , text
-                 , filepath
                  , directory
+                 , filepath
+                 , megaparsec
+                 , prettyprinter
+                 , text
                  , verse-parser
