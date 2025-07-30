@@ -16,6 +16,7 @@ common general-libs
     default-language: Haskell2010
     ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O -ticky
     build-depends:    base,
+                      bytestring,
                       directory,
                       containers,
                       random,
@@ -23,7 +24,9 @@ common general-libs
                       pretty,
                       megaparsec,
                       haskeline,
-                      scientific
+                      hashable,
+                      scientific,
+                      text
 
 executable verse-repl
     import:           general-libs
@@ -80,11 +83,12 @@ executable confluence-check
 executable tester
      import:           general-libs
      hs-source-dirs:   tester
-     build-depends:    verse-libs,
-                       megaparsec,
+     build-depends:    megaparsec,
                        optparse-applicative,
+                       unordered-containers,
                        uniplate,
-
+                       verse-libs,
+                       verse-parser
      main-is:          Main.hs
 
      default-language: Haskell2010

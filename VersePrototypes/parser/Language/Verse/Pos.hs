@@ -1,5 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
 module Language.Verse.Pos
   ( Pos (..)
   , minBound
@@ -10,6 +12,9 @@ import Data.Int
 import Data.Ord
 import Data.Semigroup
 
+import Data.Hashable
+import GHC.Generics
+
 import Prettyprinter (Pretty (..), colon)
 
 import Text.Show
@@ -18,7 +23,7 @@ data Pos = Pos
   { line :: !Int
   , column :: !Int
   , offset :: !Int
-  } deriving Show
+  } deriving (Show, Generic, Hashable)
 
 instance Eq Pos where
   x == y = x.offset == y.offset

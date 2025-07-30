@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
 module Language.Verse.Path
   ( Path (..)
   ) where
@@ -7,9 +9,13 @@ import Language.Verse.SimpleName
 
 import Prettyprinter
 
+import Data.Hashable
+import GHC.Generics
+
 data Path = Path
   {-# UNPACK #-} !SimpleName
-  [(Maybe Path, SimpleName)] deriving (Eq, Show)
+  [(Maybe Path, SimpleName)]
+  deriving (Eq, Show, Generic, Hashable)
 
 instance Pretty Path where
   pretty (Path label pathIdents) =

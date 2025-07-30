@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Rewrite.Exp
@@ -22,18 +24,22 @@ import Data.ByteString.Internal (w2c)
 import Data.Char
 import Data.Functor.Apply
 import Data.Text (Text)
+import Data.Hashable
 
 import Language.Verse.Access
 import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Loc
 import Language.Verse.Path (Path)
 import Language.Verse.SimpleName
+import qualified Language.Verse.Ident as I
 
 import Data.Word (Word8)
 
 import Numeric (showHex)
 
 import Prettyprinter
+
+import GHC.Generics
 
 data Exp f a
   = f (Exp f a) :=: f (Exp f a)
@@ -80,6 +86,7 @@ data Exp f a
   | Path !Path
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
   | Domain (f (Exp f a))
+  deriving (Generic)
 
 deriving instance ( Eq (f (Exp f a))
                   , Eq (f Text)
@@ -92,6 +99,12 @@ deriving instance ( Show (f (Exp f a))
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
+
+deriving instance ( Hashable (f (Exp f a))
+                  , Hashable (f Text)
+                  , Hashable (f a)
+                  , Hashable a
+                  ) => Hashable (Exp f a)
 
 instance ( Pretty (f (Exp f a))
          , Pretty (f Text)
@@ -162,9 +175,11 @@ instance ( Pretty (f (Exp f a))
         flatAlt (hardline <> rbrace) " }"
       prettySpec access = "<" <> pretty access <> ">"
 
-data Quantifier = Val | Fun | Var deriving (Eq, Show)
+data Quantifier = Val | Fun | Var
+  deriving (Eq, Show, Generic, Hashable)
 
-data OC = O | C deriving (Eq, Show)
+data OC = O | C
+  deriving (Eq, Show, Generic, Hashable)
 
 instance Pretty OC where
   pretty = \ case

@@ -51,7 +51,7 @@ noOptions = Options
             }
 
 parser :: String -> ByteString -> Either Error (L (Exp SimpleName))
-parser path contents = P2.parseWithLoc path contents
+parser path contents = P2.parseWithLoc P2.pFile path contents
 
 -- how much to do, parse, rewrite, desugar
 parse :: Options -> FilePath -> ByteString -> IO ()
@@ -69,7 +69,11 @@ report :: (Show a, Pretty a) => Options -> FilePath -> Either Error a -> IO ()
 report options path result = do
   case result of
     Right e -> do
-      when (progress options || verbose options) $ hPutStrLn stdout $ "Done " ++ path
+      when (progress options || verbose options) $
+        do
+          hPutStrLn stdout $ "-------------------- Done --------------------"
+          hPutStrLn stdout $ "----- " ++ path ++ " -----"
+
       when (verbose options) $ do
         if useShow options then
           hPutStr stdout $ show e

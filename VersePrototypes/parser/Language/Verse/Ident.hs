@@ -16,7 +16,8 @@ import Prettyprinter
 
 data Ident
   = Name !SimpleName
-  | Label !Label deriving (Show, Eq, Ord)
+  | Label !Label
+  deriving (Show, Eq)
 
 instance Hashable Ident where
   hash = \ case

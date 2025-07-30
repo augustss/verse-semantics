@@ -77,7 +77,9 @@ import Language.Verse.Rewrite.Exp
 import Prelude (Maybe (..), Show (..), String, (==), (+), (++), ($!), map, zip)
 
 rewrite
-  :: (MonadWrong Error m, MonadSupply Label m)
+  :: ( MonadWrong  Error m
+     , MonadSupply Label m
+     )
   => L (Parse.Exp SimpleName)
   -> m (L (Exp L Ident))
 rewrite = rewriteExp

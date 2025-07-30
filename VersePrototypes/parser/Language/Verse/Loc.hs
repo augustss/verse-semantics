@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE DeriveAnyClass      #-}
 
 module Language.Verse.Loc
   ( Loc (..)
@@ -22,6 +23,8 @@ import Data.Functor.Apply
 import Data.Ord
 import Data.Semigroup
 import Data.Traversable
+import Data.Hashable
+import GHC.Generics
 
 import Language.Verse.Pos (Pos)
 import Language.Verse.Pos qualified as Pos
@@ -30,7 +33,8 @@ import Prettyprinter
 
 import Text.Show
 
-data Loc = Loc !Pos !Pos deriving (Eq, Show)
+data Loc = Loc !Pos !Pos
+  deriving (Eq, Show, Generic, Hashable)
 
 instance Semigroup Loc where
   Loc x y <> Loc x' y' = Loc (min x x') (max y y')
@@ -43,7 +47,8 @@ instance Pretty Loc where
 minBound :: Loc
 minBound = Loc Pos.minBound Pos.minBound
 
-data L a = L !Loc a deriving (Eq, Show, Functor, Foldable, Traversable)
+data L a = L !Loc a
+  deriving (Eq, Show, Functor, Foldable, Traversable, Generic, Hashable)
 
 instance Apply L where
   L x f <.> L y a = L (x <> y) (f a)

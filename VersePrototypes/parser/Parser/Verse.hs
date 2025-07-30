@@ -3,12 +3,50 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Parser.Verse
   ( parseWithLoc
+  , parseWithRewrite
+  , parse
+  , parseDie
+  , Parser
+  , module Language.Verse.Ident
+  , module Language.Verse.Exp
+  , module Language.Verse.Loc
+  , module Language.Verse.Label
+  , module Language.Verse.SimpleName
+  , module Language.Verse.Effect.Split
+  , E.Error -- Language.Verse.Error
+  , Pos.Pos (..)
+  , pKeyword -- See Note [Extensible Verse Parser]
+  , pFile
+  , pIdent
+  , pExpr
+  , pEq
+  , pBrace
+  , pRBrace
+  , pLBrace
+  , pBraces
+  , pParens
+  , pComma
+  , pSemi
+  , pString
+  , pStringLit
+  , skip
+  , P.many
+  , P.sepBy1
+  , P.try
+  , optionMaybe
+  , eof
+  , getLoc
+  , rewrite
   -- , toPos
   ) where
 
 import Control.Comonad
-import Control.Monad(when, void)
+import Control.Monad(when, void, (<=<))
 import Control.Monad.Identity(runIdentity)
+import Control.Monad.Trans.Class
+import Control.Monad.Supply
+import Control.Monad.Wrong
+
 
 import Data.ByteString qualified as ByteString
 import Data.ByteString(ByteString)
@@ -22,7 +60,8 @@ import Data.Text.Encoding qualified as Text
 import Data.Word (Word8)
 
 import Language.Verse.Error qualified as E
-import Language.Verse.Loc (L (..), Loc(..))
+import Language.Verse.Loc (L (..), Loc(..), loc)
+import Language.Verse.Label
 import Language.Verse.SimpleName
 import Language.Verse.Exp ( Exp
                           , pattern (:=:)
@@ -47,6 +86,10 @@ import Language.Verse.Exp qualified as IdentExp
 import Language.Verse.Exp (Path)
 import Language.Verse.Exp qualified as Path
 import Language.Verse.Pos qualified as Pos
+import Language.Verse.Rewrite
+import qualified Language.Verse.Rewrite.Exp as R
+import Language.Verse.Ident
+import Language.Verse.Effect.Split
 
 import Numeric(readHex, readBin)
 import Text.Parsec qualified as P
@@ -54,6 +97,7 @@ import Text.Parsec (ParseError, (<|>), (<?>), tokenPrim, tokens)
 import Text.Parsec.Error qualified as PE
 import Text.Parsec.Pos qualified as PPos
 import Text.Parsec.Prim qualified as PPrim
+import Text.Parsec.Combinator (optionMaybe,eof)
 
 import Prelude hiding (exp)
 
@@ -87,21 +131,33 @@ instance (Monad m) => PPrim.Stream Word8String m Word8 where
 
 type Parser = P.Parsec Word8String ParserState
 
-parse_ :: String -> ByteString -> Either ParseError (L (Exp SimpleName))
-parse_ path content = runIdentity $ P.runParserT pFile beginPS path (WS content)
+parse :: Parser a -> String -> ByteString -> Either ParseError a
+parse p path content = runIdentity $ P.runParserT p beginPS path (WS content)
 
+parseDie :: Parser a -> String -> ByteString -> a
+parseDie p path content =
+  case parse p path content of
+    Left err -> error $ show err
+    Right x  -> x
 
 -- | Given a FilePath and the contents of the file, parse the file and return an
 -- @Exp@ annotated with Source Locations
-parseWithLoc :: String -> ByteString -> Either E.Error (L (Exp SimpleName))
-parseWithLoc path bytestring =
-  case parse_ path bytestring of
+parseWithLoc :: Parser a -> String -> ByteString -> Either E.Error a
+parseWithLoc p path bytestring =
+  case parse p path bytestring of
     Left err -> Left $ E.OtherError (toPos $ PE.errorPos err) (showWithoutPos err)
     Right x -> Right x
   where
     -- Copied from Parsec.Error, but without position since it's reported separately
     showWithoutPos err =
       PE.showErrorMessages "or" "unknown parse error"  "expecting" "unexpected" "end of input" (PE.errorMessages err)
+
+parseWithRewrite
+  :: Parser (L (Exp SimpleName))
+  -> String
+  -> ByteString
+  -> Either E.Error (L (R.Exp L Ident))
+parseWithRewrite p path = runSupplyT . rewrite <=< parseWithLoc p path
 
 
 liftL2 :: (Apply f, Comonad f) => (f a -> f b -> c) -> f a -> f b -> f c
@@ -485,6 +541,15 @@ pString = do
   p2 <- pos
   return $ L (toLoc p1 p2) $ Exp.String (extract s1) xs
 
+pStringLit :: Parser (L Text)
+pStringLit = do
+  p1 <- pos
+  s1 <- match '"' *> pStringText
+  xs <- pStringRest <* match '"'
+  p2 <- pos
+  return $ L (toLoc p1 p2) $ extract s1
+
+
 pStringText :: Parser (L Text)
 pStringText = ( \ p1 xs p2 -> L (toLoc p1 p2) (Text.pack xs)) <$> pos <*> P.many (pCharEsc <|> pStringChar) <*> pos
 
@@ -598,6 +663,12 @@ pDefs = P.try $ do
 -- Paren     :=  '(' List  ')' Space
 pParen :: Parser (L (Exp SimpleName))
 pParen = mkListPos  <$> pLParen <*> pList <*> pRParen <* pSpace
+
+pParens :: Parser a -> Parser a
+pParens = P.between pLParen pRParen
+
+pBraces :: Parser a -> Parser a
+pBraces = P.between pLBrace pRBrace
 
 -- QualIdent := ['(' List ":)" Space] Ident
 pQualIdent :: Parser (L (IdentExp SimpleName))
@@ -1027,6 +1098,10 @@ mkListPos p1 xs p2 = mkList xs <. p1 <. p2
 
 ---------------------------------useful parsers
 
+-- skip whitespace including comments and tabs, this already matches many
+skip :: Parser ()
+skip = pSpace $> ()
+
 -- Binary takes parser for lhs and phs and a list with pairs of parsers for operator and function to apply f matching.-
 -- Binary     := pLhs Space { pOperator Scan  pRhs Space}
 
@@ -1282,6 +1357,9 @@ pos = P.getPosition
 
 pPos :: Parser (L ())
 pPos = unitLoc <$> pos <*> pos
+
+getLoc :: Parser Loc
+getLoc = loc <$> pPos
 
 unitLoc :: PPos.SourcePos -> PPos.SourcePos -> L ()
 unitLoc p1 p2 = L (toLoc p1 p2) ()
