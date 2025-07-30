@@ -61,6 +61,11 @@ Spec/verse-rules.tex
 Spec/verse-source.tex
 Spec/verse-spec.tex
 Spec/densem-koen.tex
+Spec/densem-ess.tex
+Spec/densem-notation.tex
+Spec/densem-set-seq-set.tex
+Spec/local.tex
+Spec/verse-densem-planA.tex
 
 *.vo
 *.glob
@@ -68,3 +73,4 @@ Spec/densem-koen.tex
 *.vok
 /Tim/TimVerse/VerseGrammar/x64
 /Tim/TimVerse/.vs/Verse/copilot-chat
+
