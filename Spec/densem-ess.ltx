@@ -10,40 +10,42 @@ $$
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
  & \semess{S}{u}{v}{t} & : & [ \ENV ] \\
-\rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \{ \rho \in \Env \vb \rho(u) = \rho(v) \} ] \\
-\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \{ \rho \in \Env \vb \rho(u) = \rho(v) = \semapp{A}{a}{\rho} \} ] \\
-\rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  [ \{ \rho \in \Env \vb \rho(x) = \rho(v) \} ] \prodE \semess{S}{u}{v}{t} \\
+\rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \conBrack{\conEq{u}{v}} ] \\
+\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{ \conEq{u}{v}, \conEq{v}{a}} ] \\
+\rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  [ \conBrack{\conEq{x}{v}} ] \prodE \semess{S}{u}{v}{t} \\
 \rulename{ssquig} &  \semess{S}{u}{v}{|squig x t|} & = &
-   [ \{ \rho \in \Env \vb \rho(x) = \rho(u) \} ] \prodE \semess{S}{u}{v}{t} \\
+   [ \conBrack{\conEq{x}{u}} ] \prodE \semess{S}{u}{v}{t} \\
 \rulename{stype} &  \semess{S}{u}{v}{|:a|} & = & \semess{F}{u}{v}{a}  \\
 \rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & [ ] \\
 \rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
  & = & \semess{B}{u}{v}{t_1} \append \semess{B}{u}{v}{t_2}  \\
+\rulename{sdotdot} &  \semess{S}{u}{v}{|a_1 .. a_2|} & = & [ ] \\
 \rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 & = &  \semess{S}{u}{v}{t_1} \prodE \semess{S}{u}{v}{t_2}  \\
 \rulename{dseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
 & = &  \hideEs( \{p,q\}, \semess{S}{p}{q}{t_1})\; \prodE \;\semess{S}{u}{v}{t_2} \hspace{5mm} \text{$p,q \not\in \freevars{t_1}$}\\
 \rulename{dapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
- & = &  [\{ \rho \in \Env \vb \rho(u)=\rho(v) \}] \prodE \semess{F}{a_2}{v}{a_1} \\
+ & = &  [ \conBrack{\conEq{u}{v}} ] \prodE \semess{F}{a_2}{v}{a_1} \\
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
-  \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} } & = & ???? \\
+  \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
+& = & [ \; \hideE(\semapp{I}{|t_1|}, \EV \cap \EV_1)
+  \vb \EV \in \semess{B}{u}{v}{t_2} \; ] |++| \\
+& & & [ \; \EV \setminus \EV_1
+      \vb \EV \in \semess{B}{u}{v}{t_3} \; ] \\
+&&& \text{where}\; \EV_1 = \unionListE(\hideE(\{p,q\}, \semess{S}{p}{q}{t_1}))\\
 
+%  ------ FOR --------------
+\rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}
+  & = & [ \; \hideE( \semapp{I}{t_1}, \allE(s, v, SS) \vb S |<-| SS_2 \;] \\
 
 %  ------ ALL --------------
 \rulename{sall} & \semess{S}{u}{v}{|all t|}
-& = & [ \, \begin{array}[t]{@@{}l@@{\;}l}
-           \{ & \rho \in \Env \\
-             \vb & ws \in \pickE (\squashE
-             \begin{array}[t]{@@{}l@@{\;}l}
-               [ & \{ w \vb (w,\EV') \in \extractE(q,\hideE(p,\EV)), \rho \in \EV' \} \\
-               \vb & \EV \in \semess{S}{p}{q}{|t|} \; ]) \hspace{5mm} p,q \not\in \freevars{t}
-               \end{array} \\
-           , & \rho(u) = \rho(v) = \tupE(ws) \} \, ]
-           \end{array} \\
+& = & [\, \allE(q,v, \hideEs(p, \semess{S}{p}{q}{t})) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\
 
 %  ------ ONE --------------
+\begin{comment}
 \rulename{sone} & \semess{S}{u}{v}{|one t|}
 & = & [ \, \begin{array}[t]{@@{}l@@{\;}l}
            \{ & \rho \in \Env \\
@@ -54,20 +56,26 @@ $$
                \end{array} \\a
            , & \rho(u) = \rho(v) = w \} \, ]
            \end{array} \\
+\end{comment}
 
 % -------- LAMBDA ------------
 \rulename{dlam} &
 \multicolumn{3}{l}{\semess{S}{u}{v}{|functionOCX q t_1 fx t_2|}} \\
   & & = & ??? \\
 \\
-
 & \semess{B}{u}{v}{|t|} & : & \seq{ \ENV } \\
 & \semess{B}{u}{v}{|t|} & = & \hideEs(\semapp{I}{|t|}, \semess{S}{u}{v}{t}) \\
 \\
-& \semess{F}{u}{v}{a} & : & \seq{\ENV} \\
-& \semess{F}{u}{v}{a} & = & [ \; \{ \rho \in \Env \vb \semapp{A}{a}{\rho} = Fun(hs), \fpr{\rho(u)}{\rho(v)} \in hs[i] \}
-\vb  i |<-| 0.. \; ]
-
+& \semess{F}{a_a}{r}{a_f} & : & \seq{\ENV} \\
+& \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}} \vb i |<-| 0.. \; ] \\
+\\
+& \allE & : & \Ident \rightarrow \Ident \rightarrow [\ENV] \rightarrow \ENV \\
+& \allE(q,r,ds) & = & \begin{array}[t]{@@{}l@@{\;}l}
+           \{ & \rho \in \Env \\
+             \vb & ws \in \pickE (\squashE
+               [ \; \{ w \vb (w,\EV') \in \extractE(q,\EV), \rho \in \EV' \} \vb \EV \in ds \; ]) \\
+           , & \rho(r) = \tupE(ws) \; \}
+           \end{array} \\
 \end{array}
 \end{array}
 $$
