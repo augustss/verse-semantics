@@ -92,7 +92,9 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 
 \clearpage \newpage
 \section{Source Verse, Essential Verse, and superficial desugaring}
+\fi % \ifeverything
 \input{verse-source}
+\ifeverything
 
 % -------------------------------------------------------------
 %               Mini to Essential: wrapping
@@ -124,9 +126,10 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 
 \clearpage \newpage
 \section{Denotational semantics: notation}
-\fi
+\fi % \ifeverything
 \input{densem-notation}
 
+\ifeverything
 Design variants:
 \begin{itemize}
 \item \textbf{(E-LS)}: expression-style, list of sets of values.
@@ -170,15 +173,19 @@ Design variants:
 
 \clearpage \newpage
 \section{Denotational semantics: Essential Verse}
+\fi % \ifeverything
 \input{densem-ess}
 
 % -------------------------------------------------------------
 %               D-SLS: DPS-style: sets of sequences of sets
 % -------------------------------------------------------------
 \clearpage \newpage
+\ifeverything
 \section{Denotational semantics: DPS (sets of sequences of sets)}
+\fi % \ifeverything
 \input{densem-set-seq-set}
 
+\ifeverything
 % -------------------------------------------------------------
 %               Denotational semantics: destination style
 % -------------------------------------------------------------
@@ -195,5 +202,6 @@ Design variants:
 \clearpage \newpage
 \section{Denotational semantics: Plan A}
 \input{verse-densem-planA}
+\fi % \ifeverything
 
 \end{document}

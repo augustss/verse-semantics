@@ -64,11 +64,15 @@ $$
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
-  s \in & \VAL & = & \powerset{\Value} \\
+  s \in & \VAL & = & \powerset{\Value} \makebox[0pt]{\hspace{1.5in}\benjamin{still needed?}} \\
   Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
   &&&& \hspace{3mm} \text{with disjoint domains} \\
-  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value for \emph{in-scope} identifiers} \\
-  \EV \in &\ENV & = & \powerset{ \Env } \\
+  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value
+                                                   for \emph{in-scope}
+                                                   identifiers \benjamin{Out
+                                                   of date}} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \makebox[0pt]{\hspace{2.5in}\benjamin{rename to
+                      Con (for Constraints)?}}\\
   \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
@@ -126,11 +130,12 @@ $$
 
 \end{array}
 $$
-\caption{Domains and their function}\label{fig:env}
+\caption{Semantic domains and associated functions}\label{fig:env}
 \end{figure}
 
 % --------------------- Domains and relevant functions over domains ---------------
 
+\ifeverything
 \begin{figure}
 $$
 \begin{array}{l}
@@ -149,6 +154,7 @@ $$
 
 \end{array}
 $$
-\caption{Denotational semantics: shared syntax, domains, functions}\label{fig:densem-notation}
+\caption{Denotational semantics: shared syntax, domains, functions
+  \benjamin{Wrong caption?}}\label{fig:densem-notation}
 \end{figure}
-
+\fi % \ifeverything

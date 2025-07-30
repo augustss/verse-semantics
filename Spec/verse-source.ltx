@@ -11,6 +11,7 @@
 %include forall.fmt
 %include ../LaTex/calculus.fmt
 
+\ifeverything
 \subsection{Source Verse}
 
 \begin{figure}
@@ -96,6 +97,7 @@ $$
 % -------------------------------------------------------------
 
 \subsection{Essential Verse}
+\fi %\ifeverything
 
 \begin{figure}
 $$
@@ -139,8 +141,8 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 %       Desugaring  Source Verse --> Essential Verse
 % -------------------------------------------------------------
 
+\ifeverything
 \subsection{Desugaring Source Verse into Essential Verse}
-
 
 \begin{figure}
 $$
@@ -248,3 +250,4 @@ This means that there can be no variable name clashes in |let| and |block|.
 pA more robust desugaring could \textalpha-convert such clashes.
 \caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
 \end{figure}
+\fi % \ifeverything
