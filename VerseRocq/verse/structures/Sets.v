@@ -1,19 +1,16 @@
 Require Import Imports.
 
-Require Import Laws.
-
 From Stdlib Require Export Ensembles.
 From Stdlib Require Setoids.Setoid.
 From Stdlib Require Lists.List.
-From Stdlib Require Import Sets.Classical_sets.
-From Stdlib Require Import Logic.PropExtensionality.
-From Stdlib Require Import Logic.FunctionalExtensionality.
 
 (* Representing sets by their characteristic functions.  *)
 
 (* This file extends the usual operations on sets with 
    functorial map, monadic join and bind (set comprehension).
+*)
 
+(*
    The tactic 'set_simpl' rewrites expressions using sets 
    to simpler versions.
    
@@ -50,7 +47,7 @@ Module SetNotations.
   Infix "∪"  := Union (at level 60, right associativity) : set_scope.
   Infix "∩"  := Intersection (at level 60, right associativity) : set_scope.
   Infix "-"  := Setminus : set_scope.
-  Notation "x ∈ s" := (In s x) (at level 65) : set_scope.
+  Notation "x ∈ s" := (Ensembles.In s x) (at level 65) : set_scope.
   Notation "a ⊆ b" := (Included a b) (at level 70) : set_scope.
   Notation "a ≃ b" := (Same_set a b) (at level 70) : set_scope.
 End SetNotations. 
@@ -62,6 +59,22 @@ Check (1 ∈ ⌈ 1  ⌉ ∪ ⌈2 ⌉ /\ 2 ∈ ⌈ 2  ⌉).
 Check (∅ ⊆ ⌈ 1  ⌉ \/ ⌈ 1  ⌉ ⊆ ⌈ 2  ⌉ ∩ ⌈3 ⌉ ).
 Check (∅ ∪ ⌈ 1  ⌉).
 Check (∅ ∪ ⌈ 1  ⌉ ≃ ∅).
+
+(* ----------------------------------------------------- *)
+
+(* Sets have extensional equality! *)
+Lemma set_extensionality {A} (s1 s2 : P A) :
+  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
+Proof.
+  intros h.
+  eapply Extensionality_Ensembles.
+  split. intros x. rewrite h. done. intros x. rewrite h. done.
+Qed.
+
+Ltac set_ext x := (apply set_extensionality; intros x).
+
+(* ----------------------------------------------------- *)
+
 
 (** More operations on sets *)
 Definition Total_set {A} := fun (x:A) => True.
@@ -117,46 +130,6 @@ Import SetMonadNotation.
 
 Check (x ⭅ ⌈ 1 ⌉ ;; ⌈ x ⌉).
 
-(* ----------------------------------------------------- *)
-
-Lemma set_extensionality {A} (s1 s2 : P A) :
-  (forall x, x ∈ s1 <-> x ∈ s2) -> (s1 = s2).
-Proof.
-  intros h.
-  eapply Extensionality_Ensembles.
-  split. intros x. rewrite h. done. intros x. rewrite h. done.
-Qed.
-
-Ltac set_ext x := (apply set_extensionality; intros x).
-
-
-(* ------------------------------------------------------------- *)
-
-(* P is a monad *)
-
-#[export] Instance Monad_P : Monad P :=
-  { ret  := @Singleton;
-    bind := @bind
-   }.
-
-#[export] Instance Functor_P : Functor P :=
-  { fmap := @map
-  }.
-
-Definition ap := fun {A B} (m1 :  P (A -> B)) (m2 : P A) => 
-                   bind m1 (fun x1 => 
-                              bind m2 (fun x2 => 
-                                         ret (x1 x2))).
-
-#[export] Instance Applicative_P : Applicative P :=
-  { pure := @Singleton;
-     ap  := @ap 
-  }.
-
-#[export] Instance Alternative_P : Alternative P :=
-  { empty := @Empty_set ;
-    choose := @Union
-   }.
 
 (* ------------------------------------------------------------- *)
 
@@ -166,12 +139,12 @@ Ltac unfoldIn :=  match goal with
     | [ |- context[?ρ ∈ (fun ρ0 => @?f ρ0)] ] => 
   replace (ρ ∈ (fun ρ0 => f ρ0)) with (f ρ);[|auto] end.
 
-Ltac foldElem x := 
+Ltac foldInGoal x := 
   match goal with 
   |  [ |- context [?S x] ] => 
   replace (S x) with (x ∈ S); [|auto] end.
 
-Tactic Notation "foldElem" constr(x) "in" hyp(H) := 
+Tactic Notation "foldInH" constr(x) "in" hyp(H) := 
   match goal with 
   |  [ H : context [?S x] |- _ ] => 
   replace (S x) with (x ∈ S) in H; [|auto] end.
@@ -196,9 +169,11 @@ Ltac set_crunch :=
         inv H; crunch
     | [ H : ?ρ ∈ ∅ |- _ ] =>
         inv H
+    | [ H : ?ρ ∈ (fun ρ => _) |- _ ] => 
+        inv H ; crunch
       end.
 
-(*** Simplification rules *)
+(** Simplification rules *)
 
 (** ---- map: (functor identities) *)
 
@@ -265,7 +240,6 @@ Lemma bind_empty {A B}(k : A -> P B) : Sets.bind ∅ k = ∅.
 unfold Sets.bind.
 set_ext s.
 split; intros h; set_crunch.
-inv h. inv H. inv H0.
 Qed.
 
 Lemma bind_singleton_l {A B : Type}
@@ -302,7 +276,7 @@ exists  x. split. auto. econstructor.
 Qed.
 
 (* Define map in terms of bind *)
-Lemma bind_singleton_fmap {A B} (f : A -> B) (ma : P A) :
+Lemma bind_singleton_map {A B} (f : A -> B) (ma : P A) :
    bind ma (fun x : A => ⌈f x⌉) = map f ma.
 unfold bind.
 eapply Extensionality_Ensembles.
@@ -331,7 +305,7 @@ Proof.
 Qed.
 
 
-#[export] Hint Rewrite @bind_singleton_r @bind_singleton_l @bind_singleton_fmap @bind_union @bind_bind @bind_empty : set_simpl.
+#[export] Hint Rewrite @bind_singleton_r @bind_singleton_l @bind_singleton_map @bind_union @bind_bind @bind_empty : set_simpl.
 
 (* define bind in terms of join (not a rewrite) *)
 Lemma join_map {A B} (f : A -> P B) (S : P A) : 
@@ -347,11 +321,11 @@ Lemma bind_map_r : forall {A B C : Type} (g : A -> P B) (f : B -> C) (s : P A),
     Sets.bind s (fun x => Sets.map f (g x)) = Sets.map f (Sets.bind s g).
 Proof.
   intros.
-  rewrite <- bind_singleton_fmap.
+  rewrite <- bind_singleton_map.
   set_simpl.
   f_equal.
   eapply functional_extensionality. intros x.
-  rewrite <- bind_singleton_fmap. done.
+  rewrite <- bind_singleton_map. done.
 Qed.
 
 (* intersection *)
@@ -447,7 +421,7 @@ Lemma in_bind {A B} (ma : P A) (k : A -> P B) (ρ : B) :
 Proof. cbn. unfold bind. cbn. reflexivity. Qed.
 
 Lemma in_ret {A} (x y :A) :
-  (x ∈ (ret y : P A)) = (x = y).
+  (x ∈ (⌈ y ⌉ : P A)) = (x = y).
 Proof.     
   cbn. 
   eapply propositional_extensionality.
@@ -514,7 +488,6 @@ Proof.
   set_ext b.
   split.
   + set_simpl. intro h. set_crunch. auto.
-    inv H. 
     apply Inhabited_not_empty in h1.
     contradiction.
   + intro h. left. inv h1. exists x. split; auto.    
@@ -549,7 +522,7 @@ Abort.
 
 (* ------------------------------------------------------------- *)
 
-(* Relation classes *)
+(** Relation classes *)
 
 #[export] Instance Refl_Incl {A} : Reflexive (@Included A).
 intros x. unfold Included. eauto. Qed.
@@ -589,8 +562,8 @@ Proof.
   split; intro x; eauto.
 Qed.
 
-Lemma fmap_Included {A B}{f : A -> B}{s1}{s2} :
-  s1 ⊆ s2 -> fmap f s1 ⊆ fmap f s2.
+Lemma map_Included {A B}{f : A -> B}{s1}{s2} :
+  s1 ⊆ s2 -> map f s1 ⊆ map f s2.
 Proof. 
   cbv.
   intros h x [a [h1 h2]]. 
@@ -613,7 +586,6 @@ Qed.
     (bind : P A -> (A -> P B) -> P B).
 Proof.
     intros m1 m2 R k1 k2 S.
-    unfold bind, Monad_P.
     move: R => [M12 M21].
     split. 
     + intros b [a [h1 h2]].
@@ -743,26 +715,6 @@ Definition Exists_exists : forall {A} (Pr : A -> Prop) (l : P A),
 Proof. intros. unfold Exists. reflexivity. Qed.
 
 
-(* -------------- some monad laws -------------- *)
-
-
-#[export] Instance BindRetL_P : BindRetL (m:=P).
-intros A B f a. eapply bind_singleton_l.
-Qed.
-
-#[export] Instance BindRetR_P : BindRetR (m:=P).
-intros A ma. eapply bind_singleton_r.
-Qed.
-
-#[export] Instance BindBind_P : BindBind (m:=P).
-intros A B C ma f g.
-eapply bind_bind.
-Qed.
-
-#[export] Instance RetInv_P : RetInv (m:=P).
-intros A a1 a2 h. cbn in h.
-eapply Singleton_inv. auto.
-Qed.
 
 
 (* ------------------------------------------------------- *)

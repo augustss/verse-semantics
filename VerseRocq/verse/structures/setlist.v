@@ -2,10 +2,11 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Logic.PropExtensionality.
 
 Require Import Imports.
-From Stdlib Require Lists.List.
 Require Import structures.Monad.
 Require Import structures.Sets.
 Require Import structures.List.
+Require Import structures.ListMonad.
+Require Import structures.SetMonad.
 Set Implicit Arguments.
 
 Import List.ListNotations.

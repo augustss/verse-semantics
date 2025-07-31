@@ -13,16 +13,13 @@ Require Import PFun.
 Require Import densem.Dom.
 Require Import structures.Sets.
 Import structures.List.
-Import structures.Monad.
 
 Import mini.MiniNotation.
-Import FunctorNotation.
-Import ApplicativeNotation.
-Import MonadNotation.
 Import SetNotations.
+Import SetMonadNotation.
 Import List.ListNotations.
+Import ListMonadNotation.
 
-Open Scope monad_scope.
 Open Scope list_scope.
 Open Scope mini_expr_scope.
 

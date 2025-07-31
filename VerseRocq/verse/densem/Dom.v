@@ -10,9 +10,8 @@ Require Import structures.List.
 Require Import densem.PFun.
 
 Import ListNotations.
-Import MonadNotation.
+Import ListMonadNotation.
 Open Scope list_scope.
-Open Scope monad_scope.
 
 
 (* There are a finite number of values in this semantics, 

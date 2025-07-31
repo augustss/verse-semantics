@@ -6,7 +6,6 @@ Require Import structures.List.
 
 Import SetNotations.
 Open Scope set_scope.
-Open Scope monad_scope.
 
 Inductive fset (A:Type) := FSet : (list A) -> fset A.
 Arguments FSet {_}.

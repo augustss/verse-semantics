@@ -2,11 +2,6 @@ Require Import Imports.
 
 From Stdlib Require Lists.List.
 From Stdlib Require Import Classes.EquivDec.
-Import ssreflect.
-
-From Stdlib Require Import Logic.PropExtensionality.
-From Stdlib Require Import Logic.FunctionalExtensionality.
-From Stdlib Require Import Sets.Classical_sets.
 
 Require Import syntax.common.
 Require syntax.mini.
@@ -29,75 +24,8 @@ Open Scope env_scope.
 Open Scope set_scope.
 
 
-Ltac unfoldIn :=  match goal with 
-    | [ |- context[?ρ ∈ (fun ρ0 => @?f ρ0)] ] => 
-  replace (ρ ∈ (fun ρ0 => f ρ0)) with (f ρ);[|auto] end.
 
-Ltac foldIn x := 
-  match goal with 
-  |  [ |- context [?S x] ] => 
-  replace (S x) with (x ∈ S); [|auto] end.
-
-Tactic Notation "foldIn" constr(x) "in" hyp(H) := 
-  match goal with 
-  |  [ H : context [?S x] |- _ ] => 
-  replace (S x) with (x ∈ S) in H; [|auto] end.
-
-
-(* already in library *)
-Lemma bind_map {A B} (f : A -> B) (s : P A) :
-  Sets.map f s = Sets.bind s (fun x => ⌈ f x ⌉).
-  rewrite bind_singleton_fmap.
-  done.
-Qed.
-
-Lemma bind_map_l : forall {A B C : Type} (g : B -> P C) (f : A -> B) (xs : P A), 
-    Sets.bind (Sets.map f xs) g =  Sets.bind xs (fun x : A => g (f x)).
-Admitted.
-
-Lemma bind_map_r : forall {A B C : Type} (g : A -> P B) (f : B -> C) (s : P A), 
-    Sets.bind s (fun x => Sets.map f (g x)) = Sets.map f (Sets.bind s g).
-Proof.
-  intros.
-  rewrite bind_map.
-  set_simpl.
-  f_equal.
-  eapply functional_extensionality. intros x.
-  rewrite bind_map. done.
-Qed.
-
-Lemma map_empty {A B} {f : A -> B} : 
-  Sets.map f (∅ : P A) = ∅.
-Admitted.
-
-Lemma map_id: forall {A : Type} (s : P A), 
-    (Sets.map id s) = s.
-Admitted.
-
-Lemma map_map: forall {A B C: Type} (f : B -> C) (g : A -> B) (s : P A), 
-    (Sets.map f (Sets.map g s)) = Sets.map (fun x => f ( g x)) s.
-Admitted.
-
-#[export] Hint Rewrite @map_id @map_map @map_empty : set_simpl.
-
-Lemma join_map {A B} (f : A -> P B) (S : P A) : ⨃ (map f S) = bind S f.
-Admitted.
-
-Lemma join_singleton {A} (S : (P A)) :
-        ⨃ ⌈S⌉ = S.
-Admitted.
-
-Lemma join_empty {A} : ⨃ (∅ : P (P A)) = (∅ : P A).
-Admitted.
-
-Lemma join_union {A} (S1 S2 : P (P A)) :
-        ⨃ (S1 ∪ S2) = (⨃ S1) ∪ (⨃ S2).
-Admitted.
-
-#[export] Hint Rewrite @join_union @join_singleton @join_empty : set_simpl.
-
-
-Definition ENV := P env.
+Notation ENV := (P env).
 
 (* Constrain a variable to be equal to a particular value.
    All other mappings in the environment are unconstrained. 
@@ -140,18 +68,18 @@ Definition hidden (xs: Scope.t) (Δ : ENV) : Prop :=
 
 (* ------  Notation ----------------------------------------- *)
 
-Module ENVNotation.
-Infix "≈" := constrain_eq (at level 60).
-Infix "≉" := constrain_ne (at level 60).
+Module envSetNotation.
+Infix "≈" := constrain_eq (at level 60) : set_scope.
+Infix "≉" := constrain_ne (at level 60) : set_scope.
 Notation "⟨ n ⟩" := (fun ρ => n) (at level 40).
 Notation "⟪ x ⟫" := (fun ρ => ρ x) (at level 40).
-Notation "ρ \\ xs" := (hide_env xs ρ) (at level 70).
-Notation "Δ \ xs" := (hide xs Δ) (at level 70).
-Notation "Δ [\] xs" := (hide_list xs Δ) (at level 70).
-Notation "es \{ xs } fs" := (envs_difference es xs fs) (at level 40).
-End ENVNotation.
+Notation "ρ \\ xs" := (hide_env xs ρ) (at level 70) : set_scope.
+Notation "Δ \ xs" := (hide xs Δ) (at level 70) : set_scope.
+Notation "Δ [\] xs" := (hide_list xs Δ) (at level 70) : list_scope.
+Notation "es \{ xs } fs" := (envs_difference es xs fs) (at level 40) : set_scope.
+End envSetNotation.
 
-Import ENVNotation.
+Import envSetNotation.
 
 (* ---- theory about hide/constrain/If3 ------------------  *)
 
@@ -160,9 +88,9 @@ Lemma hide_equiv xs Δ:
 Proof.        
   set_ext ρ. split.
   - intros h.
-    rewrite join_map.
-    unfold hide,In in h. set_crunch.
-    foldIn x in H.
+    rewrite <- join_map.
+    unfold hide,In in h. Sets.set_crunch.
+    foldInH x in H.
     exists x. split. auto.
     unfold hide_env.
     intros y NI. rewrite H0; eauto.
@@ -170,7 +98,7 @@ Proof.
     move: h => [Δ0 [h1 h2]].
     unfold map in h1.
     unfold In in h1. move: h1 => [ρ0 [h3 h4]].
-    foldIn ρ0 in h4.
+    foldInH ρ0 in h4.
     subst.
     unfold hide_env in h2. 
     unfold In in h2.
@@ -209,7 +137,7 @@ Lemma hide_hidden xs Δ : ((Δ \ xs) \ xs) = (Δ \ xs).
 Proof.
   unfold hidden.
   repeat rewrite hide_equiv.
-  repeat rewrite join_map.
+  repeat rewrite <- join_map.
   rewrite Sets.bind_bind.
   f_equal.
   eapply functional_extensionality. intros ρ. 
@@ -262,7 +190,7 @@ Admitted.
  
 Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.
 rewrite hide_equiv.
-rewrite join_map.
+rewrite <- join_map.
 transitivity (Sets.bind s (fun ρ => ⌈ ρ ⌉)).
 f_equal.
 eapply functional_extensionality. intro x. eapply hide_env_nothing.
@@ -310,9 +238,10 @@ Lemma hide_constrain x k xs :
   (x ≈ ⟨ k ⟩) \ xs = (x ≈ ⟨ k ⟩).
 intro h.
 unfold hide.
-set_ext ρ. unfold In.
+set_ext ρ. unfoldIn.
 split.
 + intros h1. set_crunch. unfold constrain_eq in *.
+  unfoldIn. set_crunch.
   rewrite H0; auto.
 + unfold constrain_eq. intros h1.
   exists ρ. split; eauto.

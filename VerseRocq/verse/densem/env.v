@@ -1,25 +1,16 @@
 Require Import Imports.
 
-From Stdlib Require Lists.List.
-From Stdlib Require Import Classes.EquivDec.
-Import ssreflect.
-
 Require Import syntax.common.
 Require syntax.mini.
 Require Import PFun.
 Require Import densem.Dom.
 Require Import structures.Sets.
 Import structures.List.
-Import structures.Monad.
 
 Import mini.MiniNotation.
-Import FunctorNotation.
-Import ApplicativeNotation.
-Import MonadNotation.
 Import SetNotations.
 Import List.ListNotations.
 
-Open Scope monad_scope.
 Open Scope list_scope.
 Open Scope mini_expr_scope.
 

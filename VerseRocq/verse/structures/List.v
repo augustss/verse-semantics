@@ -1,11 +1,14 @@
 Require Import Imports.
-From Stdlib Require Import Lists.List.
-
-Require Import Laws.
+From Stdlib Require Export Lists.List.
 
 Import ListNotations.
 
+(* list simplification tactic *)
 Create HintDb list_simpl.
+Ltac list_simpl := autorewrite with list_simpl.
+Tactic Notation "list_simpl" "in" hyp(H) :=
+  autorewrite with list_simpl in H.
+
 
 Definition ap {A B} 
   (fs : list (A -> B)) (xs : list A) : list B :=
@@ -13,6 +16,11 @@ Definition ap {A B}
   flat_map (fun f => 
               flat_map (fun x => 
                           (f x :: nil)) xs) fs.
+
+(* Functor and Monad-like notation for list operations. Does not 
+   use type classes. Do not import this notation if you import the
+   more general notation defined in structures.Monad
+*)
 Module ListMonadNotation.
   Infix "<$>" := List.map (at level 52, left associativity) : list_scope.
   Infix "<*>" := List.ap  (at level 52, left associativity) : list_scope.
@@ -25,15 +33,10 @@ End ListMonadNotation.
 
 Import ListMonadNotation.
 
-
-
-Ltac list_simpl := autorewrite with list_simpl.
-Tactic Notation "list_simpl" "in" hyp(H) :=
-  autorewrite with list_simpl in H.
-
 #[export] Hint Rewrite flat_map_app : list_simpl.
 #[export] Hint Rewrite map_map : list_simpl.
 #[export] Hint Rewrite map_id : list_simpl.
+#[export] Hint Rewrite in_flat_map : list_simpl.
 
 Lemma app_nil_inv {A} (a b : list A) :
   a ++ b = [] -> a = [] /\ b = [].
@@ -59,59 +62,19 @@ cbn. f_equal. Qed.
 #[export] Hint Rewrite @flat_map_map : list_simpl.
 
 
-(* 
-Lemma in_flat_map {A B} (b : B) (k : A -> list B) (ma : list A) :
-  In b (flat_map k ma) -> exists a : A, In a ma /\ In b (k a).
-*)
-
-#[export] Hint Rewrite in_flat_map : list_simpl.
-
-
-(* Monad definitions *)
-  
-
-#[export] Instance Functor_list : Functor list :=
-{ fmap := map }.
-
-#[export] Instance Monad_list : Monad list :=
-{ ret  := fun _ x => x :: nil; 
-  bind := fun _ _ x f =>  flat_map f x
-}.
-
-#[export] Instance Applicative_list : Applicative list :=
-{ pure := fun _ x => x :: nil;
-  ap   := @List.ap
-}.
-
-#[export] Instance Alternative_list : Alternative list :=
-  { empty := @nil ;
-    choose := @app
-  }.
-
-#[export] Instance Elem_list : Elem list := 
-  { elem := fun {A} ls x => @List.In A x ls }.
-
 Lemma bind_singleton_l {A B} (v:A) (k : A -> list B): 
   List.flat_map k [v] = k v.
 cbn. rewrite app_nil_r. done. Qed.
 
 Hint Rewrite @bind_singleton_l : list_simpl.
 
-#[export] Instance BindRetL_list : BindRetL (m:=list).
-intros A B f a. cbn. rewrite app_nil_r. done. Qed.
-
-Lemma bind_singleton_r {A} (l: list A) (v:A): 
+Lemma bind_singleton_r {A} (l: list A): 
   List.flat_map (fun v => [v]) l = l.
 cbn. 
 induction l; cbn. done.
 f_equal; auto. Qed.
 
 Hint Rewrite @bind_singleton_r : list_simpl.
-
-#[export] Instance BindRetR_list : BindRetR (m:=list).
-intros A ma. cbn. 
-induction ma; cbn. done.
-f_equal; auto. Qed.
 
 Lemma bind_bind {A B C}
   (ma : list A)
@@ -125,26 +88,10 @@ Qed.
 
 #[export] Hint Rewrite @bind_bind : list_simpl.
 
-#[export] Instance BindBind_list : BindBind (m:=list).
-intros A B C ma f g.
-unfold bind, Monad_list.
-cbn.
-induction ma. cbn. done.
-cbn. rewrite flat_map_app. f_equal. rewrite
-  IHma. done.
-Qed.
-
-#[export] Instance RetInv_list : RetInv (m:=list).
-intros A a1 a2 h. cbn in h. inversion h. done.
-Qed.
-
-#[export] Instance BindRetInv_list : BindRetInv (m:=list).
-Abort.
-
 Lemma fmap_inv_ret :
       forall (A B:Type) (ma :list A) (f f' :A -> B),
-        (fmap f ma) = (fmap f' ma) ->
-        forall a : A, List.In a ma -> ret (f a) = ret (f' a).
+        (List.map f ma) = (List.map f' ma) ->
+        forall a : A, List.In a ma -> [f a] = [f' a].
 intros A B ma f f' h.
 cbn. move: h.
 induction ma.
@@ -155,6 +102,29 @@ intros a0 [h1|h1].
 + repeat rewrite flat_map_map in H1. 
   specialize (IHma H1). eauto.
 Qed.
+
+Lemma map_cons {A B} (f : A -> B) (x: A) (xs : list A) :
+        List.map f (x :: xs) = (f x :: List.map f xs).
+cbn. done.
+Qed.
+
+Lemma map_nil {A B} (f : A -> B) :
+        List.map f [] = ([] : list B).
+cbn. done.
+Qed.
+
+#[export] Hint Rewrite @map_cons @map_nil : list_simpl.
+
+Lemma bind_map {A B C} (g : B -> list C) (f : A -> B)(xs:list A) :
+  List.flat_map g (List.map f xs) = 
+   List.flat_map (fun x => g (f x)) xs.
+Proof.
+  induction xs.
+  cbn. done.
+  cbn. f_equal. auto.
+Qed.
+
+#[export] Hint Rewrite @bind_map : list_simpl.
 
 (* List Library definitions (bool). *)
 
@@ -279,20 +249,3 @@ Definition take1 {A} (xs : list A) : list A :=
   | [] => [] 
   end.
 
-Lemma map_singleton {A B} (f : A -> B) (x: A) :
-        List.map f [x] = [f x].
-cbn. done.
-Qed.
-
-#[export] Hint Rewrite @map_singleton : list_simpl.
-
-Lemma bind_map {A B C} (g : B -> list C) (f : A -> B)(xs:list A) :
-  List.flat_map g (List.map f xs) = 
-   List.flat_map (fun x => g (f x)) xs.
-Proof.
-  induction xs.
-  cbn. done.
-  cbn. f_equal. auto.
-Qed.
-
-#[export] Hint Rewrite @map_singleton : list_simpl.
