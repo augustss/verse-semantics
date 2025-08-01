@@ -25,7 +25,7 @@ $$
      && \vb & |apply1N a_1 a_2| \vb |lamH q fx i e_1 hw e_2| \\
   && \vb & |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
   && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
-\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x t|; no |x:=e|; no |where|; and lambda changes form}}
+\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |esssquig x t|; no |x:=e|; no |where|; and lambda changes form}}
 \end{array} \\
 \\
 % ------------- Desugaring ---------------
@@ -56,9 +56,9 @@ $$
 \multicolumn{2}{@@{}l}{\rulename{wif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
  & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
 \rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
-\rulename{wsquig}   & |SS (mkwu dr u) (squig x t)|
+\rulename{wsquig}   & |SS (mkwu dr u) (esssquig x t)|
   & = & |(mkwu dr u) `ueq` x; SS (mkwu dr x) t| \\
-% \rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
+% \rulename{wsquig2}   & |SS (apeff e fx) (esssquig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
 \rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
 \rulename{wcol1}\asktim   & |SS (mkwu dr wrapemp) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
 \rulename{wcol2}   & |SS (mkwu drdom x) (: t)| & = & |apply1N ((SS wuinit t)) x| \\

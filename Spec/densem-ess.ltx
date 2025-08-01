@@ -12,26 +12,39 @@ $$
  & \semess{S}{u}{v}{t} & : & [ \ENV ] \\
 \rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \conBrack{\conEq{u}{v}} ] \\
 \rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{ \conEq{u}{v}, \conEq{v}{a}} ] \\
+\rulename{stuple} & \semess{S}{u}{v}{|array (t_1,xdots,t_n)|}
+& = & \hideEs \begin{array}[t]{@@{}l@@{\,}l}
+           ( & \{u_1,\mydots u_n,v_1 \mydots v_n\} \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, p, q}\\
+           , & \begin{array}[t]{@@{}l}
+                [ \conBrack{ \conEq{u}{|arr (u_1, xdots, u_n)|},
+                             \conEq{v}{|arr (v_1, xdots, v_n)|}} ] \\
+                   \prodE \semess{S}{u_1}{v_1}{t_1} \prodE \ldots \prodE \semess{S}{u_n}{v_n}{t_n}
+      \end{array}
+      \end{array}
+      \\
 \rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  [ \conBrack{\conEq{x}{v}} ] \prodE \semess{S}{u}{v}{t} \\
-\rulename{ssquig} &  \semess{S}{u}{v}{|squig x t|} & = &
+\rulename{ssquig} &  \semess{S}{u}{v}{|esssquig x t|} & = &
    [ \conBrack{\conEq{x}{u}} ] \prodE \semess{S}{u}{v}{t} \\
 \rulename{stype} &  \semess{S}{u}{v}{|:a|} & = & \semess{F}{u}{v}{a}  \\
 \rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & [ ] \\
 \rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
  & = & \semess{B}{u}{v}{t_1} \append \semess{B}{u}{v}{t_2}  \\
-\rulename{sdotdot} &  \semess{S}{u}{v}{|a_1 .. a_2|} & = & [ ] \\
+\rulename{sdotdot} &  \semess{S}{u}{v}{|a_1 .. a_2|}
+& = & [ \conBrack{ \conEq{u}{v}, \conEq{v}{i}
+    , \conRel{i}{\geq}{a_1}, \conRel{i}{\leq}{a_2} }
+      \vb i |<-| 0.. ] \\
 \rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 & = &  \semess{S}{u}{v}{t_1} \prodE \semess{S}{u}{v}{t_2}  \\
 \rulename{dseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
-& = &  \hideEs( \{p,q\}, \semess{S}{p}{q}{t_1})\; \prodE \;\semess{S}{u}{v}{t_2} \hspace{5mm} \text{$p,q \not\in \freevars{t_1}$}\\
+& = &  \hideEs( \{p,q\}, \semess{S}{p}{q}{t_1})\; \prodE \;\semess{S}{u}{v}{t_2} \hspace{5mm} \text{$p,q \not\in \freevars{t_1,p,q}$}\\
 \rulename{dapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
  & = &  [ \conBrack{\conEq{u}{v}} ] \prodE \semess{F}{a_2}{v}{a_1} \\[1mm]
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
   \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
-& = & [ \; \hideE(\semapp{I}{|t_1|}, \EV \cap \EV_1)
-  \vb \EV \in \semess{B}{u}{v}{t_2} \; ] |++| \\
+& = & \hideEs(\semapp{I}{|t_1|}, [ \; \EV \cap \EV_1
+  \vb \EV \in \semess{B}{u}{v}{t_2} \; ]) |++| \\
 & & & [ \; \EV \setminus \EV_1
       \vb \EV \in \semess{B}{u}{v}{t_3} \; ] \\
 &&& \text{where}\; \EV_1 : \ENV = \unionListE(\hideE(\{p,q\}, \semess{S}{p}{q}{t_1}))\\[1mm]

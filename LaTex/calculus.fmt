@@ -459,6 +459,7 @@
 %format CX = "CX"
 %format eqgt = "\!=>\!\!"
 %format squig (x) (y) = x "\!" squiggt "\!" y
+%format esssquig (x) (y) = x "\!:\shortrightarrow\!" y
 %format squiggt = "\rightarrow"
 % %format squiggt = "\leadsto"
 % %format squiggt = "\!-\!\!>\!\!\!"
