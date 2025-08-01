@@ -303,7 +303,7 @@ Fixpoint combine (xs : list ENV) : P (list value * ENV) :=
 *)
 
 
-(* Tims version in Euv semantics 
+(* Tim's version in Euv semantics 
 
 Euv{if(a){b}else{c}} := 
    [A[0], 
@@ -341,6 +341,19 @@ where B:=Euv{b}-b
 where C:=Euv{c}-c
 where p&q fresh, n:=Length(Epq{a})
 
+
+Another version
+
+Euv{if(a){b}else{c}} := 
+   [A[0], 
+    A[1]\(A[0]-a), ..., 
+    A[n]\(A[0]-a)\(A[1]-a)\...\ A[n-1]] * B + 
+   [P(Env)(\A[0]\A[1]\...\A[n])-a] * C
+where A:=Epq{a} -{p,q}
+where B:=Euv{b}-a-b-{p,q}
+where C:=Euv{c}-a-c-{p,q}
+where p&q fresh, n:=Length(Epq{a})
+
 *)
 
 
@@ -356,6 +369,17 @@ Definition IF_TIM1 a (A B C : list ENV) : list ENV :=
 
 Definition IF_TIM2 a (A B C : list ENV) : list ENV := 
     let (success, avoid) := try (A [\] ⟅r⟆) in 
+     ((success * B) [\] a) ++
+     ([(Total_set - avoid) \ a] * C).
+
+
+Fixpoint try3 a (A : list ENV) : list ENV * ENV := 
+  let step := fun '(envs, avoid) Ai => 
+                (envs ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
+  List.fold_left step A ([],∅).
+
+Definition IF_TIM3 a (A B C : list ENV) : list ENV := 
+    let (success, avoid) := try3 a (A [\] ⟅r⟆) in 
      ((success * B) [\] a) ++
      ([(Total_set - avoid) \ a] * C).
 

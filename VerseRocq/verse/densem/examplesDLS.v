@@ -405,9 +405,25 @@ Proof.
     congruence.
 Qed.
 
+
 (* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
 (* Tim wants this to fail. *)
-Lemma IF_Tim_choice : 
+Lemma IF1a_Tim1_should_fail : 
+  IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
+  [r ≈ ⟨ Int 1 ⟩; ∅].
+unfold IF_TIM1.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+repeat rewrite hide_arg; auto.
+set_simpl.
+auto.
+Qed.
+
+
+(* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
+(* Tim wants this to fail. *)
+Lemma IF1a_Tim2_should_fail : 
   IF_TIM2 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
   [∅; r ≈ ⟨ Int 1 ⟩].
 unfold IF_TIM2.
@@ -424,19 +440,125 @@ Qed.
 
 (* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
 (* Tim wants this to fail. *)
-Lemma IF_Tim1_choice : 
-  IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
-  [r ≈ ⟨ Int 1 ⟩; ∅].
-unfold IF_TIM1.
+Lemma IF1a_Tim3_should_and_does_fail : 
+  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
+  [∅; ∅].
+unfold IF_TIM3.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
-repeat rewrite hide_arg; auto.
+rewrite constrain_conflict1; try done.
 set_simpl.
 auto.
 Qed.
 
-(* if (x: = (0 |1)) { x } else {fail} == [ 1 ] *)
+
+
+
+Lemma IF2a_Tim3 : 
+  IF_TIM3 (Scope.empty) 
+    ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 3⟩) ]) 
+         [(r ≈ x ≈ ⟨Int 2⟩) ] [r ≈ ⟨ Int 77⟩] = 
+  [
+   ∅; ∅;
+   Total_set - ((x ≈ ⟨ Int 1 ⟩) ∪ x ≈ ⟨ Int 3 ⟩) ∩ r ≈ ⟨ Int 77 ⟩
+   ].
+   (* last one is the same as x <> 1/3 , r = 77 *)
+unfold IF_TIM3.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+rewrite Setminus_disjoint1; try done.
+rewrite constrain_conflict1; try done.
+replace ((x ≈ ⟨ Int 3 ⟩) ∩ r ≈ x ≈ ⟨ Int 2 ⟩) with (∅ : ENV). 2: admit.
+auto.
+Admitted.
+
+Lemma IF2b_Tim2 : 
+  IF_TIM2 (Scope.empty) 
+    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
+         [(r ≈ x ≈ ⟨Int 0⟩) ] [r ≈ ⟨ Int 77⟩] = 
+  [r ≈ x ≈ ⟨ Int 0 ⟩;
+   ∅; 
+   Total_set - ((x ≈ ⟨ Int 0 ⟩) ∪ x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 77 ⟩].
+   (* last one is the same as x <> 0/1 , r = 77 *)
+unfold IF_TIM2.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+rewrite Setminus_disjoint1; try done.
+rewrite constrain_same3.
+rewrite constrain_conflict1; try done.
+Qed.
+
+
+Lemma IF2b_Tim3 : 
+  IF_TIM3 (Scope.empty) 
+    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
+         [(r ≈ x ≈ ⟨Int 0⟩) ] [r ≈ ⟨ Int 77⟩] = 
+  [r ≈ x ≈ ⟨ Int 0 ⟩;
+   ∅; 
+   Total_set - ((x ≈ ⟨ Int 0 ⟩) ∪ x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 77 ⟩].
+   (* last one is the same as x <> 0/1 , r = 77 *)
+unfold IF_TIM3.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+rewrite Setminus_disjoint1; try done.
+rewrite constrain_same3.
+rewrite constrain_conflict1; try done.
+Qed.
+
+
+
+Lemma hide_equiv_arg k x r (NE : x <> r) :
+        ((x ≈ ⟨ k ⟩) ∩ r ≈ ⟪ x ⟫ \ ⟅ x ⟆) = (r ≈ ⟨ k ⟩).
+Admitted.
+
+Lemma IF3_Tim3 : 
+  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫)] [] = 
+  [r ≈ ⟨Int 1⟩; ∅].
+Proof.
+  unfold IF_TIM3.
+  cbn.
+  set_simpl.
+  repeat rewrite hide_result; auto.
+  set_simpl.
+  rewrite hide_equiv_arg. try done.
+  auto.
+Qed.
+
+
+Lemma IF4_Tim3 : 
+  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫);(r ≈ ⟪x⟫)] [] = 
+  [r ≈ ⟨Int 1⟩; r ≈ ⟨ Int 1 ⟩; ∅; ∅].
+Proof.
+  unfold IF_TIM3.
+  cbn.
+  set_simpl.
+  repeat rewrite hide_result; auto.
+  set_simpl.
+  rewrite hide_equiv_arg; try done.
+Qed.
+
+
+Lemma IF5b_Tim3 : 
+  IF_TIM3 Scope.empty ([ (r ≈ x ≈ ⟨Int 7⟩) ; (r ≈ y ≈ ⟨Int 3⟩) ]) [(r ≈ ⟪x⟫)] [] = 
+  [(x ≈ ⟨ Int 7 ⟩) ∩ r ≈ ⟪ x ⟫; 
+   (y ≈ ⟨ Int 3 ⟩) - (x ≈ ⟨ Int 7 ⟩) ∩ r ≈ ⟪ x ⟫].
+Proof.
+  unfold IF_TIM3.
+  cbn.
+  set_simpl.
+  repeat rewrite hide_result; auto.
+  f_equal.
+  replace (r ≈ y ≈ ⟨ Int 3 ⟩ \ ⟅ r ⟆) with (y ≈ ⟨ Int 3 ⟩). 2: admit.
+Admitted.
+
+
+
+
+(* if (x: = (0|1)) { x } else {fail} == [ 1 ] *)
 (* Tim wants this to fail. *)
 Lemma IF_Tim1_choice_communicate : 
   IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ ⟪x⟫) ] [] = 
@@ -450,21 +572,6 @@ admit.
 Admitted.
 
 
-
-Lemma IF_Tim_choice_no_bind0 : 
-  IF_TIM2 (Scope.empty) 
-    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
-         [(r ≈ x ≈ ⟨Int 0⟩) ] [] = 
-  [∅; r ≈ x ≈ ⟨ Int 1 ⟩].
-unfold IF_TIM2.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-set_simpl.
-rewrite Setminus_disjoint1; try done.
-rewrite constrain_same3.
-auto.
-Qed.
 
 Lemma IF_Tim_choice_no_bind : 
   IF_TIM2 (Scope.empty) 
@@ -506,7 +613,7 @@ Lemma IF_Tim_choice_ifxxscoped :
          [(r ≈ ⟪x⟫) ] [] = 
   [r ≈ ⟨Int 0⟩; r ≈ ⟨ Int 1 ⟩].
 Proof.
-unfold IF_TIM.
+unfold IF_TIM2.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
