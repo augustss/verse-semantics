@@ -343,13 +343,19 @@ where p&q fresh, n:=Length(Epq{a})
 
 *)
 
-Fixpoint try (a : Scope.t) (A : list ENV) : list ENV * ENV := 
+
+Fixpoint try (A : list ENV) : list ENV * ENV := 
   let step := fun '(envs, avoid) Ai => 
                 (envs ++ [Ai - avoid], avoid ∪ Ai) in
   List.fold_left step A ([],∅).
 
-Definition IF_TIM a (A B C : list ENV) : list ENV := 
-    let (success, avoid) := try a (A [\] ⟅r⟆) in 
+Definition IF_TIM1 a (A B C : list ENV) : list ENV := 
+    let (success, avoid) := try (A [\] ⟅r⟆ [\] a) in 
+     (success * (B [\] a) ) ++
+     ([(Total_set - avoid)] * C).
+
+Definition IF_TIM2 a (A B C : list ENV) : list ENV := 
+    let (success, avoid) := try (A [\] ⟅r⟆) in 
      ((success * B) [\] a) ++
      ([(Total_set - avoid) \ a] * C).
 
@@ -416,10 +422,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   | mini.If3 a b c =>  
 
     let xs := mini.I a in 
-    let (success, avoid) := try xs (E a) in 
-
-     ((SEQ success (B b)) [\] xs) ++
-     (SEQ [Total_set - avoid] (B c))
+    IF_TIM1 xs (E a) (B b) (B c)
 
 
   (* TODO: should this be E or B *)

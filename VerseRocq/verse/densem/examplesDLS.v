@@ -408,9 +408,9 @@ Qed.
 (* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
 (* Tim wants this to fail. *)
 Lemma IF_Tim_choice : 
-  IF_TIM ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
+  IF_TIM2 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
   [∅; r ≈ ⟨ Int 1 ⟩].
-unfold IF_TIM.
+unfold IF_TIM2.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
@@ -422,12 +422,56 @@ rewrite hide_arg; auto.
 Qed.
 
 
+(* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
+(* Tim wants this to fail. *)
+Lemma IF_Tim1_choice : 
+  IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
+  [r ≈ ⟨ Int 1 ⟩; ∅].
+unfold IF_TIM1.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+repeat rewrite hide_arg; auto.
+set_simpl.
+auto.
+Qed.
+
+(* if (x: = (0 |1)) { x } else {fail} == [ 1 ] *)
+(* Tim wants this to fail. *)
+Lemma IF_Tim1_choice_communicate : 
+  IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ ⟪x⟫) ] [] = 
+  [ Total_set ].
+unfold IF_TIM1.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+set_simpl.
+admit.
+Admitted.
+
+
+
+Lemma IF_Tim_choice_no_bind0 : 
+  IF_TIM2 (Scope.empty) 
+    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
+         [(r ≈ x ≈ ⟨Int 0⟩) ] [] = 
+  [∅; r ≈ x ≈ ⟨ Int 1 ⟩].
+unfold IF_TIM2.
+cbn.
+set_simpl.
+repeat rewrite hide_result; auto.
+set_simpl.
+rewrite Setminus_disjoint1; try done.
+rewrite constrain_same3.
+auto.
+Qed.
+
 Lemma IF_Tim_choice_no_bind : 
-  IF_TIM (Scope.empty) 
+  IF_TIM2 (Scope.empty) 
     ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
          [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
   [∅; r ≈ x ≈ ⟨ Int 1 ⟩].
-unfold IF_TIM.
+unfold IF_TIM2.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
@@ -439,12 +483,12 @@ Qed.
 
 
 Lemma IF_Tim_choice_ifxx : 
-  IF_TIM (Scope.empty) 
+  IF_TIM2 (Scope.empty) 
     ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
          [(r ≈ ⟪x⟫) ] [] = 
   [r ≈ x ≈ ⟨Int 0⟩; r ≈ x ≈ ⟨ Int 1 ⟩].
 Proof.
-unfold IF_TIM.
+unfold IF_TIM2.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
@@ -455,8 +499,9 @@ admit.
 Admitted.
 
 
+
 Lemma IF_Tim_choice_ifxxscoped : 
-  IF_TIM ⟅x⟆ 
+  IF_TIM2 ⟅x⟆ 
     ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
          [(r ≈ ⟪x⟫) ] [] = 
   [r ≈ ⟨Int 0⟩; r ≈ ⟨ Int 1 ⟩].
