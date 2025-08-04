@@ -54,6 +54,7 @@ dO Oint = vFcn $ mkFcn [ (x, x) | x <- allIntsL ]
 dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allIntsL, y <- allIntsL, x > y ]
 -- add is a single function, not many as in the doc.
 dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allIntsL, y <- allIntsL]
+dO Oany = undefined -- Jeff: silencing warnings
 
 --------------------
 ---- Functions
@@ -386,7 +387,7 @@ mho1 = concatMap fpad
 -- XXX check if this is correct
 -- fun_c(fun_c(:succ){:int}){f[1]}
 mho2 :: MappingV
-mho2 = 
+mho2 =
    [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 0
    , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 1
    , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 2
@@ -417,7 +418,7 @@ mho2 =
    ]
 
 mho3 :: MappingV
-mho3 = 
+mho3 =
    [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 1
    , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 1
    , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 1

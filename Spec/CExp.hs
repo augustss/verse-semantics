@@ -143,7 +143,7 @@ syntaxN u (Def x e) = do
   pure $ cseqs [CExi x, CVar x `CEqu` c]
 syntaxN u (DefI x e) = do
   c <- syntaxN x e
-  pure $ cseqs [u =.= CVar x, c]  
+  pure $ cseqs [u =.= CVar x, c]
 syntaxN u (Def2 x y e) = do
   c <- syntaxN x e
   pure $ cseqs [CExi x, u =.= CVar x, CExi y, CVar y `CEqu` c]
@@ -193,15 +193,8 @@ syntaxN u (Fun q e0 e1) = do
                   (cblocks [c1])
 syntaxN u (Block e) = CBlock <$> syntaxNB u e
 
-checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))
-checkQ Open _ _ = pure Nothing
-checkQ Closed f e = do
-    e' <- syntaxN "_" e
-    pure (Just (f, e'))
-
 infix 4 =.=
 
 (=.=) :: Ident -> CExp -> CExp
 "_" =.= c                 = c
 u   =.= c                 = CVar u `CEqu` c
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods -Wno-x-partial #-}
+{-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -48,7 +48,7 @@ redef | ()/=() = id
 --    redb avs (CBlk es) | trace ("redb " ++ show (avs, es, length es)) False = undefined
     redb avs (CBlk aes) = CBlk $ loop avs aes
       where loop _ [] = []
-            loop vs (CDef i (CExi x `CSeq` CEqu (CVar x') e) : es) 
+            loop vs (CDef i (CExi x `CSeq` CEqu (CVar x') e) : es)
               | x == x', x `notElem` vs' =
                   CDef x (red vs e) : CDef i (CVar x) : loop vs' es
                   where vs' = allVars e ++ vs
@@ -245,7 +245,7 @@ dD :: CExp -> Env -> WS
 dD e rho = unionSetOfSeqs [ dE e rho' | rho' <- dX e rho ]
 
 dXL :: CExp -> Env -> [Env]
-dXL e rho = 
+dXL e rho =
   let exts = sequence $ map (\ x -> map (x,) allWsL) (dI e)
   in  map (foldr (\ (i,v) r -> extendEnv r i v) rho) exts
 
