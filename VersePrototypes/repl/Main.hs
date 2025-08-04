@@ -22,6 +22,10 @@ import FrontEnd.Prelude( findPrelude )
 -- verse-densem
 import SExp
 
+-- plancc densem
+import PlanCC(edenSem, edenSemDS, CExp)
+import SExpC(srcExprToExp)
+
 -- Epic libraries
 import Epic.Repl
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
@@ -29,15 +33,15 @@ import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
 -- General library utilities
 import Control.Exception(SomeException, try)
 import Control.Monad
+import Control.Arrow (second)
 import Data.List
 import Data.Maybe
 import Text.Printf
 import Text.Read(readMaybe)
 import qualified Options.Applicative as OA
-
-import PlanCC(edenSem, edenSemDS, CExp)
-import SExpC(srcExprToExp)
-
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
+import Data.Char (isSpace)
 
 --------------------------------------------------------
 --
@@ -136,10 +140,12 @@ mainArgs = do
 
 data CState = CState
   { cs_lastExpr    :: !(Maybe SrcExpr)
+  , cs_lastResult  :: !Doc
   , cs_lastFile    :: !(Maybe FilePath)
   , cs_definitions :: ![SrcExpr]
   , cs_flags       :: !Flags
   , cs_esystem     :: !ESystem
+  , cs_variables   :: !(HashMap String (String, Doc)) -- (repl-input, result)
   }
 
 data ESystem = ESystemPlaceHolder  -- Just for now
@@ -159,6 +165,14 @@ updateLastExpr :: CState -> SrcExpr -> IO CState
 updateLastExpr s e
   = do { display e
        ; pure s{ cs_lastExpr = Just e } }
+
+updateLastResult :: CState -> Doc -> IO CState
+updateLastResult s d
+  = do { pure s{ cs_lastResult = d} }
+
+modifyLastResult :: CState -> (Doc -> Doc) -> IO CState
+modifyLastResult s f
+  = do { pure s{ cs_lastResult = f (cs_lastResult s) } }
 
 getInputExpr :: (SrcExpr -> CState -> IO CState) -> CmdRunner CState
 getInputExpr cmd line s
@@ -200,6 +214,9 @@ theCommandSet = CommandSet
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
       , Cmd "edensem [EXPR]"       "Evaluate [last] expression"            cEDensem
+      , Cmd "let NAME [EXPR]"      "Store the result of EXPR as NAME"      cDefine
+      , Cmd "display [NAME]"       "Show the current variables"            cShowVars
+      , Cmd "delete  [NAME]"       "Remove the variable[s] [NAME0 NAME1]"  cClear
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
@@ -221,10 +238,13 @@ theCommandSet = CommandSet
   , c_bye    = "Bye!"
   , c_prompt = "> "
   , c_state  = CState { cs_lastExpr = Nothing
+                      , cs_lastResult = mempty
                       , cs_lastFile = Nothing
                       , cs_definitions = []
                       , cs_flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
-                      , cs_esystem = ESystemPlaceHolder }
+                      , cs_esystem = ESystemPlaceHolder
+                      , cs_variables = mempty
+                      }
   , c_history = Just ".versei"
   , c_nl = False
   }
@@ -306,7 +326,7 @@ cRead afn s = do
   let fn | afn == "" = fromMaybe (error "No previous file name") (cs_lastFile s)
          | otherwise = afn
       s' = s{ cs_lastFile = Just fn }
-  tryIt (pure s') (updateLastExpr s') $ do
+  tryIt (\_exc -> pure s') (updateLastExpr s') $ do
     file <- readFile fn
     let prog = parseDie pFile fn file
     when (prog == prog) $
@@ -316,7 +336,7 @@ cRead afn s = do
 
 cParseLine :: CmdRunner CState
 cParseLine line s
-  = tryIt (pure s) (updateLastExpr s) $ do
+  = tryIt (\_exc -> pure s) (updateLastExpr s) $ do
     let !prog = parseDie pFile "<interactive>" line
     pure prog
 
@@ -337,7 +357,7 @@ runGetter :: a -> (Flags -> SrcExpr -> DsM a) -> CmdRunner CState
 runGetter err_result getter
   = getInputExpr $ \ e s ->
     let flags = cs_flags s
-    in tryIt (pure s) (\_ -> pure s)
+    in tryIt (\_exc -> pure s) (\_ -> pure s)
              (runD flags err_result (getter flags e))
 
 getEssential :: Flags -> SrcExpr -> DsM SrcEssential
@@ -373,59 +393,65 @@ getCore flags e_parsed
 cEval :: CmdRunner CState
 cEval
   = getInputExpr $ \e s ->
-    tryIt (pure s) (\_ -> pure s) $
+    tryIt (\_exc -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; prepd_core <- runD flags Core.Fail (getCore flags e)
        ; let rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules
        ; let (res, tr) = Core.normalize (fRewriteSteps flags) rules prepd_core
 
-       ; displayDoc $ addHeader "Evaluate" $
-         case res of
-           NormOK      -> text "Result = " <+> pPrint (Core.term tr)
-           NormExpired -> text "Ran out of fuel"
-           NormInvalid -> hang (text "Reached an invalid expression:")
-                             2 (pPrint (Core.term tr))
+       ; let eval_doc = addHeader "Evaluate" $
+                        case res of
+                          NormOK      -> text "Result = " <+> pPrint (Core.term tr)
+                          NormExpired -> text "Ran out of fuel"
+                          NormInvalid -> hang (text "Reached an invalid expression:") 2
+                                         (pPrint (Core.term tr))
 
-       ; when (fTraceEval flags) $
-         displayDoc (addHeader "Evaluation trace" $ vcat $
-                     pPrintTrace (fTraceVerbosity flags) tr)
+       ; s' <- updateLastResult s eval_doc
+       ; displayDoc eval_doc
 
-       ; return () }
+       ; s'' <- if (fTraceEval flags)
+                then do
+                  let trace_doc = addHeader "Evaluation trace"
+                                  $ vcat
+                                  $ pPrintTrace (fTraceVerbosity flags) tr
+                  displayDoc trace_doc
+                  modifyLastResult s' (<> trace_doc)
+                else pure s'
+
+       ; return s'' }
 
 cDensem :: CmdRunner CState
 cDensem
   = getInputExpr $ \e s ->
-    tryIt (pure s) (\_ -> pure s) $
+    tryIt (updateLastResult s . text . show) pure $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- denSemDesugar e_ess
        ; res <- denSem e_ds
+       ; let desugared = addHeader "Desugared" $ text $ show e_ds
+             den_sem   = addHeader "Den-sem"   $ text $ show res
 
-       ; displayDoc $ addHeader "Desugared" $
-         text $ show e_ds
+       ; displayDoc desugared
+       ; displayDoc den_sem
 
-       ; displayDoc $ addHeader "Den-sem" $
-           text $ show res
-
-       ; return () }
+       ; updateLastResult s (desugared $$ den_sem) }
 
 cEDensem :: CmdRunner CState
 cEDensem
   = getInputExpr $ \e s ->
-    tryIt (pure s) (\_ -> pure s) $
+    tryIt (updateLastResult s . text . show) pure $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- edenSemDesugar e_ess
        ; res <- edenSem e_ds
+       ; let desugared = addHeader "Desugared" $ text $ show e_ds
+             den_sem   = addHeader "Den-sem"   $ text $ show res
 
-       ; displayDoc $ addHeader "Desugared" $
-         text $ show e_ds
+       ; displayDoc desugared
+       ; displayDoc den_sem
 
-       ; displayDoc $ addHeader "Den-sem" $
-           text $ show res
-
-       ; return () }
+       ; updateLastResult s (desugared $$ den_sem) }
 
 edenSemDesugar :: SrcExpr -> IO CExp
 edenSemDesugar e = return . edenSemDS . srcExprToExp $ e
@@ -463,11 +489,42 @@ setPrelude pn cs =
 
 
 
-{-
+
 --------------------------------------------------------
 --         Adding and displaying definitions
 --------------------------------------------------------
 
+cDefine :: CmdRunner CState
+cDefine line s = do
+  let
+     -- tail drops the leading space break finds
+    (name,expr) = second tail $ break isSpace line
+  st <- snd <$> eval theCommandSet s expr
+  -- WARNING: cDefine relies on an exact ordering of operations due to storing
+  -- the input and Doc for the last evaluation. If the repl ever becomes async
+  -- this will have to change
+  let the_output = (expr, cs_lastResult st)
+  pure st{ cs_variables = HM.insert name the_output $ cs_variables st}
+
+
+cShowVars :: CmdRunner CState
+cShowVars "" s = do
+  mapM_ putStrLn $ HM.keys (cs_variables s)
+  pure s
+cShowVars v s = do
+  let (src_expr, result) = HM.findWithDefault (mempty,mempty) v $ cs_variables s
+  displayDoc $ addHeader "Input" $ text $ show src_expr
+  displayDoc result
+  pure s
+
+cClear :: CmdRunner CState
+cClear "" s = pure s{ cs_variables = mempty }
+cClear xs s = pure s{ cs_variables = HM.filterWithKey go (cs_variables s) }
+  where
+    to_remove = words xs
+    go k _    = k `notElem` to_remove
+
+{-
 cDefine :: CmdRunner CState
 cDefine =
   withLastExpr $ \ e s -> do
@@ -646,11 +703,9 @@ cDefEval c s = do
 --------------------------------------------------------
 
 
-tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
+tryIt :: (SomeException -> IO b) -> (a -> IO b) -> IO a -> IO b
 tryIt recover success_cont try_me = do
   e <- try try_me
   case e of
-    Left (exn :: SomeException) -> do
-      print exn
-      recover
-    Right a -> success_cont a
+    Left exn -> print exn >> recover exn
+    Right a  -> success_cont a
