@@ -64,7 +64,6 @@ $$
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
-  s \in & \VAL & = & \powerset{\Value} \makebox[0pt]{\hspace{1.5in}\benjamin{still needed?}} \\
   Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
   &&&& \hspace{3mm} \text{with disjoint domains} \\
   \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value
@@ -86,32 +85,30 @@ $$
 &  & \vb & \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \vb \conCompl(\EV) \\
 \text{Relational operators}&  rop & ::= & < \vb \leq \vb = \vb \geq \vb >
 \end{array}\\
-\\
+\\[-1mm]
 \textbf{Interpretation of simple values and constraints}\\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
   \sembrack{\EV} & : & \ENV \\
   \sembrack{\conEmpty} & = & \{\} \\
   \sembrack{\conUniv} & = & \Env   & \text{Set of all environments} \\
-  \sembrack{\conCompl(\EV)} & = & \{ \rho \in \Env \vb \rho \not\in \EV \} \\
+  \sembrack{\conCompl(\EV)} & = & \complE( \sembrack{\EV} )\\
   \sembrack{\EV_1 \cup \EV_2} & = & \sembrack{\EV_1} \cup \sembrack{\EV_2} \\
   \sembrack{\EV_1 \cap \EV_2} & = & \sembrack{\EV_1} \cap \sembrack{\EV_2} \\
   \sembrack{\conBrack{\conEq{x}{a}}} & = & \{ \rho \in \Env \vb \rho(x) = \semapp{A}{a}\rho \} \\
   \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}}}
   & = & \multicolumn{2}{@@{}l}
            {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun(hs),
-                \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in hs[i] \}}\\
-\\
+                \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in hs[i] \}}\\[1mm]
 \semapp{A}{|a|} & : & \Env \rightarrow \Val \\
 \semapp{A}{|x|}\rho & = & \rho(x) \\
 \semapp{A}{|k|}\rho & = & k \\
 \semapp{A}{|o|}\rho & = & \semap{O}{o} \\
 \semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
-\semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\
-\\
+\semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
 \semap{O}{|o|} & : & \Val \\
  \semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
 \end{array}\\
-\\
+\\[-1mm]
 \textbf{Semantic functions} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
@@ -120,14 +117,16 @@ $$
 
 \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
 &  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
-\text{Hiding} & \hideE & : & \powerset{\Ident + \RES} \rightarrow \ENV \rightarrow \ENV \\
+\text{Complement} & \complE & : & \ENV \rightarrow \ENV \\
+& \complE(\EV) & = & \{ \rho \vb \rho \not\in \EV \} \\[1mm]
+\text{Hiding} & \hideE & : & \powerset{\Ident} \rightarrow \ENV \rightarrow \ENV \\
 & \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
- & \hideEs & : & \powerset{\Ident + \RES} \rightarrow \seq{\ENV} \rightarrow \seq{\ENV} \\
+ & \hideEs & : & \powerset{\Ident} \rightarrow \seq{\ENV} \rightarrow \seq{\ENV} \\
 & \hideEs(xs, s) & = & [\; \hideE(xs,\EV) \vb \EV \in s \; ]\\[1mm]
 
-\text{Extract result} & \extractE & : & \ENV \rightarrow \powerset{\Val, \ENV} \\
-& \extractE(\EV) & = & \{ (v, \hideE(\RES, \EV'))
-                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(\RES)=v \} \} \\[1mm]
+\text{Extract result} & \extractE & : & \Ident \rightarrow \ENV \rightarrow \powerset{\Val, \ENV} \\
+& \extractE(r,\EV) & = & \{ (v, \hideE(r, \EV'))
+                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(r)=v \} \} \\[1mm]
 \end{array} \\
 
 \end{array}

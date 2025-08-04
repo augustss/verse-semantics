@@ -36,18 +36,16 @@ $$
 \rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 & = &  \semess{S}{u}{v}{t_1} \prodE \semess{S}{u}{v}{t_2}  \\
 \rulename{dseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
-& = &  \hideEs( \{p,q\}, \semess{S}{p}{q}{t_1})\; \prodE \;\semess{S}{u}{v}{t_2} \hspace{5mm} \text{$p,q \not\in \freevars{t_1,p,q}$}\\
+& = &  \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}\\
 \rulename{dapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
  & = &  [ \conBrack{\conEq{u}{v}} ] \prodE \semess{F}{a_2}{v}{a_1} \\[1mm]
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
   \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
-& = & \hideEs(\semapp{I}{|t_1|}, [ \; \EV \cap \EV_1
-  \vb \EV \in \semess{B}{u}{v}{t_2} \; ]) |++| \\
-& & & [ \; \EV \setminus \EV_1
-      \vb \EV \in \semess{B}{u}{v}{t_3} \; ] \\
-&&& \text{where}\; \EV_1 : \ENV = \unionListE(\hideE(\{p,q\}, \semess{S}{p}{q}{t_1}))\\[1mm]
+& = & \hideEs(\semapp{I}{|t_1|}, [ \; \EV_1 ] \prodE \semess{B}{u}{v}{t_2}) |++| \\
+& & & [ \complE( \EV_1 )] \prodE \semess{B}{u}{v}{t_3} \\
+&&& \text{where}\; \EV_1 : \ENV = \firstE(\semapp{C}{t_1})\\[1mm]
 
 %  ------ FOR --------------
 \rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}
@@ -55,26 +53,16 @@ $$
 & & \multicolumn{2}{l}{\text{where}} \\
 & & & SS_1,SS_2 :: \seq{\seq{\ENV}} \\
 &&& SS_1 = [ \; \mapE(\cap \EV,\; \semess{B}{r}{s}{t_2})
-            \vb \EV |<-| \squashE(\hideE(\{p,q\},\semess{S}{p}{q}{t_1})) \; ] \\
+            \vb \EV |<-| \squashE(\semapp{C}{t_1}) \; ] \\
 &&& SS_2 = \pickE(SS_1)\\[1mm]
 
-%  ------ ALL --------------
-\rulename{sall} & \semess{S}{u}{v}{|all t|}
-& = & [\, \allE(q,v, \hideEs(p, \semess{S}{p}{q}{t})) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\
-
-%  ------ ONE --------------
-\begin{comment}
+%  ------ ONE,ALL --------------
 \rulename{sone} & \semess{S}{u}{v}{|one t|}
-& = & [ \, \begin{array}[t]{@@{}l@@{\;}l}
-           \{ & \rho \in \Env \\
-             \vb & w \in \headE (\squashE
-             \begin{array}[t]{@@{}l@@{\;}l}
-               [ & \{ w \vb (w,\EV') \in \extractE(q,\hideE(p,\EV)), \rho \in \EV' \} \\
-               \vb & \EV \in \semess{S}{p}{q}{|t|} \; ]) \hspace{5mm} p,q \not\in \freevars{t}
-               \end{array} \\a
-           , & \rho(u) = \rho(v) = w \} \, ]
-           \end{array} \\
-\end{comment}
+ & = & [\, \conBrack{ \conEq{u}{v} } \cap \hideE(xs, \firstE(xs, \hideEs(p, \semess{S}{p}{v}{|t|}))) \, ] \\
+ & & & \text{where}\; xs = \semapp{I}{|t|}, \; p \not\in \freevars{t} \\
+\rulename{sall} & \semess{S}{u}{v}{|all t|}
+ & = & [\, \conBrack{ \conEq{u}{v} } \cap \allE(q,v, \hideEs(p, \semess{B}{p}{q}{t})) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\
+\\
 
 % -------- LAMBDA ------------
 \rulename{dlam} &
@@ -82,7 +70,9 @@ $$
   & & = & ??? \\
 \\
 & \semess{B}{u}{v}{|t|} & : & \seq{ \ENV } \\
-& \semess{B}{u}{v}{|t|} & = & \hideEs(\semapp{I}{|t|}, \semess{S}{u}{v}{t}) \\
+& \semess{B}{u}{v}{|t|} & = & \hideEs(\semapp{I}{|t|}, \semess{S}{u}{v}{t}) \\[1mm]
+& \semapp{C}{|t|} & : & \seq{ \ENV } \\
+& \semapp{C}{|t|} & = & \hideEs(\{p,q\},\; \semess{S}{p}{q}{|t|}) \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 \\
 & \semess{F}{a_a}{r}{a_f} & : & \seq{\ENV} \\
 & \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}} \vb i |<-| 0.. \; ] \\
@@ -93,7 +83,12 @@ $$
              \vb & ws \in \pickE (\squashE
                [ \; \{ w \vb (w,\EV') \in \extractE(q,\EV), \rho \in \EV' \} \vb \EV \in S \; ]) \\
            , & \rho(r) = \tupE(ws) \; \}
-           \end{array} \\
+\end{array} \\
+\\[-2mm]
+& \firstE & : & \powerset{\Ident} \rightarrow [\ENV] \rightarrow \ENV \\
+& \firstE(xs,\; []) & = & \{\} \\
+& \firstE(xs,\; \EV : \EV{}s)  & = & \EV \cup (\firstE(xs, \EV{}s) \setminus \hideE(xs,\EV)) \\
+
 \end{array}
 \end{array}
 $$
