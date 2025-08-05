@@ -158,7 +158,7 @@ printWithHdr s d
 addHeader :: String -> Doc -> Doc
 addHeader s doc
  = vcat [ text ""
-        , text ("================ " ++ s ++ "===================")
+        , text ("================ " ++ s ++ " ===================")
         , doc ]
 
 updateLastExpr :: CState -> SrcExpr -> IO CState
@@ -511,10 +511,12 @@ cShowVars :: CmdRunner CState
 cShowVars "" s = do
   mapM_ putStrLn $ HM.keys (cs_variables s)
   pure s
-cShowVars v s = do
-  let (src_expr, result) = HM.findWithDefault (mempty,mempty) v $ cs_variables s
-  displayDoc $ addHeader "Input" $ text $ show src_expr
-  displayDoc result
+cShowVars vs' s = do
+  let vs               = words vs'
+      findResult v     = HM.findWithDefault (mempty,mempty) v $ cs_variables s
+      mkDoc v (input,result) = addHeader ("Input for " ++ v) (text input) $$ result
+      docs             = fmap (\v -> mkDoc v (findResult v)) vs
+  mapM_ displayDoc docs
   pure s
 
 cClear :: CmdRunner CState
