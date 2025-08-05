@@ -12,7 +12,7 @@ import FrontEnd.Expr(Ident(..), noLoc)
 freshList :: [Ident] -> [Ident]
 freshList xs = ys \\ xs
  where
-  ys = [ Ident noLoc ("z" ++ show i) | i <- [1..] ]
+  ys = [ Ident noLoc ("z" ++ show i) | i <- [1 :: Integer ..] ]
 
 fresh :: [Ident] -> Ident
 fresh xs = head (freshList xs)

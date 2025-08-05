@@ -189,6 +189,9 @@ library verse-densem
                       ENV
                       Oper
                       SemSeqENV
+                      ENVS
+                      TimE
+                      ValueS
     build-depends:    verse-libs,
                       base,
                       containers,
