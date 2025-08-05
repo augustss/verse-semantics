@@ -93,6 +93,7 @@ showp e = "(" ++ show e ++ ")"
 free :: Oper -> [Ident]
 free (x :=: y)           = nub [x,y]
 free (x := _k)           = [x]
+free (x :<= y)           = nub [x,y]
 free (x :=<> ys)         = nub (x:ys)
 free (Exi x)             = [x]
 free (y:=@(f,x))         = nub [f,x,y]
@@ -106,8 +107,9 @@ free (If op1 op2 op3)    = free (Scope op1) `union` (free (Scope op2) \\ exis op
 free (All x op y)        = [x] `union` (free (Scope op) \\ [y])
 free NoOp                = []
 
+
+
 exis :: Oper -> [Ident]
 exis (Exi x)       = [x]
 exis (op1 :>: op2) = exis op1 `union` exis op2
 exis _             = []
-

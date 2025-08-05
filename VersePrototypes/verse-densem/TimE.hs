@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module TimE where
-import Epic.List
+
 import FrontEnd.Expr
 import ValueS
 import ENVS
@@ -12,7 +12,7 @@ dE (EPrim p)                        i x = [ i .=. x /\ x .= Fun (dP p) ]
 dE (Variable v) i x | isSrcUnderscore v = [ i .=. x ]
                     | otherwise         = [ i .=. x /\ x .=. v ]
 dE (DefineE y t)                    i x = [ x .=. y ] *** dE t i x
-dE (DefineV y)                      i x = [ univ ] -- [ i .=. x /\ x .=. y ]
+dE (DefineV _)                      _ _ = [ univ ] -- [ i .=. x /\ x .=. y ]
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x ++ dB t1 i x
 dE (Seq t0 t1)                      i x = dE t0 j y `remv` [j, y] *** dE t1 i x  where (j, y) = fresh2 t0
@@ -62,11 +62,11 @@ dP Neg = [funNegate]
 dP p = error $ "dP undefined " ++ show p
 
 firstK :: [Ident] -> [ENV] -> ENV
-firstK ys []         = empty
+firstK _  []         = empty
 firstK ys (env:envs) = env \/ (compl (hides ys env) /\ firstK ys envs)
 
 first :: [Ident] -> [ENV] -> ENV
-first xs [] = empty
+first _  []     = empty
 first xs (d:ds) = d \/ (first xs ds \\\ hides xs d)
 
 squash :: [ENV] -> [ENV]
@@ -93,7 +93,7 @@ den t = dE (Block t) i res `remv` [i]  where (i, _x) = fresh2 t
 res :: Ident
 res = Ident noLoc "res"
 
-xx, yy, zz :: Ident
+xx, yy, zz, ii, jj :: Ident
 xx = Ident noLoc "x"
 yy = Ident noLoc "y"
 zz = Ident noLoc "z"
@@ -126,6 +126,7 @@ infixr 2 |||
 (|||) :: SrcEssential -> SrcEssential -> SrcEssential
 x ||| y = x `Choice` y
 
+aa, bb, tt, ee :: SrcEssential
 aa = (DefineV xx `Seq` (vxx === k1 ||| vxx === k2))
 bb = (vxx === k1 ||| vxx === k2)
 tt = vxx === k2
@@ -164,4 +165,3 @@ if (x=7 | y=3) { x } else fail
 [ {{x=7,r=7}}u
   {{x/=7,y=3,r=x}} ]
 -}
-      

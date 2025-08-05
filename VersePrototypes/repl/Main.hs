@@ -26,6 +26,9 @@ import SExp
 import PlanCC(edenSem, edenSemDS, CExp)
 import SExpC(srcExprToExp)
 
+-- TimE densem
+import TimE (den)
+
 -- Epic libraries
 import Epic.Repl
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
@@ -203,7 +206,9 @@ theCommandSet = CommandSet
 --       , Cmd "display"              "Show current global defs"              cDisplay
 --       , Cmd "clear"                "Clear global defs"                     cClear
 --      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
-
+      , Cmd "let NAME [EXPR]"      "Store the result of EXPR as NAME"      cDefine
+      , Cmd "display [NAME]"       "Show the current variables"            cShowVars
+      , Cmd "delete  [NAME]"       "Remove the variable[s] [NAME0 NAME1]"  cClear
       , Cmd "read FILE"            "Parse a file"                          cRead
 
       , Cmd "essential [EXPR]"  "Desugar [last] expression to Essential" (runGetterSrc getEssential)
@@ -214,9 +219,8 @@ theCommandSet = CommandSet
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
       , Cmd "edensem [EXPR]"       "Evaluate [last] expression"            cEDensem
-      , Cmd "let NAME [EXPR]"      "Store the result of EXPR as NAME"      cDefine
-      , Cmd "display [NAME]"       "Show the current variables"            cShowVars
-      , Cmd "delete  [NAME]"       "Remove the variable[s] [NAME0 NAME1]"  cClear
+      , Cmd "timEdensem [EXPR]"    "Evaluate [last] expression"            cTimEDensem
+
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
@@ -454,7 +458,21 @@ cEDensem
        ; updateLastResult s (desugared $$ den_sem) }
 
 edenSemDesugar :: SrcExpr -> IO CExp
-edenSemDesugar e = return . edenSemDS . srcExprToExp $ e
+edenSemDesugar = return . edenSemDS . srcExprToExp
+
+cTimEDensem :: CmdRunner CState
+cTimEDensem
+  = getInputExpr $ \e s ->
+    tryIt (updateLastResult s . text . show) pure $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       -- ; e_ds <- edenSemDesugar e_ess
+       ; let res = den e_ess
+       ; let den_sem   = addHeader "Den-sem" $ vcat $ fmap (text . show) res
+
+       ; displayDoc den_sem
+
+       ; updateLastResult s den_sem }
 
 --------------------------------------------------------
 --         Displaying the last expression
