@@ -43,18 +43,18 @@ $$
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
   \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
-& = & \hideEs(\semapp{I}{|t_1|}, [ \; \EV_1 ] \prodE \semess{B}{u}{v}{t_2}) |++| \\
-& & & [ \complE( \EV_1 )] \prodE \semess{B}{u}{v}{t_3} \\
-&&& \text{where}\; \EV_1 : \ENV = \firstE(\semapp{C}{t_1})\\[1mm]
+& = & \hideEs(\semapp{I}{|t_1|}, [ \EV_1 ] \prodE \semess{B}{u}{v}{t_2}) |++| \\
+& & &
+ &&& \text{where}\; \EV_1 : \ENV = \firstE(\semapp{C}{t_1}) \\[1mm]
 
 %  ------ FOR --------------
 \rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}
-& = & [ \; \hideE( \semapp{I}{t_1}, \allE(s, v, S)) \vb S |<-| SS_2 \;] \\
-& & \multicolumn{2}{l}{\text{where}} \\
-& & & SS_1,SS_2 :: \seq{\seq{\ENV}} \\
-&&& SS_1 = [ \; \mapE(\cap \EV,\; \semess{B}{r}{s}{t_2})
-            \vb \EV |<-| \squashE(\semapp{C}{\benjamin{$\semapp{I}{t_1},$}t_1}) \; ] \\
-&&& SS_2 = \pickE(SS_1)\\[1mm]
+& = & [ \; \hideE( \semapp{I}{t_1}, \allE(s, v, S)) \vb S |<-| SS \;] \\
+& & & \text{where} \  SS :: \seq{\seq{\ENV}} \\
+&&& SS = \pickE([ \; {\color{purple} [\EV] \prodE \semess{B}{r}{s}{t_2}}
+            \vb \EV |<-|
+    \squashE(\semapp{C}{t_1}) \; ]) \\
+  &&& {\color{purple} r,s \not\in \freevars{t}} \\[1mm]
 
 %  ------ ONE,ALL --------------
 \rulename{sone} & \semess{S}{u}{v}{|one t|}
