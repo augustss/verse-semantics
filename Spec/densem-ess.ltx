@@ -10,35 +10,34 @@ $$
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
  & \semess{S}{u}{v}{t} & : & [ \ENV ] \\
-\rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \conBrack{\conEq{u}{v}} ] \\
-\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{ \conEq{u}{v}, \conEq{v}{a}} ] \\
+\rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \conBrack{u =v} ] \\
+\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{u=v, v=a} ] \\
 \rulename{stuple} & \semess{S}{u}{v}{|array (t_1,xdots,t_n)|}
 & = & \hideEs \begin{array}[t]{@@{}l@@{\,}l}
            ( & \{u_1,\mydots u_n,v_1 \mydots v_n\} \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}\\
            , & \begin{array}[t]{@@{}l}
-                 \conBrack{ \conEq{u}{|arr (u_1, xdots, u_n)|},
-                             \conEq{v}{|arr (v_1, xdots, v_n)|}} \\
+                 \conBrack{ u=|arr (u_1, xdots, u_n)|,
+                            v=|arr (v_1, xdots, v_n)|} \\
                    \prodsingleE \semess{S}{u_1}{v_1}{t_1} \prodE \ldots \prodE \semess{S}{u_n}{v_n}{t_n}\; )
       \end{array}
       \end{array}
       \\
-\rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  \conBrack{\conEq{x}{v}} \prodsingleE \semess{S}{u}{v}{t} \\
+\rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \prodsingleE \semess{S}{u}{v}{t} \\
 \rulename{ssquig} &  \semess{S}{u}{v}{|esssquig x t|} & = &
-   \conBrack{\conEq{x}{u}} \prodsingleE \semess{S}{u}{v}{t} \\
+   \conBrack{x=u} \prodsingleE \semess{S}{u}{v}{t} \\
 \rulename{stype} &  \semess{S}{u}{v}{|:a|} & = & \semess{F}{u}{v}{a}  \\
 \rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & [ ] \\
 \rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
  & = & \semess{B}{u}{v}{t_1} \append \semess{B}{u}{v}{t_2}  \\
 \rulename{sdotdot} &  \semess{S}{u}{v}{|a_1 .. a_2|}
-& = & [ \conBrack{ \conEq{u}{v}, \conEq{v}{i}
-    , \conRel{i}{\geq}{a_1}, \conRel{i}{\leq}{a_2} }
+& = & [ \conBrack{u=v, v=i, i \geq a_1, i \leq a_2}
       \vb i |<-| 0.. ] \\
 \rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 & = &  \semess{S}{u}{v}{t_1} \prodE \semess{S}{u}{v}{t_2}  \\
 \rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
 & = &  \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}\\
 \rulename{sapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
- & = &  \conBrack{\conEq{u}{v}} \prodsingleE \semess{F}{a_2}{v}{a_1} \\[1mm]
+ & = &  \conBrack{u=v} \prodsingleE \semess{F}{a_2}{v}{a_1} \\[1mm]
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
@@ -53,7 +52,7 @@ $$
 
 %  ------ FOR --------------
 \rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}
-& = & \conBrack{ \conEq{u}{v} } \prodsingleE [ \, \allE(s, S, v)) \vb S |<-| SS \,] \\
+& = & \conBrack{ u=v } \prodsingleE [ \, \allE(s, S, v)) \vb S |<-| SS \,] \\
 & & & \text{where} \begin{array}[t]{l}
       xs = \semapp{I}{t_1} \hspace{5mm} r,s \not\in \freevars{t_1,t_2} \\
       SS :: \seq{\seq{\ENV}}
@@ -66,10 +65,10 @@ $$
 
 %  ------ ONE,ALL --------------
 \rulename{sone} & \semess{S}{u}{v}{|one t|}
- & = & \conBrack{ \conEq{u}{v} } \prodsingleE [\,\hideE(xs, \firstE(xs, \hideEs(p, \semess{S}{p}{v}{|t|}))) \, ] \\
+ & = & \conBrack{ u=v } \prodsingleE [\,\hideE(xs, \firstE(xs, \hideEs(p, \semess{S}{p}{v}{|t|}))) \, ] \\
  & & & \text{where}\; xs = \semapp{I}{|t|}, \; p \not\in \freevars{t} \\
 \rulename{sall} & \semess{S}{u}{v}{|all t|}
- & = & \conBrack{ \conEq{u}{v} } \prodsingleE [\, \allE(q,\hideEs(p, \semess{B}{p}{q}{t}),v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\
+ & = & \conBrack{ u=v } \prodsingleE [\, \allE(q,\hideEs(p, \semess{B}{p}{q}{t}),v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\
 \\
 
 % -------- LAMBDA ------------
@@ -90,7 +89,7 @@ $$
            \{ & \rho \in \Env \\
              \vb & ws \in \pickE (\squashE
                [ \; \{ w \in \Value \vb \rho[ \fpr{q}{w}] \in \EV \} \vb \EV \in S \; ]) \\
-           , & \rho(r) = \tupE(ws) \; \}
+           , & \rho(r) = \tupE(ws) \; \} \\
 \end{array} \\
 \\[-2mm]
 & \firstE & : & \powerset{\Ident} \rightarrow [\ENV] \rightarrow \ENV \\
