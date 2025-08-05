@@ -38,6 +38,8 @@ $$
   \seqE & : & \powerset{A} \rightarrow \powerset{A} \rightarrow \powerset{A} \\
   s_1 \seqE s_2 & = & \{ a_2 \vb a_1 \in s_1, a_2 \in s_2 \} \\
     & = & \textbf{if} \, (s_1 = \{\}) \, \textbf{then} \, \{\} \, \textbf{else} \, s_2 \\[1mm]
+  \prodsingleE & : & \powerset{A} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \\
+  \EV \prodsingleE s_2 & = & [\; \EV \cap \EV_2 \vb \EV_2 |<-| s_2 \; ] \\[1mm]
   \prodE & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \\
   s_1 \prodE s_2 & = & [\; \EV_1 \cap \EV_2 \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 \; ] \\[1mm]
   \dodgyunion & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \rightarrow \seq{\powerset{A}}
