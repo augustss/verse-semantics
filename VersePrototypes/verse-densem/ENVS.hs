@@ -1,9 +1,13 @@
 {-# OPTIONS_GHC -Wno-x-partial -Wno-name-shadowing -Wno-incomplete-patterns -Wno-unused-matches #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+#define DEBUG_SHOW 0
 module ENVS(
   ENV,
   empty, univ,
   (/\), (\/), (\\\), compl,
   (.=), (.=.),
+  (./=),
   hide, hides,
   )where
 import Data.List(intercalate, group, sort)
@@ -11,8 +15,8 @@ import ValueS
 
 -- ENV API
 
-infix  5 .=, .=.
-infixr 4 /\
+infix  5 .=, .=., ./=
+infixr 4 /\ -- dummy
 infixr 3 \/
 
 empty :: ENV
@@ -32,6 +36,9 @@ x \\\ y = x /\ compl y
 
 (.=) :: Ident -> Value -> ENV
 x .= v = OR [ YES [x :=: Value v] ]
+
+(./=) :: Ident -> Value -> ENV
+x ./= v = compl (x .= v)
 
 (.=.) :: Ident -> Ident -> ENV
 x .=. y = OR [ YES (case x `compare` y of
@@ -84,10 +91,13 @@ neg (x :/=: t) = x :=: t
 
 data ENV = OR [ CASE ]
  deriving ( Eq, Ord )
-
+#if DEBUG_SHOW
+ deriving (Show)
+#else
 instance Show ENV where
   show (OR [])              = "∅"
   show (OR cs)              = intercalate " \x222a " (map show cs)
+#endif
 
 disj :: [CASE] -> ENV
 disj as = OR (usort [ a | a@(YES _) <- as ])
@@ -96,11 +106,14 @@ data CASE
   = YES [CONSTR]
   | NO
  deriving ( Eq, Ord )
-
+#if DEBUG_SHOW
+ deriving (Show)
+#else
 instance Show CASE where
   show (YES []) = "U"
   show (YES cs) = "{{" ++ intercalate "," (map show cs) ++ "}}"
   show NO       = "∅"
+#endif
 
 true :: CASE
 true = YES []

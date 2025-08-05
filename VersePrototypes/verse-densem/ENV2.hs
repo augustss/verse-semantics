@@ -340,7 +340,9 @@ sem (If e1 e2 e3) r =
   squash $
   dodgyUnion
   [ [ hides ys (env1 /\ env2) | env2 <- sem e2 r ]
-  , [ compl env1 /\ hides ys env3 | env3 <- sem e3 r ]
+--  , [ compl env1 /\ hides ys env3 | env3 <- sem e3 r ]
+-- Lennart: must hide ys which otherwise leak from (compl env1)
+  , [ hides ys (env3 \\\ env1) | env3 <- sem e3 r ]
   ]
  where
   env1 = first ys (map (hide z) $ sem e1 z)
