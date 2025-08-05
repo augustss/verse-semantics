@@ -393,7 +393,7 @@ getCore flags e_parsed
 cEval :: CmdRunner CState
 cEval
   = getInputExpr $ \e s ->
-    tryIt (\_exc -> pure s) (\_ -> pure s) $
+    tryIt (updateLastResult s . text . show) pure $
     do { let flags = cs_flags s
        ; prepd_core <- runD flags Core.Fail (getCore flags e)
        ; let rules | fVerify flags = everywhere verificationRules
