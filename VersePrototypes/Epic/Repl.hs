@@ -6,7 +6,8 @@ module Epic.Repl(
     CommandSet(..),
     Cmd(..),
     CmdRunner,
-    runCommands
+    runCommands,
+    eval
  ) where
 
 import Data.Char
@@ -42,14 +43,14 @@ type CmdRunner s = String -> s -> IO s
 
 runCommands :: forall s . CommandSet s -> IO ()
 -- Run a REPl driven by the given CommandSet
-runCommands CommandSet{..} = do
+runCommands cs@CommandSet{..} = do
   putStrLn c_greet
   let
     commands = [Cmd "help" "Print this message" help
                ,Cmd "quit" "Quit program"       undefined] ++
                c_commands
     rpl = REPL { repl_init = pure (c_prompt, c_state)
-               , repl_eval = eval
+               , repl_eval = eval cs{c_commands = commands}
                , repl_exit = const $ putStrLn c_bye
                , repl_hist = c_history
                , repl_nl   = c_nl }
@@ -60,20 +61,22 @@ runCommands CommandSet{..} = do
       let l = maximum (map (\ (Cmd c _ _) -> length c) commands)
       mapM_ (\ (Cmd c h _) -> printf ":%-*s  %s\n" l c h) commands
       pure s
+  repl rpl
 
-    eval :: s
-         -> String          -- The input line, typed by the user
-         -> IO (Bool, s)    -- Bool = True iff user typed ":quit"
-    -- Discard leading spaces, look for leading ':',
-    --    take longest isAlpha prefix, and see if that is a prefix of a command.
-    -- If so, run the command passing the rest of the input line;
-    --  otherwise run c_exec passing the rest of the input line
-    eval s line =
+eval :: CommandSet s    -- The command set
+     -> s
+     -> String          -- The input line, typed by the user
+     -> IO (Bool, s)    -- Bool = True iff user typed ":quit"
+-- Discard leading spaces, look for leading ':',
+--    take longest isAlpha prefix, and see if that is a prefix of a command.
+-- If so, run the command passing the rest of the input line;
+--  otherwise run c_exec passing the rest of the input line
+eval commands s line =
       case dropWhile isSpace line of
         ':' : line' | null line'' -> pure (False, s)
                     | otherwise -> do
                       let (w, rest) = span isAlpha line''
-                      case filter (\ c -> w `isPrefixOf` cmd_string c) commands of
+                      case filter (\ c -> w `isPrefixOf` cmd_string c) $ c_commands commands of
                         [] -> do
                           putStrLn "Cannot parse command.  Use :help to get help."
                           pure (False, s)
@@ -85,9 +88,8 @@ runCommands CommandSet{..} = do
         "" ->
           pure (False, s)
         line' -> do
-          s' <- c_exec line' s
+          s' <- c_exec commands line' s
           pure (False, s')
-  repl rpl
 
 _testCommand :: CommandSet Int
 _testCommand = CommandSet

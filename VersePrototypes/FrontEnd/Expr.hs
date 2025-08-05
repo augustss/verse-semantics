@@ -423,7 +423,7 @@ instance Eq Ident where x == y  =  compare x y == EQ
 instance Ord Ident where compare (Ident _ x) (Ident _ y) = compare x y
 
 instance Show Ident where
-  show (Ident _ s) = show s
+  show (Ident _ s) = s
 
 identString :: Ident -> String
 identString (Ident _ s) = s

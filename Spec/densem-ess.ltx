@@ -43,9 +43,13 @@ $$
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
   \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
-& = & \hideEs(\semapp{I}{|t_1|}, [ \EV_1 ] \prodE \semess{B}{u}{v}{t_2}) |++| \\
-& & &
- &&& \text{where}\; \EV_1 : \ENV = \firstE(\semapp{C}{t_1}) \\[1mm]
+& = & \hideEs( xs, [ \; \EV_1 ] \prodE \semess{B}{u}{v}{t_2}) |++| \\
+& & & [ \complE( \EV_1 )] \prodE \semess{B}{u}{v}{t_3} \\
+&&& \text{where} \begin{array}[t]{l}
+  xs = \semapp{I}{|t_1|} \\
+  \EV_1 : \ENV = \firstE(xs, \semapp{C}{t_1}) \\
+  \end{array}
+  \\[1mm]
 
 %  ------ FOR --------------
 \rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}

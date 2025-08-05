@@ -25,6 +25,7 @@ common general-libs
                       megaparsec,
                       haskeline,
                       hashable,
+                      unordered-containers,
                       scientific,
                       text
 
@@ -86,7 +87,6 @@ executable tester
      hs-source-dirs:   tester
      build-depends:    megaparsec,
                        optparse-applicative,
-                       unordered-containers,
                        uniplate,
                        verse-libs,
                        verse-parser
@@ -105,7 +105,6 @@ executable refimpltester
                        comonad,
                        semigroupoids,
                        text,
-                       unordered-containers,
                        bytestring,
                        transformers,
                        hashable,
@@ -299,8 +298,8 @@ library verse-libs
                       QuickCheck,
                       megaparsec,
                       scientific,
-                      transformers,
-                      unordered-containers,
+                      transformers
+
 
 
 -- shared parser for various verse implementations and experiments
@@ -348,7 +347,6 @@ library verse-parser
                  , comonad
                  , semigroupoids
                  , text
-                 , unordered-containers
                  , bytestring
                  , transformers
                  , hashable
