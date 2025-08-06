@@ -45,7 +45,7 @@ import Text.Read(readMaybe)
 import qualified Options.Applicative as OA
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
-import Data.Char (isSpace)
+import Data.Char (isSpace, isAlphaNum)
 
 --------------------------------------------------------
 --
@@ -144,14 +144,14 @@ mainArgs = do
 
 data CState = CState
   { cs_lastExpr    :: !(Maybe SrcExpr)
-  , cs_lastResult  :: !Doc
   , cs_lastFile    :: !(Maybe FilePath)
   , cs_definitions :: ![SrcExpr]
   , cs_flags       :: !Flags
   , cs_esystem     :: !ESystem
-  , cs_variables   :: !(HashMap String (String, Doc)) -- (repl-input, result)
+  , cs_variables   :: !(VariableMap)
   }
 
+type VariableMap = HashMap String String
 data ESystem = ESystemPlaceHolder  -- Just for now
 
 printWithHdr :: String -> Doc -> DsM ()
@@ -169,14 +169,6 @@ updateLastExpr :: CState -> SrcExpr -> IO CState
 updateLastExpr s e
   = do { display e
        ; pure s{ cs_lastExpr = Just e } }
-
-updateLastResult :: CState -> Doc -> IO CState
-updateLastResult s d
-  = do { pure s{ cs_lastResult = d} }
-
-modifyLastResult :: CState -> (Doc -> Doc) -> IO CState
-modifyLastResult s f
-  = do { pure s{ cs_lastResult = f (cs_lastResult s) } }
 
 getInputExpr :: (SrcExpr -> CState -> IO CState) -> CmdRunner CState
 getInputExpr cmd line s
@@ -243,7 +235,6 @@ theCommandSet = CommandSet
   , c_bye    = "Bye!"
   , c_prompt = "> "
   , c_state  = CState { cs_lastExpr = Nothing
-                      , cs_lastResult = mempty
                       , cs_lastFile = Nothing
                       , cs_definitions = []
                       , cs_flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
@@ -340,10 +331,43 @@ cRead afn s = do
 
 
 cParseLine :: CmdRunner CState
-cParseLine line s
+cParseLine line' s
   = tryIt (\_exc -> pure s) (updateLastExpr s) $ do
-    let !prog = parseDie pFile "<interactive>" line
+    let !line = substitute (cs_variables s) line'
+        !prog = parseDie pFile "<interactive>" line
     pure prog
+
+variableSigil :: Char
+variableSigil = ','
+
+-- | find all variable references in the input line and splice their payload
+substitute :: VariableMap -> String -> String
+substitute st = loop' go
+  where
+    -- we assume the leading char is the sigil if we do not find the sigil we
+    -- just return the input in the fst position if we do find the sigil then
+    -- parse the rest of the identifier and do the lookup. Note that 'span' is
+    -- the converse of 'break', i.e., it puts that which satisfies the predicate
+    -- in the fst position, whereas break puts that which /does not/ satisfy the
+    -- predicate in the fst position
+    extract_name :: String -> (String, String)
+    extract_name (s:rest) | s == variableSigil = span isAlphaNum rest
+    extract_name other    = (other,mempty)
+
+    go line = previous ++ new_name ++ rest
+        where
+          (previous, name_start) = break (== variableSigil) line
+          (name, rest) = extract_name name_start
+          new_name     = case HM.lookup name st of
+                           Nothing      -> error $
+                             "Variable not in scope: " ++ drop 1 name ++ "\n"
+                             ++ "Variables must be a comma followed by an alpha"
+                             ++ "numeric string, i.e., [A-Za-z0-9]+"
+                           Just payload -> payload
+
+    has_variables = elem variableSigil
+    loop' f input | has_variables input = loop' f $ go input
+                  | otherwise = input
 
 
 --------------------------------------------------------
@@ -398,7 +422,7 @@ getCore flags e_parsed
 cEval :: CmdRunner CState
 cEval
   = getInputExpr $ \e s ->
-    tryIt (updateLastResult s . text . show) pure $
+    tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; prepd_core <- runD flags Core.Fail (getCore flags e)
        ; let rules | fVerify flags = everywhere verificationRules
@@ -411,25 +435,20 @@ cEval
                           NormExpired -> text "Ran out of fuel"
                           NormInvalid -> hang (text "Reached an invalid expression:") 2
                                          (pPrint (Core.term tr))
-
-       ; s' <- updateLastResult s eval_doc
        ; displayDoc eval_doc
 
-       ; s'' <- if (fTraceEval flags)
-                then do
-                  let trace_doc = addHeader "Evaluation trace"
-                                  $ vcat
-                                  $ pPrintTrace (fTraceVerbosity flags) tr
-                  displayDoc trace_doc
-                  modifyLastResult s' (<> trace_doc)
-                else pure s'
+       ; when (fTraceEval flags) $ do
+           let trace_doc = addHeader "Evaluation trace"
+                           $ vcat
+                           $ pPrintTrace (fTraceVerbosity flags) tr
+           displayDoc trace_doc
 
-       ; return s'' }
+       ; return () }
 
 cDensem :: CmdRunner CState
 cDensem
   = getInputExpr $ \e s ->
-    tryIt (updateLastResult s . text . show) pure $
+    tryIt (\_ -> pure s) (\_ -> pure s)  $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- denSemDesugar e_ess
@@ -440,12 +459,12 @@ cDensem
        ; displayDoc desugared
        ; displayDoc den_sem
 
-       ; updateLastResult s (desugared $$ den_sem) }
+       ; return () }
 
 cEDensem :: CmdRunner CState
 cEDensem
   = getInputExpr $ \e s ->
-    tryIt (updateLastResult s . text . show) pure $
+    tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- edenSemDesugar e_ess
@@ -456,7 +475,7 @@ cEDensem
        ; displayDoc desugared
        ; displayDoc den_sem
 
-       ; updateLastResult s (desugared $$ den_sem) }
+       ; return () }
 
 edenSemDesugar :: SrcExpr -> IO CExp
 edenSemDesugar = return . edenSemDS . srcExprToExp
@@ -471,7 +490,7 @@ eTimEDesugar e = do
 cTimEDensem :: CmdRunner CState
 cTimEDensem
   = getInputExpr $ \e s ->
-    tryIt (updateLastResult s . text . show) pure $
+    tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- eTimEDesugar e_ess
@@ -481,10 +500,10 @@ cTimEDensem
                if null res then text "No solutions"
                else vcat $ fmap (text . show) res
 -}
-       
+
        ; displayDoc den_sem
 
-       ; updateLastResult s den_sem }
+       ; return () }
 
 --------------------------------------------------------
 --         Displaying the last expression
@@ -526,26 +545,21 @@ setPrelude pn cs =
 
 cDefine :: CmdRunner CState
 cDefine line s = do
-  let
-     -- tail drops the leading space break finds
-    (name,expr) = second tail $ break isSpace line
-  st <- snd <$> eval theCommandSet s expr
-  -- WARNING: cDefine relies on an exact ordering of operations due to storing
-  -- the input and Doc for the last evaluation. If the repl ever becomes async
-  -- this will have to change
-  let the_output = (expr, cs_lastResult st)
-  pure st{ cs_variables = HM.insert name the_output $ cs_variables st}
+  let (name,expr) = second tail $ break isSpace line
+  pure s{ cs_variables = HM.insert name expr $ cs_variables s}
 
 
 cShowVars :: CmdRunner CState
 cShowVars "" s = do
-  mapM_ putStrLn $ HM.keys (cs_variables s)
+  displayDoc
+    $ addHeader "Bound Repl Variables"
+    $ vcat $ text <$> HM.keys (cs_variables s)
   pure s
 cShowVars vs' s = do
-  let vs               = words vs'
-      findResult v     = HM.findWithDefault (mempty,mempty) v $ cs_variables s
-      mkDoc v (input,result) = addHeader ("Input for " ++ v) (text input) $$ result
-      docs             = fmap (\v -> mkDoc v (findResult v)) vs
+  let vs            = words vs'
+      findResult v  = HM.findWithDefault mempty v $ cs_variables s
+      mkDoc v e     = addHeader (v ++ " Bound to") $ text e
+      docs          = fmap (\v -> mkDoc v (findResult v)) vs
   mapM_ displayDoc docs
   pure s
 
