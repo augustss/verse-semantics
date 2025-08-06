@@ -15,10 +15,12 @@ desugar e = composOp desugar e
 
 primOps :: [(String, PrimOp)]
 primOps =
-  [ ("any", error "primOps: any")  -- there's no primop for any yet
-  , ("prefix'-'", Neg)
-  , ("operator'+'", Add)
-  , ("operator'-'", Sub)
-  , ("operator'>'", Gt)
-  , ("operator'<'", Lt)
+  [ ("any",          IsAny)
+  , ("int",          IsInt)
+  , ("operator'..'", DotDot)
+  , ("prefix'-'",    Neg)
+  , ("operator'+'",  Add)
+  , ("operator'-'",  Sub)
+  , ("operator'>'",  Gt)
+  , ("operator'<'",  Lt)
   ]
