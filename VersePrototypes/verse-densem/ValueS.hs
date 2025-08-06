@@ -3,7 +3,7 @@ module ValueS(
   Ident, fresh, freshList,
   Value(..), FUN, PartialFun,
   numInt,
-  funNegate,
+  funNegate, funInt,
   ) where
 import Data.List((\\))
 import qualified Data.Map as M
@@ -41,5 +41,11 @@ instance Show PartialFun where
 numInt :: Integer
 numInt = 4
 
+allInts :: [Value]
+allInts = map Int [0 .. numInt-1]
+
 funNegate :: PartialFun
-funNegate = PF $ M.fromList [(Int i, Int ((-i) `mod` numInt)) | i <- [0 .. numInt-1] ]
+funNegate = PF $ M.fromList [(i, Int ((-k) `mod` numInt)) | i@(Int k) <- allInts ]
+
+funInt :: PartialFun
+funInt = PF $ M.fromList [(i, i) | i <- allInts]

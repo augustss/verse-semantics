@@ -59,6 +59,7 @@ dC e = dE e i x `remv` [i,x]  where (i, x) = fresh2 e
 
 dP :: PrimOp -> FUN
 dP Neg = [funNegate]
+dP IsInt = [funInt]
 dP p = error $ "dP undefined " ++ show p
 
 firstK :: [Ident] -> [ENV] -> ENV
@@ -93,75 +94,3 @@ den t = squash $ dE (Block t) i res `remv` [i]  where (i, _x) = fresh2 t
 res :: Ident
 res = Ident noLoc "res"
 
-xx, yy, zz, ii, jj :: Ident
-xx = Ident noLoc "x"
-yy = Ident noLoc "y"
-zz = Ident noLoc "z"
-ii = Ident noLoc "i"
-jj = Ident noLoc "j"
-
-ex1 :: SrcEssential
-ex1 = Lit (LInt 1)
-
-ex2 :: SrcEssential
-ex2 = DefineE xx ex1
-
-ex3 :: SrcEssential
-ex3 = ex2 `Seq` Variable xx
-
-vxx :: SrcEssential
-vxx = Variable xx
-k1 :: SrcEssential
-k1 = Lit (LInt 1)
-k2 :: SrcEssential
-k2 = Lit (LInt 2)
-k3 :: SrcEssential
-k3 = Lit (LInt 3)
-k77 :: SrcEssential
-k77 = Lit (LInt 77)
-infix 4 ===
-(===) :: SrcEssential -> SrcEssential -> SrcEssential
-x === y = x `Unify` y
-infixr 2 |||
-(|||) :: SrcEssential -> SrcEssential -> SrcEssential
-x ||| y = x `Choice` y
-
-aa, bb, tt, ee :: SrcEssential
-aa = (DefineV xx `Seq` (vxx === k1 ||| vxx === k2))
-bb = (vxx === k1 ||| vxx === k2)
-tt = vxx === k2
-ee = k77
-
-ifTests :: [(SrcEssential, [ENV])]
-ifTests = [
-  -- if(ex x. x=1 | x=2) { x=2 } else {77}    []
-    (If3 (DefineV xx `Seq` (vxx === k1 ||| vxx === k2)) (vxx === k2) k77
-    , []
-    )
-  -- if(ex x. x=1 | x=2) { x=1 } else {77}    [r=1]
-  , (If3 (DefineV xx `Seq` (vxx === k1 ||| vxx === k2)) (vxx === k1) k77
-    , [res.=Int 1]
-    )
-  -- if(x=1 | x=3){ x=2 }else{77}             [{{x/={1,3},r=77}}]
-  , (If3 (                 (vxx === k1 ||| vxx === k3)) (vxx === k2) k77
-    , [xx./=Int 1 /\ xx./= Int 2 /\ res.=Int 77]
-    )
-  ]
-
-{-
-if(x=1 | x=2){ x=2 }else{77}
-[{{r=x=2}}u{{x/={1,2},r=77}}]
-?xr. r=if(x=1 | x=2){ x=2 }else{77}; x=2; r
-[{{r=2}} ]
-?xr. r=if(x=1 | x=2){ x=2 }else{77}; x=1; r
-[]
-if (?x. x = (1|2)) { x } else {fail}
-[{{r=1}}]
-if (?x. x=(1|2)) { x | x } else {fail}
-[{{r=1}},{{r=1}}]
-if (?x y, (x=7 | y=3) { x } else fail
-[ {{x=7,r=7}} ]
-if (x=7 | y=3) { x } else fail
-[ {{x=7,r=7}}u
-  {{x/=7,y=3,r=x}} ]
--}
