@@ -5,7 +5,6 @@ import FrontEnd.Expr
 import ValueS
 import ENVS
 
-
 dE :: SrcEssential -> Ident -> Ident -> [ENV]
 dE (Lit (LInt k))                   i x = [ i .=. x /\ x .= Int k ]
 dE (EPrim p)                        i x = [ i .=. x /\ x .= Fun (dP p) ]
@@ -19,6 +18,7 @@ dE (Seq t0 t1)                      i x = dE t0 j y `remv` [j, y] *** dE t1 i x 
 dE (Where t0 t1)                    i x = dE t0 i x `remv` [j, y] *** dE t1 j y  where (j, y) = fresh2 t1
 -- dE (Array ts) i x = ...  needs tuples, i.e., functions
 dE (Block t)                        i x = dB t i x
+dE Fail                             _ _ = []
 dE (If3 t0 t1 t2)                   i x = -- squash $
 {-
   -- According to Koen
@@ -88,7 +88,7 @@ bvs = getVisibleBinders
 -------
 
 den :: SrcEssential -> [ENV]
-den t = dE (Block t) i res `remv` [i]  where (i, _x) = fresh2 t
+den t = squash $ dE (Block t) i res `remv` [i]  where (i, _x) = fresh2 t
 
 res :: Ident
 res = Ident noLoc "res"

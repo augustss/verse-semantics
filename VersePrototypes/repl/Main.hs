@@ -28,6 +28,7 @@ import SExpC(srcExprToExp)
 
 -- TimE densem
 import TimE (den)
+import ENVDesugar (envDesugar)
 
 -- Epic libraries
 import Epic.Repl
@@ -460,16 +461,27 @@ cEDensem
 edenSemDesugar :: SrcExpr -> IO CExp
 edenSemDesugar = return . edenSemDS . srcExprToExp
 
+eTimEDesugar :: SrcEssential -> IO SrcEssential
+eTimEDesugar e = do
+  let e_ds = envDesugar e
+  displayDoc $ addHeader "ENV desugar" $ pPrint e_ds
+  --print e_ds
+  return e_ds
+
 cTimEDensem :: CmdRunner CState
 cTimEDensem
   = getInputExpr $ \e s ->
     tryIt (updateLastResult s . text . show) pure $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       -- ; e_ds <- edenSemDesugar e_ess
-       ; let res = den e_ess
-       ; let den_sem   = addHeader "Den-sem" $ vcat $ fmap (text . show) res
-
+       ; e_ds <- eTimEDesugar e_ess
+       ; let res = den e_ds
+       ; let den_sem = addHeader "Den-sem" $ text $ show res
+{-
+               if null res then text "No solutions"
+               else vcat $ fmap (text . show) res
+-}
+       
        ; displayDoc den_sem
 
        ; updateLastResult s den_sem }
