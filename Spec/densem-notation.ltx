@@ -81,11 +81,11 @@ $$
 \textbf{The constraint language}\\
 \begin{array}{l@@{\;\;}c@@{\;\;}ll}
   \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o| \vb |arr (a_0, xdots, a_n)| \vb |truth a| \hspace{5mm} \text{Can add strings, floats...} \\
-\text{Constraints} &  \EV & ::= & \conBrack{\conRel{a_1}{|`rop`|}{a_2}} \\
+\text{Constraints} &  \EV & ::= & \conBrack{a_1 = a_2} \vb \conBrack{op[a_1,\mydots,a_n]} \\
 &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}}  \\
 &  & \vb & \conEmpty \vb \conUniv \\
 &  & \vb & \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \vb \conCompl(\EV) \\
-\text{Relational operators}&  rop & ::= & < \vb \leq \vb = \vb \geq \vb >
+\text{Operators}&  op & ::= & < \vb \leq \vb \geq \vb > \vb + \vb - \vb * \vb / \vb 
 \end{array}\\
 \\[-1mm]
 \textbf{Interpretation of simple values and constraints}\\
@@ -96,7 +96,8 @@ $$
   \sembrack{\conCompl(\EV)} & = & \complE( \sembrack{\EV} )\\
   \sembrack{\EV_1 \cup \EV_2} & = & \sembrack{\EV_1} \cup \sembrack{\EV_2} \\
   \sembrack{\EV_1 \cap \EV_2} & = & \sembrack{\EV_1} \cap \sembrack{\EV_2} \\
-  \sembrack{\conBrack{\conEq{x}{a}}} & = & \{ \rho \in \Env \vb \rho(x) = \semapp{A}{a}\rho \} \\
+  \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
+  \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \} \\
   \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}}}
   & = & \multicolumn{2}{@@{}l}
            {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun(hs),

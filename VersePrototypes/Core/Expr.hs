@@ -470,7 +470,7 @@ data PrimOp
 
    -- Type tests
  | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
- | IsComp
+ | IsComp | IsAny
 
  deriving
    ( Eq, Ord, Bounded, Enum, Show, Data )
@@ -504,6 +504,7 @@ primOpString IsComp   = "isComp$"
 primOpString IsTru    = "isTru$"
 primOpString IsFun    = "isFun$"
 primOpString IsGround = "isGround$"
+primOpString IsAny    = "isAny$"
 
 primOpCanFail :: PrimOp -> Bool
 
@@ -534,6 +535,7 @@ primOpCanFail ArrMap   = False
 
 -- These operations can't fail, and produce no value
 primOpCanFail IsGround = False
+primOpCanFail IsAny    = False
 
 primOpIsTypeTest :: PrimOp -> Bool
 -- Type tests; all mutually exclusive

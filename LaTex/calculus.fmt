@@ -386,6 +386,7 @@
 %format nat = "\textbf{nat}"
 %format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"
+%format isString = "\textbf{isString}"
 %format isFun = "\textbf{isFun}"
 %format string = "\textbf{string}"
 

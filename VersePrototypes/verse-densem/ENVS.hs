@@ -9,6 +9,7 @@ module ENVS(
   (.=), (.=.),
   (./=),
   hide, hides,
+  bigUnion, bigIntersect,
   )where
 import Data.List(intercalate, group, sort)
 import ValueS
@@ -58,6 +59,12 @@ compl (OR as) =
   [ OR [YES [neg c] | c <- cs]
   | YES cs <- as
   ]
+
+bigUnion :: [ENV] -> ENV
+bigUnion = foldr (\/) empty
+
+bigIntersect :: [ENV] -> ENV
+bigIntersect = foldr (/\) univ
 
 ----------------------------------
 

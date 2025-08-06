@@ -192,6 +192,7 @@ library verse-densem
                       ENVS
                       TimE
                       ValueS
+                      ENVDesugar
     build-depends:    verse-libs,
                       base,
                       containers,
