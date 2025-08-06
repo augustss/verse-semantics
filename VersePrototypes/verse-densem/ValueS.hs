@@ -32,14 +32,14 @@ instance Show Value where
   show (Int k)   = show k
   show (Fun fun) = show fun
 
-newtype PartialFun = PF (M.Map Value Value)
+data PartialFun = PF String (M.Map Value Value)
  deriving ( Eq, Ord )
 
 instance Show PartialFun where
-  show (PF m) = show m
+  show (PF s _m) = s -- show m
 
 applyPF :: PartialFun -> Value -> Maybe Value
-applyPF (PF m) a = M.lookup a m
+applyPF (PF _ m) a = M.lookup a m
 
 -----------------------------
 
@@ -53,10 +53,10 @@ allInts :: [Value]
 allInts = map Int [0 .. numInt-1]
 
 funNegate :: PartialFun
-funNegate = PF $ M.fromList [(i, Int ((-k) `mod` numInt)) | i@(Int k) <- allInts ]
+funNegate = PF "neg" $ M.fromList [(i, Int ((-k) `mod` numInt)) | i@(Int k) <- allInts ]
 
 funInt :: PartialFun
-funInt = PF $ M.fromList [(i, i) | i <- allInts]
+funInt = PF "int" $ M.fromList [(i, i) | i <- allInts]
 
 allFUNs :: [FUN]
 allFUNs = [ [funNegate], [funInt] ]
