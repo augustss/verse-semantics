@@ -344,21 +344,21 @@ variableSigil = ','
 substitute :: VariableMap -> String -> String
 substitute st = loop' go
   where
-    -- we assume the leading char is the sigil if we do not find the sigil we
-    -- just return the input in the fst position if we do find the sigil then
-    -- parse the rest of the identifier and do the lookup. Note that 'span' is
-    -- the converse of 'break', i.e., it puts that which satisfies the predicate
-    -- in the fst position, whereas break puts that which /does not/ satisfy the
-    -- predicate in the fst position
+    -- extract-name assumes the leading char is the sigil if we do not find the
+    -- sigil we just return the input in the fst position if we do find the
+    -- sigil then parse the rest of the identifier and do the lookup. Note that
+    -- 'span' is the converse of 'break', i.e., it puts that which satisfies the
+    -- predicate in the fst position, whereas break puts that which /does not/
+    -- satisfy the predicate in the fst position
     extract_name :: String -> (String, String)
     extract_name (s:rest) | s == variableSigil = span isAlphaNum rest
     extract_name other    = (other,mempty)
 
     go line = previous ++ new_name ++ rest
-        where
-          (previous, name_start) = break (== variableSigil) line
-          (name, rest) = extract_name name_start
-          new_name     = case HM.lookup name st of
+      where
+        (previous, name_start) = break (== variableSigil) line
+        (name, rest) = extract_name name_start
+        new_name     = case HM.lookup name st of
                            Nothing      -> error $
                              "Variable not in scope: " ++ drop 1 name ++ "\n"
                              ++ "Variables must be a comma followed by an alpha"
@@ -367,7 +367,7 @@ substitute st = loop' go
 
     has_variables = elem variableSigil
     loop' f input | has_variables input = loop' f $ go input
-                  | otherwise = input
+                  | otherwise           = input
 
 
 --------------------------------------------------------

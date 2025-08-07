@@ -75,7 +75,8 @@ eval commands s line =
       case dropWhile isSpace line of
         ':' : line' | null line'' -> pure (False, s)
                     | otherwise -> do
-                      let (w, rest) = span isAlpha line''
+                      let isLegalCmd c = isAlpha c || c == '-' -- matches :foo and :foo-bar
+                      let (w, rest) = span isLegalCmd line''
                       case filter (\ c -> w `isPrefixOf` cmd_string c) $ c_commands commands of
                         [] -> do
                           putStrLn "Cannot parse command.  Use :help to get help."
