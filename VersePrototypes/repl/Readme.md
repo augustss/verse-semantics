@@ -169,3 +169,125 @@ correlate to a figure built in the `verse-spec.pdf`. The commands are:
 - `:densem`: Implements the Essential Verse `E-LS` (jeff: could be out of date?)
 - `:dls-densem`: Implements the `D-LS`  semantics (Fig. 18)
 - `:sls-densem`: Implements the Essential Verse `S-LS` semantics (Fig. 22)
+
+For example:
+
+```
+> :densem x:int
+x : int
+
+================ Essential ===================
+int := (\y. isInt$[y]; y); x := :int
+
+================ Desugared ===================
+{∃x; ∃u_1; x=Pint[u_1]; res=x}
+
+================ Den-sem ===================
+[res=0/res=1/res=2/res=3]
+
+> :sls-densem x:int
+x : int
+
+================ Essential ===================
+int := (\y. isInt$[y]; y); x := :int
+
+================ ENV desugar ===================
+x := :isInt$
+
+================ S-LS Den-sem ===================
+[{{res=0}} ∪ {{res=1}} ∪ {{res=2}} ∪ {{res=3}}]
+
+> :dls-densem x:int
+x : int
+
+================ Essential ===================
+int := (\y. isInt$[y]; y); x := :int
+
+================ Desugared ===================
+{<>; x := int[_]}
+
+================ D-LS Den-sem ===================
+[{0,1,2}]
+```
+
+#### Binding Variables in the Repl
+
+The repl is equipped with some state to store and use variables. The commands
+for variables are:
+
+- `:let <var> <expr>`: binds `var` to `expr`. To reference a variable prepend a
+  comma, for example, `,x` references the variable `x`.
+- `:display [<var>]`: If the input list is empty, `:display` will show all
+  variables in the state. If the list is non-empty then `:display` will show
+  each variable and what its bound to.
+- `:delete [<var>]`: If the input list is empty, `:delete` will clear all bound
+  variables from the repl state. If the list is non-empty then `:delete` will
+  only remove each variable in the input list.
+
+One should thing of these variables as macros. They are only ever bound to
+`String` and know nothing about the underlying language.
+
+Here are some basic `:let` examples:
+
+```
+❯ cabal run verse-repl
+Verse parse, desugar, and evaluation testing.
+Use :help for help, and :quit to quit.
+> :let x 1|2
+> ,x
+1 | 2
+> :let y 1|,x  -- variables can reference other variables
+> ,y
+1 | (1 | 2)
+> :let x 1000  -- variables can be overwritten
+> ,y
+1 | 1000
+```
+
+
+and `:display` examples:
+```
+> :let z 1+2+3
+> :display x y
+
+================ x Bound to ===================
+1|2
+
+================ y Bound to ===================
+1|,x
+
+> :display
+
+================ Bound Repl Variables ===================
+y
+x
+z
+```
+
+and `:delete` examples:
+
+```
+> :delete x
+> :display
+
+================ Bound Repl Variables ===================
+y
+z
+
+> :display y
+
+================ y Bound to ===================
+1|,x
+> ,y
+Variable not in scope:
+Variables must be a comma followed by an alphanumeric string, i.e., [A-Za-z0-9]+
+CallStack (from HasCallStack):
+  error, called at repl/Main.hs:362:44 in VersePrototypes-0.1.0.0-inplace-verse-repl:Main
+
+> :let x x:=3
+> ,y
+1 | x := 3
+```
+
+Notice that `y` references `x` but we can delete `x`, which breaks `y`. We can
+of course redefine `x` to rehabilitate `y`.
