@@ -26,7 +26,7 @@ import SExp
 import PlanCC(edenSem, edenSemDS, CExp)
 import SExpC(srcExprToExp)
 
--- TimE densem
+-- S-LS densem
 import TimE (den)
 import ENVDesugar (envDesugar)
 
@@ -211,8 +211,8 @@ theCommandSet = CommandSet
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
-      , Cmd "edensem [EXPR]"       "Evaluate [last] expression"            cEDensem
-      , Cmd "timEdensem [EXPR]"    "Evaluate [last] expression"            cTimEDensem
+      , Cmd "dls-densem [EXPR]"    "Evaluate [last] expression"            cDlsDensem
+      , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -461,41 +461,41 @@ cDensem
 
        ; return () }
 
-cEDensem :: CmdRunner CState
-cEDensem
+cDlsDensem :: CmdRunner CState
+cDlsDensem
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- edenSemDesugar e_ess
+       ; e_ds <- dlsDenSemDesugar e_ess
        ; res <- edenSem e_ds
        ; let desugared = addHeader "Desugared" $ text $ show e_ds
-             den_sem   = addHeader "Den-sem"   $ text $ show res
+             den_sem   = addHeader "D-LS Den-sem"   $ text $ show res
 
        ; displayDoc desugared
        ; displayDoc den_sem
 
        ; return () }
 
-edenSemDesugar :: SrcExpr -> IO CExp
-edenSemDesugar = return . edenSemDS . srcExprToExp
+dlsDenSemDesugar :: SrcExpr -> IO CExp
+dlsDenSemDesugar = return . edenSemDS . srcExprToExp
 
-eTimEDesugar :: SrcEssential -> IO SrcEssential
-eTimEDesugar e = do
+eSlsDesugar :: SrcEssential -> IO SrcEssential
+eSlsDesugar e = do
   let e_ds = envDesugar e
   displayDoc $ addHeader "ENV desugar" $ pPrint e_ds
   --print e_ds
   return e_ds
 
-cTimEDensem :: CmdRunner CState
-cTimEDensem
+cSlsDensem :: CmdRunner CState
+cSlsDensem
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- eTimEDesugar e_ess
+       ; e_ds <- eSlsDesugar e_ess
        ; let res = den e_ds
-       ; let den_sem = addHeader "Den-sem" $ text $ show res
+       ; let den_sem = addHeader "S-LS Den-sem" $ text $ show res
 {-
                if null res then text "No solutions"
                else vcat $ fmap (text . show) res

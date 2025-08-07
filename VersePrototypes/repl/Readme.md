@@ -93,12 +93,17 @@ x := 1 | 2
 #### Desugaring and Converting expressions
 
 The repl provides several commands to translate the input expression into
-different verse's. These are:
+different verse's. Each of the semantics correlate to a figure in the
+`Spec/verse-spec.pdf` paper. If you don't have the `pdf` you have to build it by
+going to `Spec` and running `make`. If you see that the Figure listings have
+changed please update this readme.
 
-- `:essential`: Desugar to essential-verse.
-- `:mini`: Desugare to mini-verse
-- `:src-core`: Convert an expression to `SrcCore`
-- `:core`: Convert an expression to `Core`
+These are:
+
+- `:essential`: Desugars Source Verse to Essential Verse. (Fig. 4 and 5)
+- `:mini`: Desugars Source Verse to Essential Verse to Mini Verse. (Fig. 6)
+- `:src-core`: Convert an expression to `SrcCore`. `SrcCore` is `Core` but still with `x:=t` terms.
+- `:core`: Convert an expression to `Core` (Fig. 8). Verification and evaluation expect `Core`.
 
 Each command optionally takes an argument expression. If no expression is
 provided then the last expression is used.
@@ -153,9 +158,14 @@ InfixOp (Variable y) : (Variable int)
 
 Notice that `:core` used the last input: `y:int` as its argument because no
 argument was provided and that can pretty print and show the last input after
-the conversion to `:core`
+the conversion to `:core`.
 
 
 #### Running Denotational Semantics
 
-Jeff TODO:
+The repl implements multiple denotational semantics. Each of the semantics
+correlate to a figure built in the `verse-spec.pdf`. The commands are:
+
+- `:densem`: Implements the Essential Verse `E-LS` (jeff: could be out of date?)
+- `:dls-densem`: Implements the `D-LS`  semantics (Fig. 18)
+- `:sls-densem`: Implements the Essential Verse `S-LS` semantics (Fig. 22)
