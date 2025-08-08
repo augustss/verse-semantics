@@ -245,7 +245,7 @@ Use :help for help, and :quit to quit.
 ```
 
 
-and `:display: examples:
+and `:display` examples:
 ```
 > :let z 1+2+3
 > :display x y
