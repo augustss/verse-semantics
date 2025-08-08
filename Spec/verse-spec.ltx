@@ -129,27 +129,40 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \fi % \ifeverything
 \input{densem-notation}
 
-\ifeverything
-Design variants:
+Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and \Cref{fig:densem-notation}):
 \begin{itemize}
+\item \textbf{(S-LS)}: semantics of Essential Verse, lists of sets of environments.
+  \begin{itemize}
+  \item $\semess{S}{u}{v}{|t|} : \seq{ \ENV }$
+  \item \Cref{fig:s-ls}
+  \end{itemize}
+
 \item \textbf{(E-LS)}: expression-style, list of sets of values.
   \begin{itemize}
   \item $\semappsub{E}{e}{|e|} : \Env \rightarrow \seq{ \VAL }$
   \item \Cref{fig:e-lv1} and \Cref{fig:e-lv2}
-    \end{itemize}
+  \end{itemize}
 
 \item \textbf{(D-LS)}: dps-style, list of sets of environments.
   \begin{itemize}
   \item $\semapsub{E}{d}{|e|} r : \seq{ \ENV }$
   \item \Cref{fig:d-ls1} and \Cref{fig:d-ls2}
-    \end{itemize}
+  \end{itemize}
 
 \item \textbf{(D-SLS)}: dps-style, sets of lists of sets of environments.
   \begin{itemize}
   \item $\semapsub{E}{d}{|e|} r : \powersetnp{\seq{ \ENV }}$
   \item \Cref{fig:d-sls1} and \Cref{fig:d-sls2}
-    \end{itemize}
+  \end{itemize}
 \end{itemize}
+
+% -------------------------------------------------------------
+%               S-LS: Essential Verse
+% -------------------------------------------------------------
+
+% \clearpage \newpage
+\section{Denotational semantics: Essential Verse}
+\input{densem-ess}
 
 % -------------------------------------------------------------
 %               E-LS: expression-style sequences of sets
@@ -166,15 +179,6 @@ Design variants:
 \clearpage \newpage
 \section{Denotational semantics: destination passing style}
 \input{densem-koen}
-
-% -------------------------------------------------------------
-%               S-LS: Essential Verse
-% -------------------------------------------------------------
-
-\clearpage \newpage
-\section{Denotational semantics: Essential Verse}
-\fi % \ifeverything
-\input{densem-ess}
 
 % -------------------------------------------------------------
 %               D-SLS: DPS-style: sets of sequences of sets
