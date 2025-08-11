@@ -78,5 +78,5 @@ allTuples :: [Value]
 allTuples = concatMap (map Tuple . allTuplesLen) [0..maxTuples]
 
 allTuplesLen :: Int -> [[Value]]
-allTuplesLen n | n < 0 || n > maxTuples = error $ "allTuplesLen: " ++ show n
+allTuplesLen n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ show n
                | otherwise = replicateM n allInts

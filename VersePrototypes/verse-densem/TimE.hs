@@ -26,7 +26,7 @@ dE (Where t0 t1)                    i x = dE t0 i x `remv` [j, y] *** dE t1 j y
 dE t@(Array ts)                     i x =
   foldl1 (***) (et : es) `remv` (is ++ xs)
   where n = length ts
-        used = getFree t
+        used = i:x:getFree t
         is = take n $ freshList "i" used
         xs = take n $ freshList "x" used
         es = zipWith3 dE ts is xs
@@ -136,7 +136,7 @@ fresh2 :: (String, String) -> [Ident] -> SrcEssential -> (Ident, Ident)
 fresh2 (sx, sy) is t = (x, y)
   where x = fresh sx vs
         y = fresh sy (x:vs)
-        vs = is ++ getFree t
+        vs = is ++ getAllBinders t
 
 bvs :: SrcEssential -> [Ident]
 bvs = getVisibleBinders
@@ -144,7 +144,7 @@ bvs = getVisibleBinders
 -------
 
 den :: SrcEssential -> [ENV]
-den t = squash $ dE (Block t) i res `remv` [i]
-  where (i, _x) = fresh2 ("i", "res") [] t
-        res = Ident noLoc "res"
+den t = squash $ dE (Block t) i x `remv` [i]
+  where (i, x) = fresh2 ("i", "res") [] t
+        -- res = Ident noLoc "res"
 
