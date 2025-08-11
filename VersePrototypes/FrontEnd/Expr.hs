@@ -1070,4 +1070,7 @@ getAllBinders expr = Epic.List.nub (execWriter (vars expr))
     vars e@(Lam i e')     = do tell [i]; _ <- vars e'; pure e
     vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
     vars e@(Verify is e') = do tell is; _ <- vars e'; pure e
+    vars e@(DefineV i)    = do tell [i]; pure e
+    vars e@(DefineE i e') = do tell [i]; _ <- vars e'; pure e
+    vars e@(DefineIE i e')= do tell [i]; _ <- vars e'; pure e
     vars e                = compos vars e
