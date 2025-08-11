@@ -26,7 +26,7 @@ import SExp
 import PlanCC(edenSem, edenSemDS, CExp)
 import SExpC(srcExprToExp)
 
--- S-LS densem
+-- Tim densem
 import TimE (den)
 import ENVDesugar (envDesugar)
 
@@ -212,7 +212,7 @@ theCommandSet = CommandSet
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
       , Cmd "dls-densem [EXPR]"    "Evaluate [last] expression"            cDlsDensem
-      , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
+      , Cmd "tim-densem [EXPR]"    "Evaluate [last] expression"            cTimDensem
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -487,15 +487,15 @@ eSlsDesugar e = do
   --print e_ds
   return e_ds
 
-cSlsDensem :: CmdRunner CState
-cSlsDensem
+cTimDensem :: CmdRunner CState
+cTimDensem
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- eSlsDesugar e_ess
        ; let res = den e_ds
-       ; let den_sem = addHeader "S-LS Den-sem" $ text $ show res
+       ; let den_sem = addHeader "Tim Den-sem" $ text $ show res
 {-
                if null res then text "No solutions"
                else vcat $ fmap (text . show) res
