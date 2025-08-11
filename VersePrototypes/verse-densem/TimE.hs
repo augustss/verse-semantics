@@ -2,7 +2,7 @@
 module TimE where
 
 import Epic.List
-import FrontEnd.Expr
+import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
 --import Debug.Trace
@@ -23,7 +23,21 @@ dE tt@(Seq t0 t1)                   i x =
   where (j, y) = fresh2 ("j", "y") [i, x] tt
 dE (Where t0 t1)                    i x = dE t0 i x `remv` [j, y] *** dE t1 j y
   where (j, y) = fresh2 ("j", "y") [i, x] t1
--- dE (Array ts) i x = ...  needs tuples, i.e., functions
+dE t@(Array ts)                     i x =
+  foldl1 (***) (et : es) `remv` (is ++ xs)
+  where n = length ts
+        used = getFree t
+        is = take n $ freshList "i" used
+        xs = take n $ freshList "x" used
+        es = zipWith3 dE ts is xs
+        tupvals = allTuplesLen n
+        et = [ bigUnion [ i .= Tuple ivals /\
+                          x .= Tuple xvals /\
+                          bigIntersect (zipWith (.=) is ivals) /\
+                          bigIntersect (zipWith (.=) xs xvals)
+                        | ivals <- tupvals, xvals <- tupvals
+                        ]
+             ]
 dE (Block t)                        i x = dB t i x
 dE Fail                             _ _ = []
 dE (ApplyD (EPrim DotDot) (Array [_t0, _t1])) _i _x =
