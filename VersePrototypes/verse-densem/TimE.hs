@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module TimE where
 
+import Epic.List
 import FrontEnd.Expr
 import ValueS
 import ENVS
@@ -15,7 +16,7 @@ dE (DefineE y t)                    i x = [ x .=. y ] *** dE t i x
 dE (DefineV _)                      _ _ = [ univ ] -- [ i .=. x /\ x .=. y ]
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x ++ dB t1 i x
-dE tt@(Seq t0 t1)                      i x =
+dE tt@(Seq t0 t1)                   i x =
 --  trace ("Seq " ++ show (dE t0 j y,
 --                         dE t1 i x)) $
   dE t0 j y `remv` [j, y] *** dE t1 i x
@@ -46,7 +47,7 @@ dE t@(ApplyD t0 t1)                 i x =
   ) `remv` [h,f,j,y]
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
-dE (If3 t0 t1 t2)                   i x = -- squash $
+dE t@(If3 t0 t1 t2)                   i x = -- squash $
 {-
   -- According to Koen
   [ hides vs0 (d0 /\ d1)     | d1 <- dE t1 i x ] ++
@@ -55,15 +56,15 @@ dE (If3 t0 t1 t2)                   i x = -- squash $
         vs0 = bvs t0
         (j, y) = fresh2 (If3 t0 t1 t2)
 -}
-
+{-
   -- According to Simon (Koen)
   (([      d0] *** dB t1 i x) `remv` vs0) ++
    [compl (hides vs0 d0)] *** dB t2 i x
   where d0 = first vs0 (dC t0)
         vs0 = bvs t0
-
+-}
 {-
-  -- According to Tim
+  -- According to Tim, old, wrong
   ((bs  *** dB t1 i x) `remv` bvs t0 `remv` [j, y]) ++
   (([b] *** dB t2 i x) `remv` bvs t0 `remv` [j, y])
   where a0 = dE t0 j y
@@ -72,9 +73,19 @@ dE (If3 t0 t1 t2)                   i x = -- squash $
         go s [] = [univ \\\ s]
         go s (a:as) = (a \\\ s) : go (s \/ a) as
 -}
+  -- According to Tim, new
+  ((bs  *** dB t1 i x) `remv` bvs t0 `remv` [j, y]) ++
+  (([b] *** dB t2 i x) `remv` bvs t0 `remv` [j, y])
+  where a0 = dE t0 j y
+        a0' = a0 `remv` bvs t0 `remv` [j, y]
+        (j, y) = fresh2 ("j", "y") [i, x] t
+        Snoc bs b = go empty a0 a0'
+        go :: ENV -> [ENV] -> [ENV] -> [ENV]
+        go s [] [] = [univ \\\ s]
+        go s (a:as) (a':as') = (a \\\ s) : go (s \/ a') as as'
+        go _ _ _ = undefined
+
 -- For2
---dE (Range t)                        i x = undefined
---dE (ApplyD t0 t1)                   i x = undefined
 
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
