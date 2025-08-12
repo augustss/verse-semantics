@@ -216,7 +216,7 @@ The repl is equipped with some state to store and use variables. The commands
 for variables are:
 
 - `:let <var> <expr>`: binds `var` to `expr`. To reference a variable prepend a
-  comma, for example, `,x` references the variable `x`.
+   dollar sign, for example, `$x` references the variable `x`.
 - `:display [<var>]`: If the input list is empty, `:display` will show all
   variables in the state. If the list is non-empty then `:display` will show
   each variable and what its bound to.
