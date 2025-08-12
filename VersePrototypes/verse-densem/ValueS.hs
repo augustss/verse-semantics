@@ -16,7 +16,7 @@ import FrontEnd.Expr(Ident(..), noLoc)
 freshList :: String -> [Ident] -> [Ident]
 freshList s xs = ys \\ xs
  where
-  ys = [ Ident noLoc (s ++ "_" ++ i) | i <- {-"" :-} map show [1 :: Integer ..] ]
+  ys = [ Ident noLoc (s ++ {-"_" ++-} i) | i <- "" : map show [1 :: Integer ..] ]
 
 fresh :: String -> [Ident] -> Ident
 fresh s xs = head (freshList s xs)

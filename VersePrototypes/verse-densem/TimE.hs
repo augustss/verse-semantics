@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module TimE where
-
+import Control.Monad
 import Epic.List
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
@@ -100,8 +100,55 @@ dE t@(If3 t0 t1 t2)                   i x = -- squash $
         go _ _ _ = undefined
 
 -- For2
-
+dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
+                                      bigIntersect (zipWith (.=) is ss) /\
+                                      bigIntersect (zipWith (.=) xs ts)
+                                    | ss <- replicateM maxFor tups
+                                    , ts <- replicateM maxFor tups
+                                    ]
+                         | rhos <- rhoss
+                         ] `remv` is `remv` xs
+  where
+    rhoss  = foldr1 (***) [ c n | n <- [0..maxFor-1] ]
+    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
+    (j, y) = fresh2 ("j", "y") [i, x] t
+    (k, z) = fresh2 ("k", "z") [i, x] t
+    is     = take maxFor $ freshList "i_" (i : x : getAllBinders t)
+    xs     = take maxFor $ freshList "x_" (i : x : getAllBinders t)
+    empTup = Tuple []
+    c :: Int -> [ENV]
+    c n = (([a `ix` n] *** [ bigUnion [rhos /\ k .= ki /\ z .= zi /\ (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
+                                      | ki <- allValues, zi <- allValues]
+                           | rhos <- dE t1 k z])
+            `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
+         ++
+          (([univ \\\ (a' `ix` n)] *** [ (is!!n) .= empTup /\ (xs!!n) .= empTup ]))
+      where
+        a :: [ENV]
+        a = dE t0 j y
+        a' = a `remv` bvs t0 `remv` [j, y]
+{-
+i=Ident noLoc "i"
+j=Ident noLoc "j"
+k=Ident noLoc "k"
+x=Ident noLoc "x"
+y=Ident noLoc "y"
+z=Ident noLoc "z"
+a=Ident noLoc "a"
+t0= DefineE a $ Choice (Lit (LInt 1)) (Lit (LInt 2))
+t1= Variable a
+-}
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
+
+ix :: [ ENV ] -> Int -> ENV
+ix es i | i >= 0 && i < length es = es !! i
+        | otherwise = empty
+
+conc :: [Value] -> Value
+conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
+
+maxFor :: Int
+maxFor = 3
 
 dB :: SrcEssential -> Ident -> Ident -> [ENV]
 dB e i x = dE e i x `remv` bvs e
