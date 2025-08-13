@@ -192,6 +192,5 @@ bvs = getVisibleBinders
 
 den :: SrcEssential -> [ENV]
 den t = squash $ dE (Block t) i x `remv` [i]
-  where (i, x) = fresh2 ("i", "res") [] t
+  where (i, x) = fresh2 ("i", "r") [] t
         -- res = Ident noLoc "res"
-
