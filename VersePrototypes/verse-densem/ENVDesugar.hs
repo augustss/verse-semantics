@@ -17,6 +17,7 @@ primOps :: [(String, PrimOp)]
 primOps =
   [ ("any",          IsAny)
   , ("int",          IsInt)
+  , ("nat",          IsInt)   -- No negative ints
   , ("operator'..'", DotDot)
   , ("prefix'-'",    Neg)
   , ("operator'+'",  Add)

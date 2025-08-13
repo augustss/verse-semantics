@@ -5,7 +5,7 @@ module ValueS(
   numInt,
   allInts, allFUNs, allValues,
   allInts',
-  funNegate, funInt, funGt,
+  funNegate, funInt, funGt, funLt,
   allTuples, allTuplesLen,
   ) where
 import Control.Monad

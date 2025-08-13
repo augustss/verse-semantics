@@ -163,6 +163,7 @@ dP :: PrimOp -> FUN
 dP Neg = [funNegate]
 dP IsInt = [funInt]
 dP Gt = [funGt]
+dP Lt = [funLt]
 dP p = error $ "dP undefined " ++ show p
 
 firstK :: [Ident] -> [ENV] -> ENV
