@@ -5,7 +5,7 @@ import Epic.List
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
---import Debug.Trace
+import Debug.Trace
 
 dE :: SrcEssential -> Ident -> Ident -> [ENV]
 dE (Lit (LInt k))                   i x = [ i .=. x /\ x .= Int k ]
@@ -101,11 +101,33 @@ dE t@(If3 t0 t1 t2)                   i x = -- squash $
         go _ _ _ = undefined
 
 -- For2
-dE t@(For2 t0 t1) i x = [ rhos /\ i .= conc iss /\ x .= conc xss
-                        | rhos <- rhoss
-                        , iss <- sequence (map (extractVar rhos) is)
-                        , xss <- sequence (map (extractVar rhos) xs)
-                        ] `remv` is `remv` xs
+
+{- WRONG
+dE t@(For2 t0 t1) i x =
+  [ bigUnion [ rhos /\ i .= conc iss /\ x .= conc xss
+             | iss <- sequence (map (extractVar rhos) is)
+             , xss <- sequence (map (extractVar rhos) xs) ]
+  | rhos <- rhoss
+  ] `remv` is `remv` xs
+-}
+dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
+                                      bigIntersect (zipWith (.=) is ss) /\
+                                      bigIntersect (zipWith (.=) xs ts)
+                                    | ss <- replicateM nAlts (valsOf is rhos)
+                                    , ts <- replicateM nAlts (valsOf xs rhos)
+                                    ]
+                         | rhos <- rhoss
+                         ] `remv` is `remv` xs
+{-
+dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
+                                      bigIntersect (zipWith (.=) is ss) /\
+                                      bigIntersect (zipWith (.=) xs ts)
+                                    | ss <- replicateM nAlts tups
+                                    , ts <- replicateM nAlts tups
+                                    ]
+                         | rhos <- rhoss
+                         ] `remv` is `remv` xs
+-}
   where
     rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
     tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
@@ -115,7 +137,7 @@ dE t@(For2 t0 t1) i x = [ rhos /\ i .= conc iss /\ x .= conc xss
     xs     = take nAlts $ freshList "x_" (i : x : getAllBinders t)
     empTup = Tuple []
     a, a' :: [ENV]
-    a = {-squash $-} dE t0 j y   -- XXX No squash in Tim's version
+    a = dE t0 j y   -- XXX No squash in Tim's version
     a' = a `remv` bvs t0 `remv` [j, y]
     nAlts = length a
     c :: Int -> [ENV]
@@ -128,6 +150,9 @@ dE t@(For2 t0 t1) i x = [ rhos /\ i .= conc iss /\ x .= conc xss
 
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
+-- A hack to avoid iterating over so many values
+valsOf :: [Ident] -> ENV -> [Value]
+valsOf is e = nub $ concatMap (extractVar e) is
 
 i=Ident noLoc "i"
 j=Ident noLoc "j"
