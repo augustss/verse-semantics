@@ -10,6 +10,7 @@ module ENVS(
   (./=),
   hide, hides,
   bigUnion, bigIntersect,
+  extractVar,  -- dubious
   )where
 import Data.List(intercalate, group, sort)
 import ValueS
@@ -224,3 +225,13 @@ add constr cs0 = normConstr constr
   subst x t (c:cs) = (c `uinsert`) `fmap` subst x t cs
   subst x t []     = Just []
 
+-- extract definite values of a variable from ENV or die
+extractVar :: ENV -> Ident -> [Value]
+extractVar (OR cs) x = map extr cs
+  where extr NO = error $ "extractVar: NO " ++ show x
+        extr (YES os) =
+          case [ v | y :=: v <- os, x == y ] of
+            [] -> error $ "extractVar: no value " ++ show x
+            [Ident _] -> error $ "extractVar: variable " ++ show x
+            [Value v] -> v
+            _ -> error $ "extractVar: conflicting values " ++ show x

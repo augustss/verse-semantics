@@ -3,7 +3,9 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Epic.List(
-    anySame, revTake, revDrop,
+    anySame,
+    revTake, revDrop,
+    revTakeWhile, revDropWhile,
     pick, pickLR,
     pattern Snoc,
     nub, nubKey, (\\),
@@ -32,6 +34,12 @@ revTake n = reverse . take n . reverse
 
 revDrop :: Int -> [a] -> [a]
 revDrop n = reverse . drop n . reverse
+
+revTakeWhile :: (a -> Bool) -> [a] -> [a]
+revTakeWhile f = reverse . takeWhile f . reverse
+
+revDropWhile :: (a -> Bool) -> [a] -> [a]
+revDropWhile f = reverse . dropWhile f . reverse
 
 --------
 

@@ -53,6 +53,7 @@ dE (Range t)                        i x =
     where (j, y) = fresh2 ("j", "y") [i, x] t
 dE t@(ApplyD t0 t1)                 i x =
   (dE t0 h f *** dE t1 j y ***
+   squashTail   -- squash out the excessive empty sets we get because of large n
    [ bigUnion [ f .= Fun fss /\ i .=. x /\ j .= v /\ x .= r
               | fss <- allFUNs, length fss > n, v <- allValues, Just r <- [applyPF (fss !! n) v]
               ]
@@ -100,22 +101,23 @@ dE t@(If3 t0 t1 t2)                   i x = -- squash $
         go _ _ _ = undefined
 
 -- For2
-dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
-                                      bigIntersect (zipWith (.=) is ss) /\
-                                      bigIntersect (zipWith (.=) xs ts)
-                                    | ss <- replicateM maxFor tups
-                                    , ts <- replicateM maxFor tups
-                                    ]
-                         | rhos <- rhoss
-                         ] `remv` is `remv` xs
+dE t@(For2 t0 t1) i x = [ rhos /\ i .= conc iss /\ x .= conc xss
+                        | rhos <- rhoss
+                        , iss <- sequence (map (extractVar rhos) is)
+                        , xss <- sequence (map (extractVar rhos) xs)
+                        ] `remv` is `remv` xs
   where
-    rhoss  = foldr1 (***) [ c n | n <- [0..maxFor-1] ]
+    rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
     tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
     (j, y) = fresh2 ("j", "y") [i, x] t
     (k, z) = fresh2 ("k", "z") [i, x] t
-    is     = take maxFor $ freshList "i_" (i : x : getAllBinders t)
-    xs     = take maxFor $ freshList "x_" (i : x : getAllBinders t)
+    is     = take nAlts $ freshList "i_" (i : x : getAllBinders t)
+    xs     = take nAlts $ freshList "x_" (i : x : getAllBinders t)
     empTup = Tuple []
+    a, a' :: [ENV]
+    a = {-squash $-} dE t0 j y   -- XXX No squash in Tim's version
+    a' = a `remv` bvs t0 `remv` [j, y]
+    nAlts = length a
     c :: Int -> [ENV]
     c n = (([a `ix` n] *** [ bigUnion [rhos /\ k .= ki /\ z .= zi /\ (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
                                       | ki <- allValues, zi <- allValues]
@@ -123,11 +125,10 @@ dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
             `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
          ++
           (([univ \\\ (a' `ix` n)] *** [ (is!!n) .= empTup /\ (xs!!n) .= empTup ]))
-      where
-        a :: [ENV]
-        a = dE t0 j y
-        a' = a `remv` bvs t0 `remv` [j, y]
-{-
+
+dE e                               _ _ = error $ "dE: unimplemented " ++ show e
+
+
 i=Ident noLoc "i"
 j=Ident noLoc "j"
 k=Ident noLoc "k"
@@ -135,10 +136,15 @@ x=Ident noLoc "x"
 y=Ident noLoc "y"
 z=Ident noLoc "z"
 a=Ident noLoc "a"
-t0= DefineE a $ Choice (Lit (LInt 1)) (Lit (LInt 2))
-t1= Variable a
--}
-dE e                               _ _ = error $ "dE: unimplemented " ++ show e
+h=Ident noLoc "h"
+f=Ident noLoc "f"
+--t0= EPrim Gt
+--t1= Array [Lit (LInt 1), Lit (LInt 0)]
+--t0=DefineE a (Choice (Lit (LInt 1)) (Lit (LInt 2))) `Seq` ApplyD (EPrim Gt) (Array [Variable a, Lit (LInt 0)])
+t0=DefineE a (ApplyD (EPrim Gt) (Array [Lit (LInt 3), Variable x]) `Seq`
+              ApplyD (EPrim Gt) (Array [Variable x, Lit (LInt 0)])
+             )
+t1=Variable a
 
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
@@ -146,9 +152,6 @@ ix es i | i >= 0 && i < length es = es !! i
 
 conc :: [Value] -> Value
 conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
-
-maxFor :: Int
-maxFor = 3
 
 dB :: SrcEssential -> Ident -> Ident -> [ENV]
 dB e i x = dE e i x `remv` bvs e
@@ -159,6 +162,7 @@ dC e = dE e i x `remv` [i,x]  where (i, x) = fresh2 ("i", "x") [] e
 dP :: PrimOp -> FUN
 dP Neg = [funNegate]
 dP IsInt = [funInt]
+dP Gt = [funGt]
 dP p = error $ "dP undefined " ++ show p
 
 firstK :: [Ident] -> [ENV] -> ENV
@@ -171,6 +175,9 @@ first xs (d:ds) = d \/ (first xs ds \\\ hides xs d)
 
 squash :: [ENV] -> [ENV]
 squash = filter (/= empty)
+
+squashTail :: [ENV] -> [ENV]
+squashTail = revDropWhile (== empty)
 
 infixl 8 ***
 (***) :: [ENV] -> [ENV] -> [ENV]

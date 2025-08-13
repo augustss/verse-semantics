@@ -5,7 +5,7 @@ module ValueS(
   numInt,
   allInts, allFUNs, allValues,
   allInts',
-  funNegate, funInt,
+  funNegate, funInt, funGt,
   allTuples, allTuplesLen,
   ) where
 import Control.Monad
@@ -62,12 +62,18 @@ funNegate = PF "neg" $ M.fromList [(i, Int ((-k) `mod` numInt)) | i@(Int k) <- a
 funInt :: PartialFun
 funInt = PF "int" $ M.fromList [(i, i) | i <- allInts]
 
-allFUNs :: [FUN]
-allFUNs = [ [funNegate], [funInt] ]
+funGt :: PartialFun
+funGt = PF "gt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i > j ]
 
--- Just ints for now
+funLt :: PartialFun
+funLt = PF "lt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i < j ]
+
+allFUNs :: [FUN]
+allFUNs = [ [funNegate], [funInt], [funGt], [funLt] ]
+
+-- Integers and pairs of integers
 allValues :: [Value]
-allValues = allInts
+allValues = allInts ++ map Tuple (allTuplesLen 2)
 
 maxTuples :: Int
 maxTuples = 2
@@ -79,4 +85,7 @@ allTuples = concatMap (map Tuple . allTuplesLen) [0..maxTuples]
 
 allTuplesLen :: Int -> [[Value]]
 allTuplesLen n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ show n
-               | otherwise = replicateM n allInts
+               | otherwise = replicateM n allTupleElems
+
+allTupleElems :: [Value]
+allTupleElems = allInts
