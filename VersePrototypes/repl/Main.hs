@@ -338,7 +338,7 @@ cParseLine line' s
     pure prog
 
 variableSigil :: Char
-variableSigil = ','
+variableSigil = '$'
 
 -- | find all variable references in the input line and splice their payload
 substitute :: VariableMap -> String -> String
@@ -361,8 +361,8 @@ substitute st = loop' go
         new_name     = case HM.lookup name st of
                            Nothing      -> error $
                              "Variable not in scope: " ++ drop 1 name ++ "\n"
-                             ++ "Variables must be a comma followed by an alpha"
-                             ++ "numeric string, i.e., [A-Za-z0-9]+"
+                             ++ "Variables references must be a $ followed by an alpha"
+                             ++ "numeric string, i.e., $[A-Za-z0-9]+"
                            Just payload -> payload
 
     has_variables = elem variableSigil
