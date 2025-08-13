@@ -5,7 +5,7 @@ import Epic.List
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
-import Debug.Trace
+--import Debug.Trace
 
 dE :: SrcEssential -> Ident -> Ident -> [ENV]
 dE (Lit (LInt k))                   i x = [ i .=. x /\ x .= Int k ]
