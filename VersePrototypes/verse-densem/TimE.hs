@@ -13,6 +13,7 @@ dE (EPrim p)                        i x = [ i .=. x /\ x .= Fun (dP p) ]
 dE (Variable v) i x | isSrcUnderscore v = [ i .=. x ]
                     | otherwise         = [ i .=. x /\ x .=. v ]
 dE (DefineE y t)                    i x = [ x .=. y ] *** dE t i x
+dE (DefineIE y t)                   i x = [ i .=. y ] *** dE t i x
 dE (DefineV _)                      _ _ = [ univ ] -- [ i .=. x /\ x .=. y ]
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x ++ dB t1 i x
@@ -130,7 +131,7 @@ dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
 -}
   where
     rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
-    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
+--    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
     (j, y) = fresh2 ("j", "y") [i, x] t
     (k, z) = fresh2 ("k", "z") [i, x] t
     is     = take nAlts $ freshList "i_" (i : x : getAllBinders t)
@@ -154,6 +155,7 @@ dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 valsOf :: [Ident] -> ENV -> [Value]
 valsOf is e = nub $ concatMap (extractVar e) is
 
+{-
 i=Ident noLoc "i"
 j=Ident noLoc "j"
 k=Ident noLoc "k"
@@ -170,6 +172,7 @@ t0=DefineE a (ApplyD (EPrim Gt) (Array [Lit (LInt 3), Variable x]) `Seq`
               ApplyD (EPrim Gt) (Array [Variable x, Lit (LInt 0)])
              )
 t1=Variable a
+-}
 
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
@@ -224,6 +227,6 @@ bvs = getVisibleBinders
 -------
 
 den :: SrcEssential -> [ENV]
-den t = squash $ dE (Block t) i x `remv` [i]
+den t = squash $ dE (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("i", "r") [] t
         -- res = Ident noLoc "res"
