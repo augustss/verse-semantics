@@ -22,6 +22,8 @@ primOps =
   , ("prefix'-'",    Neg)
   , ("operator'+'",  Add)
   , ("operator'-'",  Sub)
+  , ("operator'*'",  Mul)
+  , ("operator'/'",  Div)
   , ("operator'>'",  Gt)
   , ("operator'<'",  Lt)
   ]

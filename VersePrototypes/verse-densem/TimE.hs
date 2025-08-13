@@ -192,6 +192,10 @@ dP Neg = [funNegate]
 dP IsInt = [funInt]
 dP Gt = [funGt]
 dP Lt = [funLt]
+dP Add = [funAdd]
+dP Sub = [funSub]
+dP Mul = [funMul]
+dP Div = [funDiv]
 dP p = error $ "dP undefined " ++ show p
 
 firstK :: [Ident] -> [ENV] -> ENV
@@ -228,5 +232,5 @@ bvs = getVisibleBinders
 
 den :: SrcEssential -> [ENV]
 den t = squash $ dE (Block t) i x -- `remv` [i]
-  where (i, x) = fresh2 ("i", "r") [] t
+  where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"

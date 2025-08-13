@@ -6,6 +6,7 @@ module ValueS(
   allInts, allFUNs, allValues,
   allInts',
   funNegate, funInt, funGt, funLt,
+  funAdd, funSub, funMul, funDiv,
   allTuples, allTuplesLen,
   ) where
 import Control.Monad
@@ -53,6 +54,9 @@ numInt = 4
 allInts' :: [Int]
 allInts' = [0 .. fromInteger numInt - 1 ]
 
+allInts'' :: [Integer]
+allInts'' = [0 .. numInt - 1 ]
+
 allInts :: [Value]
 allInts = map Int [0 .. numInt-1]
 
@@ -68,8 +72,20 @@ funGt = PF "gt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i 
 funLt :: PartialFun
 funLt = PF "lt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i < j ]
 
+funAdd :: PartialFun
+funAdd = PF "add" $ M.fromList [(Tuple [Int i, Int j], Int (i+j)) | i <- allInts'', j <- allInts'' ]
+
+funSub :: PartialFun
+funSub = PF "sub" $ M.fromList [(Tuple [Int i, Int j], Int (i-j)) | i <- allInts'', j <- allInts'' ]
+
+funMul :: PartialFun
+funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int (i*j)) | i <- allInts'', j <- allInts'' ]
+
+funDiv :: PartialFun
+funDiv = PF "div" $ M.fromList [(Tuple [Int i, Int j], Int (i`div`j)) | i <- allInts'', j <- allInts'', j /= 0 ]
+
 allFUNs :: [FUN]
-allFUNs = [ [funNegate], [funInt], [funGt], [funLt] ]
+allFUNs = [ [funNegate], [funInt], [funGt], [funLt], [funAdd], [funMul], [funDiv] ]
 
 -- Integers and pairs of integers
 allValues :: [Value]
