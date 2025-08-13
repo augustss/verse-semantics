@@ -56,7 +56,11 @@ dE t@(ApplyD t0 t1)                 i x =
   (dE t0 h f *** dE t1 j y ***
    squashTail   -- squash out the excessive empty sets we get because of large n
    [ bigUnion [ f .= Fun fss /\ i .=. x /\ j .= v /\ x .= r
-              | fss <- allFUNs, length fss > n, v <- allValues, Just r <- [applyPF (fss !! n) v]
+              | fss <- allFUNs, n < length fss, v <- allValues, Just r <- [applyPF (fss !! n) v]
+              ]
+     \/
+     bigUnion [ f .= tt /\ i .=. x /\ j .= Int (toInteger n) /\ x .= r
+              | tt@(Tuple vs) <- allTuples, n < length vs, let r = vs !! n
               ]
    | n <- allInts'
    ]
