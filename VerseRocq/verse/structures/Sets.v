@@ -379,7 +379,7 @@ Lemma union_univ_r {A} (s : P A) :
 Admitted.
 
 Lemma union_univ_l {A} (s : P A) : 
-  (Total_set ∪ s) = s.
+  (Total_set ∪ s) = Total_set.
 Admitted.
 
 
@@ -395,7 +395,7 @@ Proof.
   intros x h. left. auto.
 Qed.
 
-#[export] Hint Rewrite @union_same @union_empty_r @union_empty_l @map_union @bind_union @union_assoc : set_simpl.
+#[export] Hint Rewrite @union_same @union_empty_r @union_empty_l @union_univ_l @union_univ_r @map_union @bind_union @union_assoc : set_simpl.
 
 (** setminus *)
 

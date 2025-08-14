@@ -130,6 +130,11 @@ Infix "*" := UNIFY.
 Definition UNIONLIST {A} : list (P A) -> (P A) := 
   List.fold_right Union ∅.
 
+(* Intersect a single set with a list *)
+Definition MAP_INTERSECT {A} :=
+  fun (Δ1:P A)(Δs:list (P A)) => List.map (fun Δ2 => Δ1 ∩ Δ2) Δs.
+
+Infix "∩*" := MAP_INTERSECT (at level 70).
 
 (* --------- pick/sequence ----------- *)
 
@@ -217,7 +222,7 @@ Definition APPi (r : Ident)
   fun ρ => 
     List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some (ρ r).
 
-Definition APPi' (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
+Definition APPi' r (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
   fun ρ => 
     exists hs h, evalA e1 ρ = Fun hs 
             /\ List.nth_error hs i = Some h 
@@ -229,11 +234,29 @@ Definition APP (r : Ident) (e1 : common.Simple) (e2 : common.Simple) : list ENV 
   i <- allNums ;;
   [APPi r e1 e2 i].
 
-(* SLS application. Every ρ in the list needs to agree on e1 and e2 *)
+(* Tims semantics, allows terms, not just simple expressions 
+
+    ε⟦t0[t1]⟧ix := ε⟦t0⟧hf * ε⟦t1⟧jy * [{ρ | ρ:envs, ρ.f=Fun(fss), fs=fss[n], (ρ.j,ρ.x)∈fs, ρ.i=ρ.x} | n:[0,1,...]]-{h,f,j,y}
+
+*)
+
+(* Tim's semantics in DLS style. Requires fresh variables f and x. *)
+Definition APP_Tim (r f x : Ident) (A : list ENV) (B : list ENV) : list ENV := 
+   ((((f ≈ evalA r) ∩* A) [\] ⟅ r ⟆)
+  * (((x ≈ evalA r) ∩* B) [\] ⟅ r ⟆)
+  * (i <- allNums ;;
+    [ APPi' r f x i ]) ) [\] ⟅ f ⟆ [\] ⟅ x ⟆ .
+ 
+             
+(* SLS application. Every ρ in the list needs to agree on everything except r *)
 Definition APPs r (e1 : common.Simple) (e2 : common.Simple) : P (list ENV) := 
   ρ ⭅ Total_set ;;
   let vs := apply (evalA e1 ρ) (evalA e2 ρ) in
   ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉.
+
+
+
+
 
 
 (* --- semantics of ALL / ONE for dest passing --------- *)
@@ -293,12 +316,18 @@ Fixpoint combine (xs : list ENV) : P (list value * ENV) :=
 
 (* ----- semantics of IF ------------ *)
 
-Fixpoint try a (A : list ENV) : list ENV * ENV := 
-  let step := fun '(envs, avoid) Ai => 
-                (envs ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
+(* Given the semantics of the condition of an IF expression, 
+   produce a list of environments corresponding to successful
+   completion of each choice in the If. 
+   Also produce an environment that corresponds to all choices
+   failing. *)
+Definition try (a : Scope.t) (A : list ENV) : list ENV * ENV := 
+  let step := fun '(success, avoid) Ai => 
+                (success ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
   List.fold_left step A ([],∅).
 
-(* NOTE:  A should be raw, B/C should be blocks *)
+(* NOTE:  A should be raw, B/C should be blocks with bound variables
+   already hidden. *)
 Definition IF (r : Ident) a (A B C : list ENV) : list ENV := 
     let (success, avoid) := try a (A [\] ⟅r⟆) in 
      ((success * B) [\] a) ++
@@ -331,7 +360,117 @@ Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
     ((List.map (fun D => D ∩ GOOD) S2) [\] xs) ++ 
     (List.map (fun D => D - GOOD) S3).
 
+(* ----------- semantics of FOR ----------- *)
+
+(* ε⟦for(t0){t1}⟧ix := [{ρ | ρ ← ρs, ρ.i=ρ.i0+ρ.i1+ …, ρ.x=ρ.x0+ρ.x1+ …} 
+                    | ρs ← C0 * C1 * … * Cm ] – {i0, x0, i1, x1,… xm}
+
+       where m  := length(A)
+             Cn  := [      A  [n] ] * [{ρ | ρ ∈ ρs,   ρ.in=tuple{ρ.k}, ρ.xn=tuple{ρ.z}} | ρs ← ε⟦t1⟧kz ] – BVS(t0,t1)⋃{j,k,y,z} +
+                    [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.in=tuple{   }, ρ.xn=tuple{   }}                ]
+                    where 
+				A := ε⟦t0⟧jy 
+				A' = A — (BVS(t0)⋃{j,y})
+in j k xn y z ∉ BVS(t0,t1)
+*)
+
+(* Destination passing version, with fixed r.
+
+Each choice in A either produces a singleton tuple ⟨vn⟩ or empty tuple ⟨⟩ stored 
+in the environment in variables r0...rm. Then we concatenate all of these 
+tuples together to get the final result.
+
+ε⟦for(t0){t1}⟧r := [{ρ | ρ ← ρs, ρ.r=ρ.r0+ρ.r1+ …}    # NOTE: + is tuple concatentation
+                    | ρs ← C0 * C1 * … * Cm ] – {r0, r1,… rm}
+
+       where m  := length(A)
+             Cn  := ([ A[n] - r    ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
+                                       | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) +
+                    [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ]
+                    where 
+				A := ε⟦t0⟧r 
+				A' = A - BVS(t0) - r
+
+         r s rn ∉ BVS(t0,t1) # should these be completely fresh?
+
+*)
+
+(* z is fresh for A , B
+   a is BVS A
+   b is BVS B
+ *)
+
+(* Make the Cs *)
+Fixpoint go rn a b (A B : list ENV) : list (list ENV) := 
+    match A with 
+    | An :: rest => 
+        (* ([ A[n] - r ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
+                           | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) *)
+        ([ An \ ⟅r⟆ ] * ((rn ≈ fun ρ => mkTup [ρ r]) ∩* B)
+                          [\] ⟅ r ⟆ [\] a [\] b)  ::
+
+        (* [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ] *)
+        ([ Total_set - (An \ a) ] * [ rn ≈ ⟨ mkTup [] ⟩ ])
+        :: go (1+rn) a b rest B
+    | [] => []
+    end.
+
+Import common.ConcreteVars.
+Notation x4 := (S (S (S (S x)))).
+Notation x3 := (S (S (S x))).
+Notation x2 := (S (S x)).
+Notation x1 := (S x). 
+
+
+
+Lemma Go_example1 : 
+  go x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∪ r ≈ ⟨Int 1⟩
+                        ; x ≈ ⟨Int 2⟩ ∪ r ≈ ⟨Int 2⟩] 
+                        [ r ≈ ⟪ x ⟫ ] 
+  = [[x1 ≈ ⟨mkTup [Int 1]⟩;∅];
+     [x2 ≈ ⟨mkTup [Int 2]⟩;∅]].
+Proof.
+cbn.
+set_simpl.
+Admitted.
+
+Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV := 
+
+  (* produces the constraint on r and the tensor product of all Ci in Cs *)
+  let helper zi Cs :=
+    let step arg Ci : Ident * Scope.t * (env -> value) * list ENV := 
+      match arg with 
+        | (zk, zs, f, acc) =>
+          (1+zk, Scope.add zk zs, fun ρ => snoc (f ρ) (ρ zk), acc * Ci) end in 
+    List.fold_left step Cs (zi, Scope.empty, fun ρ => mkTup [], [Total_set]) in
+
+  
+  let '(_,rs,c,CC) := helper z (go z a b A B) in
+  (ρ <- CC  ;;
+  [ (r ≈ c) ∩ ρ ] ) [\] rs.
+
+
+
+
+(* for {x:=1|2}{x} == [ r=<1,2> ] *)
+Example For_example1 :
+  FOR x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∪ r ≈ ⟨Int 1⟩
+                         ; x ≈ ⟨Int 2⟩ ∪ r ≈⟨Int 2⟩] 
+                         [ r ≈ ⟪ x ⟫ ] 
+                       = [ r ≈ ⟨mkTup[Int 1;Int 2]⟩ ].
+Proof.
+  unfold FOR.
+  rewrite Go_example1.
+  cbn.
+  set_simpl.
+  unfold mkTup.
+Abort.
+
 (* ----------- D-LS semantics -------------- *)
+(* destination passing style semantics for miniverse, with 
+   a list of sets of env denotation. *)
+
+
 
 Module DLS. 
 
@@ -359,12 +498,21 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   | mini.Seq e1 e2 => 
       (E e1 [\] Scope.singleton r) * (E e2) 
 
-  | mini.ApplyD e1 e2 => APP r e1 e2
+  | mini.ApplyD e1 e2 => 
+      APP r e1 e2
 
   | mini.If3 a b c =>  
-
     let xs := mini.I a in 
     IF r xs (E a) (B b) (B c)
+
+  | mini.For2 t0 t1 => 
+    let xs := mini.I t0     in  (* BVS t0 *)
+    let ys := mini.I t1     in  (* BVS t1 *)
+    let x  := mini.fresh t0 in
+    let y  := mini.fresh t1 in 
+    let z  := 1 + List.list_max ([x; y] ++ xs ++ ys)   in  (* fresh for everything *)
+
+    FOR z xs ys (E t0) (E t1)
 
   (* TODO: should this be E or B? *)
   | mini.All a => 
@@ -393,12 +541,10 @@ Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
 End DLS.
 
 (* ----------- S-LS semantics Fig. 16 -------------- *)
-(* essential verse *)
+(* essential verse,  *)
 
 Module SLS.
 
-Infix "∩*" := 
-  (fun (Δ1:ENV)(Δs:list ENV) => List.map (fun Δ2 => Δ1 ∩ Δ2) Δs) (at level 70).
 
 Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV := 
 
@@ -474,7 +620,7 @@ Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV :=
 
 
 
-End ELS.
+End SLS.
 
 
 

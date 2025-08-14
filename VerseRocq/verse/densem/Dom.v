@@ -75,6 +75,7 @@ Definition mkTup (vs : list value) : value :=
     end
   in Fun (loop vs 0).
 
+
 (* extend a tuple value with a new component at the end *)
 Definition snoc (tup : value) (v: value) : value := 
   match tup with 
