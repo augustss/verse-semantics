@@ -2,6 +2,15 @@
 #  pass  evaluate the two expressions and expect them to be equal
 #  fail  evaluate the two expressions,
 #       they should be equal but currently the test fails
+#
+#######################################################################
+##                            Format
+#
+# This file is legal verse code
+# Each function is provided by `VersePrototypes/Tester/Main.hs`
+# The format for each test is:
+# <tester-fun>(<name>,<test-type>) {<expr-to-run>}   {<expected-result>}
+########################################################################
 
 # Trivial tests
 testeq("EV1",pass) {2}                                   {2}
@@ -500,3 +509,10 @@ verify("verify-exitop4", fail){ x:int; f():int := {x} }
 testeq("run-exitop4", fail){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
    # Den-sem of f is empty, something wrong
    # Fail because f itself doesn't verify
+
+#######################################################################
+#                             DenSem Tests
+#######################################################################
+testds("tup0.tim", timDensem$){ (1,2) }    { "[{{r=<1,2>}}]" }
+testds("tup0.els", elsDensem$){ (1,2) }    { "[res=<1,2>]"   }
+testds("tup0.dls", dlsDensem$){ (1,2) }    { "[{<1,2>}]"     }

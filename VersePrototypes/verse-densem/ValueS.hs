@@ -5,7 +5,8 @@ module ValueS(
   numInt,
   allInts, allFUNs, allValues,
   allInts',
-  funNegate, funInt,
+  funNegate, funInt, funGt, funLt,
+  funAdd, funSub, funMul, funDiv,
   allTuples, allTuplesLen,
   ) where
 import Control.Monad
@@ -53,6 +54,9 @@ numInt = 4
 allInts' :: [Int]
 allInts' = [0 .. fromInteger numInt - 1 ]
 
+allInts'' :: [Integer]
+allInts'' = [0 .. numInt - 1 ]
+
 allInts :: [Value]
 allInts = map Int [0 .. numInt-1]
 
@@ -62,12 +66,30 @@ funNegate = PF "neg" $ M.fromList [(i, Int ((-k) `mod` numInt)) | i@(Int k) <- a
 funInt :: PartialFun
 funInt = PF "int" $ M.fromList [(i, i) | i <- allInts]
 
-allFUNs :: [FUN]
-allFUNs = [ [funNegate], [funInt] ]
+funGt :: PartialFun
+funGt = PF "gt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i > j ]
 
--- Just ints for now
+funLt :: PartialFun
+funLt = PF "lt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i < j ]
+
+funAdd :: PartialFun
+funAdd = PF "add" $ M.fromList [(Tuple [Int i, Int j], Int (i+j)) | i <- allInts'', j <- allInts'' ]
+
+funSub :: PartialFun
+funSub = PF "sub" $ M.fromList [(Tuple [Int i, Int j], Int (i-j)) | i <- allInts'', j <- allInts'' ]
+
+funMul :: PartialFun
+funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int (i*j)) | i <- allInts'', j <- allInts'' ]
+
+funDiv :: PartialFun
+funDiv = PF "div" $ M.fromList [(Tuple [Int i, Int j], Int (i`div`j)) | i <- allInts'', j <- allInts'', j /= 0 ]
+
+allFUNs :: [FUN]
+allFUNs = [ [funNegate], [funInt], [funGt], [funLt], [funAdd], [funMul], [funDiv] ]
+
+-- Integers and pairs of integers
 allValues :: [Value]
-allValues = allInts
+allValues = allInts ++ map Tuple (allTuplesLen 2)
 
 maxTuples :: Int
 maxTuples = 2
@@ -79,4 +101,7 @@ allTuples = concatMap (map Tuple . allTuplesLen) [0..maxTuples]
 
 allTuplesLen :: Int -> [[Value]]
 allTuplesLen n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ show n
-               | otherwise = replicateM n allInts
+               | otherwise = replicateM n allTupleElems
+
+allTupleElems :: [Value]
+allTupleElems = allInts

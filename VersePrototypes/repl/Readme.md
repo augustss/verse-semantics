@@ -216,7 +216,7 @@ The repl is equipped with some state to store and use variables. The commands
 for variables are:
 
 - `:let <var> <expr>`: binds `var` to `expr`. To reference a variable prepend a
-  comma, for example, `,x` references the variable `x`.
+   dollar sign, for example, `$x` references the variable `x`.
 - `:display [<var>]`: If the input list is empty, `:display` will show all
   variables in the state. If the list is non-empty then `:display` will show
   each variable and what its bound to.
@@ -234,13 +234,13 @@ Here are some basic `:let` examples:
 Verse parse, desugar, and evaluation testing.
 Use :help for help, and :quit to quit.
 > :let x 1|2
-> ,x
+> $x
 1 | 2
-> :let y 1|,x  -- variables can reference other variables
-> ,y
+> :let y 1|$x  -- variables can reference other variables
+> $y
 1 | (1 | 2)
 > :let x 1000  -- variables can be overwritten
-> ,y
+> $y
 1 | 1000
 ```
 
@@ -254,7 +254,7 @@ and `:display` examples:
 1|2
 
 ================ y Bound to ===================
-1|,x
+1|$x
 
 > :display
 
@@ -277,15 +277,15 @@ z
 > :display y
 
 ================ y Bound to ===================
-1|,x
-> ,y
+1|$x
+> $y
 Variable not in scope:
-Variables must be a comma followed by an alphanumeric string, i.e., [A-Za-z0-9]+
+Variables references must be a $ followed by an alphanumeric string, i.e., $[A-Za-z0-9]+
 CallStack (from HasCallStack):
   error, called at repl/Main.hs:362:44 in VersePrototypes-0.1.0.0-inplace-verse-repl:Main
 
 > :let x x:=3
-> ,y
+> $y
 1 | x := 3
 ```
 

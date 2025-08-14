@@ -923,6 +923,7 @@ getVisibleBinders = go
     -- These three equations are the main payload
     go (DefineV i)     = [i]
     go (DefineE i e)   = i : go e
+    go (DefineIE i e)  = i : go e
     go (Exists is e)   = go e \\ is
 
     -- The rest is just recursive traversal

@@ -10,8 +10,10 @@ module ENVS(
   (./=),
   hide, hides,
   bigUnion, bigIntersect,
+  extractVar,  -- dubious
   )where
-import Data.List(intercalate, group, sort)
+import Data.Function(on)
+import Data.List(intercalate, group, sort, groupBy, sortBy)
 import ValueS
 
 -- ENV API
@@ -118,7 +120,11 @@ data CASE
 #else
 instance Show CASE where
   show (YES []) = "U"
-  show (YES cs) = "{{" ++ intercalate "," (map show cs) ++ "}}"
+  show (YES cs) = "{{" ++ intercalate "," (map showEqs eqss ++ map show neqs) ++ "}}"
+    where eqs = [ (i, v) | i :=: Value v <- cs ]
+          neqs = filter (\ c -> case c of _ :=: Value _ -> False; _ -> True) cs
+          eqss = groupBy ((==) `on` snd) $ sortBy (compare `on` snd) eqs
+          showEqs ivs = intercalate "=" (map (show . fst) ivs) ++ "=" ++ show (snd (ivs!!0))
   show NO       = "∅"
 #endif
 
@@ -224,3 +230,13 @@ add constr cs0 = normConstr constr
   subst x t (c:cs) = (c `uinsert`) `fmap` subst x t cs
   subst x t []     = Just []
 
+-- extract definite values of a variable from ENV or die
+extractVar :: ENV -> Ident -> [Value]
+extractVar (OR cs) x = map extr cs
+  where extr NO = error $ "extractVar: NO " ++ show x
+        extr (YES os) =
+          case [ v | y :=: v <- os, x == y ] of
+            [] -> error $ "extractVar: no value " ++ show x
+            [Ident _] -> error $ "extractVar: variable " ++ show x
+            [Value v] -> v
+            _ -> error $ "extractVar: conflicting values " ++ show x

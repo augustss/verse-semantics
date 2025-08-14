@@ -87,7 +87,10 @@ executable tester
      hs-source-dirs:   tester
      build-depends:    megaparsec,
                        optparse-applicative,
+                       parser-combinators,
                        uniplate,
+                       verse-densem,
+                       verse-plancc,
                        verse-libs,
                        verse-parser
      main-is:          Main.hs

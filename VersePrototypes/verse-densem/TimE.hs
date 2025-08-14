@@ -13,6 +13,7 @@ dE (EPrim p)                        i x = [ i .=. x /\ x .= Fun (dP p) ]
 dE (Variable v) i x | isSrcUnderscore v = [ i .=. x ]
                     | otherwise         = [ i .=. x /\ x .=. v ]
 dE (DefineE y t)                    i x = [ x .=. y ] *** dE t i x
+dE (DefineIE y t)                   i x = [ i .=. y ] *** dE t i x
 dE (DefineV _)                      _ _ = [ univ ] -- [ i .=. x /\ x .=. y ]
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x ++ dB t1 i x
@@ -53,8 +54,13 @@ dE (Range t)                        i x =
     where (j, y) = fresh2 ("j", "y") [i, x] t
 dE t@(ApplyD t0 t1)                 i x =
   (dE t0 h f *** dE t1 j y ***
+   squashTail   -- squash out the excessive empty sets we get because of large n
    [ bigUnion [ f .= Fun fss /\ i .=. x /\ j .= v /\ x .= r
-              | fss <- allFUNs, length fss > n, v <- allValues, Just r <- [applyPF (fss !! n) v]
+              | fss <- allFUNs, n < length fss, v <- allValues, Just r <- [applyPF (fss !! n) v]
+              ]
+     \/
+     bigUnion [ f .= tt /\ i .=. x /\ j .= Int (toInteger n) /\ x .= r
+              | tt@(Tuple vs) <- allTuples, n < length vs, let r = vs !! n
               ]
    | n <- allInts'
    ]
@@ -100,22 +106,45 @@ dE t@(If3 t0 t1 t2)                   i x = -- squash $
         go _ _ _ = undefined
 
 -- For2
+
+{- WRONG
+dE t@(For2 t0 t1) i x =
+  [ bigUnion [ rhos /\ i .= conc iss /\ x .= conc xss
+             | iss <- sequence (map (extractVar rhos) is)
+             , xss <- sequence (map (extractVar rhos) xs) ]
+  | rhos <- rhoss
+  ] `remv` is `remv` xs
+-}
 dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
                                       bigIntersect (zipWith (.=) is ss) /\
                                       bigIntersect (zipWith (.=) xs ts)
-                                    | ss <- replicateM maxFor tups
-                                    , ts <- replicateM maxFor tups
+                                    | ss <- replicateM nAlts (valsOf is rhos)
+                                    , ts <- replicateM nAlts (valsOf xs rhos)
                                     ]
                          | rhos <- rhoss
                          ] `remv` is `remv` xs
+{-
+dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
+                                      bigIntersect (zipWith (.=) is ss) /\
+                                      bigIntersect (zipWith (.=) xs ts)
+                                    | ss <- replicateM nAlts tups
+                                    , ts <- replicateM nAlts tups
+                                    ]
+                         | rhos <- rhoss
+                         ] `remv` is `remv` xs
+-}
   where
-    rhoss  = foldr1 (***) [ c n | n <- [0..maxFor-1] ]
-    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
+    rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
+--    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
     (j, y) = fresh2 ("j", "y") [i, x] t
     (k, z) = fresh2 ("k", "z") [i, x] t
-    is     = take maxFor $ freshList "i_" (i : x : getAllBinders t)
-    xs     = take maxFor $ freshList "x_" (i : x : getAllBinders t)
+    is     = take nAlts $ freshList "i_" (i : x : getAllBinders t)
+    xs     = take nAlts $ freshList "x_" (i : x : getAllBinders t)
     empTup = Tuple []
+    a, a' :: [ENV]
+    a = dE t0 j y   -- XXX No squash in Tim's version
+    a' = a `remv` bvs t0 `remv` [j, y]
+    nAlts = length a
     c :: Int -> [ENV]
     c n = (([a `ix` n] *** [ bigUnion [rhos /\ k .= ki /\ z .= zi /\ (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
                                       | ki <- allValues, zi <- allValues]
@@ -123,10 +152,13 @@ dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
             `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
          ++
           (([univ \\\ (a' `ix` n)] *** [ (is!!n) .= empTup /\ (xs!!n) .= empTup ]))
-      where
-        a :: [ENV]
-        a = dE t0 j y
-        a' = a `remv` bvs t0 `remv` [j, y]
+
+dE e                               _ _ = error $ "dE: unimplemented " ++ show e
+
+-- A hack to avoid iterating over so many values
+valsOf :: [Ident] -> ENV -> [Value]
+valsOf is e = nub $ concatMap (extractVar e) is
+
 {-
 i=Ident noLoc "i"
 j=Ident noLoc "j"
@@ -135,10 +167,16 @@ x=Ident noLoc "x"
 y=Ident noLoc "y"
 z=Ident noLoc "z"
 a=Ident noLoc "a"
-t0= DefineE a $ Choice (Lit (LInt 1)) (Lit (LInt 2))
-t1= Variable a
+h=Ident noLoc "h"
+f=Ident noLoc "f"
+--t0= EPrim Gt
+--t1= Array [Lit (LInt 1), Lit (LInt 0)]
+--t0=DefineE a (Choice (Lit (LInt 1)) (Lit (LInt 2))) `Seq` ApplyD (EPrim Gt) (Array [Variable a, Lit (LInt 0)])
+t0=DefineE a (ApplyD (EPrim Gt) (Array [Lit (LInt 3), Variable x]) `Seq`
+              ApplyD (EPrim Gt) (Array [Variable x, Lit (LInt 0)])
+             )
+t1=Variable a
 -}
-dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
@@ -146,9 +184,6 @@ ix es i | i >= 0 && i < length es = es !! i
 
 conc :: [Value] -> Value
 conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
-
-maxFor :: Int
-maxFor = 3
 
 dB :: SrcEssential -> Ident -> Ident -> [ENV]
 dB e i x = dE e i x `remv` bvs e
@@ -159,6 +194,12 @@ dC e = dE e i x `remv` [i,x]  where (i, x) = fresh2 ("i", "x") [] e
 dP :: PrimOp -> FUN
 dP Neg = [funNegate]
 dP IsInt = [funInt]
+dP Gt = [funGt]
+dP Lt = [funLt]
+dP Add = [funAdd]
+dP Sub = [funSub]
+dP Mul = [funMul]
+dP Div = [funDiv]
 dP p = error $ "dP undefined " ++ show p
 
 firstK :: [Ident] -> [ENV] -> ENV
@@ -171,6 +212,9 @@ first xs (d:ds) = d \/ (first xs ds \\\ hides xs d)
 
 squash :: [ENV] -> [ENV]
 squash = filter (/= empty)
+
+squashTail :: [ENV] -> [ENV]
+squashTail = revDropWhile (== empty)
 
 infixl 8 ***
 (***) :: [ENV] -> [ENV] -> [ENV]
@@ -191,6 +235,6 @@ bvs = getVisibleBinders
 -------
 
 den :: SrcEssential -> [ENV]
-den t = squash $ dE (Block t) i x `remv` [i]
-  where (i, x) = fresh2 ("i", "r") [] t
+den t = squash $ dE (Block t) i x -- `remv` [i]
+  where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"

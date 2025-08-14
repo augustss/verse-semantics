@@ -9,7 +9,7 @@
 
 module Core.Expr
   ( -- The data type itself
-    Expr(..), Val, pattern LitInt
+    Expr(..), Val, pattern LitInt, pattern LitStr
   , Ident(..)
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isComparable
@@ -566,6 +566,9 @@ data Lit
 pattern LitInt :: Integer -> Expr
 pattern LitInt i = Lit (LInt i)
 
+pattern LitStr :: String -> Expr
+pattern LitStr s = Lit (LStr s)
+
 instance Pretty Lit where
   pPrintPrec l p lit =
     case lit of
@@ -743,7 +746,7 @@ pPrintPrecE lvl prec the_expr
 
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> block "{}" (text "truth") a
-       Iter f e e0 -> {- text "iter"  <> parens (text (show f)) -} 
+       Iter f e e0 -> {- text "iter"  <> parens (text (show f)) -}
                       block "{}" (text (show f)) e <> braces (ppr0 e0)
        --All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
