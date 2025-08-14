@@ -1,10 +1,26 @@
+(* This module defines various operations on sets of environments and lemmas about their equality.
+
+   Δ := x ≈ ⟨ k ⟩ | x ≉ ⟨ k ⟩    -- k :: value           constrain equal, non equal
+     |  x ≈ ⟪ f ⟫ | x ≉ ⟪ f ⟫    -- f :: rho -> value
+     |  ρ \\ xs                  -- hide (generalize single variable to set)
+     |  Δ \ xs                   -- hide (generalize variables)
+     |  ... other set ops ...
+
+   also defines the property
+
+     "hidden Δ xs"  when xs are already hidden (i.e. Δ \ xs = Δ)
+
+   and adds several simplification rewrites to the 'set_simpl' database.
+
+ *)
+
+
 Require Import Imports.
 
 From Stdlib Require Lists.List.
 From Stdlib Require Import Classes.EquivDec.
 
 Require Import syntax.common.
-Require syntax.mini.
 Require Import PFun.
 Require Import structures.Sets.
 Import structures.List.
@@ -12,18 +28,14 @@ Import structures.List.
 Require Import densem.Dom.
 Require Import densem.tenv.  (* environments are total *)
 
-Import mini.MiniNotation.
 Import SetNotations.
 Import SetMonadNotation.
 Import List.ListNotations.
 Import EnvNotation.
 
 Open Scope list_scope.
-Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
-
-
 
 Notation ENV := (P env).
 
@@ -57,9 +69,9 @@ Definition envs_difference (Δ1 : ENV) (xs : Scope.t) (Δ2 : ENV) : ENV :=
 
 (* The set of all environments that extend rho with arbitrary 
    definitions for the variables declared in e. 
-*)
 Definition X (e : mini.Expr) (ρ : env) : ENV :=
   hide_env (mini.I e) ρ.
+*)
 
 (* A scope is unconstrained in a set *)
 Definition hidden (xs: Scope.t) (Δ : ENV) : Prop := 
@@ -184,8 +196,8 @@ Lemma hide_env_nothing ρ : ρ \\ Scope.empty = ⌈ ρ ⌉.
 Proof.
   set_ext ρ'. unfold hide. split.
   intros h. 
-  have NI: ~ Scope.In mini.Test.r Scope.empty. admit.
-  specialize (h mini.Test.r NI). 
+  have NI: ~ Scope.In (common.ConcreteVars.r) Scope.empty. admit.
+  specialize (h common.ConcreteVars.r NI). 
 Admitted.
  
 Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.

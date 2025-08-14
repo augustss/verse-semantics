@@ -10,6 +10,7 @@ From Stdlib Require Import Sets.Classical_sets.
 
 Require Import syntax.common.
 Require syntax.mini.
+Require syntax.essential.
 Require Import PFun.
 Require Import structures.Sets.
 Import structures.List.
@@ -73,12 +74,11 @@ Ltac set_crunch :=
 
 Notation VAL := (P value).
 
-Import mini.MiniNotation.
 Notation "⟅ r ⟆" := (Scope.singleton r).
 (* distinguished result variable (0) *)
-Definition r : Ident := mini.Test.r.
+Definition r : Ident := common.ConcreteVars.r.
 
-(* -------------- atomic expressions  ---------------- *)
+(* -------------- atomic/simple expressions  ---------------- *)
 
 Definition evalPrim (p : PrimOp) : value  := 
   match p with 
@@ -92,13 +92,12 @@ Definition evalPrim (p : PrimOp) : value  :=
 
 (* Evaluation function for simple values. 
    If e is not of the right form, it is interpreted as 0 *)
-Fixpoint evalA (e : mini.Expr) (ρ : env) : value := 
-  match e with 
-  | mini.Var x => ρ x
-  | mini.Lit (common.Int i) => Dom.Int i
-  | mini.EPrim p => evalPrim p
-  | mini.Array es => mkTup (List.map (fun e => evalA e ρ) es)
-  | _ => Dom.Int 0
+Fixpoint evalA (a : Simple) (ρ : env) : value := 
+  match a with 
+  | common.Var x => ρ x
+  | common.Lit (common.Int i) => Dom.Int i
+  | common.EPrim p => evalPrim p
+  | common.SArray es => mkTup (List.map (fun e => evalA e ρ) es)
   end.
 
 (* ------- operations on lists of sets and sets of lists ------ *)
@@ -162,6 +161,7 @@ Fixpoint pickl {A} (xs : list (list A)) : list (list A) :=
   end.
 
 (* --------- dodgy union ----------- *)
+
 (* elementwise union of sequences, missing elements are ∅s.  *)
 Fixpoint pointwise_union {A} (VS : list (P A)) (WS : list (P A)) : 
   list (P A) := 
@@ -195,28 +195,29 @@ Definition tups (VS : list VAL) : VAL :=
    iteration on the input. Any inputs that are in the 
    domain of the function will produce output.
  *)
-Definition apply (f : value) (v : value) : list VAL := 
+Definition apply (f : value) (v : value) : list value := 
   match f with 
   | Dom.Fun hs => 
       h <- hs ;;
       match (PFun.apply_opt _ _ Value.eqb h v) with 
-      | Some w => [⌈w⌉]
+      | Some w => [w]
       | None => []
       end
   | _ => []
   end.
 
-(* Two different versions of application. Arguments must be atomic, 
-   i.e. have a single value
+(* Two different versions of application. Arguments must be simple, 
+   i.e. have a single value.
    The set of all environments such that the ith result of 
    apply e1 to e2 is ρ r. Not sure yet which one of these is easier to 
    reason about.
 *)
-Definition APPi (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
+Definition APPi (r : Ident) 
+  (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
   fun ρ => 
-    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some (⌈ ρ r ⌉).
+    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some (ρ r).
 
-Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV := 
+Definition APPi' (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
   fun ρ => 
     exists hs h, evalA e1 ρ = Fun hs 
             /\ List.nth_error hs i = Some h 
@@ -224,9 +225,16 @@ Definition APPi' (e1 : mini.Expr) (e2 : mini.Expr) (i : nat) : ENV :=
 
 (* This is a bit dodgy by using the iteration over all numbers. 
    We need to iterate only over each partial function *)
-Definition APP (e1 : mini.Expr) (e2 : mini.Expr) : list ENV := 
+Definition APP (r : Ident) (e1 : common.Simple) (e2 : common.Simple) : list ENV := 
   i <- allNums ;;
-  [APPi e1 e2 i].
+  [APPi r e1 e2 i].
+
+(* SLS application. Every ρ in the list needs to agree on e1 and e2 *)
+Definition APPs r (e1 : common.Simple) (e2 : common.Simple) : P (list ENV) := 
+  ρ ⭅ Total_set ;;
+  let vs := apply (evalA e1 ρ) (evalA e2 ρ) in
+  ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉.
+
 
 (* --- semantics of ALL / ONE for dest passing --------- *)
 
@@ -285,103 +293,16 @@ Fixpoint combine (xs : list ENV) : P (list value * ENV) :=
 
 (* ----- semantics of IF ------------ *)
 
-(* Tim's version of IF *)
-
-(* Given a list of ENVs,  E{a}[0] ... E{a}[n]
-
-   If any of these succeed, we want to take the first one.
-   So, we will produce a list of environments, where the first one 
-   is the first one, but the second needs to know that the 
-   first one failed. So we use set difference to subtract the first 
-   set from the second.
-
-   NB: not sure what is going on with hiding here.
-
- ([E{a}[0]                                      ]             + 
-  [E{a}[1] \{xs} E{a}[0]                        ]             + … +
-  [E{a}[n] \{xs} E{a}[0] \{xs} … \{xs} E{a}[n-1]])
-*)
-
-
-(* Tim's version in Euv semantics 
-
-Euv{if(a){b}else{c}} := 
-   [A[0], 
-    A[1]\A[0], ..., 
-    A[n]\A[0]\A[1]\...\ A[n-1]] * B + 
-   [P(Env)\A[0]\A[1]\...\A[n]] * C
-where A:=Epq{a}-a -{p,q}
-where B:=Euv{b}-a-b-{p,q}
-where C:=Euv{c}-a-c-{p,q}
-where p&q fresh, n:=Length(Epq{a})
-
-Questions:
-1. should it be
-   where C:=Euv{c}-c
-   i.e. variables bound in a don't scope over c
-        p,q are fresh for c, and not input to Euv
-2. Aren't we subtracting a variables from A and B too early?
-   They need to communicate. We should only subtract
-   after the * has been calculated.
-2'. But, the a variables aren't bound in C, so we can 
-   subtract them before we do the unification
-3. Let's replace A[i]\A[0]...\A[i-i] with 
-     A[i]\(A[0] ∪ ... ∪ A[i-1])
-
-Proposed update:
-
-Euv{if(a){b}else{c}} := 
-   ([A[0], 
-     A[1]\A[0], 
-     ..., 
-     A[n]\(A[0] ∪ A[1] ... ∪ A[n-1])] * B)-a + 
-   [P(Env)\(A[0] ∪ A[1] ... ∪ A[n])-a] * C
-where A:=Epq{a}-{p,q}
-where B:=Euv{b}-b
-where C:=Euv{c}-c
-where p&q fresh, n:=Length(Epq{a})
-
-
-Another version
-
-Euv{if(a){b}else{c}} := 
-   [A[0], 
-    A[1]\(A[0]-a), ..., 
-    A[n]\(A[0]-a)\(A[1]-a)\...\ A[n-1]] * B + 
-   [P(Env)(\A[0]\A[1]\...\A[n])-a] * C
-where A:=Epq{a} -{p,q}
-where B:=Euv{b}-a-b-{p,q}
-where C:=Euv{c}-a-c-{p,q}
-where p&q fresh, n:=Length(Epq{a})
-
-*)
-
-
-Fixpoint try (A : list ENV) : list ENV * ENV := 
-  let step := fun '(envs, avoid) Ai => 
-                (envs ++ [Ai - avoid], avoid ∪ Ai) in
-  List.fold_left step A ([],∅).
-
-Definition IF_TIM1 a (A B C : list ENV) : list ENV := 
-    let (success, avoid) := try (A [\] ⟅r⟆ [\] a) in 
-     (success * (B [\] a) ) ++
-     ([(Total_set - avoid)] * C).
-
-Definition IF_TIM2 a (A B C : list ENV) : list ENV := 
-    let (success, avoid) := try (A [\] ⟅r⟆) in 
-     ((success * B) [\] a) ++
-     ([(Total_set - avoid) \ a] * C).
-
-
-Fixpoint try3 a (A : list ENV) : list ENV * ENV := 
+Fixpoint try a (A : list ENV) : list ENV * ENV := 
   let step := fun '(envs, avoid) Ai => 
                 (envs ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
   List.fold_left step A ([],∅).
 
-Definition IF_TIM3 a (A B C : list ENV) : list ENV := 
-    let (success, avoid) := try3 a (A [\] ⟅r⟆) in 
+(* NOTE:  A should be raw, B/C should be blocks *)
+Definition IF (r : Ident) a (A B C : list ENV) : list ENV := 
+    let (success, avoid) := try a (A [\] ⟅r⟆) in 
      ((success * B) [\] a) ++
-     ([(Total_set - avoid) \ a] * C).
+     ([(Total_set - avoid)] * C).  
 
 (* Koen's encoding of if *)
 
@@ -410,7 +331,7 @@ Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
     ((List.map (fun D => D ∩ GOOD) S2) [\] xs) ++ 
     (List.map (fun D => D - GOOD) S3).
 
-(* ----------- non-dodgy dest passing style -------------- *)
+(* ----------- D-LS semantics -------------- *)
 
 Module DLS. 
 
@@ -426,10 +347,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   match e with 
   | mini.DefineV _ => [ Total_set ]
 
-  | mini.Var _ => [ r ≈ evalA e ]
-  | mini.Lit _ => [ r ≈ evalA e ]
-  | mini.EPrim _ => [ r ≈ evalA e ]
-  | mini.Array es =>  [ r ≈ evalA e ]
+  | mini.ES a => [ r ≈ evalA a ]
 
   | mini.Fail => []  
 
@@ -441,15 +359,14 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   | mini.Seq e1 e2 => 
       (E e1 [\] Scope.singleton r) * (E e2) 
 
-  | mini.ApplyD e1 e2 => APP e1 e2
+  | mini.ApplyD e1 e2 => APP r e1 e2
 
   | mini.If3 a b c =>  
 
     let xs := mini.I a in 
-    IF_TIM1 xs (E a) (B b) (B c)
+    IF r xs (E a) (B b) (B c)
 
-
-  (* TODO: should this be E or B *)
+  (* TODO: should this be E or B? *)
   | mini.All a => 
       [ ALL (E a) \ mini.I a ] 
 
@@ -474,6 +391,149 @@ Create HintDb E.
 Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
 
 End DLS.
+
+(* ----------- S-LS semantics Fig. 16 -------------- *)
+(* essential verse *)
+
+Module SLS.
+
+Infix "∩*" := 
+  (fun (Δ1:ENV)(Δs:list ENV) => List.map (fun Δ2 => Δ1 ∩ Δ2) Δs) (at level 70).
+
+Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV := 
+
+  let B u (t : essential.Expr) v :list ENV := 
+    Δ <- S u t v ;; [Δ \ essential.I t] 
+  in
+
+  let C t : list ENV := 
+    let p := essential.fresh t in
+    let q := 1 + p in
+    (S p t q) [\] ⟅ p ⟆ [\] ⟅ q ⟆
+  in
+
+  match t with 
+
+  | essential.Underscore => 
+      [ u ≈ evalA v ]
+
+  | essential.ES a => 
+      [ (u ≈ evalA a) ∩ (v ≈ evalA a) ]
+
+  | essential.Array ts => [] (* TODO *)
+
+  | essential.Define x t => 
+      (x ≈ evalA v) ∩* (S u t v)
+
+  | essential.Fail => []  
+
+  | essential.Choice t1 t2 => 
+      B u t1 v ++ B u t2 v
+
+  | essential.Seq t1 t2 => 
+      C t1 * (S u t2 v) 
+
+  | essential.Iter a1 a2 => 
+      i <- allNums ;;
+      [ (u ≈ ⟨Int i⟩) ∩ (v ≈ ⟨Int i⟩) 
+        ∩ (fun ρ => Value.leb (evalA a1 ρ) (Int i) = true) 
+        ∩ (fun ρ => Value.leb (Int i) (evalA a2 ρ) = true) ]
+
+  | essential.Unify t1 t2 => 
+      S u t1 v * S u t2 v
+
+  | essential.ApplyD t1 t2 => 
+      (u ≈ evalA v) ∩* (APP v t1 t2) 
+
+  | essential.If3 t0 t1 t2 =>  
+
+    let j0  := essential.fresh t0 in 
+    let j1  := essential.fresh t1 in
+    let j   := 1 + max j0 j1      in 
+    let y   := 1 + j              in
+    let xs  := essential.I t0     in 
+    let ys  := Scope.add j (Scope.add y xs) in
+
+    IF y xs (S j t0 y) (B u t1 v) (B u t2 v)
+
+  | essential.For2 t0 t1 => []
+
+(*
+
+  (* TODO: should this be E or B? *)
+  | essential.All a => 
+      [ ALL (E a) \ essential.I a ] 
+
+  | essential.One a => 
+      [ ONE (E a) \ essential.I a ]
+*)
+  (* TODO: functions *)
+
+  | _ => [ ] 
+  end.
+
+
+
+End ELS.
+
+
+
+Module DSLS.
+
+
+Fixpoint E (u : Ident) (e : mini.Expr) (v : Ident) : P (list ENV) := 
+
+(*
+  let B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;; [Δ \ mini.I e] 
+  in
+  let V (e : mini.Expr) : list (P (value * ENV)) := 
+    Δ <- B e ;; [extract r Δ] 
+  in
+*)
+
+  match e with 
+
+(*
+  | mini.DefineV _ => [ Total_set ]
+*)
+  | mini.Var _ => [ r ≈ evalA e ]
+  | mini.Lit _ => [ r ≈ evalA e ]
+  | mini.EPrim _ => [ r ≈ evalA e ]
+  | mini.Array es =>  [ r ≈ evalA e ]
+
+  | mini.Fail => []  
+
+  | mini.Choice e1 e2 => B e1 ++ B e2
+*)
+  | mini.Unify (mini.Var r) e2 => 
+      E e1 * E e2
+
+  | mini.Seq e1 e2 => 
+      (E e1 [\] Scope.singleton r) * (E e2) 
+(*
+  | mini.ApplyD e1 e2 => APP e1 e2
+
+  | mini.If3 a b c =>  
+
+    let xs := mini.I a in 
+    IF_TIM1 xs (E a) (B b) (B c)
+
+  (* TODO: should this be E or B *)
+  | mini.All a => 
+      [ ALL (E a) \ mini.I a ] 
+
+  | mini.One a => 
+      [ ONE (E a) \ mini.I a ]
+
+  (* TODO: functions *)
+*)
+  | _ => ∅
+  end.
+
+Definition  B (e : mini.Expr) :list ENV := 
+    Δ <- E e ;; [Δ \ mini.I e]. 
+
 
 
 (* ------------------------------------------------------ *)

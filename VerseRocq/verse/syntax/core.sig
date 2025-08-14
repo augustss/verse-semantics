@@ -5,6 +5,7 @@ IterType : Type
 
 list : Functor
 
+
 Lit   : LitType -> Expr
 Tup   : "list"(Expr) -> Expr
 Tru   : Expr -> Expr

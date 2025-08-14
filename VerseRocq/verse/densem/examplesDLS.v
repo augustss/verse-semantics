@@ -441,7 +441,8 @@ Qed.
 (* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
 (* Tim wants this to fail. *)
 Lemma IF1a_Tim3_should_and_does_fail : 
-  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
+  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ])
+               [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
   [∅; ∅].
 unfold IF_TIM3.
 cbn.

@@ -30,6 +30,21 @@ Inductive LitType : Type :=
 | Int : nat -> LitType
 .
 
+Inductive Simple : Type := 
+| Var : Ident -> Simple
+| Lit : LitType -> Simple
+| EPrim : PrimOp -> Simple
+| SArray : list Simple -> Simple
+.
+
+Fixpoint fvs (a : Simple) : Scope.t := 
+  match a with 
+  | Var x => Scope.singleton x 
+  | Lit _ => Scope.empty 
+  | EPrim _ => Scope.empty
+  | SArray s => Scope_unions (List.map fvs s)
+  end.
+
 Inductive IterType : Type := 
 | IterIf : IterType
 | IterOne : IterType
@@ -49,3 +64,21 @@ Inductive Aperture : Type :=
 | Open : Aperture
 | Closed : Aperture
 .
+
+Module CommonNotation.
+Coercion Int   : nat >-> LitType.
+Coercion Lit   : LitType >-> Simple.
+Coercion Var   : Ident >-> Simple.
+Coercion EPrim : PrimOp >-> Simple.
+End CommonNotation.
+
+
+Module ConcreteVars.
+Definition r : Ident := 0.
+Definition x : Ident := 1.
+Definition y : Ident := 2.
+Definition t : Ident := 3.
+Definition i : Ident := 4.
+Definition u : Ident := 5.
+Definition v : Ident := 6.
+End ConcreteVars.

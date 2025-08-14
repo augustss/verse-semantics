@@ -9,16 +9,14 @@ Definition Wrapping := (Ident * Ident * Ident)%type.
 
 Inductive Expr : Type :=
 
-  (*  variables *)
-  | Var : Ident -> Expr
+
   | DefineV : Ident -> Expr 
+  | ES : Simple -> Expr
 
   (* basic cases *)
-  | Lit : LitType -> Expr
-  | EPrim : PrimOp -> Expr
   | Array : list Expr -> Expr
   | Truth : Expr -> Expr
-  | ApplyD : Expr -> Expr -> Expr
+  | ApplyD : Simple -> Simple -> Expr
 
   (* create a new scope *)
   | Block : Expr -> Expr 
@@ -51,28 +49,15 @@ Inductive Expr : Type :=
   | For2 : Expr -> Expr -> Expr 
 .
 
-Definition isConst (e : Expr) : bool := 
-  match e with 
-  | Lit _ => true
-  | EPrim _ => true
-  | _ => false 
-  end.
 
-Definition isAtomic (e : Expr) : bool := 
-  match e with 
-  | Var _ => true
-  | Lit _ => true
-  | EPrim _ => true
-  | _ => false
-  end.
 
 Fixpoint isValue (e : mini.Expr) : bool := 
   match e with 
-  | Var _ => true
+  | ES _ => true
   | Fun _ _ _ _ _ _ => true
   | Array es => List.forallb isValue es
   | Truth e => isValue e
-  | _ => isConst e
+  | _ => false
   end.  
 
 (* smart constructor for sequences. Right associate and drop irrelevant parts. *)
@@ -94,11 +79,12 @@ Definition eSeq (e : list Expr) := List.fold_right mkSeq eUnit e.
 Fixpoint I (e : Expr) : Scope.t := 
   match e with 
   | Block e => Scope.empty
+  | ES _ => Scope.empty
 
   | DefineV i => Scope.singleton i
   | Array es => Scope_concatMap I es
   | Truth e => I e
-  | ApplyD e1 e2 => Scope.union (I e1) (I e2)
+  | ApplyD e1 e2 => Scope.empty
   | Unify e1 e2 => Scope.union (I e1) (I e2)
   | Seq e1 e2 => Scope.union (I e1) (I e2)
   | Guard e1 _ => I e1
@@ -112,43 +98,11 @@ Fixpoint I (e : Expr) : Scope.t :=
                      *)
   end.
 
-Fixpoint fvs (e : Expr) : Scope.t := 
-  let fvs_blk e := Scope.diff (fvs e) (I e) in
-  let fvs_wrp hw (s:Scope.t) : Scope.t := match hw with 
-                      | (h, x, y) => Scope.add h (Scope.remove y s)
-                      end in
-  let fvs e := match e with 
-               | Block e => fvs_blk e
-               | Var i => Scope.singleton i
-               | Array es => Scope_concatMap fvs es
-               | Truth e => fvs e
-               | ApplyD e1 e2 => Scope.union (fvs e1)(fvs e2)
-               | Unify e1 e2 =>  Scope.union (fvs e1)(fvs e2)
-               | Choice e1 e2 => Scope.union (fvs_blk e1) (fvs_blk e2)
-               | Seq e1 e2 =>  Scope.union (fvs e1)(fvs e2)
-               | One e => fvs_blk e 
-               | All e => fvs_blk e 
-               | If3 e1 e2 e3 => 
-                   (* binders of e1 scope over e2 *)
-                   Scope.union
-                     (Scope.diff (Scope.union (fvs e1) (fvs_blk e2)) (I e1))
-                     (fvs e3)
-               | Fun q eff i e1 hw e2 => 
-                   (* binders of e1 scope over the body e2 *)
-                   let binders := (Scope.add i (I e1)) in
-                   Scope.union (fvs e1) (Scope.diff (fvs_wrp hw (fvs_blk e2)) binders)
-               | Range e => fvs_blk e 
-               | Check _ e => fvs_blk e 
-               | ESome e => fvs_blk e 
-               | Guard e1 e2 => Scope.union (fvs e1)(fvs_blk e2)
-               | _ => Scope.empty
-      end in (fvs e).
-
-
-
 Declare Scope mini_expr_scope.
 
 Module MiniNotation. 
+
+Export common.CommonNotation.
 
 Infix ":>:" := mini.Seq (at level 70, right associativity) : mini_expr_scope.
 Infix ":=:" := mini.Unify (at level 65, left associativity) : mini_expr_scope.
@@ -158,26 +112,18 @@ Notation "e |>< eff >" := (mini.Check eff e) : mini_expr_scope.
 Notation "{ e }" := (mini.Block e) : mini_expr_scope.
 Notation "∃ x"   := (mini.DefineV x) (at level 25, only printing) : mini_expr_scope.
 
-Coercion Int : nat >-> LitType.
-Coercion Lit : LitType >-> Expr.
-Coercion Var : Ident >-> Expr.
-Coercion EPrim : PrimOp >-> Expr.
+Coercion ES : Simple >-> Expr.
 
 End MiniNotation.
 
 (* These tests are from densem.versetest *)
 Module Test.
 
+Import common.ConcreteVars.
 Import List.ListNotations.
 Import MiniNotation.
 Open Scope list_scope.
 Open Scope mini_expr_scope.
-
-Definition r : Ident := 0.
-Definition x : Ident := 1.
-Definition y : Ident := 2.
-Definition t : Ident := 3.
-Definition i : Ident := 4.
 
 Definition t1 : Expr := 2.
 
@@ -187,7 +133,7 @@ Definition t1 : Expr := 2.
 *) 
 Definition t2 := { DefineV x :>: (Var x :=: 1) :>: Var x }.
 
-Definition t3 : Expr := Array [ Lit (Int 1) ; Lit (Int 2) ; Lit (Int 3) ].
+Definition t3 : Expr := Array [ ES 1 ; ES 2 ; ES 3 ].
 Definition t4 := Array [].
 
 (* NOTE: missing wrapping 
@@ -203,7 +149,8 @@ DEN: 3
 *)
 Definition t5 :=
   { DefineV t :>:  t :=: IsInt :>:
-    (Fun Closed Succeeds i (DefineV x :>: x) (x, t, i) (Add :@: x)) :@: 2 }.
+    DefineV u :>:  u :=: Fun Closed Succeeds i (DefineV x :>: x) (x, t, i) (Add :@: x) :>: 
+    u :@: 2 }.
 
 (* missing type test *)
 Definition t6 := 
@@ -226,7 +173,7 @@ Definition t8 :=
 (* (2,2) *)
 Definition t9 := 
   DefineV y :>: DefineV i :>: i :=: y :>:
-    DefineV x :>: y :=: 2 :>: Array [ Var i ; Var x ].
+    DefineV x :>: y :=: 2 :>: Array [ ES (Var i) ; ES (Var x) ].
 
 (* 
 if (x = 1) then 1 | 2 else 0;
