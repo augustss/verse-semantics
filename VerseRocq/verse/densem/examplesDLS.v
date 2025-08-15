@@ -34,9 +34,13 @@ Open Scope set_scope.
 
 Import DLS.
 
-(* other distinguished variable (not equal to r) *)
-Definition x := mini.Test.x.
-Definition y := mini.Test.y.
+
+Import common.ConcreteVars.
+Notation x4 := (S (S (S (S x)))).
+Notation x3 := (S (S (S x))).
+Notation x2 := (S (S x)).
+Notation x1 := (S x). 
+
 
 
 (* This is a bit of a hack. For examples, we special case the variables
@@ -408,43 +412,12 @@ Qed.
 
 (* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
 (* Tim wants this to fail. *)
-Lemma IF1a_Tim1_should_fail : 
-  IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
-  [r ≈ ⟨ Int 1 ⟩; ∅].
-unfold IF_TIM1.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-repeat rewrite hide_arg; auto.
-set_simpl.
-auto.
-Qed.
-
-
-(* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
-(* Tim wants this to fail. *)
-Lemma IF1a_Tim2_should_fail : 
-  IF_TIM2 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
-  [∅; r ≈ ⟨ Int 1 ⟩].
-unfold IF_TIM2.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-rewrite constrain_conflict1; try done.
-rewrite Setminus_disjoint1; try done.
-set_simpl.
-rewrite constrain_same3.
-rewrite hide_arg; auto.
-Qed.
-
-
-(* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
-(* Tim wants this to fail. *)
 Lemma IF1a_Tim3_should_and_does_fail : 
-  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ])
+  IF r ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ])
                [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
   [∅; ∅].
-unfold IF_TIM3.
+Proof.
+unfold IF.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
@@ -453,11 +426,8 @@ set_simpl.
 auto.
 Qed.
 
-
-
-
 Lemma IF2a_Tim3 : 
-  IF_TIM3 (Scope.empty) 
+  IF r (Scope.empty) 
     ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 3⟩) ]) 
          [(r ≈ x ≈ ⟨Int 2⟩) ] [r ≈ ⟨ Int 77⟩] = 
   [
@@ -465,7 +435,7 @@ Lemma IF2a_Tim3 :
    Total_set - ((x ≈ ⟨ Int 1 ⟩) ∪ x ≈ ⟨ Int 3 ⟩) ∩ r ≈ ⟨ Int 77 ⟩
    ].
    (* last one is the same as x <> 1/3 , r = 77 *)
-unfold IF_TIM3.
+unfold IF.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
@@ -475,33 +445,15 @@ replace ((x ≈ ⟨ Int 3 ⟩) ∩ r ≈ x ≈ ⟨ Int 2 ⟩) with (∅ : ENV). 
 auto.
 Admitted.
 
-Lemma IF2b_Tim2 : 
-  IF_TIM2 (Scope.empty) 
-    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
-         [(r ≈ x ≈ ⟨Int 0⟩) ] [r ≈ ⟨ Int 77⟩] = 
-  [r ≈ x ≈ ⟨ Int 0 ⟩;
-   ∅; 
-   Total_set - ((x ≈ ⟨ Int 0 ⟩) ∪ x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 77 ⟩].
-   (* last one is the same as x <> 0/1 , r = 77 *)
-unfold IF_TIM2.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-rewrite Setminus_disjoint1; try done.
-rewrite constrain_same3.
-rewrite constrain_conflict1; try done.
-Qed.
-
-
 Lemma IF2b_Tim3 : 
-  IF_TIM3 (Scope.empty) 
+  IF r (Scope.empty) 
     ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
          [(r ≈ x ≈ ⟨Int 0⟩) ] [r ≈ ⟨ Int 77⟩] = 
   [r ≈ x ≈ ⟨ Int 0 ⟩;
    ∅; 
    Total_set - ((x ≈ ⟨ Int 0 ⟩) ∪ x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 77 ⟩].
    (* last one is the same as x <> 0/1 , r = 77 *)
-unfold IF_TIM3.
+unfold IF.
 cbn.
 set_simpl.
 repeat rewrite hide_result; auto.
@@ -517,10 +469,10 @@ Lemma hide_equiv_arg k x r (NE : x <> r) :
 Admitted.
 
 Lemma IF3_Tim3 : 
-  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫)] [] = 
+  IF r ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫)] [] = 
   [r ≈ ⟨Int 1⟩; ∅].
 Proof.
-  unfold IF_TIM3.
+  unfold IF.
   cbn.
   set_simpl.
   repeat rewrite hide_result; auto.
@@ -531,10 +483,10 @@ Qed.
 
 
 Lemma IF4_Tim3 : 
-  IF_TIM3 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫);(r ≈ ⟪x⟫)] [] = 
+  IF r ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫);(r ≈ ⟪x⟫)] [] = 
   [r ≈ ⟨Int 1⟩; r ≈ ⟨ Int 1 ⟩; ∅; ∅].
 Proof.
-  unfold IF_TIM3.
+  unfold IF.
   cbn.
   set_simpl.
   repeat rewrite hide_result; auto.
@@ -544,86 +496,17 @@ Qed.
 
 
 Lemma IF5b_Tim3 : 
-  IF_TIM3 Scope.empty ([ (r ≈ x ≈ ⟨Int 7⟩) ; (r ≈ y ≈ ⟨Int 3⟩) ]) [(r ≈ ⟪x⟫)] [] = 
+  IF r Scope.empty ([ (r ≈ x ≈ ⟨Int 7⟩) ; (r ≈ y ≈ ⟨Int 3⟩) ]) [(r ≈ ⟪x⟫)] [] = 
   [(x ≈ ⟨ Int 7 ⟩) ∩ r ≈ ⟪ x ⟫; 
    (y ≈ ⟨ Int 3 ⟩) - (x ≈ ⟨ Int 7 ⟩) ∩ r ≈ ⟪ x ⟫].
 Proof.
-  unfold IF_TIM3.
+  unfold IF.
   cbn.
   set_simpl.
   repeat rewrite hide_result; auto.
   f_equal.
   replace (r ≈ y ≈ ⟨ Int 3 ⟩ \ ⟅ r ⟆) with (y ≈ ⟨ Int 3 ⟩). 2: admit.
 Admitted.
-
-
-
-
-(* if (x: = (0|1)) { x } else {fail} == [ 1 ] *)
-(* Tim wants this to fail. *)
-Lemma IF_Tim1_choice_communicate : 
-  IF_TIM1 ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ ⟪x⟫) ] [] = 
-  [ Total_set ].
-unfold IF_TIM1.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-set_simpl.
-admit.
-Admitted.
-
-
-
-Lemma IF_Tim_choice_no_bind : 
-  IF_TIM2 (Scope.empty) 
-    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
-         [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
-  [∅; r ≈ x ≈ ⟨ Int 1 ⟩].
-unfold IF_TIM2.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-rewrite constrain_conflict1; try done.
-rewrite Setminus_disjoint1; try done.
-rewrite constrain_same3.
-auto.
-Qed.
-
-
-Lemma IF_Tim_choice_ifxx : 
-  IF_TIM2 (Scope.empty) 
-    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
-         [(r ≈ ⟪x⟫) ] [] = 
-  [r ≈ x ≈ ⟨Int 0⟩; r ≈ x ≈ ⟨ Int 1 ⟩].
-Proof.
-unfold IF_TIM2.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-f_equal. admit.
-rewrite Setminus_disjoint1; try done.
-f_equal.
-admit.
-Admitted.
-
-
-
-Lemma IF_Tim_choice_ifxxscoped : 
-  IF_TIM2 ⟅x⟆ 
-    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
-         [(r ≈ ⟪x⟫) ] [] = 
-  [r ≈ ⟨Int 0⟩; r ≈ ⟨ Int 1 ⟩].
-Proof.
-unfold IF_TIM2.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-f_equal. admit.
-rewrite Setminus_disjoint1; try done.
-f_equal.
-admit.
-Admitted.
-
 
 
 (* if (x: = 0 | x = 1) { x = 1 } else {fail} == [ 1 ] *)
@@ -651,6 +534,52 @@ set_simpl.
 repeat rewrite hide_result; auto.
 rewrite constrain_conflict2; try done.
 Qed.
+
+
+(* ----------------------------- FOR --------------------------- *)
+
+Lemma Go_example1 : 
+  make_FOR_Choices x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 1⟩
+                        ; x ≈ ⟨Int 2⟩ ∩ r ≈ ⟨Int 2⟩] 
+                        [ r ≈ ⟪ x ⟫ ] 
+  = [[x1 ≈ ⟨mkTup [Int 1]⟩; Total_set - (r ≈ ⟨ Int 1 ⟩) ∩ x1 ≈ ⟨ mkTup [] ⟩];
+     [x2 ≈ ⟨mkTup [Int 2]⟩; Total_set - (r ≈ ⟨ Int 2 ⟩) ∩ x2 ≈ ⟨ mkTup [] ⟩]].
+Proof.
+cbn.
+set_simpl.
+replace (Scope.union ⟅ x ⟆ Scope.empty) with ⟅ x ⟆. 2: admit.
+rewrite constrain_eq_hide_two. done.
+rewrite constrain_eq_hide_two. done.
+rewrite (hide_intersection_r ⟅ x ⟆ _ (r ≈ ⟨ Int _ ⟩)).
+unfold hidden. rewrite constrain_eq_hide_diff. done. auto.
+rewrite (hide_intersection_r ⟅ x ⟆ _ (r ≈ ⟨ Int _ ⟩)).
+unfold hidden. rewrite constrain_eq_hide_diff. done. auto.
+set_simpl.
+f_equal.
+f_equal.
+2: f_equal; f_equal.
+replace (fun ρ : env => mkTup [ρ r]) with 
+  (compose (fun x => mkTup [x]) (fun ρ => ρ r)). 2: auto.
+Admitted.
+
+Opaque Dom.append.
+
+(* for {x:=1|2}{x} == [ r=<1,2> ] *)
+Example For_example1 :
+  FOR x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 1⟩
+                         ; x ≈ ⟨Int 2⟩ ∩ r ≈⟨Int 2⟩] 
+                         [ r ≈ ⟪ x ⟫ ] 
+                       = [ r ≈ ⟨mkTup[Int 1;Int 2]⟩ ].
+Proof.
+  unfold FOR.
+  rewrite Go_example1.
+  cbn.
+  set_simpl.
+  unfold mkTup.
+Admitted.
+
+
+(* ------------------------------------ ONE --------------------- *)
 
 
 Lemma extract_xisk k : 
@@ -736,9 +665,7 @@ Ed[ (e1; r=<>) | r=0 ] = [ hide_r D1 \cap {{r=<>}} | D1 <- E[e1] ] ++ [ {{r=0}} 
 Lemma part2 e1 : E ( (e1 :>: r :=: mini.Array []) :|: r :=: 0) = 
                 List.map (fun D1 => hide ⟅r⟆ D1 ∩ (r ≈ ⟨mkTup []⟩)) (E e1) ++ [ r ≈ ⟨Int 0⟩ ].
 rewrite E_Choice. 
-rewrite part1.
-cbn. set_simpl. done.
-Qed.
+Admitted.
 
 (* ---- y = one{ (e1; z=<>) | z=0}@z -------------
   Ed[ y = one{(e1; z=<>) | z=0}@z ]
@@ -820,7 +747,7 @@ Proof.
 
 Lemma part3 e1 : 
     E (y :=: mini.One ((e1 :>: r :=: mini.Array []) :|: r :=: 0)) = 
-      let GOOD := UNIONLIST (List.map hide_r (E e1)) in
+      let GOOD := UNIONLIST (List.map (hide ⟅ r ⟆) (E e1)) in
       [ (GOOD ∩ (r ≈ y ≈ ⟨mkTup []⟩)) 
       ∪ ((Total_set - GOOD) ∩ (r ≈ y ≈ ⟨Int 0⟩)) ].
 Proof.
@@ -832,10 +759,10 @@ Proof.
   unfold UNIFY.
   list_simpl.
 
-  remember (fmap (fun D2 : ENV => hide_r D2 ∩ r ≈ ⟨ mkTup [] ⟩) (E e1) ++ [r ≈ ⟨ Int 0 ⟩]) as Δs.
+  remember (List.map (fun D2 : ENV => (hide ⟅r⟆) D2 ∩ r ≈ ⟨ mkTup [] ⟩) (E e1) ++ [r ≈ ⟨ Int 0 ⟩]) as Δs.
 
   rewrite <- if3_rhoIn.
-  remember (UNIONLIST (List.map hide_r (E e1))) as GOOD.
+  remember (UNIONLIST (List.map (hide ⟅r⟆) (E e1))) as GOOD.
 
   unfold ONE.
 
@@ -845,9 +772,10 @@ Proof.
   unfold In. 
   remember  (List.map (consistent_results ρ) Δs) as S.
   rewrite HeqΔs in HeqS.
-  unfold fmap, Functor_list in HeqS.
   rewrite List.map_app in HeqS.
   rewrite List.map_map in HeqS.
+Admitted.
+(*
   rewrite list_map_singleton in HeqS.
   unfold consistent_results in HeqS.
   rewrite extract_one in HeqS.
@@ -962,9 +890,10 @@ Proof.
      unfold Head.
      set_simpl.
 Admitted.
+*)
 
 (* y = one{ (e1; z=<>) | z=0}@z; (y=⟨⟩; e2) | (y=0; e3)  
-  [ GOOD ⋂ {{y=<>}} ⋂ D | D ∈ Ed[e2] ] ++
+  [ GODD ⋂ {{y=<>}} ⋂ D | D ∈ Ed[e2] ] ++
   [ BAD ⋂ {{y=0}}   ⋂ D  | D ∈ Ed[e3] ]
 *)
 
@@ -1083,5 +1012,7 @@ where
   GOOD :: ENV = UNIONLIST (map hide(r) Ed[e1])
 
 *)
+
+
 
 End D_LS_Theory.

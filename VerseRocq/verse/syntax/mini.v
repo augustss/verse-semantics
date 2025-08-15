@@ -98,6 +98,45 @@ Fixpoint I (e : Expr) : Scope.t :=
                      *)
   end.
 
+
+Fixpoint fvs (e : Expr) : Scope.t := 
+  let fvs_blk e := Scope.diff (fvs e) (I e) in
+  let fvs_wrp hw (s:Scope.t) : Scope.t := match hw with 
+                      | (h, x, y) => Scope.add h (Scope.remove y s)
+                      end in
+  let fvs e := match e with 
+               | Block e => fvs_blk e
+               | ES a => common.fvs a
+               | Array es => Scope_concatMap fvs es
+               | Truth e => fvs e
+               | ApplyD e1 e2 => Scope.union (common.fvs e1)(common.fvs e2)
+               | Unify e1 e2 =>  Scope.union (fvs e1)(fvs e2)
+               | Choice e1 e2 => Scope.union (fvs_blk e1) (fvs_blk e2)
+               | Seq e1 e2 =>  Scope.union (fvs e1)(fvs e2)
+               | One e => fvs_blk e 
+               | All e => fvs_blk e 
+               | If3 e1 e2 e3 => 
+                   (* binders of e1 scope over e2 *)
+                   Scope.union
+                     (Scope.diff (Scope.union (fvs e1) (fvs_blk e2)) (I e1))
+                     (fvs e3)
+               | Fun q eff i e1 hw e2 => 
+                   (* binders of e1 scope over the body e2 *)
+                   let binders := (Scope.add i (I e1)) in
+                   Scope.union (fvs e1) (Scope.diff (fvs_wrp hw (fvs_blk e2)) binders)
+               | Range e => fvs_blk e 
+               | Check _ e => fvs_blk e 
+               | ESome e => fvs_blk e 
+               | Guard e1 e2 => Scope.union (fvs e1)(fvs_blk e2)
+               | _ => Scope.empty
+      end in (fvs e).
+
+Definition fresh (t : Expr) : Ident := 
+  match Scope.max_elt (fvs t) with 
+  | Some i => 1 + i
+  | None => 0
+  end.
+
 Declare Scope mini_expr_scope.
 
 Module MiniNotation. 

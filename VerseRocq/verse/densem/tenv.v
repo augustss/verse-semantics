@@ -35,6 +35,13 @@ Definition extend : Ident -> value -> env -> env :=
   fun x v rho => 
     fun y => if Nat.eqb x y then v else rho y.
 
+
+(* Overwrite the environment ρ1 with definitions for xs using corresponding 
+   values in ρ2.
+*)
+Definition extend_env (xs : Scope.t) (ρ2 : env) (ρ1 : env) :=
+  List.fold_right (fun x ρ' => Env.extend x (ρ2 x) ρ') ρ1 (Scope.elements xs).
+
 End Env.
 
 Declare Scope env_scope.
@@ -87,3 +94,18 @@ Proof.
   rewrite PeanoNat.Nat.eqb_eq in E. subst. auto.
   eauto.
 Qed.
+
+
+Lemma extend_env_spec1 xs ρ2 ρ1 : 
+  forall x, ~(Scope.In x xs) -> (Env.extend_env xs ρ2 ρ1) x = ρ1 x.
+Admitted.
+Lemma extend_env_spec2 xs ρ2 ρ1 : 
+  forall x, Scope.In x xs -> (Env.extend_env xs ρ2 ρ1) x = ρ2 x.
+Proof.
+  unfold Env.extend_env.
+  intro x.
+  remember (Scope.elements xs) as l.
+  move: l Heql.
+  induction l. cbn. 
+Admitted.
+

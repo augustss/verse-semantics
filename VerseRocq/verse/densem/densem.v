@@ -1,12 +1,6 @@
 Require Import Imports.
 
-From Stdlib Require Lists.List.
-From Stdlib Require Import Classes.EquivDec.
 Import ssreflect.
-
-From Stdlib Require Import Logic.PropExtensionality.
-From Stdlib Require Import Logic.FunctionalExtensionality.
-From Stdlib Require Import Sets.Classical_sets.
 
 Require Import syntax.common.
 Require syntax.mini.
@@ -362,17 +356,6 @@ Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
 
 (* ----------- semantics of FOR ----------- *)
 
-(* ε⟦for(t0){t1}⟧ix := [{ρ | ρ ← ρs, ρ.i=ρ.i0+ρ.i1+ …, ρ.x=ρ.x0+ρ.x1+ …} 
-                    | ρs ← C0 * C1 * … * Cm ] – {i0, x0, i1, x1,… xm}
-
-       where m  := length(A)
-             Cn  := [      A  [n] ] * [{ρ | ρ ∈ ρs,   ρ.in=tuple{ρ.k}, ρ.xn=tuple{ρ.z}} | ρs ← ε⟦t1⟧kz ] – BVS(t0,t1)⋃{j,k,y,z} +
-                    [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.in=tuple{   }, ρ.xn=tuple{   }}                ]
-                    where 
-				A := ε⟦t0⟧jy 
-				A' = A — (BVS(t0)⋃{j,y})
-in j k xn y z ∉ BVS(t0,t1)
-*)
 
 (* Destination passing version, with fixed r.
 
@@ -395,82 +378,54 @@ tuples together to get the final result.
 
 *)
 
-(* z is fresh for A , B
-   a is BVS A
-   b is BVS B
- *)
+(* Helper function: make the Cs
 
-(* Make the Cs *)
-Fixpoint go rn a b (A B : list ENV) : list (list ENV) := 
+NOTE:  
+   rn is a fresh identifier for A , B
+   a  is BVS A
+   b  is BVS B
+
+*)
+Fixpoint make_FOR_Choices rn a b (A B : list ENV) : list (list ENV) := 
     match A with 
     | An :: rest => 
         (* ([ A[n] - r ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
                            | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) *)
-        ([ An \ ⟅r⟆ ] * ((rn ≈ fun ρ => mkTup [ρ r]) ∩* B)
-                          [\] ⟅ r ⟆ [\] a [\] b)  ::
+        [(([ An \ ⟅r⟆ ] * (((rn ≈ fun ρ => mkTup [ρ r]) ∩* B)
+                          [\] ⟅ r ⟆)) [\] a [\] b)  ++
 
         (* [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ] *)
-        ([ Total_set - (An \ a) ] * [ rn ≈ ⟨ mkTup [] ⟩ ])
-        :: go (1+rn) a b rest B
+        ([ Total_set - (An \ a) ] * [ rn ≈ ⟨ mkTup [] ⟩ ])]
+        ++ (make_FOR_Choices (1+rn) a b rest B)
     | [] => []
     end.
 
-Import common.ConcreteVars.
-Notation x4 := (S (S (S (S x)))).
-Notation x3 := (S (S (S x))).
-Notation x2 := (S (S x)).
-Notation x1 := (S x). 
 
-
-
-Lemma Go_example1 : 
-  go x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∪ r ≈ ⟨Int 1⟩
-                        ; x ≈ ⟨Int 2⟩ ∪ r ≈ ⟨Int 2⟩] 
-                        [ r ≈ ⟪ x ⟫ ] 
-  = [[x1 ≈ ⟨mkTup [Int 1]⟩;∅];
-     [x2 ≈ ⟨mkTup [Int 2]⟩;∅]].
-Proof.
-cbn.
-set_simpl.
-Admitted.
-
+(* Semantics of FOR *)
+(* z must be fresh for A and B *)
 Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV := 
 
-  (* produces the constraint on r and the tensor product of all Ci in Cs *)
-  let helper zi Cs :=
-    let step arg Ci : Ident * Scope.t * (env -> value) * list ENV := 
+  let Cs := make_FOR_Choices z a b A B in
+
+  (* produces the constraint on r and the tensor product of all Ci in Cs
+     rs = {r0, r1, .. rm}
+     c  = fun ρ => ρ.r0+ρ.r1+ …   # NOTE: + is tuple concatentation
+     CC = C0 * C1 * … * Cm
+  *)
+  let step arg Ci : Ident * Scope.t * (env -> value) * list ENV := 
       match arg with 
         | (zk, zs, f, acc) =>
-          (1+zk, Scope.add zk zs, fun ρ => snoc (f ρ) (ρ zk), acc * Ci) end in 
-    List.fold_left step Cs (zi, Scope.empty, fun ρ => mkTup [], [Total_set]) in
+          (1+zk, Scope.add zk zs, fun ρ => append (f ρ) (ρ zk), acc * Ci) end in
+  let '(_,rs,c,CC) :=  
+    List.fold_left step Cs (z, Scope.empty, fun ρ => mkTup [], [Total_set]) in
 
-  
-  let '(_,rs,c,CC) := helper z (go z a b A B) in
-  (ρ <- CC  ;;
-  [ (r ≈ c) ∩ ρ ] ) [\] rs.
+  (*  [ {ρ | ρ ← ρs, ρ.r=c ρ } | ρs ← CC ] – rs *)
+  ( ρ <- CC  ;; [ (r ≈ c) ∩ ρ ]) [\] rs.
 
-
-
-
-(* for {x:=1|2}{x} == [ r=<1,2> ] *)
-Example For_example1 :
-  FOR x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∪ r ≈ ⟨Int 1⟩
-                         ; x ≈ ⟨Int 2⟩ ∪ r ≈⟨Int 2⟩] 
-                         [ r ≈ ⟪ x ⟫ ] 
-                       = [ r ≈ ⟨mkTup[Int 1;Int 2]⟩ ].
-Proof.
-  unfold FOR.
-  rewrite Go_example1.
-  cbn.
-  set_simpl.
-  unfold mkTup.
-Abort.
 
 (* ----------- D-LS semantics -------------- *)
 (* destination passing style semantics for miniverse, with 
    a list of sets of env denotation. *)
-
-
 
 Module DLS. 
 
@@ -478,6 +433,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 
   let B (e : mini.Expr) :list ENV := 
     Δ <- E e ;; [Δ \ mini.I e] 
+    (* [ Δ \ mini.I e | Δ <- E e ] *)
   in
   let V (e : mini.Expr) : list (P (value * ENV)) := 
     Δ <- B e ;; [extract r Δ] 
@@ -496,7 +452,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
       E e1 * E e2
 
   | mini.Seq e1 e2 => 
-      (E e1 [\] Scope.singleton r) * (E e2) 
+      (E e1 [\] ⟅r⟆) * (E e2) 
 
   | mini.ApplyD e1 e2 => 
       APP r e1 e2
@@ -510,7 +466,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
     let ys := mini.I t1     in  (* BVS t1 *)
     let x  := mini.fresh t0 in
     let y  := mini.fresh t1 in 
-    let z  := 1 + List.list_max ([x; y] ++ xs ++ ys)   in  (* fresh for everything *)
+    let z  := 1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)   in  (* z is fresh for everything *)
 
     FOR z xs ys (E t0) (E t1)
 
@@ -541,9 +497,23 @@ Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
 End DLS.
 
 (* ----------- S-LS semantics Fig. 16 -------------- *)
-(* essential verse,  *)
+(* This is the essential verse semantics, where the definition is 
+   parameterized by an input and output variables. *)
 
 Module SLS.
+
+(* ε⟦for(t0){t1}⟧ix := [{ρ | ρ ← ρs, ρ.i=ρ.i0+ρ.i1+ …, ρ.x=ρ.x0+ρ.x1+ …} 
+                    | ρs ← C0 * C1 * … * Cm ] – {i0, x0, i1, x1,… xm}
+
+       where m  := length(A)
+             Cn  := [      A  [n] ] * [{ρ | ρ ∈ ρs,   ρ.in=tuple{ρ.k}, ρ.xn=tuple{ρ.z}} | ρs ← ε⟦t1⟧kz ] – BVS(t0,t1)⋃{j,k,y,z} +
+                    [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.in=tuple{   }, ρ.xn=tuple{   }}                ]
+                    where 
+				A := ε⟦t0⟧jy 
+				A' = A — (BVS(t0)⋃{j,y})
+in j k xn y z ∉ BVS(t0,t1)
+*)
+
 
 
 Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV := 
@@ -602,61 +572,64 @@ Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV :=
 
     IF y xs (S j t0 y) (B u t1 v) (B u t2 v)
 
+(* TODO:
+
   | essential.For2 t0 t1 => []
 
-(*
-
-  (* TODO: should this be E or B? *)
   | essential.All a => 
       [ ALL (E a) \ essential.I a ] 
 
   | essential.One a => 
       [ ONE (E a) \ essential.I a ]
 *)
+
   (* TODO: functions *)
 
   | _ => [ ] 
   end.
 
-
-
 End SLS.
 
-
+(* ----------- D-SLS semantics ------------------ *)
+(* This is a destination passing style verse semantics, using sets of lists of sets. *)
 
 Module DSLS.
 
 
-Fixpoint E (u : Ident) (e : mini.Expr) (v : Ident) : P (list ENV) := 
+Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
-(*
-  let B (e : mini.Expr) :list ENV := 
-    Δ <- E e ;; [Δ \ mini.I e] 
+  let B (e : mini.Expr) : P (list ENV) := 
+    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉
+    (* with set comprehension:
+       { Δs \ I e | Δs ∈ E e } 
+     *)
   in
-  let V (e : mini.Expr) : list (P (value * ENV)) := 
-    Δ <- B e ;; [extract r Δ] 
-  in
-*)
 
   match e with 
 
-(*
-  | mini.DefineV _ => [ Total_set ]
-*)
-  | mini.Var _ => [ r ≈ evalA e ]
-  | mini.Lit _ => [ r ≈ evalA e ]
-  | mini.EPrim _ => [ r ≈ evalA e ]
-  | mini.Array es =>  [ r ≈ evalA e ]
+  | mini.DefineV _ => ⌈ [ Total_set ] ⌉
 
-  | mini.Fail => []  
+  | mini.ES a => 
+      ρ ⭅ Total_set ;;
+      ⌈ [ ⌈ (r |-> evalA a ρ, ρ) ⌉ ] ⌉
 
-  | mini.Choice e1 e2 => B e1 ++ B e2
-*)
-  | mini.Unify (mini.Var r) e2 => 
-      E e1 * E e2
+  | mini.Fail => ⌈ [] ⌉
+
+  | mini.Choice e1 e2 => 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ D1 ++ D2 ⌉
+
+  | mini.Unify e1 e2 => 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ D1 * D2 ⌉
 
   | mini.Seq e1 e2 => 
-      (E e1 [\] Scope.singleton r) * (E e2) 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
+
 (*
   | mini.ApplyD e1 e2 => APP e1 e2
 
@@ -677,9 +650,7 @@ Fixpoint E (u : Ident) (e : mini.Expr) (v : Ident) : P (list ENV) :=
   | _ => ∅
   end.
 
-Definition  B (e : mini.Expr) :list ENV := 
-    Δ <- E e ;; [Δ \ mini.I e]. 
-
+End DSLS.
 
 
 (* ------------------------------------------------------ *)
@@ -697,10 +668,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   match e with 
   | mini.DefineV _ => [ Total_set ]
 
-  | mini.Var _ => [ r ≈ evalA e ]
-  | mini.Lit _ => [ r ≈ evalA e ]
-  | mini.EPrim _ => [ r ≈ evalA e ]
-  | mini.Array es =>  [ r ≈ evalA e ]
+  | mini.ES a => [ r ≈ evalA a ]
 
   | mini.Fail => [ ]
 
@@ -710,7 +678,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 
   | mini.Unify e1 e2 => E e1 * E e2  (* missing from fig *)
 
-  | mini.ApplyD e1 e2 => APP e1 e2
+(*   | mini.ApplyD e1 e2 => APP e1 e2 TODO *) 
 
   | mini.If3 e1 e2 e3 => 
       IF_SPJ (mini.I e1) (E e1) (E e2) (E e3)
@@ -729,61 +697,10 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 
 End DLS_Dodgy.
 
-(* ----------- dest passing style - sets of lists of ENV -------------- *)
-(* TODO: complete this definition *)
-Module DSLS.
 
-Definition map2 {A B} : (A -> B) -> (P (list A)) -> (P (list B)) := 
-  fun f => Sets.map (List.map f).
+Definition X (e : mini.Expr) (ρ : env) : ENV := 
+    hide_env (mini.I e) ρ.
 
-Fixpoint E (e : mini.Expr) : P (list ENV) := 
-
-  let B (e : mini.Expr) : P (list ENV)  :=
-    Sets.map (hide_list (mini.I e)) (E e) 
-  in
-
-  match e with 
-
-  | mini.Block e =>  B e
-
-  | mini.Var _ => ⌈[ r ≈ evalA e ]⌉
-  | mini.Lit _ => ⌈[ r ≈ evalA e ]⌉
-  | mini.EPrim _ => ⌈[ r ≈ evalA e ]⌉
-  | mini.Array es =>  ⌈[ r ≈ evalA e ]⌉
-
-  | mini.DefineV _ => ⌈ SUCCEED ⌉
-
-  | mini.ApplyD e1 e2 => ⌈ APP e1 e2 ⌉
-
-  | mini.Fail => ⌈ FAIL ⌉
-
-  | mini.Choice e1 e2 => 
-      D1 ⭅ E e1 ;;
-      D2 ⭅ E e2 ;;
-      ⌈ CHOICE D1 D2 ⌉
-
-  | mini.Seq e1 e2 => 
-      D1 ⭅ E e1 ;;
-      D2 ⭅ E e2 ;;
-      ⌈ SEQ D1 D2 ⌉
-
-
-  | mini.Unify e1 e2 => 
-      D1 ⭅ E e1 ;;
-      D2 ⭅ E e2 ;;
-      ⌈ D1 * D2 ⌉
-(* 
-  | mini.All e1 => (fun x => [ ALL x ]) <$> (B e1)
-*)
-  | mini.If3 e1 e2 e3 => fun _ => False
-      
-  | mini.Fun q eff i e1 (y,h,x) e2 => fun _ => False
-
-  | _ => fun _ => False
-
-  end.
-
-End DSLS.
 
 (* ------------------------------------------------------ *)
 (* ------  Fig 15 E-LV (uses dodgy union) --------------- *)
@@ -798,6 +715,7 @@ Definition ALL (VS : list VAL) : VAL :=
 
 Fixpoint E (e :mini.Expr) (ρ:env) : list VAL := 
   
+
   let B (e : mini.Expr) (ρ : env) : list VAL  := 
     DODGY_UNIONS
       (ρ' ⭅ X e ρ ;; ⌈ E e ρ' ⌉) 
@@ -813,14 +731,13 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
 
   | mini.Block e =>  B e ρ
 
-  | mini.Var _ => [ ⌈evalA e ρ⌉ ]
-  | mini.Lit _ => [ ⌈evalA e ρ⌉ ] 
-  | mini.EPrim _ => [ ⌈evalA e ρ⌉ ] 
-  | mini.Array es =>  [ ⌈evalA e ρ⌉ ] 
+  | mini.ES a => [ ⌈evalA a ρ⌉ ]
 
   | mini.DefineV _ => [ ⌈ mkTup[] ⌉ ]
 
-  | mini.ApplyD e1 e2 => apply (evalA e1 ρ) (evalA e2 ρ)
+  | mini.ApplyD e1 e2 => 
+      List.map (fun x => ⌈x⌉)
+        (apply (evalA e1 ρ) (evalA e2 ρ))
 
   | mini.Fail => [ ∅ ]
 
@@ -872,6 +789,9 @@ Definition apply (f : value) (v : value) : list value :=
 
 Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) := 
   
+  let X (e : mini.Expr) (ρ : env) : ENV := 
+    hide_env (mini.I e) ρ in
+
   let B (e : mini.Expr) (ρ : env) : P (list value)  := 
       (ρ' ⭅ X e ρ ;; E e ρ' ) 
     in
@@ -880,10 +800,7 @@ Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) :=
 
   | mini.Block e =>  B e ρ
 
-  | mini.Var _ => ⌈[ evalA e ρ ]⌉
-  | mini.Lit _ => ⌈[ evalA e ρ ]⌉
-  | mini.EPrim _ => ⌈[ evalA e ρ ]⌉
-  | mini.Array es =>  ⌈[ evalA e ρ ]⌉
+  | mini.ES a => ⌈[ evalA a ρ ]⌉
 
   | mini.DefineV _ => ⌈[  mkTup[]  ]⌉
 
@@ -981,10 +898,7 @@ Fixpoint E_e (rho : env) (e : mini.Expr) : P (list VAL) :=
   match e with 
   | mini.Block e => D rho e
 
-  | mini.Var _ =>   ⌈[ ⌈evalA e rho⌉ ]⌉
-  | mini.Lit _ =>   ⌈[ ⌈evalA e rho⌉ ]⌉
-  | mini.EPrim _ => ⌈[ ⌈evalA e rho⌉ ]⌉                     
-  | mini.Array _ => ⌈[ ⌈evalA e rho⌉ ]⌉
+  | mini.ES a =>   ⌈[ ⌈evalA a rho⌉ ]⌉
 
   | mini.DefineV x => ⌈[ ⌈mkTup nil⌉ ]⌉
 

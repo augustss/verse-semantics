@@ -84,6 +84,23 @@ Definition snoc (tup : value) (v: value) : value :=
   | _ => tup
   end.
 
+Definition append (tup1 : value) (tup2: value) : value := 
+  match tup1, tup2 with 
+  | Fun hs1, Fun hs2 =>
+      let k := List.length hs1 in 
+      let incr k x := 
+        match x with 
+        | [(Int i, v)]  => [(Int (i+k), v)]
+        | _ => x
+        end in
+      let gs2 := List.map (incr k) hs2 in
+      Fun (hs1 ++ gs2)
+  | _ , _ => Int 0
+  end.
+
+Eval cbn in (append (mkTup [Int 1]) (mkTup [Int 2])).
+
+
 Lemma snoc_mktup xs v : 
   snoc (mkTup xs) v = mkTup (xs ++ [v]).
 Admitted.

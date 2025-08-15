@@ -1,6 +1,6 @@
 (* This module defines various operations on sets of environments and lemmas about their equality.
 
-   Δ := x ≈ ⟨ k ⟩ | x ≉ ⟨ k ⟩    -- k :: value           constrain equal, non equal
+   Δ := x ≈ ⟨ k ⟩ | x ≉ ⟨ k ⟩    -- k :: value       constrain equal, non equal
      |  x ≈ ⟪ f ⟫ | x ≉ ⟪ f ⟫    -- f :: rho -> value
      |  ρ \\ xs                  -- hide (generalize single variable to set)
      |  Δ \ xs                   -- hide (generalize variables)
@@ -12,13 +12,18 @@
 
    and adds several simplification rewrites to the 'set_simpl' database.
 
+  By default, the notations are not inscope, but can be made accessible using 
+
+      Import envSetNotation.
+
  *)
 
 
 Require Import Imports.
 
+From Stdlib Require Export Program.Basics.
+
 From Stdlib Require Lists.List.
-From Stdlib Require Import Classes.EquivDec.
 
 Require Import syntax.common.
 Require Import PFun.
@@ -56,8 +61,7 @@ Definition hide_env (xs : Scope.t) (ρ : env) : ENV :=
 (* "Envs Drop Variables" Δ \ xs *)
 Definition hide (xs : Scope.t) (Δ : ENV) : ENV := 
   fun ρ => exists ρ', (ρ' ∈ Δ) /\ forall x, ~ (Scope.In x xs) -> (ρ x = ρ' x).
-(* equivalent to: ⨃(map (hide_env xs) Δ)  *)
-
+(* NB: this is equivalent to: ⨃(map (hide_env xs) Δ)  *)
 
 (* Generalize all of the xs to be anything *)
 (* Envss Drop Variables Δs [\] xs *)
@@ -66,12 +70,6 @@ Definition hide_list (xs : Scope.t) (Δs : list ENV) : list ENV :=
 
 Definition envs_difference (Δ1 : ENV) (xs : Scope.t) (Δ2 : ENV) : ENV :=
   Δ1 - (hide xs Δ2).
-
-(* The set of all environments that extend rho with arbitrary 
-   definitions for the variables declared in e. 
-Definition X (e : mini.Expr) (ρ : env) : ENV :=
-  hide_env (mini.I e) ρ.
-*)
 
 (* A scope is unconstrained in a set *)
 Definition hidden (xs: Scope.t) (Δ : ENV) : Prop := 
@@ -93,7 +91,7 @@ End envSetNotation.
 
 Import envSetNotation.
 
-(* ---- theory about hide/constrain/If3 ------------------  *)
+(* ---- theory about hide ------------------  *)
 
 Lemma hide_equiv xs Δ: 
   Δ \ xs = ⨃ (Sets.map (hide_env xs) Δ).
@@ -143,6 +141,9 @@ Proof.
     exists ρ. split. eapply hide_env_self.
     intros x Ih. rewrite h; eauto.
 Qed.
+
+#[export] Hint Rewrite hide_env_hidden : set_simpl.
+
   
 (* This is the same as "hidden xs (ρ \ xs)" *)
 Lemma hide_hidden xs Δ : ((Δ \ xs) \ xs) = (Δ \ xs).
@@ -162,6 +163,8 @@ Proof.
   + intros h. exists ρ0. split; eauto. eapply hide_env_self.
 Qed.
 
+#[export] Hint Rewrite hide_hidden  : set_simpl.
+
 Lemma hide_union x s1 s2 : hide x (s1 ∪ s2) = hide x s1 ∪ hide x s2.
 Proof.
   rewrite hide_equiv.
@@ -170,7 +173,7 @@ Proof.
   done.
 Qed.
 
-#[export] Hint Rewrite hide_env_hidden hide_hidden hide_union : set_simpl.
+#[export] Hint Rewrite hide_union : set_simpl.
 
 (* This is the same as "hidden xs ∅" *)
 Lemma hide_empty (xs : Scope.t) : ∅ \ xs = ∅.
@@ -195,10 +198,20 @@ Qed.
 Lemma hide_env_nothing ρ : ρ \\ Scope.empty = ⌈ ρ ⌉. 
 Proof.
   set_ext ρ'. unfold hide. split.
-  intros h. 
-  have NI: ~ Scope.In (common.ConcreteVars.r) Scope.empty. admit.
-  specialize (h common.ConcreteVars.r NI). 
-Admitted.
+  - intros h. 
+    unfold hide_env in h.
+    unfold Ensembles.In in h.
+    have EQ: ρ' = ρ.
+    { extensionality x.
+      rewrite h. intro h1. inv h1. done. }
+    rewrite EQ. eapply in_singleton.
+  - intro h. inversion h. 
+    unfold Ensembles.In, hide_env.
+    intros x NI. done.
+Qed.
+
+#[export] Hint Rewrite hide_env_nothing : set_simpl.
+
  
 Lemma hide_nothing (s : ENV) : s \ Scope.empty = s.
 rewrite hide_equiv.
@@ -213,7 +226,8 @@ Qed.
 #[export] Hint Rewrite hide_nothing : set_simpl.
 
 
-Lemma hide_intersect x s1 s2 : hide x (s1 ∩ s2) ⊆ ((hide x s1) ∩ (hide x s2)).
+Lemma hide_intersect xs s1 s2 : 
+  hide xs (s1 ∩ s2) ⊆ ((hide xs s1) ∩ (hide xs s2)).
 Proof. 
   intros ρ [_ [[ρ' h11] h2]].
   unfold hide.
@@ -226,27 +240,36 @@ Lemma hide_intersection_l xs s1 s2 :
   hidden xs s1 ->
   hide xs (s1 ∩ s2) = s1 ∩ hide xs s2.
 Proof.
-  intro h.
-  rewrite hide_equiv.
-  set_simpl.
+  intro h. 
+  unfold hidden in h.
   set_ext ρ.
   split.
-  + intro r.
-    inv r. rename x into ρ0. move: H => [h1 h2].
-    inv h1. rename x into ρ1. move: H => [h3 h4].
-    unfold hidden in h. rewrite <- h in *.
-    subst.
-Admitted.
+  - intro r.
+    apply hide_intersect in r.
+    rewrite h in r.
+    done.
+  - intro r. inv r.
+    destruct H0 as [ρ' [h1 h2]].
+    exists ρ'. 
+    split; auto. split; auto.
+    rewrite <- h.
+    unfold hide.
+    exists ρ. split. auto.
+    intros x NI. rewrite h2; auto.
+Qed.
 
 Lemma hide_intersection_r xs s1 s2 :
   hidden xs s2 ->
   hide xs (s1 ∩ s2) = hide xs s1 ∩ s2.
 Proof.
-Admitted.
-
+  intro h.
+  rewrite Intersection_commutes.
+  rewrite hide_intersection_l. done.
+  rewrite Intersection_commutes. done.
+Qed.
 
 Lemma hide_constrain x k xs :
-  ~ (Scope.In x xs) ->
+  ~ Scope.In x xs ->
   (x ≈ ⟨ k ⟩) \ xs = (x ≈ ⟨ k ⟩).
 intro h.
 unfold hide.
@@ -258,6 +281,104 @@ split.
 + unfold constrain_eq. intros h1.
   exists ρ. split; eauto.
 Qed.
+
+
+(*
+(* Overwrite the environment ρ1 with definitions for xs using corresponding 
+   values in ρ2.
+*)
+Definition extend_env (xs : Scope.t) (ρ2 : env) (ρ1 : env) :=
+  List.fold_right (fun x ρ' => Env.extend x (ρ2 x) ρ') ρ1 (Scope.elements xs).
+Lemma extend_env_spec1 xs ρ2 ρ1 : 
+  forall x, ~(Scope.In x xs) -> (extend_env xs ρ2 ρ1) x = ρ1 x.
+Admitted.
+Lemma extend_env_spec2 xs ρ2 ρ1 : 
+  forall x, Scope.In x xs -> (extend_env xs ρ2 ρ1) x = ρ2 x.
+Proof.
+  unfold extend_env.
+  intro x.
+  remember (Scope.elements xs) as l.
+  move: l Heql.
+  induction l. cbn. 
+Admitted.
+*)
+
+Lemma hide_hide xs ys s : 
+  ((s \ xs ) \ ys) = (s \ Scope.union xs ys).
+Proof.
+  set_ext ρ.
+  unfold hide.
+  unfoldIn.
+  split.
+  - intros h. set_crunch.
+    exists x0. split; auto.
+    intros y yNI.
+    rewrite <- H1. 
+    rewrite <- H0. done.
+    rewrite Scope.union_spec in yNI. tauto.
+    rewrite Scope.union_spec in yNI. tauto.
+  - intro h. set_crunch.
+    exists (Env.extend_env xs ρ x). split.
+    exists x. split. auto.
+    intro y. specialize (H0 y).
+    rewrite Scope.union_spec in H0. 
+    intro h1.
+    rewrite extend_env_spec1; auto. 
+    intro y. specialize (H0 y).
+    rewrite Scope.union_spec in H0. 
+    intro h1.
+    move: (Scope.mem_spec xs y) => MEM.
+    destruct (Scope.mem y xs) eqn:DEC.
+    rewrite extend_env_spec2; auto. tauto.
+    have h2: ~(Scope.In y xs).  intro h3. apply MEM in h3. done.
+    rewrite extend_env_spec1; auto. 
+    rewrite H0.
+    tauto.
+    done.
+Qed.
+
+Lemma hide_constrain_eq_constant x (f : env -> value) xs : 
+   (forall ρ1 ρ2, f ρ1 = f ρ2) -> 
+   ~ Scope.In x xs ->
+   (x ≈ f \ xs) = (x ≈ f).
+intros h NI.
+unfold hide.
+set_ext ρ1. unfoldIn.
+split.
++ intros h1. set_crunch. rename x0 into ρ2.
+  unfold constrain_eq in *.
+  unfoldIn. set_crunch.
+  rewrite H0; auto.
+  rewrite H2; auto.
++ unfold constrain_eq. intros h1.
+  exists ρ1. split; eauto.
+Qed.
+
+
+
+Lemma hide_constrain_eq x (f : env -> value) xs : 
+   (forall ρ1 ρ2, (forall y, ~Scope.In y xs -> ρ1 y = ρ2 y) -> f ρ1 = f ρ2) -> 
+   ~(Scope.In x xs) ->
+   (x ≈ f \ xs) = (x ≈ f).
+Proof.
+  intros h NI.
+  unfold hide.
+  set_ext ρ1. unfoldIn.
+  split.
+  + intros h1. set_crunch. rename x0 into ρ2.
+    unfold constrain_eq in *.
+    unfoldIn. set_crunch.
+    rewrite H0; auto.
+    rewrite H2; auto.
+    symmetry.
+    eapply h.
+    eapply H0.
+  + unfold constrain_eq. intros h1.
+    exists ρ1. split; eauto.
+Qed.
+
+
+
 
 (* ------------------------------------------------------ *)
 
@@ -357,3 +478,18 @@ split.
 Admitted.
 
 
+
+Lemma intersect_lookup (g : value -> value)(f : env -> value)  (y r : Ident) : 
+  y <> r ->
+  ((y ≈ compose g (fun ρ : env => ρ r)) ∩ r ≈ f) = 
+  ((y ≈ compose g f) ∩ r ≈ f).
+Proof.
+  intro h.
+  unfold compose.
+  unfold constrain_eq.
+  set_ext ρ.
+  repeat rewrite in_intersection.
+  unfold Ensembles.In.
+  split. intros [h1 h2]. rewrite h1. rewrite h2. done.
+  intros [h1 h2]. rewrite h1. rewrite h2. done.
+Qed.
