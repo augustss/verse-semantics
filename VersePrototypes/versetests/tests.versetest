@@ -513,6 +513,6 @@ testeq("run-exitop4", fail){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
 #######################################################################
 #                             DenSem Tests
 #######################################################################
-testds("tup0.tim", timDensem$){ (1,2) }    { "[{{r=<1,2>}}]" }
-testds("tup0.els", elsDensem$){ (1,2) }    { "[res=<1,2>]"   }
-testds("tup0.dls", dlsDensem$){ (1,2) }    { "[{<1,2>}]"     }
+testds("tup0.tim", tim$, pass){ (1,2) }    { "[{{r=<1,2>}}]" }
+testds("tup0.els", els$, pass){ (1,2) }    { "[res=<1,2>]"   }
+testds("tup0.dls", dls$, pass){ (1,2) }    { "[{<1,2>}]"     }

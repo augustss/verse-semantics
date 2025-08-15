@@ -166,7 +166,7 @@ the conversion to `:core`.
 The repl implements multiple denotational semantics. Each of the semantics
 correlate to a figure built in the `verse-spec.pdf`. The commands are:
 
-- `:densem`: Implements the Essential Verse `E-LS` (jeff: could be out of date?)
+- `:densem`: Implements the Essential Verse `E-LS`? (jeff: could be out of date?)
 - `:dls-densem`: Implements the `D-LS`  semantics (Fig. 18)
 - `:tim-densem`: Implements the Tim's denotational semantics.
 

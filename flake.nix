@@ -65,6 +65,7 @@
           hPkgs.implicit-hie            # auto generate LSP hie.yaml file from cabal
           hPkgs.cabal-install
           hPkgs.lhs2tex                 # for latex make
+          hPkgs.fast-tags               # for TAGS files
           texEnv                        # the latex packages
           stack-wrapped
           pkgs.zlib # External C library needed by some Haskell packages

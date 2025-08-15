@@ -48,7 +48,8 @@ import ENVDesugar (envDesugar)
 import Epic.Print hiding ( (<>) )
 import Data.Generics.Uniplate.Data( universeBi )
 
-import Text.Megaparsec( getSourcePos, unPos, sepBy1, try, anySingleBut, manyTill, single)
+import Text.Megaparsec( getSourcePos, unPos, sepBy1, try, anySingleBut, manyTill, single, choice)
+import Text.Megaparsec.Char (string)
 import Text.Megaparsec.Pos (mkPos, SourcePos(..))
 -- import Control.Applicative.Combinators (between)
 
@@ -144,9 +145,9 @@ runTests test_flags
   * We try to keep the data pipeline for the tester the same as much as
     possible. Thus we define a parser ('pTestDenSem') to parse a "testds" call
     in a .versetest file. This parser decides the correct semantic function to
-    run in 'pTestType' which propogates this information to 'pTestInfo'. Each
-    semantic function is built into the tester and suffixed with a '$' to make
-    it obvious that its built in.
+    run in 'pTestRunner' which propogates this information to the 'testRunner'
+    field of 'pTestInfo'. Each semantic function is built into the tester and
+    suffixed with a '$' to make it obvious that its built in.
 
   * A 'TestDenSem info e1 e2' is morally the same as a 'TestEvalEq info e1 e2',
     only instead of evaluating e1, then e2 and checking for equivalence with
@@ -156,7 +157,7 @@ runTests test_flags
     For example:
 
     -- in tests.versetest
-    testds("DS1", timDensem$){ (1,2) }     { "[{{r=<1,2>}}]" }
+    testds("DS1", tim$){ (1,2) }     { "[{{r=<1,2>}}]" }
 
     becomes 'TestDenSem tinfo e1 e2' where:
       tinfo = TestInfo {..., testType = Tim_DS }
@@ -165,7 +166,7 @@ runTests test_flags
 
   * We diverge from the normal data pipeline in 'checkResults' by calling
     'evalDenSem' and then construct the output exactly like the normal
-    pipeline. 'evalDenSem' is responsible for dispatching the TestType to the
+    pipeline. 'evalDenSem' is responsible for dispatching the TestRunner to the
     semantic functions for each denotational semantics.
 -}
 
@@ -193,15 +194,28 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     { testMName    :: !(Maybe String)
     , testLocStart :: !Loc
     , testLocEnd   :: !Loc
-    , testType     :: !TestType                      -- Default test type
+    , testType     :: !TestType           -- Default test type
+    , testRunner   :: !(Maybe TestRunner) -- the function the test data is passed to, Nothing is evaluation/verification
     , testStatus   :: !TestStatus
-    , testTimSkip  :: !TimSkip                       -- skip (or error code) when converting to Tim's format
+    , testTimSkip  :: !TimSkip            -- skip (or error code) when converting to Tim's format
     }
     deriving (Show)
 
+data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS   -- denotational semantic functions
+
+instance Show TestRunner where
+  -- INFO: Ideally these should correspond to their respective commands in the
+  -- repl just without the : prefix, i.e., dls-densem here is :dls-densem in the
+  -- repl. But this would require changing the frontend parser to handle the
+  -- '-'. Instead, we treat these like builtins with a $.
+  show Tim_DS = "tim$"
+  show DLS_DS = "dls$"
+  show SLS_DS = "sls$"
+  show ELS_DS = "els$"
+
+
 data TestType =
   TPass | TFail | TLoop                -- Expected behaviour
-  | Tim_DS | DLS_DS | SLS_DS | ELS_DS  -- den-sem functions
   deriving (Eq)
 
 data TimSkip = TimNone | TimSkip String | TimError String
@@ -211,14 +225,6 @@ instance Show TestType where
   show TPass = "pass"
   show TFail = "fail"
   show TLoop = "loop"
-  -- INFO: Ideally these should correspond to their respective commands in the
-  -- repl just without the : prefix, i.e., dls-densem here is :dls-densem in the
-  -- repl. But this would require changing the frontend parser to handle the
-  -- '-'. Instead, we treat these like builtins with a $.
-  show Tim_DS = "timDensem$"
-  show DLS_DS = "dlsDensem$"
-  show SLS_DS = "slsDensem$"
-  show ELS_DS = "elsDensem$"
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
@@ -259,7 +265,6 @@ expectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
       TPass  -> outcome == TO_Equal
       TFail  -> outcome == TO_NotEqual
       TLoop  -> outcome == TO_Abnormal NormExpired
-      _dnsm  -> outcome == TO_Equal
 
 unexpectedTestRes :: TestRes -> Bool
 unexpectedTestRes tr@(TestRes { tr_info = info })
@@ -275,8 +280,6 @@ unexpectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
       TPass -> outcome == TO_NotEqual || outcome == TO_Abnormal NormExpired
       TFail -> outcome == TO_Equal    || outcome == TO_Abnormal NormExpired
       TLoop -> outcome == TO_Equal    || outcome == TO_NotEqual
-      -- for densem's
-      _other -> outcome == TO_NotEqual || outcome == TO_Abnormal NormExpired
 
 outcomeIs :: TestOutcome -> TestRes -> Bool
 outcomeIs oc1 (TestRes { tr_outcome = oc2 }) = oc1 == oc2
@@ -291,10 +294,6 @@ failedButShouldPass :: TestRes -> Bool
 failedButShouldPass (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
        TPass  -> outcome == TO_NotEqual
-       Tim_DS -> outcome == TO_NotEqual
-       DLS_DS -> outcome == TO_NotEqual
-       SLS_DS -> outcome == TO_NotEqual
-       ELS_DS -> outcome == TO_NotEqual
        _      -> False
 
 failedWithLoop :: TestRes -> Bool
@@ -428,7 +427,6 @@ evalDenSem _flags test e = do
   res <- LitStr <$> f e
   return (NormOK, 0, res)
   where
-    typ  = testType $ testInfo test
     flgs = FrontEnd.defaultFlags
     err  = error "runD: exception in evalDenSem"
     go   = runD flgs err . getEssential flgs
@@ -440,12 +438,13 @@ evalDenSem _flags test e = do
     -- because each semantic function returns a different type we convert to
     -- show to normalize the result
     f :: SrcExpr -> IO String
-    f = case typ of
-          Tim_DS   -> fmap (show . den . envDesugar) . go
-          DLS_DS   -> go >=> fmap show . edenSem . edenSemDS . srcExprToExp
-          SLS_DS   -> error "SLS densem not implemented yet. Sorry!"
-          ELS_DS -> go >=> denSemDesugar >=> fmap show . denSem
-          _        -> error $ "evalExpr: Expected densem type, got: " ++ show typ
+    f = case testRunner $ testInfo test of
+          Nothing     -> error $ "evalExpr: Expected densem type, got Nothing with test: " ++ show test
+          Just Tim_DS -> fmap (show . den . envDesugar) . go
+          Just DLS_DS -> go >=> fmap show . edenSem . edenSemDS . srcExprToExp
+          Just SLS_DS -> error "SLS densem not implemented yet. Sorry!"
+          Just ELS_DS -> go >=> denSemDesugar >=> fmap show . denSem
+
 
 type TimTag = Src.Ident
 
@@ -455,6 +454,7 @@ timTestInfo (Ident loc status) = TestInfo
   , testLocStart = loc
   , testLocEnd   = loc
   , testType     = timTestType status
+  , testRunner   = Nothing
   , testStatus   = TS_Normal
   , testTimSkip  = timSkip status
   }
@@ -589,7 +589,6 @@ checkResults tflg test@TestDenSem{} (src1, _core1) (src2, mb_v2)
                         (_, TPass)    -> "success"
                         (_, TFail)    -> "failure"
                         (_, TLoop)    -> "loop   "
-                        (_, densem)   -> show densem
 
                fail_what
                  | failedWithLoop test_res = "timeout"
@@ -597,7 +596,6 @@ checkResults tflg test@TestDenSem{} (src1, _core1) (src2, mb_v2)
                                  TPass -> "failure"
                                  TFail -> "success"
                                  TLoop -> "termination"
-                                 densem -> show densem
 
          ; show_result tflg status outcome test_herald test_res succ_what
            fail_what src1 v1 src2 mb_v2 n_steps
@@ -639,7 +637,6 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
              (_, TPass)    -> "success"
              (_, TFail)    -> "failure"
              (_, TLoop)    -> "loop   "
-             (_, densem)   -> show densem
 
     fail_what
       | failedWithLoop test_res = "timeout"
@@ -647,7 +644,6 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
                                     TPass -> "failure"
                                     TFail -> "success"
                                     TLoop -> "termination" -- this case probably never happens?
-                                    densem -> show densem
 
 
 -- | Equivalence on values (or stuck expressions)
@@ -765,11 +761,13 @@ pTestInfo :: P TestInfo
 pTestInfo = do
   loc   <- getSourcePos
   mname <- optional (pStringLit <* pOp ",")
+  rnner <- try (optional pTestRunner)
   typ   <- pTestType
   stat  <- try (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
   tim   <- (pOp "," *> pTimSkip) OA.<|> pure TimNone
   pure (TestInfo { testMName = mname, testLocStart = loc, testLocEnd = loc
-                 , testType = typ, testStatus = stat, testTimSkip = tim })
+                 , testType = typ, testRunner = rnner, testStatus = stat
+                 , testTimSkip = tim })
 
 pTestType :: P TestType
 pTestType = do
@@ -778,11 +776,15 @@ pTestType = do
     "pass"    -> pure TPass
     "fail"    -> pure TFail
     "loop"    -> pure TLoop
-    "timdensem$" -> pure Tim_DS
-    "slsdensem$" -> pure SLS_DS
-    "dlsdensem$" -> pure DLS_DS
-    "elsdensem$" -> pure ELS_DS
-    _         -> fail "pTestType"
+    d         -> fail $ "pTestType: " ++ d
+
+pTestRunner :: P TestRunner
+pTestRunner = choice
+    [ string "tim$" *> pure Tim_DS
+    , string "sls$" *> pure SLS_DS
+    , string "dls$" *> pure DLS_DS
+    , string "els$" *> pure ELS_DS
+    ] <* pOp ","
 
 pTestStatus :: P TestStatus
 pTestStatus = do
@@ -1082,6 +1084,7 @@ convert TestInfo'{..} = TestInfo { testMName    = testMName'
                                  , testLocStart = locToLoc name testLocStart'
                                  , testLocEnd   = locToLoc name testLocEnd'
                                  , testType     = testType'
+                                 , testRunner   = Nothing
                                  , testStatus   = testStatus'
                                  , testTimSkip  = testTimSkip'
                                  }
@@ -1536,7 +1539,6 @@ displayTest test = do
       retCode TPass | Just err <- bad = err
                     | otherwise = "S00"
       retCode TLoop = "S00"  -- What should this be?
-      retCode _     = ""     -- Don't show anything for densem tests
 
       -- Error code, if this is a bad test.
       bad = case testTimSkip (testInfo test) of
