@@ -223,6 +223,13 @@ Lemma add1_spec :
   forall x, x < largestNum -> List.In (Int x, Int (x+1)) h.
 Admitted.
 
+
+Definition times2 : value := 
+  let h := x <- mostNums ;;
+           [ (Int x, Int (x * 2)) ]
+  in
+    Fun [ h ].
+
 Definition any : value := 
   let h := v <- Value.universe ;; [ (v, v) ] 
   in Fun [ h ].

@@ -18,6 +18,7 @@ Definition Scope_concatMap {A}
 
 Inductive PrimOp : Type :=
 | Add : PrimOp
+| TimesTwo : PrimOp
 | ArrayLen : PrimOp
 | Lt  : PrimOp
 | IsInt : PrimOp

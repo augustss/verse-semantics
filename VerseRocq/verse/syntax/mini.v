@@ -43,6 +43,7 @@ Inductive Expr : Type :=
   | Range : Expr -> Expr
 
   (* iter *)
+  | Iter : Simple -> Simple -> Expr
   | One : Expr -> Expr
   | All : Expr -> Expr
   | If3 : Expr -> Expr -> Expr -> Expr 
@@ -110,6 +111,7 @@ Fixpoint fvs (e : Expr) : Scope.t :=
                | Array es => Scope_concatMap fvs es
                | Truth e => fvs e
                | ApplyD e1 e2 => Scope.union (common.fvs e1)(common.fvs e2)
+               | Iter a1 a2 => Scope.union (common.fvs a1)(common.fvs a2)
                | Unify e1 e2 =>  Scope.union (fvs e1)(fvs e2)
                | Choice e1 e2 => Scope.union (fvs_blk e1) (fvs_blk e2)
                | Seq e1 e2 =>  Scope.union (fvs e1)(fvs e2)

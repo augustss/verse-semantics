@@ -77,6 +77,7 @@ Definition r : Ident := common.ConcreteVars.r.
 Definition evalPrim (p : PrimOp) : value  := 
   match p with 
   | common.Add  => Prim.add1
+  | common.TimesTwo => Prim.times2
   | common.ArrayLen => Prim.arrayLen
   | common.IsInt => Prim.isInt
   | common.IsArr => Prim.isArr
@@ -378,12 +379,18 @@ tuples together to get the final result.
 
 *)
 
-(* Helper function: make the Cs
+(* This helper function constructs Cn by iterating over A.
+
+   To be compositional, this function takes the denotations of t0 and t1 
+   as arguments.
 
 NOTE:  
-   rn is a fresh identifier for A , B
-   a  is BVS A
-   b  is BVS B
+   r  is the result variable
+   rn is a fresh identifier (and all of its successors are fresh)
+   a  is BVS t0
+   b  is BVS t1
+   A  ε⟦t0⟧r
+   B  ε⟦t1⟧r
 
 *)
 Fixpoint make_FOR_Choices rn a b (A B : list ENV) : list (list ENV) := 
@@ -391,18 +398,28 @@ Fixpoint make_FOR_Choices rn a b (A B : list ENV) : list (list ENV) :=
     | An :: rest => 
         (* ([ A[n] - r ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
                            | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) *)
-        [(([ An \ ⟅r⟆ ] * (((rn ≈ fun ρ => mkTup [ρ r]) ∩* B)
-                          [\] ⟅ r ⟆)) [\] a [\] b)  ++
+        [(([ An \ ⟅r⟆ ] * (((rn ≈ fun ρ => mkTup [ρ r]) ∩* B) [\] ⟅ r ⟆))
+                          [\] a [\] b) ++
 
         (* [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ] *)
-        ([ Total_set - (An \ a) ] * [ rn ≈ ⟨ mkTup [] ⟩ ])]
+        ([ Total_set - (An \ a \ ⟅r⟆) ] * [ rn ≈ ⟨ mkTup [] ⟩ ])]
         ++ (make_FOR_Choices (1+rn) a b rest B)
     | [] => []
     end.
 
 
 (* Semantics of FOR *)
-(* z must be fresh for A and B *)
+(* z must be fresh for A and B
+   a  is BVS t0
+   b  is BVS t1
+   A  ε⟦t0⟧r
+   B  ε⟦t1⟧r
+ *)
+
+Notation "Δ \* xs" := (hide_list xs Δ) (at level 70) : list_scope.
+
+
+
 Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV := 
 
   let Cs := make_FOR_Choices z a b A B in
@@ -420,7 +437,7 @@ Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list EN
     List.fold_left step Cs (z, Scope.empty, fun ρ => mkTup [], [Total_set]) in
 
   (*  [ {ρ | ρ ← ρs, ρ.r=c ρ } | ρs ← CC ] – rs *)
-  ( ρ <- CC  ;; [ (r ≈ c) ∩ ρ ]) [\] rs.
+  ( ρ <- CC  ;; [ (r ≈ c) ∩ ρ ]) \* rs.
 
 
 (* ----------- D-LS semantics -------------- *)
@@ -454,8 +471,8 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   | mini.Seq e1 e2 => 
       (E e1 [\] ⟅r⟆) * (E e2) 
 
-  | mini.ApplyD e1 e2 => 
-      APP r e1 e2
+  | mini.ApplyD a1 a2 => 
+      APP r a1 a2
 
   | mini.If3 a b c =>  
     let xs := mini.I a in 
@@ -469,6 +486,12 @@ Fixpoint E (e : mini.Expr) : list ENV :=
     let z  := 1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)   in  (* z is fresh for everything *)
 
     FOR z xs ys (E t0) (E t1)
+
+(*
+  | mini.Iter a1 a2 =>
+      k <- allNats ;;
+      ( r = 
+*)
 
   (* TODO: should this be E or B? *)
   | mini.All a => 
@@ -498,7 +521,7 @@ End DLS.
 
 (* ----------- S-LS semantics Fig. 16 -------------- *)
 (* This is the essential verse semantics, where the definition is 
-   parameterized by an input and output variables. *)
+   parameterized by an input and output variables (u and v). *)
 
 Module SLS.
 
@@ -595,6 +618,9 @@ End SLS.
 
 Module DSLS.
 
+Print enumFrom.
+
+Eval cbn in (enumFrom 1 3).
 
 Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
@@ -630,25 +656,67 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
       D2 ⭅ B e2 ;;
       ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
 
+  (* { List.map (\k. {(v→k,u→k,ρ)}) ks 
+                | ρ in env, k1=A[a1]ρ, k2=A[a2]ρ, ks = enum(k1,k2) } *)
+
+  | mini.Iter a1 a2 =>
+     ρ ⭅ Total_set ;;
+     let v1 := evalA a1 ρ in 
+     let v2 := evalA a2 ρ in
+     match v1 , v2 with 
+     | Int k1 , Int k2 => 
+         let ks := enumFrom k1 k2 in
+         ⌈  List.map (fun k => ⌈(r |-> Int k, ρ)⌉) ks ⌉
+     | _ , _ => ∅
+     end
+      
+
+  | mini.ApplyD a1 a2 => 
+     ρ ⭅ Total_set ;;
+     let v1 := evalA a1 ρ in 
+     let v2 := evalA a2 ρ in
+     let vs := apply v1 v2 in
+     ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉
+
+
+  | mini.If3 t0 t1 t2 =>  
+      T0 ⭅ E t0 ;;
+      T1 ⭅ B t1 ;;
+      T2 ⭅ B t2 ;;
+      let xs := mini.I t0 in 
+      let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
+      ⌈(successes * T1) [\] xs⌉ ∪ 
+      ⌈(Total_set - avoid) ∩* T2⌉
+
 (*
-  | mini.ApplyD e1 e2 => APP e1 e2
-
-  | mini.If3 a b c =>  
-
-    let xs := mini.I a in 
-    IF_TIM1 xs (E a) (B b) (B c)
-
   (* TODO: should this be E or B *)
   | mini.All a => 
       [ ALL (E a) \ mini.I a ] 
 
   | mini.One a => 
       [ ONE (E a) \ mini.I a ]
-
-  (* TODO: functions *)
 *)
+  (* TODO: functions *)
+
   | _ => ∅
   end.
+
+Import common.ConcreteVars.
+
+(* t = (x,y) ; y = x+1 ; t i = i * 2 *)
+Definition example : mini.Expr := 
+  t :=: mini.ES (SArray [Var x ; Var y]) :>: 
+  (y :=: (EPrim common.Add) :@: (common.Var x)) :>:
+  ((Var t :@: Var i) :=: EPrim common.TimesTwo :@: Var i).
+
+Eval cbn in (E example).
+
+(* 
+Lemma example_eval : E example = ∅.
+unfold example.
+cbn.
+set_simpl.
+*)
 
 End DSLS.
 
