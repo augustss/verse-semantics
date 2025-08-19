@@ -1,0 +1,36 @@
+# Some tests for Tim's semantics
+testds("arith1", tim$, pass) {2}                                   {"[{{u=v=2}}]"}
+testds("arith2", tim$, pass) {x:=1; x}                             {"[{{u=v=1}}]"}
+testds("arith3", tim$, pass) {1+2}                                 {"[{{u=v=3}}]"}
+testds("arith3", tim$, pass) {1-2}                                 {"[{{u=v=3}}]"}   # mod 4
+testds("arith4", tim$, pass) {1*2}                                 {"[{{u=v=2}}]"}
+testds("arith5", tim$, pass) {3/2}                                 {"[{{u=v=1}}]"}
+testds("arith6", tim$, pass) {1/0}                                 {"[]"}
+testds("arith7", tim$, pass) {3>3}                                 {"[]"}
+testds("arith8", tim$, pass) {3>2}                                 {"[{{u=v=3}}]"}
+testds("tup1",   tim$, pass) {array{1;2}}                          {"[{{u=v=<1,2>}}]"}
+testds("tup2",   tim$, pass) {array{}}                             {"[{{u=v=<>}}]"}
+testds("choice1",tim$, pass) {1|2}                                 {"[{{u=v=1}},{{u=v=2}}]"}
+testds("choice2",tim$, pass) {(1=2)|2}                             {"[{{u=v=2}}]"}
+testds("exi1",   tim$, pass) {x:any; x>0; x<3}                     {"[{{u=v=1}} U {{u=v=2}}]"}
+testds("if1",    tim$, pass) {if(0){1}else{2}}                     {"[{{u=v=1}}]"}
+testds("if2",    tim$, pass) {if(0=1){1}else{2}}                   {"[{{u=v=2}}]"}
+testds("if3",    tim$, pass) {if(x:=1|2){x}else{3}}                {"[{{u=v=1}}]"}
+testds("if4",    tim$, pass) {if(x:=1|2){x=2}else{3}}              {"[]"}
+testds("if5",    tim$, pass) {if(0){1|2}else{3}}                   {"[{{u=v=1}},{{u=v=2}}]"}
+testds("if6",    tim$, pass) {x:any; if(x=0){1}else{2}}            {"[{{u=v=1}},{{u=v=2}}]"}  # weird, but what Tim wants
+testds("if7",    tim$, pass) {x:any; if(x=0|3){1}else{2}}          {"[{{u=v=1}},{{u=v=1}},{{u=v=2}}]"}  # weird
+testds("apptup1",tim$, pass) {a:=(1,2); a[0]}                      {"[{{u=v=1}}]"}
+testds("apptup2",tim$, pass) {a:=(1,2); a[1]}                      {"[{{u=v=2}}]"}
+testds("apptup3",tim$, pass) {a:=(1,2); a[3]}                      {"[]"}
+testds("apptup4",tim$, pass) {i:nat; a:=(1,2); a[i]}               {"[{{u=v=1}},{{u=v=2}}]"}
+testds("range1", tim$, pass) {a:=(1,2); :a}                        {"[{{u=0,v=1}},{{u=1,v=2}}]"}
+testds("inp1",   tim$, pass) {x->y:=1; (x,y)}                      {"[{{u=v=<1,1>}}]"}
+testds("inp2",   tim$, pass) {x->y:prefix'-'; (x,y)}               {"[{{u=v=<0,0>}} U {{u=v=<1,3>}} U {{u=v=<2,2>}} U {{u=v=<3,1>}}]"}
+testds("for1",   tim$, pass) {for(0|0){1}}                         {"[{{u=v=<1,1>}}]"}
+testds("for2",   tim$, pass) {for(x:=1|2){x}}                      {"[{{u=v=<1,2>}}]"}
+testds("for3",   tim$, pass) {for(x:=1|2; y:=2|3){y-x}}            {"[{{u=v=<1,2,0,1>}}]"}
+##testds("for4",   tim$, pass) {a:=(1,2); for(x:a){x+1}}             {"[{{u=v=<2,3>}}]"}  # SLOW
+##testds("for5",   tim$, pass) {a:=(1,2); for(i->x:a){i}}            {"[{{u=v=<0,1>}}]"}  # SLOW
+testds("for6",   tim$, pass) {for(0|1){:prefix'-'}}                {"[{{u=v=<0,0>}} U {{u=<0,1>,v=<0,3>}} U {{u=v=<0,2>}} U {{v=<0,1>,u=<0,3>}} U {{u=<1,0>,v=<3,0>}} U {{u=<1,1>,v=<3,3>}} U {{u=<1,2>,v=<3,2>}} U {{u=<1,3>,v=<3,1>}} U {{u=v=<2,0>}} U {{u=<2,1>,v=<2,3>}} U {{u=v=<2,2>}} U {{v=<2,1>,u=<2,3>}} U {{v=<1,0>,u=<3,0>}} U {{v=<1,3>,u=<3,1>}} U {{v=<1,2>,u=<3,2>}} U {{v=<1,1>,u=<3,3>}}]"}
+#testds("forx",   tim$, pass) {for{a:nat; f:=(a,a+1); f[i:nat]=i*2; f}} {""} # SLOW

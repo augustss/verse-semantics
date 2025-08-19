@@ -73,19 +73,19 @@ funLt :: PartialFun
 funLt = PF "lt" $ M.fromList [(Tuple [i, j], i) | i <- allInts, j <- allInts, i < j ]
 
 funAdd :: PartialFun
-funAdd = PF "add" $ M.fromList [(Tuple [Int i, Int j], Int (i+j)) | i <- allInts'', j <- allInts'' ]
+funAdd = PF "add" $ M.fromList [(Tuple [Int i, Int j], Int ((i+j) `mod` numInt)) | i <- allInts'', j <- allInts'' ]
 
 funSub :: PartialFun
-funSub = PF "sub" $ M.fromList [(Tuple [Int i, Int j], Int (i-j)) | i <- allInts'', j <- allInts'' ]
+funSub = PF "sub" $ M.fromList [(Tuple [Int i, Int j], Int ((i-j) `mod` numInt)) | i <- allInts'', j <- allInts'' ]
 
 funMul :: PartialFun
-funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int (i*j)) | i <- allInts'', j <- allInts'' ]
+funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int ((i*j) `mod` numInt)) | i <- allInts'', j <- allInts'' ]
 
 funDiv :: PartialFun
 funDiv = PF "div" $ M.fromList [(Tuple [Int i, Int j], Int (i`div`j)) | i <- allInts'', j <- allInts'', j /= 0 ]
 
 allFUNs :: [FUN]
-allFUNs = [ [funNegate], [funInt], [funGt], [funLt], [funAdd], [funMul], [funDiv] ]
+allFUNs = [ [funNegate], [funInt], [funGt], [funLt], [funAdd], [funSub], [funMul], [funDiv] ]
 
 -- Integers and pairs of integers
 allValues :: [Value]

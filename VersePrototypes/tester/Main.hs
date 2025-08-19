@@ -440,11 +440,16 @@ evalDenSem _flags test e = do
     f :: SrcExpr -> IO String
     f = case testRunner $ testInfo test of
           Nothing     -> error $ "evalExpr: Expected densem type, got Nothing with test: " ++ show test
-          Just Tim_DS -> fmap (show . den . envDesugar) . go
-          Just DLS_DS -> go >=> fmap show . edenSem . edenSemDS . srcExprToExp
+          Just Tim_DS -> fmap (showASCII . den . envDesugar) . go
+          Just DLS_DS -> go >=> fmap showASCII . edenSem . edenSemDS . srcExprToExp
           Just SLS_DS -> error "SLS densem not implemented yet. Sorry!"
-          Just ELS_DS -> go >=> denSemDesugar >=> fmap show . denSem
+          Just ELS_DS -> go >=> denSemDesugar >=> fmap showASCII . denSem
 
+-- Hackily replace some Unicode characters
+showASCII :: Show a => a -> String
+showASCII = concatMap ascii . show
+  where ascii '\8746' = "U"
+        ascii c = [c]
 
 type TimTag = Src.Ident
 

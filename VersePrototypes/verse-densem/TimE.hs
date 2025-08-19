@@ -48,6 +48,10 @@ dE (Range t)                        i x =
    [ bigUnion [ y .= Fun fss /\ i .= v /\ x .= r
               | fss <- allFUNs, length fss > n, v <- allValues, Just r <- [applyPF (fss !! n) v]
               ]
+     \/
+     bigUnion [ y .= tt /\ i .= Int (toInteger n) /\ x .= r
+              | tt@(Tuple vs) <- allTuples, n < length vs, let r = vs !! n
+              ]
    | n <- allInts'
    ]
   ) `remv` [j,y]
