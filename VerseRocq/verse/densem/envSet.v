@@ -183,6 +183,28 @@ Qed.
 
 #[export] Hint Rewrite hide_empty : set_simpl.
 
+Lemma hide_list_empty Ds : 
+  Ds [\] Scope.empty = Ds.
+unfold hide_list. 
+Admitted.
+
+#[export] Hint Rewrite hide_list_empty : set_simpl.
+
+
+Lemma hide_empty_id : 
+  (hide Scope.empty) = id.
+Admitted.
+
+Lemma hide_list_empty_id : 
+  (hide_list Scope.empty) = id.
+Admitted.
+
+
+#[export] Hint Rewrite hide_empty_id hide_list_empty_id : set_simpl.
+
+
+
+
 (* This is the same as "hidden xs Total_set" *)
 Lemma Total_set_hide (xs : Scope.t) : Total_set \ xs = Total_set.
 unfold hide. 

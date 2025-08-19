@@ -27,43 +27,6 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
-
-(* ---------------------------------------------- *)
-
-
-
-Ltac set_crunch :=
-    crunch ; repeat match goal with 
-    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
-        let ρ1 := fresh ρ in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ (Sets.seq ?s1 ?s2) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (Sets.map ?f ?s) |- _ ] =>
-        let ρ1 := fresh ρ in
-        move: H => [ρ1 H]; crunch
-    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
-        inv H; crunch
-    | [ H : ⌈?v ⌉ ?ρ |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ∅ |- _] => 
-        inv H
-    | [ H : ?ρ ∈ (fun x => _ ) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (?x ≉ ?k) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ (hide ?s ?S) |- _ ] =>
-        inv H; crunch
-    | [ H : ?ρ ∈ ∅ |- _ ] =>
-        inv H
-      end.
-
 (* --------------------------------------------------- *)
 
 Notation VAL := (P value).
@@ -614,13 +577,62 @@ Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV :=
 End SLS.
 
 (* ----------- D-SLS semantics ------------------ *)
-(* This is a destination passing style verse semantics, using sets of lists of sets. *)
+(* This is a destination passing style verse semantics, using sets of lists of sets.
 
-Module DSLS.
+The advantage of this semantics:
+- infinite lists are not required. All infinite 
+quantification is at the set level. 
+- if does not need to be ordered. We can use the outer set for unordered choices.
 
-Print enumFrom.
+HOWEVER:
+In this "Thin" version, the interpretation of ITER / SIMPLE / APP restricts the 
+individual sets of environments to be as small as possible.
 
-Eval cbn in (enumFrom 1 3).
+This has the disadvantage that 1..2 does not have the same semantics as 1|2.
+The former is { [ {(r=1,rho)} ; {(r=2,rho)} ] | rho in envs }   -- many lists 
+the latter is { [ (r≈1) ; (r≈2) ] }                             -- only a single list
+
+See below for a "thicker" version that gives both terms the latter semantics while 
+still avoiding infinite lists.
+ *)
+
+Module Thin_DSLS.
+
+Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+  ρ ⭅ Total_set ;;
+  match v1 ρ , v2 ρ with 
+     | Int k1 , Int k2 => 
+         let ks := enumFrom k1 k2 in
+         ⌈  List.map (fun k => ⌈(r |-> Int k, ρ)⌉) ks ⌉
+     | _ , _ => ∅
+     end.
+
+Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+   ρ ⭅ Total_set ;;
+   let vs := apply (v1 ρ) (v2 ρ) in
+   ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉.
+
+Definition SIMPLE (a : env -> value) := 
+   ρ ⭅ Total_set ;;
+   ⌈ [ ⌈ (r |-> a ρ, ρ) ⌉ ] ⌉.
+
+
+
+(* This is NOT the same as IF above because it uses ∪ instead of ++ 
+   to join the two branches together. *)
+Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
+  T0 ⭅ TS0 ;;
+  T1 ⭅ TS1 ;;
+  T2 ⭅ TS2 ;;
+  let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
+  ⌈(successes * T1) [\] xs⌉ ∪ 
+  ⌈(Total_set - avoid) ∩* T2⌉.
+
+Definition PFOR (z:Ident) (a b : Scope.t) (TS0 : P (list ENV)) 
+  (TS1 : P (list ENV)) : P (list ENV) := 
+  T0 ⭅ TS0 ;;
+  T1 ⭅ TS1 ;;
+  ⌈ FOR z a b T0 T1 ⌉.
 
 Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
@@ -633,11 +645,11 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 
   match e with 
 
-  | mini.DefineV _ => ⌈ [ Total_set ] ⌉
+  | mini.DefineV _ => 
+      ⌈ [ Total_set ] ⌉
 
   | mini.ES a => 
-      ρ ⭅ Total_set ;;
-      ⌈ [ ⌈ (r |-> evalA a ρ, ρ) ⌉ ] ⌉
+      SIMPLE (evalA a)
 
   | mini.Fail => ⌈ [] ⌉
 
@@ -656,69 +668,264 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
       D2 ⭅ B e2 ;;
       ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
 
-  (* { List.map (\k. {(v→k,u→k,ρ)}) ks 
-                | ρ in env, k1=A[a1]ρ, k2=A[a2]ρ, ks = enum(k1,k2) } *)
-
   | mini.Iter a1 a2 =>
-     ρ ⭅ Total_set ;;
-     let v1 := evalA a1 ρ in 
-     let v2 := evalA a2 ρ in
-     match v1 , v2 with 
-     | Int k1 , Int k2 => 
-         let ks := enumFrom k1 k2 in
-         ⌈  List.map (fun k => ⌈(r |-> Int k, ρ)⌉) ks ⌉
-     | _ , _ => ∅
-     end
-      
+     ITER (evalA a1) (evalA a2)
 
   | mini.ApplyD a1 a2 => 
-     ρ ⭅ Total_set ;;
-     let v1 := evalA a1 ρ in 
-     let v2 := evalA a2 ρ in
-     let vs := apply v1 v2 in
-     ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉
-
+     APP (evalA a1) (evalA a2)
 
   | mini.If3 t0 t1 t2 =>  
-      T0 ⭅ E t0 ;;
-      T1 ⭅ B t1 ;;
-      T2 ⭅ B t2 ;;
-      let xs := mini.I t0 in 
-      let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
-      ⌈(successes * T1) [\] xs⌉ ∪ 
-      ⌈(Total_set - avoid) ∩* T2⌉
+     IF (mini.I t0) (E t0) (B t1) (B t2)
 
-(*
-  (* TODO: should this be E or B *)
-  | mini.All a => 
-      [ ALL (E a) \ mini.I a ] 
+  | mini.All t0 => 
+     D ⭅ B t0 ;;  (* or E ?? *)
+     ⌈ [ ALL D ] ⌉
 
   | mini.One a => 
-      [ ONE (E a) \ mini.I a ]
-*)
+     D ⭅ B a ;;  (* or E ?? *)
+     ⌈ [ ONE D ] ⌉
+
+  | mini.For2 t0 t1 => 
+    let xs := mini.I t0     in  (* BVS t0 *)
+    let ys := mini.I t1     in  (* BVS t1 *)
+    let x  := mini.fresh t0 in
+    let y  := mini.fresh t1 in 
+    let z  := 1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)  
+       in  (* z is fresh for everything *)
+
+    T0 ⭅ E t0 ;;
+    T1 ⭅ E t1 ;;
+    ⌈ FOR z xs ys T0 T1 ⌉
+
   (* TODO: functions *)
 
   | _ => ∅
   end.
 
-Import common.ConcreteVars.
 
-(* t = (x,y) ; y = x+1 ; t i = i * 2 *)
-Definition example : mini.Expr := 
-  t :=: mini.ES (SArray [Var x ; Var y]) :>: 
-  (y :=: (EPrim common.Add) :@: (common.Var x)) :>:
-  ((Var t :@: Var i) :=: EPrim common.TimesTwo :@: Var i).
+End Thin_DSLS.
 
-Eval cbn in (E example).
 
-(* 
-Lemma example_eval : E example = ∅.
-unfold example.
-cbn.
-set_simpl.
+(* ----------- D-SLS semantics ------------------ *)
+
+Module Thicker_DSLS.
+
+(* This is different from the thin version above. *)
+Definition SIMPLE (a : env -> value) : P (list ENV) := 
+   ⌈ [r ≈ a] ⌉.
+
+(* This is different from above. We keep each 
+   env set in the list unconstrained. *)
+Definition ITER (v1 : env -> value) (v2 : env -> value) : 
+  P (list ENV) :=
+  ρ ⭅ Total_set ;;
+  match v1 ρ , v2 ρ with 
+     | Int k1 , Int k2 => 
+         let ks := enumFrom k1 k2 in
+         ⌈  List.map (fun k => (r ≈ ⟨Int k⟩)) ks ⌉
+     | _ , _ => ∅
+     end.
+
+
+(* NB: This version DOESN't work. It includes partial runs that 
+   don't correspond to any evaluation *)
+(*
+  k ⭅ (Total_set : P nat) ;;
+  ⌈ let ks := enumFrom 0 k in 
+    List.map (fun k => (r ≈ ⟨Int k⟩)
+                      ∩ (fun ρ => Value.leb (v1 ρ) (Int k) = true) 
+                      ∩ (fun ρ => Value.leb (Int k) (v2 ρ) = true)) ks ⌉.
 *)
 
-End DSLS.
+(* Slightly thicker application *)
+Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+   ρ ⭅ Total_set ;;
+   let vs := apply (v1 ρ) (v2 ρ) in
+   ⌈ List.map (fun v => r ≈ ⟨v⟩) vs ⌉.
+
+
+(* This is NOT the same as IF above because it uses ∪ instead of ++ 
+   to join the two branches together. *)
+Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
+  T0 ⭅ TS0 ;;
+  T1 ⭅ TS1 ;;
+  T2 ⭅ TS2 ;;
+  let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
+  ⌈(successes * T1) [\] xs⌉ ∪ 
+  ⌈(Total_set - avoid) ∩* T2⌉.
+
+Definition PFOR (z:Ident) (a b : Scope.t) (TS0 : P (list ENV)) 
+  (TS1 : P (list ENV)) : P (list ENV) := 
+  T0 ⭅ TS0 ;;
+  T1 ⭅ TS1 ;;
+  ⌈ FOR z a b T0 T1 ⌉.
+
+
+Fixpoint E (e : mini.Expr) : P (list ENV) := 
+
+  let B (e : mini.Expr) : P (list ENV) := 
+    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉
+    (* with set comprehension:
+       { Δs \ I e | Δs ∈ E e } 
+     *)
+  in
+
+  match e with 
+
+  | mini.DefineV _ => 
+      ⌈ [ Total_set ] ⌉
+
+  | mini.ES a => 
+      SIMPLE (evalA a)
+
+  | mini.Fail => ⌈ [] ⌉
+
+  | mini.Choice e1 e2 => 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ D1 ++ D2 ⌉
+
+  | mini.Unify e1 e2 => 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ D1 * D2 ⌉
+
+  | mini.Seq e1 e2 => 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
+
+  | mini.Iter a1 a2 =>
+     ITER (evalA a1) (evalA a2)
+
+  | mini.ApplyD a1 a2 => 
+     APP (evalA a1) (evalA a2)
+
+  | mini.If3 t0 t1 t2 =>  
+     IF (mini.I t0) (E t0) (B t1) (B t2)
+
+  | mini.All t0 => 
+     D ⭅ B t0 ;;  (* or E ?? *)
+     ⌈ [ ALL D ] ⌉
+
+  | mini.One a => 
+     D ⭅ B a ;;  (* or E ?? *)
+     ⌈ [ ONE D ] ⌉
+
+  | mini.For2 t0 t1 => 
+    let xs := mini.I t0     in  (* BVS t0 *)
+    let ys := mini.I t1     in  (* BVS t1 *)
+    let x  := mini.fresh t0 in
+    let y  := mini.fresh t1 in 
+    let z  := 1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)  
+       in  (* z is fresh for everything *)
+
+    T0 ⭅ E t0 ;;
+    T1 ⭅ E t1 ;;
+    ⌈ FOR z xs ys T0 T1 ⌉
+
+  (* TODO: functions *)
+
+  | _ => ∅
+  end.
+
+
+End Thicker_DSLS.
+
+
+
+(* ------------------------------------------------------ *)
+(* ------  Sets of lists of values ---------------------- *)
+
+Module ESL.
+
+(* Why doesn't a set of list of values or set of list of VAL 
+   work? 
+*)
+
+Definition intersect (xs : list value) (ys : list value) : list value := 
+  x <- xs ;;
+  y <- ys ;;
+  if Value.eqb x y then [x] else [].
+
+Definition seq (xs : list value) (ys : list value) : list value := 
+  match xs with 
+  | [] => [] 
+  | _ => ys
+  end.
+
+Definition ALL (VS : list value) : value := 
+  List.fold_left snoc VS (mkTup []).
+
+Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) := 
+  
+  let X (e : mini.Expr) (ρ : env) : ENV := 
+    hide_env (mini.I e) ρ in
+
+  let B (e : mini.Expr) (ρ : env) : P (list value)  := 
+      (ρ' ⭅ X e ρ ;; E e ρ' ) 
+    in
+
+  match e with 
+
+  | mini.Block e =>  B e ρ
+
+  | mini.ES a => ⌈[ evalA a ρ ]⌉
+
+  | mini.DefineV _ => ⌈[  mkTup[]   ]⌉
+
+  | mini.ApplyD e1 e2 =>
+      ⌈ apply (evalA e1 ρ) (evalA e2 ρ) ⌉
+
+  | mini.Fail =>  ⌈[]⌉
+
+  | mini.Choice e1 e2 =>
+      vs1 ⭅ E e1 ρ ;;
+      vs2 ⭅ E e2 ρ ;;
+      ⌈ vs1 ++ vs2 ⌉
+
+  | mini.Unify e1 e2 =>
+      vs1 ⭅ E e1 ρ ;;
+      vs2 ⭅ E e2 ρ ;;
+      ⌈ intersect vs1 vs2 ⌉
+
+  | mini.Seq e1 e2 => 
+      vs1 ⭅ E e1 ρ ;;
+      vs2 ⭅ E e2 ρ ;;
+      ⌈ seq vs1 vs2 ⌉
+
+  | mini.Iter a1 a2 => 
+      match evalA a1 ρ, evalA a2 ρ with 
+      | Int i, Int j => 
+          let ks := enumFrom i j in
+          ⌈ List.map Int ks ⌉
+      | _,_ => ⌈[]⌉
+      end
+
+  | mini.All e => 
+      vs ⭅ B e ρ ;;
+      ⌈ [ ALL vs ]  ⌉
+
+  (* with nontermination, this is probably not correct *)
+  | mini.One e => 
+      vs ⭅ B e ρ ;;
+      ⌈ match vs with 
+        | [] => [] 
+        | v :: _ => [v] 
+        end ⌉
+
+
+  (* TODO: functions, one *)      
+
+  | mini.If3 t0 t1 t2 => ∅
+
+  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
+  | _ => ∅
+
+  end.
+
+End ESL.
+
 
 
 (* ------------------------------------------------------ *)
@@ -835,64 +1042,6 @@ Fixpoint E (e :mini.Expr) (ρ:env) : list VAL :=
 End ELV.
 
 
-(* ------------------------------------------------------ *)
-(* ------  Sets of lists of values ---------------------- *)
-
-Module ESL.
-
-Definition ALL (VS : list value) : value := 
-  List.fold_left snoc VS (mkTup []).
-
-Definition apply (f : value) (v : value) : list value := 
-  match f with 
-  | Dom.Fun hs => 
-      h <- hs ;;
-      match (PFun.apply_opt _ _ Value.eqb h v) with 
-      | Some w => [w]
-      | None => []
-      end
-  | _ => []
-  end.
-
-
-Fixpoint E (e :mini.Expr) (ρ:env) : P (list value) := 
-  
-  let X (e : mini.Expr) (ρ : env) : ENV := 
-    hide_env (mini.I e) ρ in
-
-  let B (e : mini.Expr) (ρ : env) : P (list value)  := 
-      (ρ' ⭅ X e ρ ;; E e ρ' ) 
-    in
-
-  match e with 
-
-  | mini.Block e =>  B e ρ
-
-  | mini.ES a => ⌈[ evalA a ρ ]⌉
-
-  | mini.DefineV _ => ⌈[  mkTup[]  ]⌉
-
-  | mini.ApplyD e1 e2 => ⌈apply (evalA e1 ρ) (evalA e2 ρ) ⌉
-
-  | mini.Fail =>  ⌈[]⌉
-
-  | mini.Choice e1 e2 => ∅
-
-  | mini.Unify e1 e2 => ∅
-
-  | mini.Seq e1 e2 =>  ∅
-  | mini.All e1 =>  
-      vs ⭅ B e1 ρ ;;
-      ⌈ [ ALL vs ] ⌉
-
-  (* TODO: functions, one *)      
-  | mini.If3 e1 e2 e3 => ∅
-  | mini.Fun q eff i e1 (y,h,x) e2 =>  ∅
-  | _ => ∅
-
-  end.
-
-End ESL.
 
 (* -------------------------------------------------------- *)
 

@@ -62,6 +62,16 @@ cbn. f_equal. Qed.
 #[export] Hint Rewrite @flat_map_map : list_simpl.
 
 
+Lemma flat_map_nil {A B} (xs : list A) : 
+  List.flat_map (fun _ => []) xs = ([] : list B).
+Proof. 
+  induction xs. cbn. done.
+  cbn. done.
+Qed.
+
+#[export] Hint Rewrite @flat_map_nil : list_simpl.
+
+
 Lemma bind_singleton_l {A B} (v:A) (k : A -> list B): 
   List.flat_map k [v] = k v.
 cbn. rewrite app_nil_r. done. Qed.

@@ -42,6 +42,38 @@ Notation x2 := (S (S x)).
 Notation x1 := (S x). 
 
 
+Ltac set_crunch :=
+    crunch ; repeat match goal with 
+    | [ H : ?ρ ∈ (Sets.bind ?ma ?k) |- _ ] =>
+        let ρ1 := fresh ρ in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ (Sets.seq ?s1 ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (Sets.map ?f ?s) |- _ ] =>
+        let ρ1 := fresh ρ in
+        move: H => [ρ1 H]; crunch
+    | [ H : ?ρ ∈ ⌈?v ⌉ |- _ ] =>
+        inv H; crunch
+    | [ H : ⌈?v ⌉ ?ρ |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?s1 ∩ ?s2) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (when ?x ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ∅ |- _] => 
+        inv H
+    | [ H : ?ρ ∈ (fun x => _ ) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (?x ≉ ?k) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ (hide ?s ?S) |- _ ] =>
+        inv H; crunch
+    | [ H : ?ρ ∈ ∅ |- _ ] =>
+        inv H
+      end.
+
 
 (* This is a bit of a hack. For examples, we special case the variables
    x,y, and y when simplifying environment lookups *)
@@ -101,16 +133,18 @@ Admitted.
 Lemma extract_one {v} : 
   extract r (r ≈ ⟨ v ⟩) = ⌈ (v, Total_set) ⌉.
 Proof. 
-eapply set_extensionality. intro ρ.
+eapply set_extensionality. intros [w Δ].
 unfold extract. 
 set_simpl.
 split.
 - move=>h.
+  inv h.
   set_crunch.
-  set_simpl.
+  inv H.
   f_equal.
-- destruct ρ as [w Δ].
-  intro h. inv h.
+  set_simpl.
+  done.
+- intro h. inv h.
   exists (r |-> v).
   set_simpl.
   done.
@@ -909,7 +943,7 @@ Lemma part4 e1 e2 e3 :
   E (y :=: mini.One (e1 :>: r :=: mini.Array [] :|: r :=: 0) 
        :>: 
     ((y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3))) = 
-  let GOOD := UNIONLIST (List.map hide_r (E e1)) in
+  let GOOD := UNIONLIST (List.map (hide ⟅r⟆) (E e1)) in
   let BAD  := Total_set - GOOD in 
   (List.map (fun D => GOOD ∩ (y ≈ ⟨mkTup []⟩) ∩ D) (E e2)) ++
   (List.map (fun D => BAD  ∩ (y ≈ ⟨Int 0⟩) ∩ D) (E e3)).
@@ -921,12 +955,15 @@ Proof.
   repeat rewrite E_Unify.
   repeat rewrite E_Var.
   cbn.
-  remember (UNIONLIST (ListDef.map hide_r (E e1))) as GOOD.
+  remember (UNIONLIST (ListDef.map (hide ⟅r⟆) (E e1))) as GOOD.
   remember (Total_set - GOOD) as BAD.
+  list_simpl.
   repeat rewrite flat_map_map.
   repeat rewrite List.app_nil_r.
-  repeat rewrite List.map_app.
-  repeat rewrite List.map_map.
+  set_simpl.
+Admitted.
+(*
+  unfold List.map.
   f_equal.
   - f_equal.
     apply functional_extensionality. intro D.
@@ -966,6 +1003,7 @@ Proof.
        inv H.
        exists (r |-> mkTup [], ρ). repeat split.
 Admitted.
+*)
 
 
 (* E [if (x=1|x=2) { x } { 0 }] = [ {r=1,x=1} | {r=2,x=2} | {r=0,x<>1,2} *)
@@ -973,21 +1011,26 @@ Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
 
 (** other examples **)
 
-
 (* if(a){b}else{c} <=> if(a){b}else{:false} | if(a){:false}else{c} *)
 Lemma opinionated_if a b c: 
   E(mini.If3 a b c) =  E( mini.If3 a b mini.Fail :|: mini.If3 a mini.Fail c).
 Proof. 
   unfold E. fold E.
-  destruct (try (mini.I a) (E a)) as [success avoid].
-  replace (SEQ [Total_set - avoid] []) with ([] : list ENV).
+  unfold mini.I. fold mini.I.
+  set_simpl. cbn.
+  unfold IF.
+  destruct (try (mini.I a) (E a [\] ⟅ densem.r ⟆)) as [success avoid].
+  replace ([Total_set - avoid] * []) with ([] : list ENV).
   2 : { cbn. auto. } 
   rewrite -> List.app_nil_r.
-  replace (SEQ success ([] [\] mini.I a)) with ([] : list ENV).
-  2: { cbn. unfold SEQ, UNIFY. cbn.
-       admit. } 
-  rewrite -> List.app_nil_l. auto.
-Admitted.
+  replace (success * [] [\] mini.I a) with ([] : list ENV).
+  2: { unfold SEQ, UNIFY. cbn.    
+       unfold hide_list.
+       list_simpl.
+       done. } 
+  list_simpl.
+  f_equal.
+Qed.
 
 
 
@@ -1015,4 +1058,3 @@ where
 
 
 
-End D_LS_Theory.
