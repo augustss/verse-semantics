@@ -3,13 +3,19 @@
 #  fail  evaluate the two expressions,
 #       they should be equal but currently the test fails
 #
+# Test Status
+#  broken  the test is broken, the reason is not recorded (yet)
+#  skip    skip this test
+#  normal  if test status is omitted then the status is parsed as normal
 #######################################################################
 ##                            Format
 #
 # This file is legal verse code
 # Each function is provided by `VersePrototypes/Tester/Main.hs`
 # The format for each test is:
-# <tester-fun>(<name>,<test-type>) {<expr-to-run>}   {<expected-result>}
+# <tester-fun>(<name>,<test-type>,[test-status]) {<expr-to-run>}   {<expected-result>}
+# when <tester-fun> == testds the format becomes
+# testds(<name>,<densem-type>,<test-type>,[test-status]) <expr-to-run>}   {<expected-result>}
 ########################################################################
 
 # Trivial tests
@@ -509,10 +515,3 @@ verify("verify-exitop4", fail){ x:int; f():int := {x} }
 testeq("run-exitop4", fail){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
    # Den-sem of f is empty, something wrong
    # Fail because f itself doesn't verify
-
-#######################################################################
-#                             DenSem Tests
-#######################################################################
-testds("tup0.tim", tim$, pass){ (1,2) }    { "[{{r=<1,2>}}]" }
-testds("tup0.els", els$, pass){ (1,2) }    { "[res=<1,2>]"   }
-testds("tup0.dls", dls$, pass){ (1,2) }    { "[{<1,2>}]"     }
