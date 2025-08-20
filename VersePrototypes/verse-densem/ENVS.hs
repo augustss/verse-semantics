@@ -11,7 +11,6 @@ module ENVS(
   hide, hides,
   bigUnion, bigIntersect,
   extractVar,  -- dubious
-  disj, (&&&), add,
   )where
 import Data.Function(on)
 import Data.List(intercalate, groupBy, sortBy)

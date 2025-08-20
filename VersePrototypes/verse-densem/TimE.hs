@@ -16,7 +16,7 @@ dE (Variable v) i x | isSrcUnderscore v = [ i .=. x ]
                     | otherwise         = [ i .=. x /\ x .=. v ]
 dE (DefineE y t)                    i x = [ x .=. y ] *** dE t i x
 dE (DefineIE y t)                   i x = [ i .=. y ] *** dE t i x
-dE (DefineV _)                      _ _ = [ univ ]
+dE (DefineV y)                      i x = [ i .=. x /\ x .=. y ]
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x ++ dB t1 i x
 dE tt@(Seq t0 t1)                   i x =

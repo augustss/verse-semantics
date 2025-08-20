@@ -140,14 +140,16 @@ runTests test_flags
     'TestType' in 'TestInfo' to track which semantic function to call. This is
     purely a descision to enable the tester to use the semantic functions as
     fast as possible. In general, the tester should know less about the tests,
-    see #77
+    see #77.
 
   * We try to keep the data pipeline for the tester the same as much as
     possible. Thus we define a parser ('pTestDenSem') to parse a "testds" call
     in a .versetest file. This parser decides the correct semantic function to
     run in 'pTestRunner' which propogates this information to the 'testRunner'
-    field of 'pTestInfo'. Each semantic function is built into the tester and
-    suffixed with a '$' to make it obvious that its built in.
+    field of 'pTestInfo'. Each semantic function is built into the tester and is
+    one of this set: { "tim", "dls", "sls", "els" }. We have precisely chosen
+    this format for these symbols so that the 'foo.versetest' files are valid
+    verse.
 
   * A 'TestDenSem info e1 e2' is morally the same as a 'TestEvalEq info e1 e2',
     only instead of evaluating e1, then e2 and checking for equivalence with
@@ -157,7 +159,7 @@ runTests test_flags
     For example:
 
     -- in tests.versetest
-    testds("DS1", tim$){ (1,2) }     { "[{{r=<1,2>}}]" }
+    testds("DS1", tim){ (1,2) }     { "[{{r=<1,2>}}]" }
 
     becomes 'TestDenSem tinfo e1 e2' where:
       tinfo = TestInfo {..., testType = Tim_DS }
@@ -205,13 +207,14 @@ data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS   -- denotational semantic f
 
 instance Show TestRunner where
   -- INFO: Ideally these should correspond to their respective commands in the
-  -- repl just without the : prefix, i.e., dls-densem here is :dls-densem in the
-  -- repl. But this would require changing the frontend parser to handle the
-  -- '-'. Instead, we treat these like builtins with a $.
-  show Tim_DS = "tim$"
-  show DLS_DS = "dls$"
-  show SLS_DS = "sls$"
-  show ELS_DS = "els$"
+  -- repl just without the ':' prefix, i.e., dls-densem here is :dls-densem in
+  -- the repl. But this would require changing the frontend parser to handle the
+  -- '-' which would no longer be valid verse. See Note [Testing densem in the
+  -- tester]
+  show Tim_DS = "tim"
+  show DLS_DS = "dls"
+  show SLS_DS = "sls"
+  show ELS_DS = "els"
 
 
 data TestType =
@@ -786,10 +789,10 @@ pTestType = do
 
 pTestRunner :: P TestRunner
 pTestRunner = choice
-    [ string "tim$" *> pure Tim_DS
-    , string "sls$" *> pure SLS_DS
-    , string "dls$" *> pure DLS_DS
-    , string "els$" *> pure ELS_DS
+    [ string "tim" *> pure Tim_DS
+    , string "sls" *> pure SLS_DS
+    , string "dls" *> pure DLS_DS
+    , string "els" *> pure ELS_DS
     ] <* pOp ","
 
 pTestStatus :: P TestStatus
