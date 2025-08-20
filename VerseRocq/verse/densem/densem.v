@@ -9,10 +9,10 @@ Require Import PFun.
 Require Import structures.Sets.
 Import structures.List.
 
-Require Export densem.Dom.
-Require Export densem.tenv.  (* environments are total *)
+Require Export densem.Dom.    (* values are finite *)
+Require Export densem.tenv.   (* environments are total *)
 Require Export densem.envSet. (* def of ENV , hide, constraints *)
-Require Export densem.squash.
+Require Export densem.squash. (* definitions related to squashing *)
 
 Import mini.MiniNotation.
 Import SetNotations.
@@ -27,12 +27,27 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
+Lemma bind_Total_set {A B} (k : A  -> P B) (S : P B) : 
+  inhabited A ->
+  (forall ρ, k ρ = S) ->
+  (ρ ⭅ Total_set ;; k ρ) = S.
+Proof.
+  intros iA h.
+  set_ext ρ'.
+  rewrite in_bind.
+  split. 
+  + intro h1. set_crunch. rewrite h in H0. done.
+  + intros h1. inv iA. exists X. split; cbv; auto. rewrite h. done.
+Qed.
+
+
 (* --------------------------------------------------- *)
 
 Notation VAL := (P value).
 
 Notation "⟅ r ⟆" := (Scope.singleton r).
-(* distinguished result variable (0) *)
+
+(* For destination-passing style, distinguished result variable (0) *)
 Definition r : Ident := common.ConcreteVars.r.
 
 (* -------------- atomic/simple expressions  ---------------- *)
@@ -45,7 +60,7 @@ Definition evalPrim (p : PrimOp) : value  :=
   | common.IsInt => Prim.isInt
   | common.IsArr => Prim.isArr
   | common.IsFun => Prim.isFun
-  | _ => Dom.Int 0  (* others primitives *)
+  | _ => Dom.Int 0  (* other primitives *)
   end.
 
 (* Evaluation function for simple values. 
@@ -83,14 +98,18 @@ Definition IF2 {A B} (d1 : list (P A)) (d2: list (P B)) : list (P B) :=
   ρ2 <- d2 ;;
   [If2 ρ1 ρ2].
 
-Infix "*" := UNIFY.
 
 Definition UNIONLIST {A} : list (P A) -> (P A) := 
   List.fold_right Union ∅.
 
-(* Intersect a single set with a list *)
+(* Intersect a single set with a list. This is equivalent to 
+   UNIFY [D1] Ds. 
+ *)
 Definition MAP_INTERSECT {A} :=
   fun (Δ1:P A)(Δs:list (P A)) => List.map (fun Δ2 => Δ1 ∩ Δ2) Δs.
+
+(* Sometimes written as *∩* *)
+Infix "*" := UNIFY.
 
 Infix "∩*" := MAP_INTERSECT (at level 70).
 
@@ -596,6 +615,8 @@ See below for a "thicker" version that gives both terms the latter semantics whi
 still avoiding infinite lists.
  *)
 
+Definition envs : ENV := Total_set.
+
 Module Thin_DSLS.
 
 Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
@@ -607,16 +628,47 @@ Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
      | _ , _ => ∅
      end.
 
+(*
+ Thin  application. I don't think this is what we want.
+   For (2,3)[i] gives us  
+   { [(rho,i=0,r=2)] | rho } ∪ { [(rho,i=1,r=3)] | rho } 
+*)
+
 Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
-   ρ ⭅ Total_set ;;
+   ρ ⭅ envs ;;
    let vs := apply (v1 ρ) (v2 ρ) in
    ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉.
 
 Definition SIMPLE (a : env -> value) := 
-   ρ ⭅ Total_set ;;
+   ρ ⭅ envs ;;
    ⌈ [ ⌈ (r |-> a ρ, ρ) ⌉ ] ⌉.
 
 
+
+Import ConcreteVars.
+Example pair_app := mini.ApplyD (common.SArray [common.Lit 2; common.Lit 3]) 
+                       (common.Var x).
+Lemma example_pair_app :
+  APP (fun _ => mkTup [Int 2;Int 3]) (fun rho => rho x) = 
+    (ρ ⭅ envs ;; 
+     if Value.eqb (ρ x) (Int 0) then 
+     ⌈ [ ⌈ (r |-> Int 2, ρ) ⌉ ] ⌉
+     else if Value.eqb (ρ x) (Int 1) then
+     ⌈ [ ⌈ (r |-> Int 3, ρ) ⌉ ] ⌉
+     else ⌈ [] ⌉).
+Proof.    
+  unfold APP.
+  f_equal. extensionality ρ.
+  cbn.
+  destruct (Value.eqb (ρ x) (Int 0)) eqn:h0.
+  + have h1: (Value.eqb (ρ x) (Int 1) = false). admit.
+    rewrite h1.
+    cbn.
+    done.
+  + destruct (Value.eqb (ρ x) (Int 1)) eqn:h1.
+    cbn. done.
+    cbn. done.
+Admitted.
 
 (* This is NOT the same as IF above because it uses ∪ instead of ++ 
    to join the two branches together. *)
@@ -708,9 +760,13 @@ End Thin_DSLS.
 
 (* ----------- D-SLS semantics ------------------ *)
 
+(* This is SLS semantics that makes the most sense. *)
+
+Import ConcreteVars.
+
 Module Thicker_DSLS.
 
-(* This is different from the thin version above. *)
+(* This is similar to the LS semantics. *)
 Definition SIMPLE (a : env -> value) : P (list ENV) := 
    ⌈ [r ≈ a] ⌉.
 
@@ -718,16 +774,17 @@ Definition SIMPLE (a : env -> value) : P (list ENV) :=
    env set in the list unconstrained. *)
 Definition ITER (v1 : env -> value) (v2 : env -> value) : 
   P (list ENV) :=
-  ρ ⭅ Total_set ;;
+  ρ ⭅ envs ;;
   match v1 ρ , v2 ρ with 
      | Int k1 , Int k2 => 
          let ks := enumFrom k1 k2 in
-         ⌈  List.map (fun k => (r ≈ ⟨Int k⟩)) ks ⌉
+         ⌈  List.map (fun k => (r ≈ ⟨Int k⟩) ∩ 
+                            (* make sure each env agrees with ρ on v1 / v2 *)
+                            (fun ρ' => v1 ρ' = Int k1 /\ v2 ρ' = Int k2)) ks ⌉
      | _ , _ => ∅
      end.
 
-
-(* NB: This version DOESN't work. It includes partial runs that 
+(* NB: This version of Iter DOESN't work. It includes partial runs that 
    don't correspond to any evaluation *)
 (*
   k ⭅ (Total_set : P nat) ;;
@@ -737,11 +794,114 @@ Definition ITER (v1 : env -> value) (v2 : env -> value) :
                       ∩ (fun ρ => Value.leb (Int k) (v2 ρ) = true)) ks ⌉.
 *)
 
-(* Slightly thicker application *)
-Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
-   ρ ⭅ Total_set ;;
+(* Slightly thicker application. This is NOT what we want.
+   For (2,3)[i] gives us  
+   { [r=2] | rho } ∪ { [(rho,i=1,r=3)] | rho } 
+
+  { [{{r=2}}] } ∪ { [{{i=1,r=3}}] } 
+
+ *)
+
+Import ConcreteVars.
+
+Definition APP' (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+   ρ ⭅ envs ;;
    let vs := apply (v1 ρ) (v2 ρ) in
    ⌈ List.map (fun v => r ≈ ⟨v⟩) vs ⌉.
+
+(*  (2,3)[x] == 2|3 *)
+Lemma example_pair_app' :
+  APP' (fun _ => mkTup [Int 2;Int 3]) (fun rho => rho x) = 
+    ρ ⭅ envs ;;
+    if (Value.eqb (ρ x) (Int 0)) then
+    ⌈ [ (r ≈ ⟨Int 2⟩)] ⌉ 
+    else if (Value.eqb (ρ x) (Int 1)) then
+    ⌈ [ (r ≈ ⟨Int 3⟩) ] ⌉ else ⌈[]⌉.
+Proof.
+  unfold APP'.
+  f_equal.  extensionality ρ. 
+  cbn.
+  destruct (Value.eqb (ρ x) (Int 0)) eqn:h0.
+  + cbn.
+    have h1: (Value.eqb (ρ x) (Int 1) = false). admit.
+    rewrite h1. cbn. done.
+  + destruct (Value.eqb (ρ x) (Int 1)) eqn:h1.
+    cbn. done.
+  cbn. done.
+Admitted. 
+
+(* Even thicker application: don't use same ρ for v1 and v2.
+   Let ρ2 change for each partial function in hs. *)
+Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+  ρ1 ⭅ envs ;;
+  ⌈ match (v1 ρ1) with 
+  | Fun hs => 
+    h <- hs ;;
+    [ ρ2 ⭅ envs ;;
+      match (PFun.apply_opt _ _ Value.eqb h (v2 ρ2)) with 
+        | Some w => (r ≈ ⟨ w ⟩) ∩ (fun ρ' => v1 ρ' = v1 ρ1 /\ v2 ρ' = v2 ρ2)
+        | None => ∅
+      end ]
+  | _ => []
+  end ⌉.
+
+
+Example pair_app := mini.ApplyD (common.SArray [common.Lit 2; common.Lit 3]) 
+                       (common.Var x).
+Lemma example_pair_app :
+  APP (fun _ => mkTup [Int 2;Int 3]) (fun rho => rho x) = 
+    ⌈ [ (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 2⟩) ; (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 3⟩) ] ⌉.
+Proof.
+  unfold APP.
+  eapply bind_Total_set. constructor. exact Env.empty.
+  intros _.
+  cbn.
+  f_equal.
+  f_equal.
+  + 
+  set_ext ρ2.
+  rewrite in_bind.
+  split.
+  - intro h. set_crunch. rename x0 into ρ.
+    destruct (Value.eqb (ρ x) (Int 0)) eqn:h0.
+    inv H0. inv H2. inv H1.
+    econstructor.
+    unfold constrain_eq. unfold Ensembles.In.
+    rewrite Value.eqb_eq in h0. rewrite H3. done.
+    unfold Ensembles.In. unfold constrain_eq. done.
+    inv H0.
+  - intro h. set_crunch. inv H. inv H0.
+    exists ρ2. split. cbv; auto.
+    have R: Value.eqb (ρ2 x) (ρ2 x)= true. {
+      rewrite Value.eqb_eq. done. } 
+    rewrite R. 
+    split. 
+    unfold Ensembles.In, constrain_eq. done.
+    unfold Ensembles.In. split; auto.
+Admitted.
+
+(*  + 
+    f_equal.
+  set_ext ρ2.
+  rewrite in_bind.
+  split.
+  - intro h. set_crunch. rename x0 into ρ.
+    destruct (Value.eqb (ρ x) (Int 1)) eqn:h0.
+    inv H0.
+    econstructor.
+    unfold constrain_eq. unfold Ensembles.In.
+    inv H1. rewrite Value.eqb_eq in h0. done.
+    done.
+    inv H0.
+  - intro h. set_crunch. inv H. inv H0.
+    exists ρ2. split. cbv; auto.
+    have R: Value.eqb (ρ2 x) (ρ2 x)= true. {
+      rewrite Value.eqb_eq. done. } 
+    rewrite R. 
+    split. eapply in_singleton. 
+    unfold constrain_eq, Ensembles.In. done.
+Qed. *)
+
 
 
 (* This is NOT the same as IF above because it uses ∪ instead of ++ 
@@ -786,13 +946,13 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
       ⌈ D1 ++ D2 ⌉
 
   | mini.Unify e1 e2 => 
-      D1 ⭅ B e1 ;;
-      D2 ⭅ B e2 ;;
+      D1 ⭅ E e1 ;;
+      D2 ⭅ E e2 ;;
       ⌈ D1 * D2 ⌉
 
   | mini.Seq e1 e2 => 
-      D1 ⭅ B e1 ;;
-      D2 ⭅ B e2 ;;
+      D1 ⭅ E e1 ;;  
+      D2 ⭅ E e2 ;;
       ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
 
   | mini.Iter a1 a2 =>
@@ -817,7 +977,8 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
     let ys := mini.I t1     in  (* BVS t1 *)
     let x  := mini.fresh t0 in
     let y  := mini.fresh t1 in 
-    let z  := 1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)  
+    let z  := 1 + List.list_max ([x; y] 
+                                   ++ Scope.elements xs ++ Scope.elements ys)  
        in  (* z is fresh for everything *)
 
     T0 ⭅ E t0 ;;
@@ -828,6 +989,181 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 
   | _ => ∅
   end.
+
+Definition  B (e : mini.Expr) : P (list ENV) := 
+    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉.
+
+Lemma E_Choice e1 e2 : E (e1 :|: e2) = 
+    D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ D1 ++ D2 ⌉. reflexivity. Qed.
+
+Lemma E_Seq e1 e2 : E (e1 :>: e2) =
+   D1 ⭅ E e1 ;;
+   D2 ⭅ E e2 ;;
+   ⌈ (D1 [\] ⟅r⟆) * D2 ⌉.
+reflexivity. Qed.
+
+Lemma E_Unify e1 e2 : E (e1 :=: e2) = 
+  D1 ⭅ E e1 ;;
+      D2 ⭅ E e2 ;;
+      ⌈ D1 * D2 ⌉.
+ reflexivity. Qed.
+
+
+Lemma iter_choice : 
+  E (mini.Iter 1 2) = E (1 :|: 2).
+Proof.
+  cbn. unfold ITER, SIMPLE.
+  eapply bind_Total_set. constructor. exact Env.empty. intros _.
+  cbn.
+  set_simpl. cbn. 
+Admitted.  (* need to do a little more straightforward work *)
+
+
+Lemma if_example :
+  E (mini.If3 (x:=: 0)(1:|:2)(3:|:4)) = 
+  ⌈ [ (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 1⟩) ; (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 2 ⟩) ] ⌉ ∪
+  ⌈ [ (x ≉ ⟨Int 0⟩ ∩ r ≈ ⟨Int 3⟩) ; (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 4 ⟩) ] ⌉.
+Proof.
+  cbn.
+  unfold IF, SIMPLE.
+  set_simpl.
+  replace (Scope.union Scope.empty Scope.empty) with Scope.empty.
+  cbn.
+  f_equal.
+  - f_equal.
+    set_simpl.
+    f_equal.
+    set_ext ρ.
+    split.
+    unfold constrain_eq.
+    + intro h. set_crunch.
+      inv H. set_crunch.
+      split. unfold Ensembles.In.
+      rewrite H0. admit.
+      rewrite H3. done.
+      unfold Ensembles.In. done.
+    + intro h. set_crunch.
+      inv H. inv H0.
+      econstructor.
+      unfold Ensembles.In. 
+Admitted.
+
+
+Lemma if_example_2 :
+  E ((mini.If3 (x:=: 0)(1:|:2)(3:|:4)) :|: 5) = 
+     ⌈ [ (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 1⟩) ; 
+         (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 2⟩) ; 
+         (r ≈ ⟨Int 5⟩) ] ⌉ ∪
+     ⌈ [ (x ≉ ⟨Int 0⟩ ∩ r ≈ ⟨Int 3⟩) ; 
+         (x ≉ ⟨Int 0⟩ ∩ r ≈ ⟨Int 4⟩) ; 
+         (r ≈ ⟨Int 5⟩)] ⌉.
+Proof.
+  rewrite E_Choice.
+  unfold B.
+  rewrite if_example.
+  set_simpl. unfold mini.I.
+  set_simpl.
+  unfold E, SIMPLE.
+  set_simpl. unfold evalA. unfold id.
+  cbn.
+  f_equal.
+Qed.
+
+(*
+∃x. (if x = 1 then 11| 22 else 33); 
+    x = (1 | 2); 
+    (if x = 1 then 44 else 55 | 66)
+*)
+
+Lemma if_example_3A :
+  E (mini.If3 (x :=: 1) (11 :|: 22) 33) = 
+   ⌈ [ (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 11⟩) ; 
+       (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 22⟩) ] ⌉ ∪
+   ⌈ [ (x ≉ ⟨Int 1⟩ ∩ r ≈ ⟨Int 33⟩) ] ⌉.
+Admitted.
+Lemma if_example_3B :
+  E (x :=: (1 :|: 2)) = 
+   ⌈ [ (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 1⟩) ; 
+       (x ≈ ⟨Int 2⟩ ∩ r ≈ ⟨Int 2⟩) ] ⌉. 
+Admitted.
+Lemma if_example_3C :
+  E (mini.If3 (x :=: 1) 44 (55 :|: 66)) = 
+     ⌈ [ (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 44⟩) ] ⌉ ∪ 
+     ⌈ [ (x ≉ ⟨Int 1⟩ ∩ r ≈ ⟨Int 55⟩) ;
+         (x ≉ ⟨Int 1⟩ ∩ r ≈ ⟨Int 66⟩) ] ⌉.
+Admitted.
+
+Definition if_example_3 := 
+  (mini.If3 (x :=: 1) (11 :|: 22) 33) :>:
+  (x :=: (1 :|: 2)) :>:
+  (mini.If3 (x :=: 1) 44 (55 :|: 66)).
+
+Lemma if_example_3_meaning_AB : 
+  E ((mini.If3 (x :=: 1) (11 :|: 22) 33) :>:
+    (x :=: (1 :|: 2))) = 
+  (⌈ [(x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 1 ⟩;  ∅ ; 
+      (x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 1 ⟩;  ∅ ] ⌉
+   ∪
+   ⌈ [∅ ; (x ≈ ⟨ Int 2 ⟩) ∩ r ≈ ⟨ Int 2 ⟩] ⌉ ).
+Proof.
+  rewrite E_Seq.
+  rewrite if_example_3A.
+  rewrite E_Unify.
+  unfold E, SIMPLE, evalA.
+  set_simpl.
+  unfold hide_list.
+  list_simpl.
+  rewrite constrain_eq_hide_two. done.
+  rewrite constrain_eq_hide_two. done.
+  cbn.
+Admitted.
+
+Lemma if_example_3_meaning : 
+  E (((mini.If3 (x :=: 1) (11 :|: 22) 33) :>:
+    (x :=: (1 :|: 2))) :>:
+    (mini.If3 (x :=: 1) 44 (55 :|: 66))) = 
+  (⌈ [(x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 44 ⟩;  ∅ ; 
+      (x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 44 ⟩;  ∅ ] ⌉
+   ∪ ⌈ [∅; ∅; ∅; ∅; ∅; ∅; ∅; ∅] ⌉
+   ∪ ⌈ [∅; ∅] ⌉ 
+   ∪ ⌈ [∅ ; ∅ ; (x ≈ ⟨ Int 2 ⟩) ∩ r ≈ ⟨ Int 55 ⟩ ; 
+                (x ≈ ⟨ Int 2 ⟩) ∩ r ≈ ⟨ Int 66 ⟩ ] ⌉ ).
+Proof.
+  rewrite E_Seq.
+  rewrite if_example_3_meaning_AB.
+  rewrite if_example_3C.
+  set_simpl.
+  unfold hide_list. list_simpl.
+  set_simpl.
+  rewrite constrain_eq_hide_two. done.
+  rewrite constrain_eq_hide_two. done.
+  cbn.
+  set_simpl.
+  f_equal.
+  f_equal.
+  f_equal.
+  rewrite <- intersection_assoc.
+  rewrite constrain_eq_same. done.
+  f_equal.
+  rewrite <- intersection_assoc.
+  rewrite constrain_eq_same. done.
+  rewrite <- intersection_assoc.
+  replace ((x ≈ ⟨ Int 1 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (∅ : ENV). set_simpl.
+  rewrite <- intersection_assoc.
+  replace ((x ≈ ⟨ Int 1 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (∅ : ENV). set_simpl.
+  rewrite <- intersection_assoc.
+  replace ((x ≈ ⟨ Int 2 ⟩) ∩ (x ≈ ⟨ Int 1 ⟩)) with (∅ : ENV). set_simpl.
+  rewrite <- intersection_assoc.
+  replace ((x ≈ ⟨ Int 2 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (x ≈ ⟨ Int 2 ⟩). 
+  rewrite <- intersection_assoc.
+  replace ((x ≈ ⟨ Int 2 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (x ≈ ⟨ Int 2 ⟩). 
+  done.
+  admit.
+  admit.
+  admit.
+Admitted.
 
 
 End Thicker_DSLS.

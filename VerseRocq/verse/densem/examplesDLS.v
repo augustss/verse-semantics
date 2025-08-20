@@ -1058,3 +1058,9 @@ where
 
 
 
+
+(*** D-SLS examples ************************)
+
+Import Thicker_DSLS.
+
+
