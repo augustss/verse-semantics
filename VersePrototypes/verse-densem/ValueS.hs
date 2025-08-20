@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
 module ValueS(
+  Z,
   Ident, fresh, freshList,
   Value(..), FUN, PartialFun, applyPF,
   numInt,
@@ -11,8 +12,15 @@ module ValueS(
   ) where
 import Control.Monad
 import Data.List((\\), intercalate)
-import qualified Data.Map as M
+import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
+
+default ()
+
+-- Use Int for speed
+type Z = Int
+
+-------------------------------
 
 freshList :: String -> [Ident] -> [Ident]
 freshList s xs = ys \\ xs
@@ -25,7 +33,7 @@ fresh s xs = head (freshList s xs)
 -------------------------------
 
 data Value
-  = Int Integer
+  = Int Z
   | Fun FUN
   | Tuple [Value]             -- temporary, until we do it with functions
  deriving ( Eq, Ord )
@@ -38,7 +46,17 @@ instance Show Value where
   show (Tuple vs) = "<" ++ intercalate "," (map show vs) ++ ">"
 
 data PartialFun = PF String (M.Map Value Value)
- deriving ( Eq, Ord )
+-- deriving ( Eq, Ord )
+
+instance Eq PartialFun where
+  PF f1 _ == PF f2 _  =  f1 == f2
+
+instance Ord PartialFun where
+  PF f1 _ <= PF f2 _  =  f1 <= f2
+  PF f1 _ <  PF f2 _  =  f1 <  f2
+  PF f1 _ >= PF f2 _  =  f1 >= f2
+  PF f1 _ >  PF f2 _  =  f1 >  f2
+  PF f1 _ `compare` PF f2 _  =  f1 `compare` f2
 
 instance Show PartialFun where
   show (PF s _m) = s -- show m
@@ -48,13 +66,13 @@ applyPF (PF _ m) a = M.lookup a m
 
 -----------------------------
 
-numInt :: Integer
+numInt :: Z
 numInt = 4
 
 allInts' :: [Int]
-allInts' = [0 .. fromInteger numInt - 1 ]
+allInts' = [0 .. fromIntegral numInt - 1 ]
 
-allInts'' :: [Integer]
+allInts'' :: [Z]
 allInts'' = [0 .. numInt - 1 ]
 
 allInts :: [Value]
@@ -100,8 +118,12 @@ allTuples :: [Value]
 allTuples = concatMap (map Tuple . allTuplesLen) [0..maxTuples]
 
 allTuplesLen :: Int -> [[Value]]
-allTuplesLen n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ show n
-               | otherwise = replicateM n allTupleElems
+allTuplesLen = allTuplesLen' allTupleElems
+
+allTuplesLen' :: [Value] -> Int -> [[Value]]
+allTuplesLen' els n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ show n
+                    | otherwise = replicateM n els
 
 allTupleElems :: [Value]
 allTupleElems = allInts
+-- TOO SLOW                ++ map Tuple (allTuplesLen' allInts 2)   -- all pairs on ints

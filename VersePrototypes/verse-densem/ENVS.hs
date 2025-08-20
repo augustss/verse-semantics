@@ -11,10 +11,13 @@ module ENVS(
   hide, hides,
   bigUnion, bigIntersect,
   extractVar,  -- dubious
+  disj, (&&&), add,
   )where
 import Data.Function(on)
-import Data.List(intercalate, group, sort, groupBy, sortBy)
+import Data.List(intercalate, groupBy, sortBy)
 import ValueS
+
+default ()
 
 -- ENV API
 
@@ -167,7 +170,9 @@ hideCase x (YES cs) =
       ]
 
 usort :: Ord a => [a] -> [a]
-usort = map head . group . sort
+--usort = map head . group . sort
+-- with the very short lists we have it's faster to use insertion sort
+usort = foldr uinsert []
 
 uinsert :: Ord a => a -> [a] -> [a]
 uinsert x []     = [x]
@@ -197,6 +202,17 @@ add constr cs0 = normConstr constr
           EQ -> Just cs0
           GT -> addEq t1 t2 cs0
           LT -> addEq t2 t1 cs0
+{- minimal speedup
+      (t1@(Value x), t2@(Value y)) ->
+        if x /= y then Nothing else Just cs0
+      (t1@(Ident x), t2@(Ident y)) ->
+        case compare x y of
+          EQ -> Just cs0
+          GT -> addEq t1 t2 cs0
+          LT -> addEq t2 t1 cs0
+      (t1@(Value _), t2@(Ident _)) -> addEq t2 t1 cs0
+      (t1@(Ident _), t2@(Value _)) -> addEq t1 t2 cs0
+-}
 
   normConstr (x :/=: t) =
     case (norm (Ident x) cs0, norm t cs0) of
@@ -208,7 +224,18 @@ add constr cs0 = normConstr constr
           EQ -> Nothing
           GT -> addNeq t1 t2 cs0
           LT -> addNeq t2 t1 cs0
-
+{- minimal speedup
+      (t1@(Value x), t2@(Value y)) ->
+        if x == y then Nothing else Just cs0
+      (t1@(Ident x), t2@(Ident y)) ->
+        case compare x y of
+          EQ -> Nothing
+          GT -> addNeq t1 t2 cs0
+          LT -> addNeq t2 t1 cs0
+      (t1@(Value _), t2@(Ident _)) -> addNeq t2 t1 cs0
+      (t1@(Ident _), t2@(Value _)) -> addNeq t1 t2 cs0
+-}
+      
   addEq  (Ident x) t cs = ((x :=: t) `uinsert`) `fmap` subst x t cs
   addNeq (Ident x) t cs = Just ((x :/=: t) `uinsert` cs)
 

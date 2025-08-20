@@ -195,6 +195,7 @@ library verse-densem
                       ENVS
                       TimE
                       ValueS
+                      Map
                       ENVDesugar
     build-depends:    verse-libs,
                       base,

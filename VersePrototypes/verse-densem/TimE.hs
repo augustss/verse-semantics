@@ -7,8 +7,10 @@ import ValueS
 import ENVS
 --import Debug.Trace
 
+default ()
+
 dE :: SrcEssential -> Ident -> Ident -> [ENV]
-dE (Lit (LInt k))                   i x = [ i .=. x /\ x .= Int k ]
+dE (Lit (LInt k))                   i x = [ i .=. x /\ x .= Int (fromIntegral k) ]
 dE (EPrim p)                        i x = [ i .=. x /\ x .= Fun (dP p) ]
 dE (Variable v) i x | isSrcUnderscore v = [ i .=. x ]
                     | otherwise         = [ i .=. x /\ x .=. v ]
@@ -52,7 +54,7 @@ dE (Range t)                        i x =
               | fss <- allFUNs, length fss > n, v <- allValues, Just r <- [applyPF (fss !! n) v]
               ]
      \/
-     bigUnion [ y .= tt /\ i .= Int (toInteger n) /\ x .= r
+     bigUnion [ y .= tt /\ i .= Int (fromIntegral n) /\ x .= r
               | tt@(Tuple vs) <- allTuples, n < length vs, let r = vs !! n
               ]
    | n <- allInts'
@@ -66,7 +68,7 @@ dE t@(ApplyD t0 t1)                 i x =
               | fss <- allFUNs, n < length fss, v <- allValues, Just r <- [applyPF (fss !! n) v]
               ]
      \/
-     bigUnion [ f .= tt /\ i .=. x /\ j .= Int (toInteger n) /\ x .= r
+     bigUnion [ f .= tt /\ i .=. x /\ j .= Int (fromIntegral n) /\ x .= r
               | tt@(Tuple vs) <- allTuples, n < length vs, let r = vs !! n
               ]
    | n <- allInts'
