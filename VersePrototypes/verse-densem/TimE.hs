@@ -14,7 +14,7 @@ dE (Variable v) i x | isSrcUnderscore v = [ i .=. x ]
                     | otherwise         = [ i .=. x /\ x .=. v ]
 dE (DefineE y t)                    i x = [ x .=. y ] *** dE t i x
 dE (DefineIE y t)                   i x = [ i .=. y ] *** dE t i x
-dE (DefineV _)                      _ _ = [ univ ] -- [ i .=. x /\ x .=. y ]
+dE (DefineV _)                      _ _ = [ univ ]
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x ++ dB t1 i x
 dE tt@(Seq t0 t1)                   i x =
@@ -43,8 +43,11 @@ dE (Block t)                        i x = dB t i x
 dE Fail                             _ _ = []
 dE (ApplyD (EPrim DotDot) (Array [_t0, _t1])) _i _x =
   [ error ".. not implemented yet" | _i <- allInts ]
+-- A speedup for x:int
+dE (Range (EPrim IsInt))            i x = [ bigUnion [ i .= v /\ x .= v | v <- allInts ] ]
 dE (Range t)                        i x =
   (dE t j y ***
+   squashTail   -- squash out the excessive empty sets we get because of large n
    [ bigUnion [ y .= Fun fss /\ i .= v /\ x .= r
               | fss <- allFUNs, length fss > n, v <- allValues, Just r <- [applyPF (fss !! n) v]
               ]
