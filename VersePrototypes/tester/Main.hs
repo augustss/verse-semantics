@@ -209,7 +209,8 @@ instance Show TestRunner where
   -- INFO: Ideally these should correspond to their respective commands in the
   -- repl just without the ':' prefix, i.e., dls-densem here is :dls-densem in
   -- the repl. But this would require changing the frontend parser to handle the
-  -- '-'.
+  -- '-' which would no longer be valid verse. See Note [Testing densem in the
+  -- tester]
   show Tim_DS = "tim"
   show DLS_DS = "dls"
   show SLS_DS = "sls"
