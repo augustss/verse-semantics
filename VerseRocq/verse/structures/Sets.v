@@ -611,6 +611,15 @@ Proof. unfold In. econstructor. Qed.
 Lemma in_singleton' {A} (x y : A) : x = y -> x ∈ ⌈ y ⌉.
 Proof. intros. subst. eapply in_singleton. Qed.
 
+
+Lemma in_singleton_iff {A} (x y : A) :
+        x ∈ ⌈ y ⌉ <-> x = y.
+Proof.
+  split. intro h. inversion h. done.
+  intro h. subst. eapply in_singleton.
+Qed.
+
+
 Lemma in_singleton_sub {A}{v:A}{X} : v ∈ X -> ⌈ v ⌉ ⊆ X.
 Proof.
   intros. intros x xIn. inv xIn. done.

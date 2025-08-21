@@ -44,6 +44,8 @@ Open Scope set_scope.
 
 Notation ENV := (P env).
 
+Notation envs := (Total_set : ENV).
+
 (* Constrain a variable to be equal to a particular value.
    All other mappings in the environment are unconstrained. 
    x ≈ f
@@ -515,3 +517,49 @@ Proof.
   split. intros [h1 h2]. rewrite h1. rewrite h2. done.
   intros [h1 h2]. rewrite h1. rewrite h2. done.
 Qed.
+
+(* ---------------------------------------------------- *)
+
+
+Lemma bind_Total_set {A B} (k : A  -> P B) (S : P B) : 
+  inhabited A ->
+  (forall ρ, k ρ = S) ->
+  (ρ ⭅ Total_set ;; k ρ) = S.
+Proof.
+  intros iA h.
+  set_ext ρ'.
+  rewrite in_bind.
+  split. 
+  + intro h1. set_crunch. rewrite h in H0. done.
+  + intros h1. inv iA. exists X. split; cbv; auto. rewrite h. done.
+Qed.
+
+Lemma bind_envs {B} (k : env -> P B) (S : P B) :
+  (forall ρ, k ρ = S) -> 
+  (ρ ⭅ envs ;; k ρ) = S.
+eapply bind_Total_set. econstructor. exact Env.empty.
+Qed.
+
+Lemma bind_set {A B} (k : A -> P B) S1 (S2 : P B) :
+  forall ρ1, ρ1 ∈ S1 ->
+  (forall ρ, ρ ∈ S1 -> (k ρ = S2)) -> 
+  (ρ ⭅ S1 ;; k ρ) = S2.
+Proof.
+  intros.
+  set_ext ρ'.
+  rewrite in_bind.
+  split.
+  + intro h. set_crunch. rewrite H0 in H2; done.
+  + intro h. specialize (H0 ρ1). rewrite <- H0 in h; auto.
+    exists ρ1. split; eauto.
+Qed.
+
+
+(* -------- *)
+
+Lemma bind_singleton_r_id {A} (l1 : list (P A)) : 
+  (List.flat_map (fun ρ0 => [ Total_set ∩ ρ0 ]) l1 = l1).
+induction l1; cbn.
+done. set_simpl. f_equal. auto. Qed.
+
+#[export] Hint Rewrite @bind_singleton_r_id : set_simpl.
