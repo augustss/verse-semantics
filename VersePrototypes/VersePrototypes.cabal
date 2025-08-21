@@ -365,10 +365,7 @@ test-suite verse-parser-test
     import:           general-libs
     hs-source-dirs:   parser/test
     type: exitcode-stdio-1.0
-
-    -- exposed-modules:
-    main-is:          Main.hs
-
+    main-is:          Test.hs
     default-language: GHC2021
     ghc-options:      -Wall -Wno-name-shadowing
 
@@ -376,9 +373,13 @@ test-suite verse-parser-test
     build-depends: base
                  , bytestring
                  , containers
+                 , comonad
                  , directory
                  , filepath
-                 , megaparsec
+                 , parsec
                  , prettyprinter
+                 , tasty
+                 , tasty-hunit
+                 , tasty-expected-failure
                  , text
                  , verse-parser
