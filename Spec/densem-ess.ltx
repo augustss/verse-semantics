@@ -101,3 +101,110 @@ $$
 $$
 \caption{Denotational semantics of Essential Verse: plan (S-LS)} \label{fig:s-ls}
 \end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}
+$$
+% ------------- Denotational semantics of Essential Verse in SLS style ---------------
+\begin{array}{l}
+\textbf{Domains} \\
+\begin{array}{r@@{\;}l@@{\;\;}c@@{\;\;}ll}
+  \rho \in & \Env & = & \Ident\rightarrow \Value  \\
+\end{array} \\
+\\
+\textbf{Denotational semantics} \\
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+    & \semess{S}{u}{v}{|t|} & : & \powersetnp{\seq{ \ENV }} \\
+%
+\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{u=v=a} ] \\
+% \rulename{edef} & \semess{S}{u}{v}{|defintro x|} & = & \singleE(\Env) \\
+% \rulename{eatom} &  \semess{S}{u}{v}{|a|} & = & \singleE( \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \}) \\
+%
+\rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & \{ [ ]  \} \\
+%
+\rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
+ & = & \{ s_1 \append s_2 \vb s_1 \in \semap{B}{t_1}, s_2 \in \semap{B}{t_2}\}  \\
+% \rulename{eunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
+%  & = & \begin{array}[t]{@@{}l@@{\,}l}
+%           \{     & [ \EV_1 \intersectE \EV_2 \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 ] \\
+%           |vbar| & s_1 \in \semess{S}{u}{v}{t_1}, s_2 \in \semess{S}{u}{v}{t_2} \; \} 
+%  \end{array} \\
+%
+\rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
+& = &  \begin{array}[t]{@@{}l@@{\,}l}
+          \{     & \semess{S}{u}{v}{t_1} \; \prodE \;\semess{S}{u}{v}{t_2} 
+          \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+  \end{array} \\
+%
+\rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
+& = &  \begin{array}[t]{@@{}l@@{\,}l}
+          \{     & \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2} 
+          \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+  \end{array} \\
+  %
+\rulename{siter} &  \semess{S}{u}{v}{|1 ..  a|}
+& = & \{  [ \ \conBrack{u=v=k \wedge a=n}  |vbar| k \leftarrow [1..n] ]       \\
+  &&& |vbar| \rho \in \Env,\ \semapp{A}{a}\rho = n \}  \\
+%
+\ \\ 
+\ \\ 
+\ \\ 
+\ \\ 
+\ \\ 
+\ \\ 
+\ \\ 
+%
+\rulename{eapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+& = & \{ \; \begin{array}[t]{@@{}l}
+         [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
+         |vbar| i |<-| 0\mydots\, ] \; \}
+         \end{array} \\
+\multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
+  \semess{S}{u}{v}{|if3 e_1 e_2 e_3|} }r
+& = & \bigcup \begin{array}[t]{@@{}l@@{\,}l}
+  \{      & \begin{array}[t]{@@{}l}
+               \mapEs(\lambda \EV.\, \hideE(Y,\EV \cap \EV_1),  \; \semess{S}{u}{v}{e_2})
+                  \; \cup \\
+                  \mapEs(\lambda \EV.\, \EV \setminus (\hideE(Y,\EV_1)), \; \semess{S}{u}{v}{e_3} )
+           \end{array}
+  \\
+      |vbar|  & s_1 \in \semess{S}{u}{v}{e_1}, \EV \in \unionEL( s_1 ) \; \}
+    \end{array} \\
+&&& |where|\; Y = \semap{I}{|e_1|} \\
+\rulename{eall} & \semess{S}{u}{v}{|all e|}
+& = & \begin{array}[t]{@@{}l@@{\,}l}
+       \{ & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(s), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ] \\
+       |vbar| & s \in \semapsub{B}{c}{e} \; \}
+      \end{array}
+\\
+\\
+
+& \semapp{B}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
+& \semapp{B}{|e|} & = & \mapEs( \lambda \EV. \, \hideE(\semapp{I}{|e|}, \EV),\; \semess{S}{u}{v}{e})
+\end{array}
+\end{array}
+$$
+\caption{Denotational semantics of Essential Verse: plan (S-SLS)}
+\label{fig:S-sls1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+ \singleE & : & \ENV \rightarrow \powersetnp{\seq{\ENV}} \\
+ \singleE( \EV ) & = & \{ [ \EV ] \} \\[1mm]
+
+\unionEL & : & \seq{ \ENV } \rightarrow \ENV \\
+   \unionEL( [] ) & = & \{ \} \\
+   \unionEL( \EV : S ) & = & \EV \cup \unionEL(S) \\ [1mm]
+
+ \mapEs & : & (\ENV \rightarrow \ENV) \rightarrow \powersetnp {\seq{ \ENV }} \rightarrow \powersetnp {\seq{ \ENV }} \\
+   \mapEs(f, S) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in S \; \} \\[1mm]
+
+\end{array}
+$$
+\caption{Auxiliary functions for plan (S-SLS)}
+\label{fig:d-sls2}
+\end{figure}
+
