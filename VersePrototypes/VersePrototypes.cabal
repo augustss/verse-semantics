@@ -370,6 +370,9 @@ test-suite verse-parser-test
     ghc-options:      -Wall -Wno-name-shadowing
 
     other-modules: Paths_VersePrototypes
+                 , Utils
+                 , TestSuite.All
+                 , TestSuite.Syntax
     build-depends: base
                  , bytestring
                  , containers
