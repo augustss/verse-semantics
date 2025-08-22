@@ -309,8 +309,9 @@ Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list EN
 
 Definition FOR_SPJ (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) 
   : list ENV := 
-  [].
-
+  let SS : list (list ENV) := 
+    pickl [ Δ ∩* B [\] (Scope.union a ⟅ r ⟆) | Δ <- squash A ] in
+  [ ].
 
 
 (* ----- semantics of IF ------------ *)
