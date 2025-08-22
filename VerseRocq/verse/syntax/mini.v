@@ -190,7 +190,7 @@ DEN: 3
 *)
 Definition t5 :=
   { DefineV t :>:  t :=: IsInt :>:
-    DefineV u :>:  u :=: Fun Closed Succeeds i (DefineV x :>: x) (x, t, i) (Add :@: x) :>: 
+    DefineV u :>:  u :=: Fun Closed Succeeds i (DefineV x :>: x) (x, t, i) (AddOne :@: x) :>: 
     u :@: 2 }.
 
 (* missing type test *)

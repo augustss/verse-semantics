@@ -130,7 +130,7 @@ Qed.
 (* t = (x,y) ; y = x+1  *)
 Definition example0 : mini.Expr := 
   t :=: mini.ES (SArray [Var x ; Var y]) :>: 
-  (y :=: (EPrim common.Add) :@: (common.Var x)).
+  (y :=: (EPrim common.AddOne) :@: (common.Var x)).
 
 (* t i = i * 2 *)
 Definition example1 : mini.Expr := 
