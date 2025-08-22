@@ -300,8 +300,6 @@ End ValueNotation.
 
 Require Import common.
 
-Print PrimOp.
-
 Definition evalPrim (p : PrimOp) : value  := 
   match p with 
   | common.AddOne  => Prim.add1

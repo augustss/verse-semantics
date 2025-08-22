@@ -1,3 +1,7 @@
+(* Examples for the D-LS semantics 
+   (destination passing list of sets of environments)
+*)
+
 Require Import Imports.
 
 From Stdlib Require Lists.List.
@@ -14,10 +18,10 @@ Require Import PFun.
 Require Import structures.Sets.
 Import structures.List.
 
-Require Import densem.Dom.
-Require Import densem.tenv.  (* environments are total *)
-Require Import densem.envSet. (* def of ENV , hide, constraints *)
-Require Import densem.densem. (* semantic definitions *)
+Require Export densem.Dom.
+Require Export densem.tenv.  (* environments are total *)
+Require Export densem.envSet. (* def of ENV , hide, constraints *)
+Require Export densem.densem. (* semantic definitions *)
 
 Import mini.MiniNotation.
 Import SetNotations.
@@ -64,9 +68,9 @@ Ltac set_crunch :=
         inv H
     | [ H : ?ρ ∈ (fun x => _ ) |- _ ] =>
         inv H; crunch
-    | [ H : ?ρ ∈ (?x ≈ ?k) |- _ ] =>
+    | [ H : ?ρ ∈ constrain_eq ?x ?k |- _ ] =>
         inv H; crunch
-    | [ H : ?ρ ∈ (?x ≉ ?k) |- _ ] =>
+    | [ H : ?ρ ∈ constrain_ne ?x ?k |- _ ] =>
         inv H; crunch
     | [ H : ?ρ ∈ (hide ?s ?S) |- _ ] =>
         inv H; crunch
@@ -75,36 +79,9 @@ Ltac set_crunch :=
       end.
 
 
-(* This is a bit of a hack. For examples, we special case the variables
-   x,y, and y when simplifying environment lookups *)
 
-Ltac rewrite_env := 
-  repeat match goal with 
-    | [ |- context[ (?x |-> ?v , ?rho) ?x ] ] => 
-        rewrite extend_lookup_same
-    | [ |- context[ (x |-> ?v , ?rho) r ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-    | [ |- context[ (y |-> ?v , ?rho) r ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-    | [ |- context[ (r |-> ?v , ?rho) x ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-    | [ |- context[ (r |-> ?v , ?rho) y ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-    | [ |- context[ (y |-> ?v , ?rho) x ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-    | [ |- context[ (x |-> ?v , ?rho) y ] ] => 
-        rewrite extend_lookup_diff;
-        [rewrite PeanoNat.Nat.eqb_neq;easy|]
-  end.
-
-
-(* -------------------------------------------------------- *)
-(* ---- examples / theory about extract / squash_pick ----- *)
+(* -------------------------------------------- *)
+(* ---- examples of extract / squash_pick ----- *)
 
 Lemma squash_pick_singleton {A} (v : A) : 
   squash_pick [ ⌈ v ⌉ ] = ⌈ [v] ⌉.  
@@ -130,8 +107,8 @@ Proof.
 Admitted.
 
 
-Lemma extract_one {v} : 
-  extract r (r ≈ ⟨ v ⟩) = ⌈ (v, Total_set) ⌉.
+Lemma extract_one {k : nat} : 
+  extract r ({{ r ≈ k }}) = ⌈ (Int k, Total_set) ⌉.
 Proof. 
 eapply set_extensionality. intros [w Δ].
 unfold extract. 
@@ -142,17 +119,18 @@ split.
   set_crunch.
   inv H.
   f_equal.
+  rewrite H2.
   set_simpl.
   done.
 - intro h. inv h.
-  exists (r |-> v).
+  exists (r |-> Int k).
   set_simpl.
   done.
 Qed. 
 
-Lemma extract_example {k} :
-  extract r (x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = 
-    ⌈ (k, x ≈ ⟨ k ⟩) ⌉.
+Lemma extract_example {k : nat} :
+  extract r ({{x ≈ k}} ∩ {{r ≈ k}}) = 
+    ⌈ (Int k, {{ x ≈ k }}) ⌉.
 Proof.
   unfold extract.
   eapply set_extensionality. intros [v Δ].
@@ -164,25 +142,26 @@ Proof.
     inv H.
     repeat rewrite H2.  clear H2.
     f_equal.
+    rewrite H3. 
     set_simpl.
     rewrite constrain_eq_hide_two. done. done.
   + intro h. inv h.
-    exists (x |-> k, r |-> k).
+    exists (x |-> Int k, r |-> Int k).
     set_simpl.
     rewrite_env.
     rewrite constrain_eq_hide_two. done. done.
 Qed. 
 
 Lemma extract_two :
-  extract r (r ≈ ⟨ Int 0 ⟩ ∪ (r ≈ ⟨ Int 1 ⟩)) = 
+  extract r ({{ r ≈ 0 }} ∪ {{r ≈ 1}}) = 
     (⌈ (Int 0, Total_set) ⌉ ∪ ⌈ (Int 1, Total_set) ⌉).
 Admitted.
 
 
 Lemma bcp_example : 
-  ALL [x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩] = 
-      ((x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup [Int 0]⟩) ∪
-       (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨mkTup []⟩)).
+  ALL [ {{ x ≈ 0 }} ∩ {{ r ≈ 0 }} ] = 
+      ( {{ x ≈ 0 }} ∩ {{ r ≈ SArray [ 0 : Simple] }} ) ∪
+        {{ x ≉ 0 }} ∩ {{ r ≈ SArray [] }}.
 Proof.
   unfold ALL.
   apply set_extensionality. intros ρ.
@@ -192,7 +171,7 @@ Proof.
   rewrite extract_example.
   set_simpl.
   unfold squash_pick.
-  remember (when (ρ ∈ x ≈ ⟨ Int 0 ⟩) ⌈ Int 0 ⌉) as ϕ.
+  remember (when (ρ ∈ {{ x ≈ 0}} ) ⌈ Int 0 ⌉) as ϕ.
   split.
   + intro h. 
     crunch.
@@ -200,6 +179,7 @@ Proof.
     inv H. 
     ++ set_crunch.
        unfold Cons in H1.
+       cbn.
        set_crunch.
        inv H2.
        rewrite H3.
@@ -232,9 +212,9 @@ Qed. *)
 (* one { x = 0 } = [ {{ r = x = 0 }} ] *)
 (* one { x = 0 | x = 1 } = [ {{ r=x=0 }} union {{r=x=1}} ] *)
 
-Definition D0 : ENV := r ≈ ⟨ Int 0 ⟩.
-Definition D1 : ENV := r ≈ ⟨ Int 1 ⟩.
-Definition Dx v : ENV := x ≈ ⟨ v ⟩ ∩ r ≈ ⟨ v ⟩.
+Definition D0 : ENV := {{ r ≈ 0 }}.
+Definition D1 : ENV := {{ r ≈ 1 }}.
+Definition Dx (v:nat) : ENV := {{ x ≈ v }} ∩ {{ r ≈ v }}.
 
 
 Lemma extract_D0 : 
@@ -276,20 +256,20 @@ Qed.
 *)
 
 Lemma ONE_example2 : 
-  ONE [ Dx (Int 0) ] = Dx (Int 0).
+  ONE [ Dx 0  ] = Dx 0 .
 Admitted.
 
 Lemma bind_when {A B} ϕ (s : P A) (k : A -> P B) : 
-  (bind (when ϕ s) k) = (⟨ϕ⟩ ∩ (bind s k)).
+  (bind (when ϕ s) k) = ((fun _ => ϕ) ∩ (bind s k)).
 Proof.
 Admitted.
 
 Lemma If3_when_ret {A B} (k : A) ϕ (s2 s3 : P B): 
-  If3 (when ϕ ⌈k⌉) s2 s3 = ((⟨ϕ⟩ ∩ s2) ∪ (⟨not ϕ⟩ ∩ s3)).
+  If3 (when ϕ ⌈k⌉) s2 s3 = (((fun _ => ϕ) ∩ s2) ∪ ((fun _ => not ϕ) ∩ s3)).
 Admitted.
 
 Lemma ONE_example3 : 
-  ONE [ Dx (Int 0) ; Dx (Int 1) ] = (Dx (Int 0) ∪ Dx (Int 1)).
+  ONE [ Dx 0 ; Dx 1] = (Dx 0 ∪ Dx 1).
 Proof.
   unfold ONE, Dx, consistent_results.
   apply set_extensionality. intros ρ.
@@ -304,8 +284,9 @@ Admitted.
 
 
 Lemma ALL_two_example :
-  ALL [(r ≈ ⟨Int 0⟩ ∪ (r ≈ ⟨Int 1⟩)) ] = 
-      (r ≈ ⟨mkTup [Int 0]⟩ ∪ (r ≈ ⟨mkTup [Int 1]⟩)).
+  ALL [ {{r ≈ 0 }} ∪ {{ r ≈ 1 }} ] = 
+         {{ r ≈ SArray [ (0 : Simple) ] }}
+       ∪ {{ r ≈ SArray [ (1 : Simple) ] }}.
   apply set_extensionality. intros ρ.
   set_simpl.
   unfold ALL.
@@ -323,6 +304,7 @@ Lemma ALL_two_example :
     exists [Int 1]. split; auto. right. eapply in_singleton. 
 Qed.
 
+(*
 Lemma conflict_example : 
   ALL [ x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 0 ⟩ ; 
          x ≈ ⟨ Int 1 ⟩ ∩ r ≈ ⟨ Int 1 ⟩ ]
@@ -330,7 +312,7 @@ Lemma conflict_example :
    ∪ ((x ≈ ⟨ Int 1 ⟩) ∩ (r ≈ ⟨ mkTup [Int 1] ⟩))
    ∪ ((x ≉ ⟨ Int 0 ⟩) ∩ x ≉ ⟨ Int 1 ⟩ ∩ (r ≈ ⟨ mkTup []⟩))).
 Admitted.  
-
+*)
 
 Lemma squash_irr_ALL (s : list ENV) : 
   ALL s = ALL (squash s).
@@ -347,14 +329,14 @@ Abort.
 
 (*** IF examples and variants ***)    
 
+Notation "{{ r ≈ x ≈ k }}" := ({{ r ≈ k }} ∩ {{ x ≈ k }}) : set_scope.
 
+(*
 Definition negative_IF := 
   mini.If3 (x :=: 0 :|: x :=: 1) (x :=: 1) mini.Fail.
 
-Notation "r ≈ x ≈ ⟨ k ⟩" := ((r ≈ ⟨ k ⟩) ∩ (x ≈ ⟨ k ⟩)) : set_scope.
-
 Lemma E_scrut :
-  E (x :=: 0 :|: x :=: 1) = [ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ].
+  E (x :=: 0 :|: x :=: 1) = [ (r ≈ x ≈ ⟨0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ].
 Proof.
   cbn. 
 Abort.  
@@ -371,53 +353,49 @@ unfold hidden. rewrite hide_constrain. eapply xNr. done. done.
 Qed.
 
 Hint Resolve hidden_constrain : sets.
+*)
 
-Lemma hide_result k:
-  (r ≈ x ≈ ⟨ k ⟩ \ ⟅ r ⟆) = x ≈ ⟨ k ⟩.
-Proof.
-  rewrite hide_intersection_r. eapply hidden_constrain; auto.
-  set_simpl. done.
-Qed.
-
-Lemma hide_arg k:
-  (r ≈ x ≈ ⟨ k ⟩ \ ⟅ x ⟆) = r ≈ ⟨ k ⟩.
-Proof.
-  rewrite hide_intersection_l. eapply hidden_constrain; auto.
-  set_simpl. done.
-Qed.
-
-
-Hint Rewrite hide_result hide_arg : sets.
 (*
 Lemma hide_example k: 
   ((r ≈ x ≈ ⟨ k ⟩) ∩ r ≈ ⟨ k ⟩ \ ⟅ r ⟆) = x ≈ ⟨ k ⟩.
 Admitted.
 *)
-Lemma constrain_same1 r x k : 
-  (r ≈ x ≈ ⟨ k ⟩ ∩ r ≈ ⟨ k ⟩) = (r ≈ x ≈ ⟨ k ⟩).
+
+(*
+Lemma constrain_same1 (r x : Ident) (k : nat) : 
+  {{ r ≈ x ≈ k }} ∩ {{ r ≈ k }} = {{ r ≈ x ≈ k }}.
 Admitted.
 
-Lemma constrain_same2 r x k : 
-  (r ≈ ⟨ k ⟩ ∩ (r ≈ x ≈ ⟨ k ⟩)) = (r ≈ x ≈ ⟨ k ⟩).
+Lemma constrain_same2 (r x : Ident) (k : nat) : 
+  {{ r ≈ k }} ∩ {{ r ≈ x ≈ k }}  = {{ r ≈ x ≈ k }}.
 Admitted.
 
-Lemma constrain_same3 r x k : 
-  (x ≈ ⟨ k ⟩ ∩ (r ≈ x ≈ ⟨ k ⟩)) = (r ≈ x ≈ ⟨ k ⟩).
+Lemma constrain_same3 (r x : Ident) (k : nat) : 
+  {{ x ≈ k }} ∩  {{ r ≈ x ≈ k }} = {{ r ≈ x ≈ k }}.
 Admitted.
 
-Lemma constrain_same4 r x k : 
-  (r ≈ x ≈ ⟨ k ⟩ ∩ x ≈ ⟨ k ⟩) = (r ≈ x ≈ ⟨ k ⟩).
+Lemma constrain_same4 (r x : Ident) (k : nat) : 
+  {{ r ≈ x ≈ k }} ∩ {{ x ≈ k }} = {{r ≈ x ≈ k }}.
 Admitted.
 
 
 Hint Rewrite constrain_same1 constrain_same2 constrain_same3 constrain_same4 : sets.
+*)
 
-Lemma constrain_conflict0 k1 k2 (NE : k1 <> k2) :
-  (x ≈ ⟨ k1 ⟩) ∩ (x ≈ ⟨ k2 ⟩) = ∅.
+
+Lemma constrain_eq_sort (x : Ident) a1 a2 :
+  {{ S x ≈ a1 }} ∩ {{ x ≈ a2 }} = {{ x ≈ a2 }} ∩ {{ S x ≈ a1 }}.
+Proof. rewrite Intersection_commutes. done. Qed.
+
+Hint Rewrite constrain_eq_sort : set_simpl.
+
+Lemma constrain_conflict0 (k1 k2 : nat) (NE : k1 <> k2) :
+  {{ x ≈ k1 }} ∩ {{ x ≈ k2 }} = ∅.
 Admitted.
 
-Lemma constrain_conflict1 k1 k2 (NE : k1 <> k2) :
-  (x ≈ ⟨ k1 ⟩) ∩ (r ≈ x ≈ ⟨ k2 ⟩) = ∅.
+(* 
+Lemma constrain_conflict1 (k1 k2 : nat) (NE : k1 <> k2) :
+  {{ x ≈ k1 }} ∩ {{ r ≈ x ≈ k2}} = ∅.
 Admitted.
 
 Lemma constrain_conflict2 k1 k2 (NE : k1 <> k2) :
@@ -442,172 +420,197 @@ Proof.
     set_crunch; unfold constrain_eq; try split; try unfoldIn; auto.
     congruence.
 Qed.
+*)
+
+Lemma hide_result (k : nat):
+  {{ r ≈ x ≈ k }} \ ⟅ r ⟆ = {{ x ≈ k }}.
+Proof.
+  rewrite hide_intersection_r. 
+  unfold hidden. 
+  rewrite (constrain_eq_hide_diff x r k); auto.
+  set_simpl. done.
+Qed.
+
+Lemma hide_arg (k : nat):
+  {{ r ≈ x ≈ k }} \ ⟅ x ⟆ = {{ r ≈ k }}.
+Proof.
+  rewrite hide_intersection_l. 
+  unfold hidden. rewrite constrain_eq_hide_diff; done.
+  set_simpl. done.
+Qed.
 
 
-(* if (x: = (0 |1)) { x = 1 } else {fail} == [ 1 ] *)
-(* Tim wants this to fail. *)
-Lemma IF1a_Tim3_should_and_does_fail : 
-  IF r ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ])
-               [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
+Hint Rewrite hide_result hide_arg : set_simpl.
+
+
+(* if (x: = (0|1)) {x=1} else {fail} == [ ] *)
+(* Should fail *)
+Lemma IF1a : 
+  IF r ⟅x⟆ [ {{ r ≈ x ≈ 0 }} ; {{ r ≈ x ≈ 1 }} ] [ {{ r ≈ x ≈ 1 }} ] [] = 
   [∅; ∅].
 Proof.
 unfold IF.
 cbn.
 set_simpl.
-repeat rewrite hide_result; auto.
-rewrite constrain_conflict1; try done.
+rewrite <- intersection_assoc.
+rewrite Intersection_commutes.
+rewrite <- intersection_assoc.
+rewrite (@constrain_eq_intersection x 1 0).
+cbn.
 set_simpl.
 auto.
 Qed.
 
-Lemma IF2a_Tim3 : 
+Lemma IF1b : 
+  IF r ⟅x⟆ [ {{ r ≈ x ≈ 0 }} ; {{ r ≈ x ≈ 1 }} ] [ {{ r ≈ x ≈ 0 }} ] [ ] = 
+  [ {{ r ≈ 0 }} ; ∅].
+Proof.
+unfold IF.
+cbn.
+set_simpl.
+rewrite <- intersection_assoc.
+rewrite Intersection_commutes.
+rewrite <- intersection_assoc.
+set_simpl.
+rewrite hide_intersection_r. unfold hidden.
+rewrite constrain_eq_hide_diff. done. done.
+set_simpl. done.
+Qed.
+
+Lemma IF2a : 
   IF r (Scope.empty) 
-    ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 3⟩) ]) 
-         [(r ≈ x ≈ ⟨Int 2⟩) ] [r ≈ ⟨ Int 77⟩] = 
+    ([ {{r ≈ x ≈ 1 }} ; {{ r ≈ x ≈ 3 }} ]) 
+     [ {{r ≈ x ≈ 2 }} ] [ {{ r ≈ 77 }}] = 
   [
    ∅; ∅;
-   Total_set - ((x ≈ ⟨ Int 1 ⟩) ∪ x ≈ ⟨ Int 3 ⟩) ∩ r ≈ ⟨ Int 77 ⟩
+   (Total_set - {{ x ≈ 1 }} ∪ {{ x ≈ 3 }}) ∩ {{ r ≈ 77 }}
    ].
    (* last one is the same as x <> 1/3 , r = 77 *)
 unfold IF.
 cbn.
+set_simpl. unfold id.
+rewrite <- intersection_assoc.
+rewrite Intersection_commutes.
+rewrite <- intersection_assoc.
+rewrite constrain_eq_intersection. cbn.
 set_simpl.
-repeat rewrite hide_result; auto.
-rewrite Setminus_disjoint1; try done.
-rewrite constrain_conflict1; try done.
-replace ((x ≈ ⟨ Int 3 ⟩) ∩ r ≈ x ≈ ⟨ Int 2 ⟩) with (∅ : ENV). 2: admit.
-auto.
 Admitted.
+
+Lemma all_but (x : Ident )(a : Simple ) : 
+  (Total_set - {{ x ≈ a }}) = (constrain_ne x a).
+Proof.
+  set_ext ρ.
+  split.
+  intro h. inv h. unfold constrain_ne, Ensembles.In. 
+  unfold constrain_eq, Ensembles.In in H0. done.
+  intro h. unfold constrain_ne, Ensembles.In in h. 
+  unfold Ensembles.In. econstructor. cbv. done.
+  unfold constrain_eq, Ensembles.In. done.
+Qed.
+
+Hint Rewrite all_but : set_simpl.
 
 Lemma IF2b_Tim3 : 
   IF r (Scope.empty) 
-    ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) 
-         [(r ≈ x ≈ ⟨Int 0⟩) ] [r ≈ ⟨ Int 77⟩] = 
-  [r ≈ x ≈ ⟨ Int 0 ⟩;
-   ∅; 
-   Total_set - ((x ≈ ⟨ Int 0 ⟩) ∪ x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 77 ⟩].
+    [ {{ r ≈ x ≈ 0 }} ; {{ r ≈ x ≈ 1}} ] 
+    [ {{ r ≈ x ≈ 0 }} ] [ {{ r ≈ 77 }} ] = 
+    [ {{ r ≈ x ≈ 0 }} ;  ∅; 
+      {{ x ≉ 0 }} ∩ {{ x ≉ 1 }}  ∩ {{ r ≈ 77 }} ].
    (* last one is the same as x <> 0/1 , r = 77 *)
 unfold IF.
 cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-rewrite Setminus_disjoint1; try done.
-rewrite constrain_same3.
-rewrite constrain_conflict1; try done.
-Qed.
+set_simpl. unfold id.
+rewrite <- intersection_assoc.
+rewrite Intersection_commutes.
+rewrite <- intersection_assoc.
+rewrite constrain_eq_intersection. cbn.
+f_equal. rewrite Intersection_commutes. done.
+f_equal. 
+Admitted.
 
 
-
+(*
 Lemma hide_equiv_arg k x r (NE : x <> r) :
         ((x ≈ ⟨ k ⟩) ∩ r ≈ ⟪ x ⟫ \ ⟅ x ⟆) = (r ≈ ⟨ k ⟩).
 Admitted.
+*)
 
 Lemma IF3_Tim3 : 
-  IF r ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫)] [] = 
-  [r ≈ ⟨Int 1⟩; ∅].
+  IF r ⟅x⟆ ([ {{ r ≈ x ≈ 1 }} ; {{ r ≈ x ≈ 2 }} ]) [ {{ r ≈ x }} ] [] = 
+  [ {{ r ≈ 1 }} ; ∅].
 Proof.
   unfold IF.
   cbn.
   set_simpl.
+Admitted.
+(*
   repeat rewrite hide_result; auto.
   set_simpl.
   rewrite hide_equiv_arg. try done.
   auto.
-Qed.
+Qed. *)
 
 
 Lemma IF4_Tim3 : 
-  IF r ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 1⟩) ; (r ≈ x ≈ ⟨Int 2⟩) ]) [(r ≈ ⟪x⟫);(r ≈ ⟪x⟫)] [] = 
-  [r ≈ ⟨Int 1⟩; r ≈ ⟨ Int 1 ⟩; ∅; ∅].
+  IF r ⟅x⟆ ([ {{ r ≈ x ≈ 1 }}  ; {{ r ≈ x ≈ 2 }} ]) [ {{ r ≈ x }} ; {{ r ≈ x }} ] [] = 
+  [ {{ r ≈ 1 }} ; {{ r ≈ 1 }} ; ∅; ∅].
 Proof.
   unfold IF.
   cbn.
   set_simpl.
+Admitted.
+(*
   repeat rewrite hide_result; auto.
   set_simpl.
   rewrite hide_equiv_arg; try done.
-Qed.
+Qed. *)
 
 
 Lemma IF5b_Tim3 : 
-  IF r Scope.empty ([ (r ≈ x ≈ ⟨Int 7⟩) ; (r ≈ y ≈ ⟨Int 3⟩) ]) [(r ≈ ⟪x⟫)] [] = 
-  [(x ≈ ⟨ Int 7 ⟩) ∩ r ≈ ⟪ x ⟫; 
-   (y ≈ ⟨ Int 3 ⟩) - (x ≈ ⟨ Int 7 ⟩) ∩ r ≈ ⟪ x ⟫].
+  IF r Scope.empty ([ {{ r ≈ x ≈ 7 }} ;  {{ r ≈ y ≈ 3 }} ]) [{{ r ≈ x }} ] [] = 
+  [ {{x ≈ 7 }} ∩ {{ r ≈ x }} ; 
+    {{y ≈ 3 }} - {{ x ≈ 7 }} ∩ {{ r ≈ x }} ].
 Proof.
   unfold IF.
   cbn.
   set_simpl.
   repeat rewrite hide_result; auto.
   f_equal.
-  replace (r ≈ y ≈ ⟨ Int 3 ⟩ \ ⟅ r ⟆) with (y ≈ ⟨ Int 3 ⟩). 2: admit.
 Admitted.
-
-
-(* if (x: = 0 | x = 1) { x = 1 } else {fail} == [ 1 ] *)
-Lemma IF_SPJ_choice : 
-  IF_SPJ ⟅x⟆ ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ]) [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
-  [r ≈ ⟨ Int 1 ⟩].
-unfold IF_SPJ.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-rewrite constrain_conflict2; try done.
-rewrite hide_arg.
-auto.
-Qed.
-
-(* if (x = 0 | x = 1) { x = 1 } else {fail} == [ x = 1 ] *)
-Lemma IF_SPJ_choice_no_bind : 
-  IF_SPJ (Scope.empty) ([ (r ≈ x ≈ ⟨Int 0⟩) ; (r ≈ x ≈ ⟨Int 1⟩) ])
-     [(r ≈ x ≈ ⟨Int 1⟩) ] [] = 
-  [r ≈ x ≈ ⟨ Int 1 ⟩].
-Proof.
-unfold IF_SPJ.
-cbn.
-set_simpl.
-repeat rewrite hide_result; auto.
-rewrite constrain_conflict2; try done.
-Qed.
-
 
 (* ----------------------------- FOR --------------------------- *)
 
 Lemma Go_example1 : 
-  make_FOR_Choices x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 1⟩
-                        ; x ≈ ⟨Int 2⟩ ∩ r ≈ ⟨Int 2⟩] 
-                        [ r ≈ ⟪ x ⟫ ] 
-  = [[x1 ≈ ⟨mkTup [Int 1]⟩; Total_set - (r ≈ ⟨ Int 1 ⟩) ∩ x1 ≈ ⟨ mkTup [] ⟩];
-     [x2 ≈ ⟨mkTup [Int 2]⟩; Total_set - (r ≈ ⟨ Int 2 ⟩) ∩ x2 ≈ ⟨ mkTup [] ⟩]].
+  make_FOR_Choices x1 ⟅x⟆ Scope.empty [ {{ x ≈ 1 }} ∩ {{ r ≈ 1 }}
+                        ; {{ x ≈ 2 }} ∩ {{ r ≈ 2 }} ] 
+                        [ {{ r ≈ x }} ] 
+  = [[ {{ x1 ≈ SArray [(1 : Simple)]}}; Total_set - ({{ r ≈ 1 }}) ∩ {{ x1 ≈ SArray [] }}];
+     [ {{ x2 ≈ SArray [(2 : Simple)]}}; Total_set - ({{ r ≈ 2 }}) ∩ {{ x2 ≈ SArray [] }}]].
 Proof.
 cbn.
 set_simpl.
 replace (Scope.union ⟅ x ⟆ Scope.empty) with ⟅ x ⟆. 2: admit.
 rewrite constrain_eq_hide_two. done.
 rewrite constrain_eq_hide_two. done.
-rewrite (hide_intersection_r ⟅ x ⟆ _ (r ≈ ⟨ Int _ ⟩)).
+rewrite (hide_intersection_r ⟅ x ⟆ _ ({{ r ≈ _ }})).
 unfold hidden. rewrite constrain_eq_hide_diff. done. auto.
-rewrite (hide_intersection_r ⟅ x ⟆ _ (r ≈ ⟨ Int _ ⟩)).
+rewrite (hide_intersection_r ⟅ x ⟆ _ ({{ r ≈ _ }})).
 unfold hidden. rewrite constrain_eq_hide_diff. done. auto.
 set_simpl.
 f_equal.
 f_equal.
 2: f_equal; f_equal.
-replace (fun ρ : env => mkTup [ρ r]) with 
-  (compose (fun x => mkTup [x]) (fun ρ => ρ r)). 2: auto.
 Admitted.
-
-Opaque Dom.append.
 
 (* for {x:=1|2}{x} == [ r=<1,2> ] *)
 Example For_example1 :
-  FOR x1 ⟅x⟆ Scope.empty [ x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 1⟩
-                         ; x ≈ ⟨Int 2⟩ ∩ r ≈⟨Int 2⟩] 
-                         [ r ≈ ⟪ x ⟫ ] 
-                       = [ r ≈ ⟨mkTup[Int 1;Int 2]⟩ ].
+  FOR x1 ⟅x⟆ Scope.empty [ {{ x ≈ 1 }} ∩ {{ r ≈ 1 }}
+                         ; {{ x ≈ 2 }} ∩ {{ r ≈ 2 }}] 
+                         [ {{ r ≈ x }} ] 
+                       = [ {{ r ≈ SArray [(1 : Simple);(2:Simple)] }} ].
 Proof.
   unfold FOR.
   rewrite Go_example1.
-  cbn.
   set_simpl.
   unfold mkTup.
 Admitted.
@@ -615,6 +618,7 @@ Admitted.
 
 (* ------------------------------------ ONE --------------------- *)
 
+(*
 
 Lemma extract_xisk k : 
   extract r (r ≈ x ≈ ⟨k⟩) = ⌈ (k, x ≈ ⟨k⟩) ⌉.
@@ -1004,7 +1008,7 @@ Admitted.
        exists (r |-> mkTup [], ρ). repeat split.
 Admitted.
 *)
-
+*)
 
 (* E [if (x=1|x=2) { x } { 0 }] = [ {r=1,x=1} | {r=2,x=2} | {r=0,x<>1,2} *)
 Definition if_iter := mini.If3 (x :=: 1 :|: x :=: 2) x 0.
@@ -1019,21 +1023,19 @@ Proof.
   unfold mini.I. fold mini.I.
   set_simpl. cbn.
   unfold IF.
-  destruct (try (mini.I a) (E a [\] ⟅ densem.r ⟆)) as [success avoid].
+  destruct (try (mini.I a) (E a [\] ⟅ densem.r ⟆)) as [success avoid] eqn:h0.
+  rewrite h0.
   replace ([Total_set - avoid] * []) with ([] : list ENV).
   2 : { cbn. auto. } 
   list_simpl.
-Admitted.
-(*
   rewrite -> List.app_nil_r.
   replace (success * [] [\] mini.I a) with ([] : list ENV).
   2: { unfold SEQ, UNIFY. cbn.    
        unfold hide_list.
        list_simpl.
        done. } 
-  list_simpl.
   f_equal.
-Qed. *)
+Qed. 
 
 
 

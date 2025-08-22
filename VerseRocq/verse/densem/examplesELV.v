@@ -35,6 +35,8 @@ Open Scope set_scope.
 Require Import densem.densem.
 Import ELV.
 
+(*
+
 (* ----------------------- examples --------------- *)
 
 Definition eval_top t d := eval Env.empty t d.
@@ -387,3 +389,4 @@ Proof.
 Admitted. *)
 
 End Rewrites.
+*)
