@@ -1022,6 +1022,9 @@ Proof.
   destruct (try (mini.I a) (E a [\] ⟅ densem.r ⟆)) as [success avoid].
   replace ([Total_set - avoid] * []) with ([] : list ENV).
   2 : { cbn. auto. } 
+  list_simpl.
+Admitted.
+(*
   rewrite -> List.app_nil_r.
   replace (success * [] [\] mini.I a) with ([] : list ENV).
   2: { unfold SEQ, UNIFY. cbn.    
@@ -1030,7 +1033,7 @@ Proof.
        done. } 
   list_simpl.
   f_equal.
-Qed.
+Qed. *)
 
 
 
@@ -1057,10 +1060,13 @@ where
 *)
 
 
+(*
+Definition choice (k1 k2 : nat) : 
+  (E (k1 :=: k2)) = (⌈ [ (r ≈ ⟨ Int k1 ⟩) ; (r ≈ ⟨Int k2⟩) ] ⌉).
 
 
-(*** D-SLS examples ************************)
+Definition unordered :
+  mini.If3 (x :=: 0) (1 :|: 2) (3 :|: 4).
 
-Import Thicker_DSLS.
-
-
+∃ x. if(x=0){1|2}else{3|4}
+*)
