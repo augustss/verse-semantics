@@ -18,7 +18,7 @@ $$
            , & \begin{array}[t]{@@{}l}
                  \conBrack{ u=|arr (u_1, xdots, u_n)|,
                             v=|arr (v_1, xdots, v_n)|} \\
-                   \prodsingleE \semess{S}{u_1}{v_1}{t_1} \prodE \ldots \prodE \semess{S}{u_n}{v_n}{t_n}\; )
+                   \prodsingleE \semess{S}{u_1}{v_1}{t_1} \prodE \mydots \prodE \semess{S}{u_n}{v_n}{t_n}\; )
       \end{array}
       \end{array}
       \\
@@ -68,14 +68,41 @@ $$
  & = & \conBrack{ u=v } \prodsingleE [\,\hideE(xs, \firstE(xs, \hideEs(p, \semess{S}{p}{v}{|t|}))) \, ] \\
  & & & \text{where}\; xs = \semapp{I}{|t|}, \; p \not\in \freevars{t} \\
 \rulename{sall} & \semess{S}{u}{v}{|all t|}
- & = & \conBrack{ u=v } \prodsingleE [\, \allE(q,\hideEs(p, \semess{B}{p}{q}{t}),v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\
-\\
+ & = & \conBrack{ u=v } \prodsingleE [\, \allE(q,\hideEs(p, \semess{B}{p}{q}{t}),v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\[2mm]
 
 % -------- LAMBDA ------------
 \rulename{dlam} &
-\multicolumn{3}{l}{\semess{S}{u}{v}{|functionOCX q t_1 fx t_2|}} \\
-  & & = & ??? \\
+\multicolumn{3}{l}{\semess{S}{h}{f}{|functionOCX c t_0 succeeds t_1|}} \\
+& & = & [
+  \begin{array}[t]{ll}
+ \{ \rho \, \vb \rho \inb \ENV, \\
+    \exists H \inb Fun.\, \rho(h)=H, \\
+    \exists F \inb Fun.\, \rho(f)=F, \\
+    \letvar \EV_{0}s = \squashE( \hideEs(\semapp{I}{|t_0|} \cup \{p,w\}, \{\rho\}) \prodsingleE \semess{S}{p}{w}{|t_0|}) \\
+    \letvar n = \lengthseq{\EV_{0}s},
+    \lengthseq{H} = n,
+    \lengthseq{F} = n, \\
+    \forall i\inb \{0,\mydots,n-1\}.\, \forall \rho_0 \inb \EV_{0}s[i] . \\
+    \quad \letvar \EV_{1}s = \hideEs(\semapp{I}{|t_1|} \cup \{j,z\}, \{\rho_0\}) \prodsingleE \semess{S}{j}{z}{|t_1|} \\
+    \quad \lengthseq{\squashE(\EV_{1}s)} = 1 \, \land \\
+    \quad \exists J \inb \Val\, . (\fpr{\rho_0(w)}{J}) \in H[i], \\
+    \forall k \inb \{0,\mydots,n-1\}.\, \forall I,Z \inb \Val. \\
+    \quad (\fpr{I}{Z}) \in F[k] \\
+    \quad\quad \Leftrightarrow \\
+    \quad ( (\exists i. \exists \rho_0 \inb \EV_{0}s[i]. \rho_0(p) = I) \, \land \\
+    \quad \quad \forall \rho_0 \inb \EV_{0}s[k].\, \rho_0(p) = I \\
+    \quad \quad \quad \Rightarrow \\
+    \quad \quad \exists \rho_1 \inb \squashE(\hideEs(\semapp{I}{|t_1|} \cup \{j,z\}, \{\rho_0\}) \prodsingleE \semess{S}{j}{z}{|t_1|})[0]. \\
+    \quad \quad \quad (\fpr{\rho_1(w)}{\rho_1(j)} \in H[k] \land \rho_1(z)=Z \\
+    \quad ) \\
+ \} ]
+ \end{array}
+ \\
 \\
+%% \rulename{dlam} &
+%% \multicolumn{3}{l}{\semess{S}{u}{v}{|functionOCX q t_1 fx t_2|}} \\
+%%  & & = & ??? \\
+%% \\
 & \semess{B}{u}{v}{|t|} & : & \seq{ \ENV } \\
 & \semess{B}{u}{v}{|t|} & = & \hideEs(\semapp{I}{|t|}, \semess{S}{u}{v}{t}) \\[1mm]
 & \semapp{C}{|t|} & : & \seq{ \ENV } \\
