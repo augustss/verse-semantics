@@ -115,7 +115,7 @@ $$
 \\
 \textbf{Denotational semantics} \\
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
-    & \semess{S}{u}{v}{|t|} & : & \powersetnp{\seq{ \ENV }} \\
+    & \semess{S}{u}{v}{|t|} & : & \powersetnp{\seq{ \ENV\! }} \\[1.3ex]
 %
 \rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{u=v=a} ] \\
 % \rulename{edef} & \semess{S}{u}{v}{|defintro x|} & = & \singleE(\Env) \\
@@ -128,18 +128,18 @@ $$
 % \rulename{eunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 %  & = & \begin{array}[t]{@@{}l@@{\,}l}
 %           \{     & [ \EV_1 \intersectE \EV_2 \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 ] \\
-%           |vbar| & s_1 \in \semess{S}{u}{v}{t_1}, s_2 \in \semess{S}{u}{v}{t_2} \; \} 
+%           |vbar| & s_1 \in \semess{S}{u}{v}{t_1}, s_2 \in \semess{S}{u}{v}{t_2} \; \}
 %  \end{array} \\
 %
 \rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 & = &  \begin{array}[t]{@@{}l@@{\,}l}
-          \{     & \semess{S}{u}{v}{t_1} \; \prodE \;\semess{S}{u}{v}{t_2} 
+          \{     & \semess{S}{u}{v}{t_1} \; \prodE \;\semess{S}{u}{v}{t_2}
           \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
   \end{array} \\
 %
 \rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
 & = &  \begin{array}[t]{@@{}l@@{\,}l}
-          \{     & \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2} 
+          \{     & \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}
           \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
   \end{array} \\
   %
@@ -147,13 +147,23 @@ $$
 & = & \{  [ \ \conBrack{u=v=k \wedge a=n}  |vbar| k \leftarrow [1..n] ]       \\
   &&& |vbar| \rho \in \Env,\ \semapp{A}{a}\rho = n \}  \\
 %
-\ \\ 
-\ \\ 
-\ \\ 
-\ \\ 
-\ \\ 
-\ \\ 
-\ \\ 
+\ \\
+\rulename{sapp}
+\ \\
+\rulename{sif}
+\ \\
+\rulename{sall}
+\ \\
+\rulename{sone}
+\ \\
+\rulename{sfor}
+\ \\
+\ \\
+\ \\
+\ \\
+\ \\
+\ \\
+\ \\
 %
 \rulename{eapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
 & = & \{ \; \begin{array}[t]{@@{}l}
@@ -207,4 +217,3 @@ $$
 \caption{Auxiliary functions for plan (S-SLS)}
 \label{fig:d-sls2}
 \end{figure}
-
