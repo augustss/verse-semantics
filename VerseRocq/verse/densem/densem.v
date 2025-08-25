@@ -298,6 +298,8 @@ Fixpoint combine (xs : list ENV) : P (list value * ENV) :=
    completion of each choice in the If. 
    Also produce an environment that corresponds to all choices
    failing. *)
+(* BCP: Is this right? I feel like the success accumulator needs to
+   subtract out all the previous successes at each stage... *)
 Definition try (a : Scope.t) (A : list ENV) : list ENV * ENV := 
   let step := fun '(success, avoid) Ai => 
                 (success ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
@@ -761,6 +763,7 @@ End Thin_DSLS.
 (* ----------- D-SLS semantics ------------------ *)
 
 (* This is SLS semantics that makes the most sense. *)
+(* BCP: CURRENT *)
 
 Import ConcreteVars.
 
@@ -911,57 +914,57 @@ Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
   T1 ⭅ TS1 ;;
   T2 ⭅ TS2 ;;
   let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
-  ⌈(successes * T1) [\] xs⌉ ∪ 
+  ⌈(successes * T1) [\] xs⌉ ∪
   ⌈(Total_set - avoid) ∩* T2⌉.
 
-Definition PFOR (z:Ident) (a b : Scope.t) (TS0 : P (list ENV)) 
-  (TS1 : P (list ENV)) : P (list ENV) := 
+Definition PFOR (z:Ident) (a b : Scope.t) (TS0 : P (list ENV))
+  (TS1 : P (list ENV)) : P (list ENV) :=
   T0 ⭅ TS0 ;;
   T1 ⭅ TS1 ;;
   ⌈ FOR z a b T0 T1 ⌉.
 
 
-Fixpoint E (e : mini.Expr) : P (list ENV) := 
+Fixpoint E (e : mini.Expr) : P (list ENV) :=
 
-  let B (e : mini.Expr) : P (list ENV) := 
+  let B (e : mini.Expr) : P (list ENV) :=
     Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉
     (* with set comprehension:
-       { Δs \ I e | Δs ∈ E e } 
+       { Δs \ I e | Δs ∈ E e }
      *)
   in
 
-  match e with 
+  match e with
 
-  | mini.DefineV _ => 
+  | mini.DefineV _ =>
       ⌈ [ Total_set ] ⌉
 
-  | mini.ES a => 
+  | mini.ES a =>
       SIMPLE (evalA a)
 
   | mini.Fail => ⌈ [] ⌉
 
-  | mini.Choice e1 e2 => 
+  | mini.Choice e1 e2 =>
       D1 ⭅ B e1 ;;
       D2 ⭅ B e2 ;;
       ⌈ D1 ++ D2 ⌉
 
-  | mini.Unify e1 e2 => 
+  | mini.Unify e1 e2 =>
       D1 ⭅ E e1 ;;
       D2 ⭅ E e2 ;;
       ⌈ D1 * D2 ⌉
 
-  | mini.Seq e1 e2 => 
-      D1 ⭅ E e1 ;;  
+  | mini.Seq e1 e2 =>
+      D1 ⭅ E e1 ;;
       D2 ⭅ E e2 ;;
       ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
 
   | mini.Iter a1 a2 =>
      ITER (evalA a1) (evalA a2)
 
-  | mini.ApplyD a1 a2 => 
+  | mini.ApplyD a1 a2 =>
      APP (evalA a1) (evalA a2)
 
-  | mini.If3 t0 t1 t2 =>  
+  | mini.If3 t0 t1 t2 =>
      IF (mini.I t0) (E t0) (B t1) (B t2)
 
   | mini.All t0 => 

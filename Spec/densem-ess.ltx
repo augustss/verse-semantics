@@ -150,7 +150,27 @@ $$
 \ \\
 \rulename{sapp}
 \ \\
-\rulename{sif}
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{S}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = &
+  \bigcup
+\begin{array}[t]{@@{}l@@{\,}l}
+  \{      & \begin{array}[t]{@@{}l}
+              [ \; s_0[0], \;
+                   s_0[1] \SETMINUS s'[0] ,\;
+                   s_0[2] \SETMINUS (s'[0] \cup s'[1]) ,\;
+              ]
+           \end{array}
+  \\
+     |vbar|  &
+           \begin{array}[t]{@@{}l}
+            s_0 \in \semess{S}{u}{v}{t_0},\;
+                s_1 \in \semess{S}{u}{v}{t_1},\;
+                s_2 \in \semess{S}{u}{v}{t_2},\; \\
+                s' = \HIDE{A}{(\semap{I}{|t_0|}\mathord{\cup}\{u,v\})}
+           \; \}
+           \end{array}
+    \end{array}
 \ \\
 \rulename{sall}
 \ \\
