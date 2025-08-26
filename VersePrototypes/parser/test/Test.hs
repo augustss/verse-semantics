@@ -18,8 +18,10 @@ module Main where
 import Test.Tasty
 import System.Environment (setEnv)
 
-import qualified TestSuite.Syntax
 import qualified TestSuite.All
+import qualified TestSuite.Syntax
+import qualified TestSuite.VerseTest
+import qualified TestSuite.Compat
 
 
 -- the test runner entry point
@@ -32,4 +34,6 @@ tests :: TestTree
 tests = testGroup "Parser"
   [ TestSuite.Syntax.unitTests
   , TestSuite.All.unitTests
+  , TestSuite.VerseTest.unitTests
+  , TestSuite.Compat.unitTests
   ]

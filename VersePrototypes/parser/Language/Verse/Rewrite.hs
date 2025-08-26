@@ -28,6 +28,7 @@ import Data.Maybe (maybe)
 import Data.Text.Encoding qualified as Text
 import Data.Traversable
 import Data.Tuple
+import Data.List
 
 import Language.Verse.Access
 import Language.Verse.Effect.Split qualified as Split (Effect)
@@ -36,7 +37,7 @@ import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Loc (L (..), Loc (..), liftL1, liftL2, loc)
+import Language.Verse.Loc (L (..), Loc (..), liftL1, liftL2, loc, mkL)
 import Language.Verse.Path (Path)
 import Language.Verse.Path qualified as Path
 import Language.Verse.SimpleName
@@ -85,7 +86,9 @@ rewrite
 rewrite = rewriteExp
 
 rewriteExp
-  :: (MonadWrong Error m, MonadSupply Label m)
+  :: ( MonadWrong Error m
+     , MonadSupply Label m
+     )
   => L (Parse.Exp SimpleName)
   -> m (L (Exp L Ident))
 rewriteExp e = for e $ \ case
@@ -252,8 +255,10 @@ rewriteExp e = for e $ \ case
     ParenInvoke <$> rewriteExp e1 <*> rewriteExp e2
   Parse.BracketInvoke e1 e2 ->
     BracketInvoke <$> rewriteExp e1 <*> rewriteExp e2
-  Parse.Exists x ->
-    pure . Exists $ Ident.Name <$> x
+  Parse.Exists nms' body' -> do
+    let nms = fmap Ident.Name <$> nms'
+    body <- rewriteExp body'
+    pure $ Exists nms body
   Parse.Forall x ->
     pure . Forall $ Ident.Name <$> x
   Parse.Tuple es ->
@@ -280,8 +285,28 @@ rewriteExp e = for e $ \ case
       Text.encodeUtf8 txt
   e@(Parse.String _txt _txts) ->
     notImplemented "rewriteExp on string with {}" e
-  Parse.InfixColonEqual (expToPat -> Just p) e ->
-    rewriteDef p =<< rewriteExp e
+  Parse.InfixColonEqual l r ->
+    case expToPat l of
+      Just p  -> rewrite r >>= rewriteDef p
+      -- HACK: See #86: This matches (a,b,c) := (1,2,3) which shows up in the
+      -- test cases in versetest. This case is a hack because according to
+      -- verse-spec a Tuple should be a pattern. So the ast should be
+      -- ((InfixColonEqual (Tuple ...) (Tuple ...)). But that would mean adding
+      -- 'Tuple' to Parser.Exp.Pat and then modifying the parser to accomodate
+      -- that pattern. Instead of doing that (the real fix) we use this case for
+      -- the time being.
+      Nothing -> case (extract l, extract r) of
+        -- we expect ls to all be idents
+        (Parse.Tuple ls, Parse.Tuple rs) -> do
+          let get_idents (Parse.Pat (Parse.Name (Parse.IdentName n))) = n
+              binders :: [L (Parse.Exp SimpleName)]
+              binders = ls
+              inner :: [L (Parse.Exp SimpleName)]
+              inner = zipWith (\a b -> mkL (loc e) $ Parse.InfixColonEqual a b) binders rs
+              new :: L (Parse.Exp SimpleName)
+              new = mkL (loc e) $ Parse.List inner
+          res <- rewrite new
+          return $ extract res
   Parse.Lam e1 e2 -> do
     e1 <- rewriteExp e1
     e2 <- rewriteExp e2
@@ -330,7 +355,9 @@ rewritePath = \ case
       (rewritePath <$> qualPath, extract ident)
 
 rewriteDef
-  :: (MonadWrong Error m, MonadSupply Label m)
+  :: ( MonadWrong Error m
+     , MonadSupply Label m
+     )
   => L (Pat SimpleName)
   -> L (Exp L Ident)
   -> m (Exp L Ident)

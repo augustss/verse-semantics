@@ -1,15 +1,56 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module    : Parser.Verse
+-- Copyright : (c) Epic Games
+-- License   : CC0
+-- Maintainer: jeffrey.young@epicgames.com
+-- Stability : experimental
+--
+-- This module defines the parser for Verse in accordance with the 0.15 language
+-- spec. This parser is a modified version of the '$ROOT/VerseReferenceImpl/'
+-- parser that has been modified to accept MaxVerse terms. For example '1;2' is
+-- not defined as sequential composition in the verse spec and in the reference
+-- implementation but this parser will parse it as just that.
+--
+-- We highlight parts of departure with a comment or a prefix of 'pc'. Functions
+-- that come from the reference implemantion are If you continue to extend this
+-- parser please follow this convention.
+-----------------------------------------------------------------------------
+
+{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE PatternSynonyms   #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+{- Note [Differences to Ref Impl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two naming conventions in this Parser. Functions that are prefixed
+with a 'p' like 'pNum' and functions that are prefixed with a 'pc' like 'pcExpr'.
+
+Functions prefixed with a 'p', in general, come directly from the reference
+implementation parser. When these functions have been extended we add a note as
+a comment indicating the extension.
+
+Functions prefixed with a 'pc' are pure extensions and have no counterpart in
+the reference implementation.
+
+In general the most general verse parser from the reference implementation is
+'pList'. 'pExpr' will fail on sequential expressions. 'pcExpr' extends 'pExpr'
+to handle sequences.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-}
+
+
 module Parser.Verse
   ( parseWithLoc
   , parseWithRewrite
-  , parse_
+  , parseToSrcExpr
+  , parse
   , parseDie
   , parseNoLoc
   , Parser
-  , module Language.Verse.Ident
-  , module Language.Verse.Exp
+  , Ident
   , module Language.Verse.Loc
   , module Language.Verse.Label
   , module Language.Verse.SimpleName
@@ -18,55 +59,43 @@ module Parser.Verse
   , Pos.Pos (..)
   , pKeyword -- See Note [Extensible Verse Parser]
   , pFile
+  , pLine, pList
   , pIdent, pIdentT
   , pNumT, pNum
   , pBlock
-  , pExpr
-  , pEq
+  , pSpace, skip
+  , pLineCmt, pComment, pBlockCmt
+  , pExpr, pcSemiExpr, pcExpr
+  , pEq, pEqual
   , pBrace
   , pRBrace
   , pLBrace
-  , pBraces
+  , pBraces, pcBraces
   , pParens
   , pPath
   , pComma
+  , pAlpha
   , pChar
+  , pHash
   , pSemi
   , pString
   , pStringLit
-  , skip
-  , P.many
-  , P.sepBy1
-  , P.try
+  , pIf
+  , P.many, P.sepBy1, P.try, P.chainl, P.optional, P.manyTill
   , optionMaybe
   , eof
   , getLoc
   , rewrite
   -- , toPos
-  , pDigit
+  , lexeme, spaces
   ) where
 
-import Control.Comonad
-import Control.Monad(when, void, (<=<))
-import Control.Monad.Identity(runIdentity)
-import Control.Monad.Trans.Class
-import Control.Monad.Supply
-import Control.Monad.Wrong
+import qualified Parser.Compat as PC
 
-
-import Data.ByteString qualified as ByteString
-import Data.ByteString(ByteString)
-import Data.ByteString.Internal(c2w, w2c)
-import Data.Char qualified as Char
-import Data.Char(isAlpha, isAlphaNum)
-import Data.Functor.Apply
-import Data.Text qualified as Text
-import Data.Text(Text)
-import Data.Text.Encoding qualified as Text
-import Data.Word (Word8)
+import qualified FrontEnd.Expr as Src
 
 import Language.Verse.Error qualified as E
-import Language.Verse.Loc (L (..), Loc(..), loc)
+import Language.Verse.Loc (L (..), Loc(..), loc, mkL)
 import Language.Verse.Label
 import Language.Verse.SimpleName
 import Language.Verse.Exp ( Exp
@@ -97,7 +126,25 @@ import qualified Language.Verse.Rewrite.Exp as R
 import Language.Verse.Ident
 import Language.Verse.Effect.Split
 
+
+import Control.Comonad
+import Control.Monad(when, void, (<=<))
+import Control.Monad.Identity(runIdentity)
+import Control.Monad.Supply
+
+import Data.ByteString(ByteString)
+import qualified Data.ByteString       as ByteString
+import qualified Data.ByteString.Char8 as BC
+import Data.ByteString.Internal(c2w, w2c)
+import Data.Char qualified as Char
+import Data.Char(isAlpha, isAlphaNum)
+import Data.Functor.Apply
+import Data.Text qualified as Text
+import Data.Text(Text)
+import Data.Text.Encoding qualified as Text
+import Data.Word (Word8)
 import Numeric(readHex, readBin)
+
 import Text.Parsec qualified as P
 import Text.Parsec (ParseError, (<|>), (<?>), tokenPrim, tokens)
 import Text.Parsec.Error qualified as PE
@@ -108,21 +155,29 @@ import Text.Parsec.Combinator (optionMaybe,eof)
 import Prelude hiding (exp)
 
 -- Nice to have when debugging
+
 {-
 import Debug.Trace(trace)
 
 traceChar :: String -> Parser ()
 traceChar msg = do
   p <- pos
-  c <- P.lookAhead pAny
-  trace (show (PPos.sourceLine p) ++ ":" ++ show (PPos.sourceColumn p) ++ ": '" ++ show (w2c c) ++ "' " ++ msg) $ return ()
+  cs <- P.lookAhead (P.try $ P.manyTill pAny pEnding)
+  trace (show (PPos.sourceLine p) ++ ":" ++ show (PPos.sourceColumn p) ++ ": '" ++ show (fmap w2c cs) ++ "' " ++ msg) $ return ()
   where
   pAny :: Parser Word8
   pAny = tokenPrim
     (\c -> showW8s [c])
-    (\pos w _ws -> updatePosWord pos w)
+    (\pos' w _ws -> updatePosWord pos' w)
     (\w -> Just w)
 -}
+
+--------------------------------------------------------------------------------
+--
+--                              Parser API
+--
+--------------------------------------------------------------------------------
+
 
 -- The predefined interface for Parsec on ByteString converts all Word8 to Char one at a time.
 -- That doesn't work well with UTF-8
@@ -133,16 +188,41 @@ instance (Monad m) => PPrim.Stream Word8String m Word8 where
   uncons (WS byteString) =
     case ByteString.uncons byteString of
       Nothing -> return Nothing
-      Just (word8, byteString) -> return $ Just (word8, WS byteString)
+      Just (word8, bs) -> return $ Just (word8, WS bs)
 
 type Parser = P.Parsec Word8String ParserState
 
-parse_ :: Parser a -> String -> ByteString -> Either ParseError a
-parse_ p path content = runIdentity $ P.runParserT p beginPS path (WS content)
+-- | Given a FilePath and the contents of the file, parse the file and return an
+-- @Exp@ annotated with Source Locations.  This is likely the parser you are
+-- looking for.
+parseWithRewrite
+  :: Parser (L (Exp SimpleName))
+  -> String
+  -> ByteString
+  -> Either E.Error ((R.Exp L Ident))
+parseWithRewrite p path bs = fmap extract $ parseWithLocRewrite p path bs
 
+-- | Parse directly to FrontEnd.Expr. This is the general purpose parser used in
+-- the tester for arbritrary expressions
+parseToSrcExpr :: String -> ByteString -> Src.SrcExpr
+parseToSrcExpr = (PC.expToSrcExpr .) . go_parse pcExpr
+  where
+    go_parse :: Parser (L (Exp SimpleName)) -> String -> ByteString -> L (R.Exp L Ident)
+    go_parse p path content =
+      case parseWithLocRewrite p path content of
+        Left err -> error $ show err
+        Right x  -> x
+
+-- | The general purpose parser entry point
+parse :: Parser a -> String -> ByteString -> Either ParseError a
+parse p path content = runIdentity $ P.runParserT p beginPS path (WS content)
+
+-- | The general purpose parser that throws exceptions. Run parser 'p' on
+-- 'content', 'path' is only for error messages. Throw an exception if something
+-- goes wrong.
 parseDie :: Parser a -> String -> ByteString -> a
 parseDie p path content =
-  case parse_ p path content of
+  case parse p path content of
     Left err -> error $ show err
     Right x  -> x
 
@@ -153,23 +233,13 @@ parseNoLoc p path bs = extract $ parseDie p path bs
 -- @Exp@ annotated with Source Locations
 parseWithLoc :: Parser a -> String -> ByteString -> Either E.Error a
 parseWithLoc p path bytestring =
-  case parse_ p path bytestring of
+  case parse p path bytestring of
     Left err -> Left $ E.OtherError (toPos $ PE.errorPos err) (showWithoutPos err)
     Right x -> Right x
   where
     -- Copied from Parsec.Error, but without position since it's reported separately
     showWithoutPos err =
       PE.showErrorMessages "or" "unknown parse error"  "expecting" "unexpected" "end of input" (PE.errorMessages err)
-
--- | Given a FilePath and the contents of the file, parse the file and return an
--- @Exp@ annotated with Source Locations
-parseWithRewrite
-  :: Parser (L (Exp SimpleName))
-  -> String
-  -> ByteString
-  -- -> R.Exp L Ident
-  -> Either E.Error ((R.Exp L Ident))
-parseWithRewrite p path bs = fmap extract $ parseWithLocRewrite p path bs
 
 parseWithLocRewrite
   :: Parser (L (Exp SimpleName))
@@ -238,21 +308,33 @@ pPrintable = ((:[]) <$> byte 0x09) <|> P.notFollowedBy (void pLessHash <|> void 
 
 -- Space     := {0o09 | 0o20 | Comment}
 pSpace :: Parser (L String)
-pSpace = (\ p1 p2 -> L (toLoc p1 p2) "<space>") <$> pos <* P.many (match '\t'  <|> match ' ' <|> pComment) <*> pos
+-- pSpace = (\ p1 p2 -> L (toLoc p1 p2) "<space>") <$> pos <* P.many (match '\t'  <|> match ' ' <|> pComment) <*> pos
+pSpace = P.try $ do
+  p1 <- pos
+  -- See Note [Differences in the Ref Impl]. The Ref Impl parser only skips
+  -- tabs, spaces, and comments here. We've extended this with newlines
+  -- here. The Ref Impl parser assumes one is always parsing a file and calls
+  -- sepBy ... pNewline but this creates problems for the verse programs in
+  -- versetests hence this extension.
+  _  <- P.skipMany (match '\t' <|> match ' ' <|> pComment <|> pNewline)
+  p2 <- pos
+  return $ L (toLoc p1 p2) "<space>"
 
 -- NewLine   := 0o0D [0o0A] | 0o0A
 pNewline :: Parser (L String)
 pNewline =
-  match '\n'
+  match '\n' -- 0o0A (0x0A in the ascii table)
   <|>
   match '\r' <* P.option () (void $ match '\n')
---  )
---  <?>
---  "end of line"
 
 -- Ending    := &(NewLine | end)
 pEnding :: Parser (L String)
-pEnding = wrapLoc <$> pos <*> ("<end of line/file>" <$ P.lookAhead (void pNewline <|> P.eof)) <*> pos
+pEnding = do
+  start <- pos
+  _ <- void pNewline <|> P.eof
+  end   <- pos
+  return $ wrapLoc start "<end of line/file>" end
+  -- wrapLoc <$> pos <*> ("<end of line/file>" <$ P.lookAhead (void pNewline <|> P.eof)) <*> pos
 
 -- Ind       := Ending Line push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 pInd :: Parser ()
@@ -321,7 +403,10 @@ pScanKeyNS = P.lookAhead pNewline *> pScan *> pLinePrefix *> void pSpace
 
 -- LineCmt   :=  "#" !'>' {Text        } Ending
 pLineCmt :: Parser ()
-pLineCmt = void pHash <* P.manyTill pText (P.lookAhead pEnding)
+pLineCmt = do
+  void pHash
+  void $ P.manyTill (satisfy $ const True) (pNewline <|> pEnding) -- (P.lookAhead pEnding)
+  return ()
 
 -- BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
 pBlockCmt :: Parser ()
@@ -563,7 +648,7 @@ pString = do
 pStringLit :: Parser (L Text)
 pStringLit = do
   p1 <- pos
-  s1 <- match '"' *> pStringText
+  s1 <- (match '"') *> pStringText
   xs <- pStringRest <* match '"'
   p2 <- pos
   return $ L (toLoc p1 p2) $ extract s1
@@ -640,9 +725,9 @@ pBrace = P.try $ mkListPos <$ pScan <*> pLBrace <*> pList <*> pRBrace <* pSpace
 
 -- Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
 pBlock :: Parser (L (Exp SimpleName))
-pBlock = pBrace
+pBlock = P.try pBrace
          <|>
-         pDotSpace *> pSpace *> pDef <* pSpace
+         (pDotSpace *> pSpace *> pDef <* pSpace)
          <|>
          P.try (mkListPos <$> pColon <* pSpace <* pInd <*> pList <* pDed <*> pPos)  -- After "of" there can be either a "colon pInd ... pDed" or a prefix ":"
 
@@ -684,10 +769,15 @@ pParen :: Parser (L (Exp SimpleName))
 pParen = mkListPos  <$> pLParen <*> pList <*> pRParen <* pSpace
 
 pParens :: Parser a -> Parser a
-pParens = P.between pLParen pRParen
+pParens = do
+  P.between pLParen pRParen
 
 pBraces :: Parser a -> Parser a
 pBraces = P.between pLBrace pRBrace
+
+-- like pBraces but remove white space after the '{'
+pcBraces :: Parser a -> Parser a
+pcBraces = P.between (lexeme pLBrace) pRBrace
 
 -- QualIdent := ['(' List ":)" Space] Ident
 pQualIdent :: Parser (L (IdentExp SimpleName))
@@ -799,17 +889,26 @@ pVar = (((\ specs e -> addSpecs specs $ Exp.ExpVar <$> duplicate e) <$ pKeyword 
         ((\ specs e -> addSpecs specs $ Exp.ExpAlias <$> duplicate e) <$ pKeyword "alias"))
        <*> pSpecs <* pSpace <*> pChoose
 
+pExists :: Parser (L (Exp SimpleName))
+pExists = pKeyword "exists" *> do
+  beg    <- pos
+  _      <- pSpace -- leading space between exists and the first ident
+  idents <- P.sepBy1 pIdent pSpace
+  body   <- pBlock
+  end    <- pos
+  return $ wrapLoc beg (Exp.Exists idents body) end
+
 -- Base      := '(' List ')' | Num | Char | Path | String | Markup | If | !Reserved QualIdent
 -- TODO Markup
 pBase :: Parser (L (Exp SimpleName))
 pBase =
-  (\ n -> Exp.Exists <$> duplicate n) <$ pKeyword "exists" <* pSpace <*> pIdent  -- TODO Here for refimpl
+  pExists
   <|>
-  (\ n -> Exp.All <$> duplicate n) <$ pKeyword "all" <* pSpace <*> pBlock -- TODO Here for refimpl
+  (\ n -> Exp.All <$> duplicate n)   <$ (pKeyword "all") <* lexeme pSpace <*> pBlock -- TODO Here for refimpl
   <|>
-  (\ n -> Exp.One <$> duplicate n) <$ pKeyword "one" <* pSpace <*> pBlock -- TODO Here for refimpl
+  (\ n -> Exp.One <$> duplicate n)   <$ pKeyword "one" <* pSpace <*> pBlock       -- TODO Here for refimpl
   <|>
-  (\ n -> Exp.Block <$> duplicate n) <$ pKeyword "block" <* pSpace <*> pBlock -- TODO Here for refimpl
+  (\ n -> Exp.Block <$> duplicate n) <$ pKeyword "block" <* pSpace <*> pBlock   -- TODO Here for refimpl
   <|>
   (Exp.True <$) <$> pKeyword "true"  -- TODO: Is "true" a reserved words?
   <|>
@@ -940,8 +1039,6 @@ pOr =
 --              | Space   "where" Key   (KeyBlock | Defs)
 --              | ScanKey "is"    Key   (KeyBlock | Def ) } StopDef
 --           |  ('&'|"..") Space Def | Return [Block | Def] StopDef
-
-
 pDef :: Parser (L (Exp SimpleName))
 pDef = pDef' Nothing
 
@@ -1017,11 +1114,44 @@ pFun' e1 =
                        , \e1 -> liftL2 Exp.While e1 <$ pKeyword "while" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
                   ]
 
+-- | top level parse an expression
+pcExpr :: Parser (L (Exp SimpleName))
+pcExpr = do
+  pcUniExpr
+    <|> pcSemiExpr
+    <|> P.try (spaces *> pNum   <* spaces)
+    <|> P.try (spaces *> pParen <* spaces)
+    <|> P.try (pExpr) -- this try is necessary or else pExpr throws exceptions
+                      -- on literal numbers
+
+-- | parse a unification expression: 'f = g'
+pcUniExpr :: Parser (L (Exp SimpleName))
+pcUniExpr = P.try $ do
+  l <- P.try pExpr
+  _ <- match '='
+  r <- P.try pExpr
+  let start = loc $ l
+      end   = loc $ r
+      res_loc = start <> end
+      es    = [l,r]
+      combine acc x = mkL res_loc $ (:=:) acc x
+      res   = foldl1 combine es
+  return res
+
+-- | parse a sequential composition expression: 'f;g'
+pcSemiExpr :: Parser (L (Exp SimpleName))
+pcSemiExpr = P.try $ do
+  es <- P.sepBy1 pExpr (lexeme pSemi)
+  let start = loc $ head es
+      end   = loc $ last es
+      res_loc = start <> end
+  return $ mkL res_loc $ Exp.List es
+
 -- Expr      := Fun {Space '@' Space Call} StopExpr
 --           |  '@' Space Call Scan &('@' | QualIdent) Expr
 -- added optional ';' since it's already used in the wild
 pExpr :: Parser (L (Exp SimpleName))
-pExpr =
+pExpr = do
   liftL2 Exp.AtSpec <$ pAt <* pSpace <*> pCall <* pScan  <* P.optionMaybe pSemi <*> pExpr
   <|>
   fixAfterAt <$> pFun <*> P.many ((.>) <$ pSpace <*> pAt <* pSpace <*> pCall <* pScan)
@@ -1066,6 +1196,9 @@ pSeparator = (pSemi <|> pEnding) *> pScan
 -- List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
 pList :: Parser (L [L (Exp SimpleName)])
 pList = doList pCommas pSeparator
+
+pDotList :: Parser (L [L (Exp SimpleName)])
+pDotList = doList pChoose pSeparator
 
 pNameList :: Parser (L [([L (Exp SimpleName)], L SimpleName)])
 pNameList = doList pAtName pNameSeparator
@@ -1117,11 +1250,24 @@ mkListPos p1 xs p2 = mkList xs <. p1 <. p2
 
 ---------------------------------useful parsers
 
+isSpace :: Word8 -> Bool
+isSpace w = w `elem` [9,10,11,12,13,32]  -- [tab,linefeed,vertical_tab,newpage,carriage return,space]
+
+spaces :: Parser ()
+spaces = P.skipMany (satisfy isSpace)
+
+-- | a lexeme parser assumes no _in-significant_ spaces before the lexeme and
+-- consumes all white space after the lexeme including newlines. This convention
+-- comes from megaparsec. See:
+-- https://hackage.haskell.org/package/megaparsec-9.7.0/docs/Text-Megaparsec-Char-Lexer.html
+lexeme :: Parser a -> Parser a
+lexeme p = p <* spaces
+
 -- skip whitespace including comments and tabs, this already matches many
 skip :: Parser ()
 skip = pSpace $> ()
 
--- Binary takes parser for lhs and phs and a list with pairs of parsers for operator and function to apply f matching.-
+-- Binary takes parser for lhs and rhs and a list with pairs of parsers for operator and function to apply f matching.-
 -- Binary     := pLhs Space { pOperator Scan  pRhs Space}
 
 doBinary :: Parser (L a) -> Parser (L b) -> [(Parser (L c), L a -> L b -> a)] -> Parser (L a)
@@ -1181,7 +1327,7 @@ pDot :: Parser (L String)
 pDot =  P.try (match '.' <* P.notFollowedBy (match '.' <|> match ' ' <|> match '\t' <|> pEnding))
 
 pSemi :: Parser (L String)
-pSemi =  match ';'
+pSemi = match ';'
 
 pFatArrow :: Parser (L String)
 pFatArrow =  string "=>"
@@ -1249,7 +1395,7 @@ pLinePrefix = do
 pKeyword :: String -> Parser (L String)
 pKeyword kwd = P.try $ do
   p1 <- pos
-  x <- pAlpha
+  x  <- pAlpha
   xs <- P.many pAlnum
   p2 <- pos
   case Text.decodeUtf8' (ByteString.pack $ x:xs) of

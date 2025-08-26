@@ -16,12 +16,14 @@
 
 module Utils
   ( makeTest
-  , prettyTest
+  , prettyTest, prettyTest_
   , roundTrip
   , broken
+  , patName
   ) where
 
 import Parser.Verse
+import Language.Verse.Exp
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -40,6 +42,10 @@ dummy_file = "<parser test suite>"
 
 verse_parser :: Comonad w => Parser (w a) -> Text -> a
 verse_parser p inp = parseNoLoc p dummy_file (encodeUtf8 inp)
+
+-- only test if 'p' throws an exception or not
+verse_parser_ :: Parser () -> Text -> ()
+verse_parser_ p inp = parseDie p dummy_file (encodeUtf8 inp)
 
 makeTest
   :: ( Eq      a
@@ -66,6 +72,14 @@ prettyTest p (desc, result) =
     escape_newlines = concatMap (\c -> if c == '\n' then "\\n" else [c])
     cleaned_desc    = escape_newlines $ unpack desc
 
+prettyTest_ :: Parser () -> (Text, Text) -> TestTree
+prettyTest_ p (desc, result) =
+  testCase cleaned_desc $ (render (verse_parser_ p desc)) @=? result
+  where
+    render          = renderStrict . layoutPretty defaultLayoutOptions . pretty
+    escape_newlines = concatMap (\c -> if c == '\n' then "\\n" else [c])
+    cleaned_desc    = escape_newlines $ unpack desc
+
 roundTrip
   :: ( Eq      a
      , Show    a
@@ -77,3 +91,14 @@ roundTrip p desc = prettyTest p (desc,desc)
 
 broken :: Text -> TestTree -> TestTree
 broken (unpack -> str) = expectFailBecause str
+
+
+-----------------------------------------------
+--
+--                Helpers
+--
+-----------------------------------------------
+
+-- just to avoid name clashes and a qualified import
+patName :: IdentExp a -> Pat a
+patName = Language.Verse.Exp.Name
