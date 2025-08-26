@@ -155,63 +155,55 @@ $$
 & = &
   \bigcup
 \begin{array}[t]{@@{}l@@{\,}l}
-  \{      & \begin{array}[t]{@@{}l}
-              [ \; s_0[0], \;
-                   s_0[1] \SETMINUS s'[0] ,\;
-                   s_0[2] \SETMINUS (s'[0] \cup s'[1]) ,\;
+  \{      & \HIDE{(\begin{array}[t]{@@{}l}
+              [ \; s[0], \;
+                   s[1] \mathord{\SETMINUS} s[0] ,\;
+                   \ldots
+                   s[n] \mathord{\SETMINUS} (s[0] \cup s[1] \ldots
+                       \cup  s[n\mathord{-}1]) \;
               ]
            \end{array}
+       \!\! \prodE s_1)}{\semap{I}{|t_0|}}
   \\
      |vbar|  &
            \begin{array}[t]{@@{}l}
-            s_0 \in \semess{S}{u}{v}{t_0},\;
-                s_1 \in \semess{S}{u}{v}{t_1},\;
-                s_2 \in \semess{S}{u}{v}{t_2},\; \\
-                s' = \HIDE{A}{(\semap{I}{|t_0|}\mathord{\cup}\{u,v\})}
+                s_0 \in \semess{S}{u}{v}{t_0}, \\
+                s = \HIDE{s_0}{(\semap{I}{|t_0|}\mathord{\cup}\{u,v\})} \\
+                s_1 \in \semess{B}{u}{v}{t_1}, \\
+                s_2 \in \semess{B}{u}{v}{t_2}
            \; \}
            \end{array}
-    \end{array}
+\end{array}
 \ \\
 \rulename{sall}
 \ \\
 \rulename{sone}
 \ \\
 \rulename{sfor}
-\ \\
-\ \\
-\ \\
-\ \\
-\ \\
-\ \\
-\ \\
-%
-\rulename{eapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
-& = & \{ \; \begin{array}[t]{@@{}l}
-         [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
-         |vbar| i |<-| 0\mydots\, ] \; \}
-         \end{array} \\
-\multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
-  \semess{S}{u}{v}{|if3 e_1 e_2 e_3|} }r
-& = & \bigcup \begin{array}[t]{@@{}l@@{\,}l}
-  \{      & \begin{array}[t]{@@{}l}
-               \mapEs(\lambda \EV.\, \hideE(Y,\EV \cap \EV_1),  \; \semess{S}{u}{v}{e_2})
-                  \; \cup \\
-                  \mapEs(\lambda \EV.\, \EV \setminus (\hideE(Y,\EV_1)), \; \semess{S}{u}{v}{e_3} )
-           \end{array}
-  \\
-      |vbar|  & s_1 \in \semess{S}{u}{v}{e_1}, \EV \in \unionEL( s_1 ) \; \}
-    \end{array} \\
-&&& |where|\; Y = \semap{I}{|e_1|} \\
-\rulename{eall} & \semess{S}{u}{v}{|all e|}
-& = & \begin{array}[t]{@@{}l@@{\,}l}
-       \{ & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(s), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ] \\
-       |vbar| & s \in \semapsub{B}{c}{e} \; \}
-      \end{array}
-\\
+ \ \\
+ \ \\
+ \ \\
+ \ \\
+% \ \\
+% \ \\
+% \ \\
+% %
+% \rulename{eapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+% & = & \{ \; \begin{array}[t]{@@{}l}
+%          [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
+%          |vbar| i |<-| 0\mydots\, ] \; \}
+%          \end{array} \\
+% %
+% \rulename{eall} & \semess{S}{u}{v}{|all e|}
+% & = & \begin{array}[t]{@@{}l@@{\,}l}
+%        \{ & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(s), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ] \\
+%        |vbar| & s \in \semapsub{B}{c}{e} \; \}
+%       \end{array}
+% \\
 \\
 
-& \semapp{B}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
-& \semapp{B}{|e|} & = & \mapEs( \lambda \EV. \, \hideE(\semapp{I}{|e|}, \EV),\; \semess{S}{u}{v}{e})
+& \semess{B}{u}{v}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
+& \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \, \hideE(\semapp{I}{|e|}, \EV),\; \semess{S}{u}{v}{e})
 \end{array}
 \end{array}
 $$
@@ -234,6 +226,6 @@ $$
 
 \end{array}
 $$
-\caption{Auxiliary functions for plan (S-SLS)}
+\caption{Auxiliary functions for plan (S-SLS) \benjamin{not all needed}}
 \label{fig:d-sls2}
 \end{figure}
