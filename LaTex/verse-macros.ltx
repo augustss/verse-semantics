@@ -302,6 +302,7 @@
 \newcommand{\semappsub}[4]{\semfun{#1}_{#2}\llbracket #3 \rrbracket\, #4}
 \newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4}
 \newcommand{\semapppp}[5]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5}
+\newcommand{\semappppp}[6]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5 \, #6}
 
 %% Semantics of Essential Verse
 \newcommand{\semess}[4]{\semfun{#1}\,#2\llbracket #4 \rrbracket #3}
@@ -341,8 +342,10 @@
 \newcommand{\prodE}{\mathrel{\prescript{*\hspace{-.165em}}{}{\cap}^{\!*}}}
 \newcommand{\unionListE}{\mathbf{unionl}}
 \newcommand{\allE}{\mathbf{ALL}}
-\newcommand{\letvar}{\textbf{let}\,}
+\newcommand{\letvar}{\mathbf{let}\,}
+\newcommand{\subseq}[1]{\mathbf{subsequence}(#1)}
 \newcommand{\lengthseq}[1]{\mathbf{length}(#1)}
+\newcommand{\DSifthenelse}[3]{\begin{array}[t]{@@{}l} \mathbf{if}\; #1 \\ \,\mathbf{then}\; #2 \\ \,\mathbf{else}\; #3 \end{array}}
 
 % Notation for ENV
 \newcommand{\sembrack}[1]{\llbracket #1 \rrbracket}
