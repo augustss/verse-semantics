@@ -257,21 +257,46 @@ $$
 %           |vbar| & s_1 \in \semess{S}{u}{v}{t_1}, s_2 \in \semess{S}{u}{v}{t_2} \; \}
 %  \end{array} \\
 %
+%
+\rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
+& = &
+  \begin{array}[t]{@@{}l@@{\,}l}
+          \{  \mathit{concat} \ ss
+
+            \\\;
+              |vbar|
+        \begin{array}[t]{@@{}l}
+            s_1 \in \semapp{C}{t_1}, \\
+            ss \in \mathit{flatten}
+                      [ \; \begin{array}[t]{@@{}l}
+                          \{ \; \begin{array}[t]{@@{}l}
+                              [\Delta_1\cap \Delta_2
+                                \mathrel{|vbar|}
+                               \Delta_2 \leftarrow s_2]
+                            \\ \mathrel{|vbar|}
+                      s_2 \in \semess{S}{u}{v}{t_2} \; \}
+                     \end{array}
+                   \\
+                   \mathrel{|vbar|} \Delta_1 \in s_1 \; ] \}
+                   \end{array}
+        \end{array}
+  \end{array}
+  % \begin{array}[t]{@@{}l@@{\,}l}
+  %         \{     & \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}
+  %         \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+  % \end{array}
+  % &  \prodE \;\semess{S}{u}{v}{t_2}
+  %         \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+  %
+\ \ \ \ \ \ \benjamin{per Koen, hopefully}
+\\[0.6ex]
+%
 \rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
 & = &  \begin{array}[t]{@@{}l@@{\,}l}
           \{     & \semess{S}{u}{v}{t_1} \; \prodE \;\semess{S}{u}{v}{t_2}
           \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
   \end{array}
-\ \ \ \ \ \ \ \ \ \benjamin{fix}
-\\[0.6ex]
-%
-\rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
-& = &  \begin{array}[t]{@@{}l@@{\,}l}
-          \{     & \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}
-          \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
-  \end{array}
-  %
-\ \ \ \ \ \ \ \ \ \benjamin{fix}
+\\ &&& \ \ \ \benjamin{similar fix needed there?}
 \\[0.6ex]
 %
 \rulename{sdotdot} &  \semess{S}{u}{v}{|1 ..  a|}
@@ -315,7 +340,11 @@ $$
            \; \}
            \end{array}
 \end{array}
- \ \\
+\\[0.6ex]
+\rulename{sapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+ & = &  \conBrack{u=v} \prodE \semess{F}{a_2}{v}{a_1}    \ \ \ \ \
+       \benjamin{where to mix in $u=v$?}
+\\[0.6ex]
  \ \\
  \ \\
  \ \\
@@ -336,15 +365,28 @@ $$
 %       \end{array}
 % \\
 \\
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \text{where...} \\
 & \semess{B}{u}{v}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
 & \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \,
                               \HIDE{\semapp{I}{|e|}}{\EV},\;
                               \semess{S}{u}{v}{e})
 \ \\[1.5ex]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
 &   \mapEs & : & (\ENV \rightarrow \ENV) \rightarrow \powersetnp {\seq{ \ENV }} \rightarrow \powersetnp {\seq{ \ENV }} \\
-&   \mapEs(f, S) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in S \; \} \\[1mm]
-
+&   \mapEs(f, S) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in S \; \}
+\ \\[1.5ex]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+  % F arg[fun]r = { [ {{ arg⇒r ∈ hs[i] }} | i<-[0..len(hs)] ]
+  %               | hs ∈ Fun
+  %               }
+& \semess{F}{a_a}{r}{a_f} & : & \powersetnp{\seq{\ENV}} \\
+& \semess{F}{a_a}{r}{a_f} & = &
+    \{ \ [ \; \conBrack{\conFun{a_a}{r}{hs}{i}} \vb i |<-| 0..||hs|| \; ]
+   \\ &&& \,|vbar| hs \in a_f
+      \; \}
+\ \\[1.5ex]
 \end{array}
 \end{array}
 $$
