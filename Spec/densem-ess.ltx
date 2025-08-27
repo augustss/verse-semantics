@@ -143,7 +143,7 @@ $$
   \\
   \\
  & \semapp{Q}{t} & : & \Env \rightarrow \Ident \rightarrow \Ident \rightarrow \seq{\ENV} \\
- & \semapppp{Q}{t}{\rho}{x\,y} & = & 
+ & \semapppp{Q}{t}{\rho}{x\,y} & = &
  \squashE(\hideEs(\semapp{I}{|t|} \cup \{x,y\}, \{\rho\}) \prodsingleE \semess{S}{x}{y}{|t|}) \\
 
 \end{array}
@@ -252,9 +252,10 @@ $$
 %       \end{array}
 % \\
 \\
-
 & \semess{B}{u}{v}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
-& \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \, \hideE(\semapp{I}{|e|}, \EV),\; \semess{S}{u}{v}{e})
+& \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \,
+                              \hideE(\semapp{I}{|e|}, \EV),\;
+                              \semess{S}{u}{v}{e})
 \end{array}
 \end{array}
 $$
@@ -279,3 +280,4 @@ $$
 $$
 \caption{Auxiliary functions for plan (S-SLS) \benjamin{not all needed}}
 \label{fig:d-sls2}
+\end{figure}
