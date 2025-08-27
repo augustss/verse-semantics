@@ -181,21 +181,21 @@ Definition APP_Tim (r f x : Ident) (A : list ENV) (B : list ENV) : list ENV :=
 (* --- other definitions --------- *)
 
 (* Interpret atomic/simple values *)
-Definition SIMPLE (a : common.Simple) : list ENV :=
+Definition SIMPLE (a : common.Simple) : list ENV := 
    [ {{ r ≈ a }} ].
 
-Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV :=
+Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
   (d1 [\] ⟅ r ⟆) * d2.
 
 (* This character C-X 8 ret U+2A3E,  or \fcmp  *)
 (* Infix "⨾" := SEQ (at level 70, left associativity) : list_scope. *)
 
 (* Iteration: a1 .. a2 *)
-(* This definition requires infinite lists. Here we approximate
+(* This definition requires infinite lists. Here we approximate 
    because we assume that there are only a finite number of values. *)
-Definition ITER (a1 : env -> value) (a2 : env -> value) : list ENV :=
+Definition ITER (a1 : env -> value) (a2 : env -> value) : list ENV := 
   i <- allNums ;;
-  [ (fun ρ => (ρ r = Int i) /\
+  [ (fun ρ => (ρ r = Int i) /\ 
              exists n1 n2, (a1 ρ = Int n1) /\ n1 <= i /\ (a2 ρ = Int n2) /\ n2 >= i) ].
 
 
@@ -205,33 +205,34 @@ Definition ITER (a1 : env -> value) (a2 : env -> value) : list ENV :=
 (* find all environments in Δ such that ρ(r) = v, then hide r *)
 
 (* {{  (v, Δ') | ρ ∈ Δ , v = ρ.r, Δ' = (Δ ∩ {{ r = v }}) \ r  }} *)
-Definition extract r (Δ : ENV) : P (value * ENV) :=
+Definition extract r (Δ : ENV) : P (value * ENV) := 
   ρ ⭅ Δ ;;
-  let v := ρ r in
+  let v := ρ r in 
   ⌈ (v , Δ ∩ (fun ρ => ρ r = v) \ ⟅r⟆) ⌉.
 
-(* The set of results in Δ that could be produced by environments
+(* The set of results in Δ that could be produced by environments 
    consistent with ρ *)
 (* {{ v | (v , Δ') ∈ extract Δ , ρ ∈ Δ ' }} *)
-Definition consistent_results (ρ : env) (Δ : ENV) : VAL :=
+Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
   '(v, Δ') ⭅ extract r Δ ;; when (ρ ∈ Δ') ⌈v⌉.
 
-Definition ALL (Δs : list ENV) : ENV :=
+Definition ALL (Δs : list ENV) : ENV := 
   fun ρ => exists vs,
       (vs ∈ squash_pick (List.map (consistent_results ρ) Δs)) /\
       (ρ r = mkTup vs).
-
-Definition ONE (Δs : list ENV) : ENV :=
-  fun ρ =>
+       
+Definition ONE (Δs : list ENV) : ENV := 
+  fun ρ => 
       (ρ r ∈ Head (squash_pick (List.map (consistent_results ρ) Δs))).
 
 
 (* ----------- semantics of FOR ----------- *)
 
+
 (* Destination passing version, with fixed r.
 
-Each choice in A either produces a singleton tuple ⟨vn⟩ or empty tuple ⟨⟩ stored
-in the environment in variables r0...rm. Then we concatenate all of these
+Each choice in A either produces a singleton tuple ⟨vn⟩ or empty tuple ⟨⟩ stored 
+in the environment in variables r0...rm. Then we concatenate all of these 
 tuples together to get the final result.
 
 ε⟦for(t0){t1}⟧r := [{ρ | ρ ← ρs, ρ.r=ρ.r0+ρ.r1+ …}    # NOTE: + is tuple concatentation
@@ -241,9 +242,9 @@ tuples together to get the final result.
              Cn  := ([ A[n] - r    ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
                                        | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) +
                     [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ]
-                    where
-                                A := ε⟦t0⟧r
-                                A' = A - BVS(t0) - r
+                    where 
+				A := ε⟦t0⟧r 
+				A' = A - BVS(t0) - r
 
          r s rn ∉ BVS(t0,t1) # should these be completely fresh?
 
@@ -251,10 +252,10 @@ tuples together to get the final result.
 
 (* This helper function constructs Cn by iterating over A.
 
-   To be compositional, this function takes the denotations of t0 and t1
+   To be compositional, this function takes the denotations of t0 and t1 
    as arguments.
 
-NOTE:
+NOTE:  
    r  is the result variable
    rn is a fresh identifier (and all of its successors are fresh)
    a  is BVS t0
@@ -263,9 +264,9 @@ NOTE:
    B  ε⟦t1⟧r
 
 *)
-Fixpoint make_FOR_Choices (rn : Ident) a b (A B : list ENV) : list (list ENV) :=
-    match A with
-    | An :: rest =>
+Fixpoint make_FOR_Choices (rn : Ident) a b (A B : list ENV) : list (list ENV) := 
+    match A with 
+    | An :: rest => 
         (* ([ A[n] - r ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
                            | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) *)
         [(([ An \ ⟅r⟆ ] * (((fun ρ => ρ rn = mkTup [ρ r]) ∩* B) [\] ⟅ r ⟆))
@@ -286,7 +287,7 @@ Fixpoint make_FOR_Choices (rn : Ident) a b (A B : list ENV) : list (list ENV) :=
    B  ε⟦t1⟧r
  *)
 
-Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV :=
+Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV := 
 
   let Cs := make_FOR_Choices z a b A B in
 
@@ -295,54 +296,54 @@ Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list EN
      c  = fun ρ => ρ.r0+ρ.r1+ …   # NOTE: + is tuple concatentation
      CC = C0 * C1 * … * Cm
   *)
-  let step arg Ci : Ident * Scope.t * (env -> value) * list ENV :=
-      match arg with
+  let step arg Ci : Ident * Scope.t * (env -> value) * list ENV := 
+      match arg with 
         | (zk, zs, f, acc) =>
           (1+zk, Scope.add zk zs, fun ρ => append (f ρ) (ρ zk), acc * Ci) end in
-  let '(_,rs,c,CC) :=
+  let '(_,rs,c,CC) :=  
     List.fold_left step Cs (z, Scope.empty, fun ρ => mkTup [], [Total_set]) in
 
   (*  [ {ρ | ρ ← ρs, ρ.r=c ρ } | ρs ← CC ] – rs *)
   ( Δ <- CC  ;; [ (fun (ρ : env) => (ρ ∈ Δ) /\ (ρ r = c ρ)) ]) \* rs.
 
 
-Definition FOR_SPJ (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV)
-  : list ENV :=
-  let SS : list (list ENV) :=
+Definition FOR_SPJ (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) 
+  : list ENV := 
+  let SS : list (list ENV) := 
     pickl [ Δ ∩* B [\] (Scope.union a ⟅ r ⟆) | Δ <- squash A ] in
   [ ].
 
 
 (* ----- semantics of IF ------------ *)
 
-(* Given the semantics of the condition of an IF expression,
+(* Given the semantics of the condition of an IF expression, 
    produce a list of environments corresponding to successful
-   completion of each choice in the If.
+   completion of each choice in the If. 
    Also produce an environment that corresponds to all choices
    failing. *)
-Definition try (a : Scope.t) (A : list ENV) : list ENV * ENV :=
-  let step := fun '(success, avoid) Ai =>
+Definition try (a : Scope.t) (A : list ENV) : list ENV * ENV := 
+  let step := fun '(success, avoid) Ai => 
                 (success ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
   List.fold_left step A ([],∅).
 
 (* NOTE:  A should be raw, B/C should be blocks with bound variables
    already hidden. *)
-Definition IF (r : Ident) a (A B C : list ENV) : list ENV :=
-    let (success, avoid) := try a (A [\] ⟅r⟆) in
+Definition IF (r : Ident) a (A B C : list ENV) : list ENV := 
+    let (success, avoid) := try a (A [\] ⟅r⟆) in 
      ((success * B) [\] a) ++
-     ([(Total_set - avoid)] * C).
+     ([(Total_set - avoid)] * C).  
 
 (* Koen's encoding of if *)
 
 (*
 if e1 e2 e3 =
-  exists y;
+  exists y; 
   y = one{ (e1; z=⟨⟩) | z=0 }@z;
   (y=⟨⟩; e2) | (y=0; e3)
 *)
 
 (* Translated to DPS style, with distinguished result r *)
-Definition koen_if y e1 e2 e3 : mini.Expr :=
+Definition koen_if y e1 e2 e3 : mini.Expr := 
   mini.DefineV y :>:
   y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
   (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
@@ -818,421 +819,6 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 End Thin_DSLS.
 
 
-<<<<<<< HEAD
-(* ----------- D-SLS semantics ------------------ *)
-
-(* This is SLS semantics that makes the most sense. *)
-(* BCP: CURRENT *)
-
-Import ConcreteVars.
-
-Module Thicker_DSLS.
-
-(* This is similar to the LS semantics. *)
-Definition SIMPLE (a : env -> value) : P (list ENV) := 
-   ⌈ [r ≈ a] ⌉.
-
-(* This is different from above. We keep each 
-   env set in the list unconstrained. *)
-Definition ITER (v1 : env -> value) (v2 : env -> value) : 
-  P (list ENV) :=
-  ρ ⭅ envs ;;
-  match v1 ρ , v2 ρ with 
-     | Int k1 , Int k2 => 
-         let ks := enumFrom k1 k2 in
-         ⌈  List.map (fun k => (r ≈ ⟨Int k⟩) ∩ 
-                            (* make sure each env agrees with ρ on v1 / v2 *)
-                            (fun ρ' => v1 ρ' = Int k1 /\ v2 ρ' = Int k2)) ks ⌉
-     | _ , _ => ∅
-     end.
-
-(* NB: This version of Iter DOESN't work. It includes partial runs that 
-   don't correspond to any evaluation *)
-(*
-  k ⭅ (Total_set : P nat) ;;
-  ⌈ let ks := enumFrom 0 k in 
-    List.map (fun k => (r ≈ ⟨Int k⟩)
-                      ∩ (fun ρ => Value.leb (v1 ρ) (Int k) = true) 
-                      ∩ (fun ρ => Value.leb (Int k) (v2 ρ) = true)) ks ⌉.
-*)
-
-(* Slightly thicker application. This is NOT what we want.
-   For (2,3)[i] gives us  
-   { [r=2] | rho } ∪ { [(rho,i=1,r=3)] | rho } 
-
-  { [{{r=2}}] } ∪ { [{{i=1,r=3}}] } 
-
- *)
-
-Import ConcreteVars.
-
-Definition APP' (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
-   ρ ⭅ envs ;;
-   let vs := apply (v1 ρ) (v2 ρ) in
-   ⌈ List.map (fun v => r ≈ ⟨v⟩) vs ⌉.
-
-(*  (2,3)[x] == 2|3 *)
-Lemma example_pair_app' :
-  APP' (fun _ => mkTup [Int 2;Int 3]) (fun rho => rho x) = 
-    ρ ⭅ envs ;;
-    if (Value.eqb (ρ x) (Int 0)) then
-    ⌈ [ (r ≈ ⟨Int 2⟩)] ⌉ 
-    else if (Value.eqb (ρ x) (Int 1)) then
-    ⌈ [ (r ≈ ⟨Int 3⟩) ] ⌉ else ⌈[]⌉.
-Proof.
-  unfold APP'.
-  f_equal.  extensionality ρ. 
-  cbn.
-  destruct (Value.eqb (ρ x) (Int 0)) eqn:h0.
-  + cbn.
-    have h1: (Value.eqb (ρ x) (Int 1) = false). admit.
-    rewrite h1. cbn. done.
-  + destruct (Value.eqb (ρ x) (Int 1)) eqn:h1.
-    cbn. done.
-  cbn. done.
-Admitted. 
-
-(* Even thicker application: don't use same ρ for v1 and v2.
-   Let ρ2 change for each partial function in hs. *)
-Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
-  ρ1 ⭅ envs ;;
-  ⌈ match (v1 ρ1) with 
-  | Fun hs => 
-    h <- hs ;;
-    [ ρ2 ⭅ envs ;;
-      match (PFun.apply_opt _ _ Value.eqb h (v2 ρ2)) with 
-        | Some w => (r ≈ ⟨ w ⟩) ∩ (fun ρ' => v1 ρ' = v1 ρ1 /\ v2 ρ' = v2 ρ2)
-        | None => ∅
-      end ]
-  | _ => []
-  end ⌉.
-
-
-Example pair_app := mini.ApplyD (common.SArray [common.Lit 2; common.Lit 3]) 
-                       (common.Var x).
-Lemma example_pair_app :
-  APP (fun _ => mkTup [Int 2;Int 3]) (fun rho => rho x) = 
-    ⌈ [ (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 2⟩) ; (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 3⟩) ] ⌉.
-Proof.
-  unfold APP.
-  eapply bind_Total_set. constructor. exact Env.empty.
-  intros _.
-  cbn.
-  f_equal.
-  f_equal.
-  + 
-  set_ext ρ2.
-  rewrite in_bind.
-  split.
-  - intro h. set_crunch. rename x0 into ρ.
-    destruct (Value.eqb (ρ x) (Int 0)) eqn:h0.
-    inv H0. inv H2. inv H1.
-    econstructor.
-    unfold constrain_eq. unfold Ensembles.In.
-    rewrite Value.eqb_eq in h0. rewrite H3. done.
-    unfold Ensembles.In. unfold constrain_eq. done.
-    inv H0.
-  - intro h. set_crunch. inv H. inv H0.
-    exists ρ2. split. cbv; auto.
-    have R: Value.eqb (ρ2 x) (ρ2 x)= true. {
-      rewrite Value.eqb_eq. done. } 
-    rewrite R. 
-    split. 
-    unfold Ensembles.In, constrain_eq. done.
-    unfold Ensembles.In. split; auto.
-Admitted.
-
-(*  + 
-    f_equal.
-  set_ext ρ2.
-  rewrite in_bind.
-  split.
-  - intro h. set_crunch. rename x0 into ρ.
-    destruct (Value.eqb (ρ x) (Int 1)) eqn:h0.
-    inv H0.
-    econstructor.
-    unfold constrain_eq. unfold Ensembles.In.
-    inv H1. rewrite Value.eqb_eq in h0. done.
-    done.
-    inv H0.
-  - intro h. set_crunch. inv H. inv H0.
-    exists ρ2. split. cbv; auto.
-    have R: Value.eqb (ρ2 x) (ρ2 x)= true. {
-      rewrite Value.eqb_eq. done. } 
-    rewrite R. 
-    split. eapply in_singleton. 
-    unfold constrain_eq, Ensembles.In. done.
-Qed. *)
-
-
-
-(* This is NOT the same as IF above because it uses ∪ instead of ++ 
-   to join the two branches together. *)
-Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
-  T0 ⭅ TS0 ;;
-  T1 ⭅ TS1 ;;
-  T2 ⭅ TS2 ;;
-  let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
-  ⌈(successes * T1) [\] xs⌉ ∪
-  ⌈(Total_set - avoid) ∩* T2⌉.
-
-Definition PFOR (z:Ident) (a b : Scope.t) (TS0 : P (list ENV))
-  (TS1 : P (list ENV)) : P (list ENV) :=
-  T0 ⭅ TS0 ;;
-  T1 ⭅ TS1 ;;
-  ⌈ FOR z a b T0 T1 ⌉.
-
-
-Fixpoint E (e : mini.Expr) : P (list ENV) :=
-
-  let B (e : mini.Expr) : P (list ENV) :=
-    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉
-    (* with set comprehension:
-       { Δs \ I e | Δs ∈ E e }
-     *)
-  in
-
-  match e with
-
-  | mini.DefineV _ =>
-      ⌈ [ Total_set ] ⌉
-
-  | mini.ES a =>
-      SIMPLE (evalA a)
-
-  | mini.Fail => ⌈ [] ⌉
-
-  | mini.Choice e1 e2 =>
-      D1 ⭅ B e1 ;;
-      D2 ⭅ B e2 ;;
-      ⌈ D1 ++ D2 ⌉
-
-  | mini.Unify e1 e2 =>
-      D1 ⭅ E e1 ;;
-      D2 ⭅ E e2 ;;
-      ⌈ D1 * D2 ⌉
-
-  | mini.Seq e1 e2 =>
-      D1 ⭅ E e1 ;;
-      D2 ⭅ E e2 ;;
-      ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
-
-  | mini.Iter a1 a2 =>
-     ITER (evalA a1) (evalA a2)
-
-  | mini.ApplyD a1 a2 =>
-     APP (evalA a1) (evalA a2)
-
-  | mini.If3 t0 t1 t2 =>
-     IF (mini.I t0) (E t0) (B t1) (B t2)
-
-  | mini.All t0 => 
-     D ⭅ B t0 ;;  (* or E ?? *)
-     ⌈ [ ALL D ] ⌉
-
-  | mini.One a => 
-     D ⭅ B a ;;  (* or E ?? *)
-     ⌈ [ ONE D ] ⌉
-
-  | mini.For2 t0 t1 => 
-    let xs := mini.I t0     in  (* BVS t0 *)
-    let ys := mini.I t1     in  (* BVS t1 *)
-    let x  := mini.fresh t0 in
-    let y  := mini.fresh t1 in 
-    let z  := 1 + List.list_max ([x; y] 
-                                   ++ Scope.elements xs ++ Scope.elements ys)  
-       in  (* z is fresh for everything *)
-
-    T0 ⭅ E t0 ;;
-    T1 ⭅ E t1 ;;
-    ⌈ FOR z xs ys T0 T1 ⌉
-
-  (* TODO: functions *)
-
-  | _ => ∅
-  end.
-
-Definition  B (e : mini.Expr) : P (list ENV) := 
-    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉.
-
-Lemma E_Choice e1 e2 : E (e1 :|: e2) = 
-    D1 ⭅ B e1 ;;
-      D2 ⭅ B e2 ;;
-      ⌈ D1 ++ D2 ⌉. reflexivity. Qed.
-
-Lemma E_Seq e1 e2 : E (e1 :>: e2) =
-   D1 ⭅ E e1 ;;
-   D2 ⭅ E e2 ;;
-   ⌈ (D1 [\] ⟅r⟆) * D2 ⌉.
-reflexivity. Qed.
-
-Lemma E_Unify e1 e2 : E (e1 :=: e2) = 
-  D1 ⭅ E e1 ;;
-      D2 ⭅ E e2 ;;
-      ⌈ D1 * D2 ⌉.
- reflexivity. Qed.
-
-
-Lemma iter_choice : 
-  E (mini.Iter 1 2) = E (1 :|: 2).
-Proof.
-  cbn. unfold ITER, SIMPLE.
-  eapply bind_Total_set. constructor. exact Env.empty. intros _.
-  cbn.
-  set_simpl. cbn. 
-Admitted.  (* need to do a little more straightforward work *)
-
-
-Lemma if_example :
-  E (mini.If3 (x:=: 0)(1:|:2)(3:|:4)) = 
-  ⌈ [ (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 1⟩) ; (x ≈ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 2 ⟩) ] ⌉ ∪
-  ⌈ [ (x ≉ ⟨Int 0⟩ ∩ r ≈ ⟨Int 3⟩) ; (x ≉ ⟨ Int 0 ⟩ ∩ r ≈ ⟨ Int 4 ⟩) ] ⌉.
-Proof.
-  cbn.
-  unfold IF, SIMPLE.
-  set_simpl.
-  replace (Scope.union Scope.empty Scope.empty) with Scope.empty.
-  cbn.
-  f_equal.
-  - f_equal.
-    set_simpl.
-    f_equal.
-    set_ext ρ.
-    split.
-    unfold constrain_eq.
-    + intro h. set_crunch.
-      inv H. set_crunch.
-      split. unfold Ensembles.In.
-      rewrite H0. admit.
-      rewrite H3. done.
-      unfold Ensembles.In. done.
-    + intro h. set_crunch.
-      inv H. inv H0.
-      econstructor.
-      unfold Ensembles.In. 
-Admitted.
-
-
-Lemma if_example_2 :
-  E ((mini.If3 (x:=: 0)(1:|:2)(3:|:4)) :|: 5) = 
-     ⌈ [ (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 1⟩) ; 
-         (x ≈ ⟨Int 0⟩ ∩ r ≈ ⟨Int 2⟩) ; 
-         (r ≈ ⟨Int 5⟩) ] ⌉ ∪
-     ⌈ [ (x ≉ ⟨Int 0⟩ ∩ r ≈ ⟨Int 3⟩) ; 
-         (x ≉ ⟨Int 0⟩ ∩ r ≈ ⟨Int 4⟩) ; 
-         (r ≈ ⟨Int 5⟩)] ⌉.
-Proof.
-  rewrite E_Choice.
-  unfold B.
-  rewrite if_example.
-  set_simpl. unfold mini.I.
-  set_simpl.
-  unfold E, SIMPLE.
-  set_simpl. unfold evalA. unfold id.
-  cbn.
-  f_equal.
-Qed.
-
-(*
-∃x. (if x = 1 then 11| 22 else 33); 
-    x = (1 | 2); 
-    (if x = 1 then 44 else 55 | 66)
-*)
-
-Lemma if_example_3A :
-  E (mini.If3 (x :=: 1) (11 :|: 22) 33) = 
-   ⌈ [ (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 11⟩) ; 
-       (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 22⟩) ] ⌉ ∪
-   ⌈ [ (x ≉ ⟨Int 1⟩ ∩ r ≈ ⟨Int 33⟩) ] ⌉.
-Admitted.
-Lemma if_example_3B :
-  E (x :=: (1 :|: 2)) = 
-   ⌈ [ (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 1⟩) ; 
-       (x ≈ ⟨Int 2⟩ ∩ r ≈ ⟨Int 2⟩) ] ⌉. 
-Admitted.
-Lemma if_example_3C :
-  E (mini.If3 (x :=: 1) 44 (55 :|: 66)) = 
-     ⌈ [ (x ≈ ⟨Int 1⟩ ∩ r ≈ ⟨Int 44⟩) ] ⌉ ∪ 
-     ⌈ [ (x ≉ ⟨Int 1⟩ ∩ r ≈ ⟨Int 55⟩) ;
-         (x ≉ ⟨Int 1⟩ ∩ r ≈ ⟨Int 66⟩) ] ⌉.
-Admitted.
-
-Definition if_example_3 := 
-  (mini.If3 (x :=: 1) (11 :|: 22) 33) :>:
-  (x :=: (1 :|: 2)) :>:
-  (mini.If3 (x :=: 1) 44 (55 :|: 66)).
-
-Lemma if_example_3_meaning_AB : 
-  E ((mini.If3 (x :=: 1) (11 :|: 22) 33) :>:
-    (x :=: (1 :|: 2))) = 
-  (⌈ [(x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 1 ⟩;  ∅ ; 
-      (x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 1 ⟩;  ∅ ] ⌉
-   ∪
-   ⌈ [∅ ; (x ≈ ⟨ Int 2 ⟩) ∩ r ≈ ⟨ Int 2 ⟩] ⌉ ).
-Proof.
-  rewrite E_Seq.
-  rewrite if_example_3A.
-  rewrite E_Unify.
-  unfold E, SIMPLE, evalA.
-  set_simpl.
-  unfold hide_list.
-  list_simpl.
-  rewrite constrain_eq_hide_two. done.
-  rewrite constrain_eq_hide_two. done.
-  cbn.
-Admitted.
-
-Lemma if_example_3_meaning : 
-  E (((mini.If3 (x :=: 1) (11 :|: 22) 33) :>:
-    (x :=: (1 :|: 2))) :>:
-    (mini.If3 (x :=: 1) 44 (55 :|: 66))) = 
-  (⌈ [(x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 44 ⟩;  ∅ ; 
-      (x ≈ ⟨ Int 1 ⟩) ∩ r ≈ ⟨ Int 44 ⟩;  ∅ ] ⌉
-   ∪ ⌈ [∅; ∅; ∅; ∅; ∅; ∅; ∅; ∅] ⌉
-   ∪ ⌈ [∅; ∅] ⌉ 
-   ∪ ⌈ [∅ ; ∅ ; (x ≈ ⟨ Int 2 ⟩) ∩ r ≈ ⟨ Int 55 ⟩ ; 
-                (x ≈ ⟨ Int 2 ⟩) ∩ r ≈ ⟨ Int 66 ⟩ ] ⌉ ).
-Proof.
-  rewrite E_Seq.
-  rewrite if_example_3_meaning_AB.
-  rewrite if_example_3C.
-  set_simpl.
-  unfold hide_list. list_simpl.
-  set_simpl.
-  rewrite constrain_eq_hide_two. done.
-  rewrite constrain_eq_hide_two. done.
-  cbn.
-  set_simpl.
-  f_equal.
-  f_equal.
-  f_equal.
-  rewrite <- intersection_assoc.
-  rewrite constrain_eq_same. done.
-  f_equal.
-  rewrite <- intersection_assoc.
-  rewrite constrain_eq_same. done.
-  rewrite <- intersection_assoc.
-  replace ((x ≈ ⟨ Int 1 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (∅ : ENV). set_simpl.
-  rewrite <- intersection_assoc.
-  replace ((x ≈ ⟨ Int 1 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (∅ : ENV). set_simpl.
-  rewrite <- intersection_assoc.
-  replace ((x ≈ ⟨ Int 2 ⟩) ∩ (x ≈ ⟨ Int 1 ⟩)) with (∅ : ENV). set_simpl.
-  rewrite <- intersection_assoc.
-  replace ((x ≈ ⟨ Int 2 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (x ≈ ⟨ Int 2 ⟩). 
-  rewrite <- intersection_assoc.
-  replace ((x ≈ ⟨ Int 2 ⟩) ∩ (x ≉ ⟨ Int 1 ⟩)) with (x ≈ ⟨ Int 2 ⟩). 
-  done.
-  admit.
-  admit.
-  admit.
-Admitted.
-
-
-End Thicker_DSLS.
-
-
-=======
->>>>>>> origin/main
 
 (* ------------------------------------------------------ *)
 (* ------  Sets of lists of values ---------------------- *)
