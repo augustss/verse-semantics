@@ -32,7 +32,10 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
+Require Import densem.densem.
 Import ELV.
+
+(*
 
 (* ----------------------- examples --------------- *)
 
@@ -386,3 +389,4 @@ Proof.
 Admitted. *)
 
 End Rewrites.
+*)

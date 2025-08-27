@@ -109,3 +109,33 @@ Proof.
   induction l. cbn. 
 Admitted.
 
+
+Import ConcreteVars.
+
+(* This is a bit of a hack. For examples, we special case the variables
+   x, y, and r when simplifying environment lookups *)
+
+
+Ltac rewrite_env := 
+  repeat match goal with 
+    | [ |- context[ (?x |-> ?v , ?rho) ?x ] ] => 
+        rewrite extend_lookup_same
+    | [ |- context[ (x |-> ?v , ?rho) r ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (y |-> ?v , ?rho) r ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (r |-> ?v , ?rho) x ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (r |-> ?v , ?rho) y ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (y |-> ?v , ?rho) x ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+    | [ |- context[ (x |-> ?v , ?rho) y ] ] => 
+        rewrite extend_lookup_diff;
+        [rewrite PeanoNat.Nat.eqb_neq;easy|]
+  end.

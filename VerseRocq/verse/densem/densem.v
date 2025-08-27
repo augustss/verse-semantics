@@ -1,3 +1,6 @@
+(* This file defines various forms of the semantics
+   for Essential Verse and Mini Verse *)
+
 Require Import Imports.
 
 Import ssreflect.
@@ -27,53 +30,20 @@ Open Scope mini_expr_scope.
 Open Scope env_scope.
 Open Scope set_scope.
 
-Lemma bind_Total_set {A B} (k : A  -> P B) (S : P B) : 
-  inhabited A ->
-  (forall ρ, k ρ = S) ->
-  (ρ ⭅ Total_set ;; k ρ) = S.
-Proof.
-  intros iA h.
-  set_ext ρ'.
-  rewrite in_bind.
-  split. 
-  + intro h1. set_crunch. rewrite h in H0. done.
-  + intros h1. inv iA. exists X. split; cbv; auto. rewrite h. done.
-Qed.
-
-
 (* --------------------------------------------------- *)
 
-Notation VAL := (P value).
+Definition envs : ENV := Total_set.
 
-Notation "⟅ r ⟆" := (Scope.singleton r).
+Notation VAL := (P value).
 
 (* For destination-passing style, distinguished result variable (0) *)
 Definition r : Ident := common.ConcreteVars.r.
 
-(* -------------- atomic/simple expressions  ---------------- *)
+Notation "⟅ r ⟆" := (Scope.singleton r).
 
-Definition evalPrim (p : PrimOp) : value  := 
-  match p with 
-  | common.Add  => Prim.add1
-  | common.TimesTwo => Prim.times2
-  | common.ArrayLen => Prim.arrayLen
-  | common.IsInt => Prim.isInt
-  | common.IsArr => Prim.isArr
-  | common.IsFun => Prim.isFun
-  | _ => Dom.Int 0  (* other primitives *)
-  end.
+Import ConcreteVars.
 
-(* Evaluation function for simple values. 
-   If e is not of the right form, it is interpreted as 0 *)
-Fixpoint evalA (a : Simple) (ρ : env) : value := 
-  match a with 
-  | common.Var x => ρ x
-  | common.Lit (common.Int i) => Dom.Int i
-  | common.EPrim p => evalPrim p
-  | common.SArray es => mkTup (List.map (fun e => evalA e ρ) es)
-  end.
-
-(* ------- operations on lists of sets and sets of lists ------ *)
+(** ------- operations on lists of sets and sets of lists ------ *)
 
 Definition SUCCEED {A} : list (P A) := [Total_set]. 
 
@@ -108,42 +78,6 @@ Definition UNIONLIST {A} : list (P A) -> (P A) :=
 Definition MAP_INTERSECT {A} :=
   fun (Δ1:P A)(Δs:list (P A)) => List.map (fun Δ2 => Δ1 ∩ Δ2) Δs.
 
-(* Sometimes written as *∩* *)
-Infix "*" := UNIFY.
-
-Infix "∩*" := MAP_INTERSECT (at level 70).
-
-(* --------- pick/sequence ----------- *)
-
-(* This operation is liftM2 snoc *)
-Definition Snoc {A} := (fun (VS : P (list A)) (V : P A) => 
-    vs ⭅ VS ;;  v  ⭅ V  ;; ⌈ vs ++ [v]⌉).
-   
-(* The set of all first elements from a list. *)
-(*   {{ v | (v :: _) <- V }}   *)
-Definition Head {A} (V : P (list A)) : P A := 
-  vs ⭅ V ;;
-  match vs with 
-  | v :: _ => ⌈ v ⌉
-  | _ => ∅
-  end. 
-
-Fixpoint pick {A} (xs : list (P A)) : P (list A) := 
-  match xs with 
-  | nil => ⌈ [] ⌉
-  | V :: VS => v  ⭅ V ;; vs ⭅ pick VS ;; ⌈ v :: vs⌉ 
-  end.
-
-(* pick / 
-   this is the list instance of 'sequence' from Haskell's Traversable class *)
-Fixpoint pickl {A} (xs : list (list A)) : list (list A) := 
-  match xs with 
-  | nil => [ [] ]
-  | V :: VS =>  v <- V ;; vs <- pickl VS ;; [ v :: vs ] 
-  end.
-
-(* --------- dodgy union ----------- *)
-
 (* elementwise union of sequences, missing elements are ∅s.  *)
 Fixpoint pointwise_union {A} (VS : list (P A)) (WS : list (P A)) : 
   list (P A) := 
@@ -156,13 +90,55 @@ Fixpoint pointwise_union {A} (VS : list (P A)) (WS : list (P A)) :
 Definition Pointwise_Unions {A} : list (list (P A)) -> list (P A) :=
   List.fold_right pointwise_union nil.         
 
+
+(* --------- Notation ----------- *)
+
+(* Sometimes written as *∩* *)
+Infix "*" := UNIFY : list_scope.
+
+Infix "∩*" := MAP_INTERSECT (at level 70) : list_scope.
+
+(* hide identitfiers in a list of sets of environments *)
+Notation "Δ \* xs" := (hide_list xs Δ) (at level 70) : list_scope.
+
+(* dodgy union *)
+Infix "⩅" := pointwise_union (at level 70) : list_scope.
+
+(* --------- pick/sequence ----------- *)
+   
+(* The set of all first elements from a list. *)
+(*   {{ v | (v :: _) <- V }}   *)
+Definition Head {A} (V : P (list A)) : P A := 
+  vs ⭅ V ;;
+  match vs with 
+  | v :: _ => ⌈ v ⌉
+  | _ => ∅
+  end. 
+
+(* pick for sets: given a list of sets, make the set of 
+   all lists where each element comes from each set. *)
+Fixpoint pick {A} (xs : list (P A)) : P (list A) := 
+  match xs with 
+  | nil => ⌈ [] ⌉
+  | V :: VS => v  ⭅ V ;; vs ⭅ pick VS ;; ⌈ v :: vs⌉ 
+  end.
+
+(* pick for lists: 
+   NB: this is the list instance of 'sequence' from Haskell's 
+   Traversable class *)
+Fixpoint pickl {A} (xs : list (list A)) : list (list A) := 
+  match xs with 
+  | nil => [ [] ]
+  | V :: VS =>  v <- V ;; vs <- pickl VS ;; [ v :: vs ] 
+  end.
+
+(* --------- dodgy union ----------- *)
+
 (* another version of the dodgy big union *)
 Definition DODGY_UNIONS {A} (VVS : P (list (P A))) : list (P A) := 
   i <- allNums ;;
   let VS : P (P A) := Sets.map (fun VS => List.nth i VS ∅) VVS in
   [ ⨃ VS ].
-
-Infix "⩅" := pointwise_union (at level 70).
 
 (* -------------- tuples and application ------ *)
 
@@ -172,180 +148,90 @@ Definition tups (VS : list VAL) : VAL :=
     exists (vs : list value), 
       v = mkTup vs /\ List.Forall2 (fun x y => x ∈ y) vs VS.
 
-(* apply domain function value f to x 
-   f is a list of partial functions, corresponding to 
-   iteration on the input. Any inputs that are in the 
-   domain of the function will produce output.
- *)
-Definition apply (f : value) (v : value) : list value := 
-  match f with 
-  | Dom.Fun hs => 
-      h <- hs ;;
-      match (PFun.apply_opt _ _ Value.eqb h v) with 
-      | Some w => [w]
-      | None => []
-      end
-  | _ => []
-  end.
-
-(* Two different versions of application. Arguments must be simple, 
-   i.e. have a single value.
-   The set of all environments such that the ith result of 
-   apply e1 to e2 is ρ r. Not sure yet which one of these is easier to 
-   reason about.
-*)
-Definition APPi (r : Ident) 
-  (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
-  fun ρ => 
-    List.nth_error (apply (evalA e1 ρ) (evalA e2 ρ)) i = Some (ρ r).
-
-Definition APPi' r (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
+(* This is {{ (e2 ⤇ r ) ∈ e1 <i> }} *)
+Definition APPi r (e1 : common.Simple) (e2 : common.Simple) (i : nat) : ENV := 
   fun ρ => 
     exists hs h, evalA e1 ρ = Fun hs 
             /\ List.nth_error hs i = Some h 
             /\ List.In (evalA e2 ρ , ρ r ) h.
 
-(* This is a bit dodgy by using the iteration over all numbers. 
-   We need to iterate only over each partial function *)
+(* This definition is a bit dodgy by using the iteration over all numbers. 
+   We need it to iterate only over each partial function. *)
 Definition APP (r : Ident) (e1 : common.Simple) (e2 : common.Simple) : list ENV := 
   i <- allNums ;;
-  [APPi r e1 e2 i].
+  [ {{ ( e2 ⤇ r ) ∈ e1 <i> }} ].
 
-(* Tims semantics, allows terms, not just simple expressions 
+(* NB: Tims semantics, allows terms, not just simple expressions 
 
-    ε⟦t0[t1]⟧ix := ε⟦t0⟧hf * ε⟦t1⟧jy * [{ρ | ρ:envs, ρ.f=Fun(fss), fs=fss[n], (ρ.j,ρ.x)∈fs, ρ.i=ρ.x} | n:[0,1,...]]-{h,f,j,y}
+    ε⟦t0[t1]⟧ix := 
+        ε⟦t0⟧hf * ε⟦t1⟧jy * 
+         [{ρ | ρ:envs, ρ.f=Fun(fss), fs=fss[n], (ρ.j,ρ.x)∈fs, ρ.i=ρ.x} | n:[0,1,...]]-{h,f,j,y}
 
 *)
 
 (* Tim's semantics in DLS style. Requires fresh variables f and x. *)
 Definition APP_Tim (r f x : Ident) (A : list ENV) (B : list ENV) : list ENV := 
-   ((((f ≈ evalA r) ∩* A) [\] ⟅ r ⟆)
-  * (((x ≈ evalA r) ∩* B) [\] ⟅ r ⟆)
+   ((({{f ≈ r }} ∩* A) [\] ⟅ r ⟆)
+  * (({{x ≈ r }} ∩* B) [\] ⟅ r ⟆)
   * (i <- allNums ;;
-    [ APPi' r f x i ]) ) [\] ⟅ f ⟆ [\] ⟅ x ⟆ .
+    [ APPi r f x i]) ) [\] ⟅ f ⟆ [\] ⟅ x ⟆ .
  
-             
-(* SLS application. Every ρ in the list needs to agree on everything except r *)
-Definition APPs r (e1 : common.Simple) (e2 : common.Simple) : P (list ENV) := 
-  ρ ⭅ Total_set ;;
-  let vs := apply (evalA e1 ρ) (evalA e2 ρ) in
-  ⌈ List.map (fun v => ⌈ (r |-> v, ρ) ⌉) vs ⌉.
+        
+
+(* --- other definitions --------- *)
+
+(* Interpret atomic/simple values *)
+Definition SIMPLE (a : common.Simple) : list ENV :=
+   [ {{ r ≈ a }} ].
+
+Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV :=
+  (d1 [\] ⟅ r ⟆) * d2.
+
+(* This character C-X 8 ret U+2A3E,  or \fcmp  *)
+(* Infix "⨾" := SEQ (at level 70, left associativity) : list_scope. *)
+
+(* Iteration: a1 .. a2 *)
+(* This definition requires infinite lists. Here we approximate
+   because we assume that there are only a finite number of values. *)
+Definition ITER (a1 : env -> value) (a2 : env -> value) : list ENV :=
+  i <- allNums ;;
+  [ (fun ρ => (ρ r = Int i) /\
+             exists n1 n2, (a1 ρ = Int n1) /\ n1 <= i /\ (a2 ρ = Int n2) /\ n2 >= i) ].
 
 
 
-
-
-
-(* --- semantics of ALL / ONE for dest passing --------- *)
+(* --- semantics of ALL / ONE ------------ *)
 
 (* find all environments in Δ such that ρ(r) = v, then hide r *)
 
 (* {{  (v, Δ') | ρ ∈ Δ , v = ρ.r, Δ' = (Δ ∩ {{ r = v }}) \ r  }} *)
-Definition extract r (Δ : ENV) : P (value * ENV) := 
+Definition extract r (Δ : ENV) : P (value * ENV) :=
   ρ ⭅ Δ ;;
-  ⌈ (ρ r , (Δ ∩ r ≈ ⟨ρ r⟩) \ ⟅r⟆) ⌉.
+  let v := ρ r in
+  ⌈ (v , Δ ∩ (fun ρ => ρ r = v) \ ⟅r⟆) ⌉.
 
-(* The set of results in Δ that could be produced by environments 
+(* The set of results in Δ that could be produced by environments
    consistent with ρ *)
 (* {{ v | (v , Δ') ∈ extract Δ , ρ ∈ Δ ' }} *)
-Definition consistent_results (ρ : env) (Δ : ENV) : VAL := 
+Definition consistent_results (ρ : env) (Δ : ENV) : VAL :=
   '(v, Δ') ⭅ extract r Δ ;; when (ρ ∈ Δ') ⌈v⌉.
 
-Definition ALL (Δs : list ENV) : ENV := 
+Definition ALL (Δs : list ENV) : ENV :=
   fun ρ => exists vs,
       (vs ∈ squash_pick (List.map (consistent_results ρ) Δs)) /\
       (ρ r = mkTup vs).
-       
-Definition ONE (Δs : list ENV) : ENV := 
-  fun ρ => 
+
+Definition ONE (Δs : list ENV) : ENV :=
+  fun ρ =>
       (ρ r ∈ Head (squash_pick (List.map (consistent_results ρ) Δs))).
 
-(* --- other definitions --------- *)
-
-Definition SEQ (d1 : list ENV) (d2: list ENV) : list ENV := 
-  (d1 [\] ⟅ r ⟆) * d2.
-
-(* This character C-X 8 ret U+2A3E,  or \fcmp  *)
-(* Infix "⨾" := seq (at level 70, left associativity) : list_scope. *)
-
-
-(* The semantics of 0..x 
-   [ {{r=1,x>=1}}, {{r=2,x>=2}}, ... ]
-   [ {{r=i,x>=i}} | i <- [0 ..] ]
-
- *)
-Definition enumTo x : list ENV := 
-  i <- allNums ;;
-  [ (fun ρ => (ρ r = Int i) /\ exists n, (ρ x = Int n) /\ n >= i) ].
-
-Fixpoint combine (xs : list ENV) : P (list value * ENV) := 
-    match xs with 
-    | [] => ⌈ ([], Total_set) ⌉
-    | (Δi :: rest) => 
-        let failΔi '(vs, Δ) := (vs, (Total_set - Δi) ∩ Δ) in 
-        (Sets.map failΔi (combine rest)) ∪
-
-        ('(vi, Δi') ⭅ extract r Δi ;;
-         let succΔi '(vs, Δ) := (vi :: vs, Δi' ∩ Δ) in
-          Sets.map succΔi (combine rest))
-    end.
-
-
-(* ----- semantics of IF ------------ *)
-
-(* Given the semantics of the condition of an IF expression, 
-   produce a list of environments corresponding to successful
-   completion of each choice in the If. 
-   Also produce an environment that corresponds to all choices
-   failing. *)
-(* BCP: Is this right? I feel like the success accumulator needs to
-   subtract out all the previous successes at each stage... *)
-Definition try (a : Scope.t) (A : list ENV) : list ENV * ENV := 
-  let step := fun '(success, avoid) Ai => 
-                (success ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
-  List.fold_left step A ([],∅).
-
-(* NOTE:  A should be raw, B/C should be blocks with bound variables
-   already hidden. *)
-Definition IF (r : Ident) a (A B C : list ENV) : list ENV := 
-    let (success, avoid) := try a (A [\] ⟅r⟆) in 
-     ((success * B) [\] a) ++
-     ([(Total_set - avoid)] * C).  
-
-(* Koen's encoding of if *)
-
-(*
-if e1 e2 e3 =
-  exists y; 
-  y = one{ (e1; z=⟨⟩) | z=0 }@z;
-  (y=⟨⟩; e2) | (y=0; e3)
-*)
-
-(* Translated to DPS style, with distinguished result r *)
-Definition koen_if y e1 e2 e3 : mini.Expr := 
-  mini.DefineV y :>:
-  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
-  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
-
-Definition IF_KOEN y (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
-  let D1 := ONE( SEQ S1 [r ≈ ⟨mkTup []⟩] ++ [ r ≈ ⟨Int 0⟩]) in
-  SEQ [ (y ≈ fun ρ => ρ r) ∩ D1 ]
-      (SEQ [y≈⟨mkTup[]⟩] S2) ++ (SEQ [y ≈⟨Int 0⟩] S3).
-
-(* Simon's version of If *)
-
-Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
-    let GOOD := UNIONLIST (S1 [\] ⟅ r ⟆) in
-    ((List.map (fun D => D ∩ GOOD) S2) [\] xs) ++ 
-    (List.map (fun D => D - GOOD) S3).
 
 (* ----------- semantics of FOR ----------- *)
 
-
 (* Destination passing version, with fixed r.
 
-Each choice in A either produces a singleton tuple ⟨vn⟩ or empty tuple ⟨⟩ stored 
-in the environment in variables r0...rm. Then we concatenate all of these 
+Each choice in A either produces a singleton tuple ⟨vn⟩ or empty tuple ⟨⟩ stored
+in the environment in variables r0...rm. Then we concatenate all of these
 tuples together to get the final result.
 
 ε⟦for(t0){t1}⟧r := [{ρ | ρ ← ρs, ρ.r=ρ.r0+ρ.r1+ …}    # NOTE: + is tuple concatentation
@@ -355,9 +241,9 @@ tuples together to get the final result.
              Cn  := ([ A[n] - r    ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
                                        | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) +
                     [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ]
-                    where 
-				A := ε⟦t0⟧r 
-				A' = A - BVS(t0) - r
+                    where
+                                A := ε⟦t0⟧r
+                                A' = A - BVS(t0) - r
 
          r s rn ∉ BVS(t0,t1) # should these be completely fresh?
 
@@ -365,10 +251,10 @@ tuples together to get the final result.
 
 (* This helper function constructs Cn by iterating over A.
 
-   To be compositional, this function takes the denotations of t0 and t1 
+   To be compositional, this function takes the denotations of t0 and t1
    as arguments.
 
-NOTE:  
+NOTE:
    r  is the result variable
    rn is a fresh identifier (and all of its successors are fresh)
    a  is BVS t0
@@ -377,16 +263,16 @@ NOTE:
    B  ε⟦t1⟧r
 
 *)
-Fixpoint make_FOR_Choices rn a b (A B : list ENV) : list (list ENV) := 
-    match A with 
-    | An :: rest => 
+Fixpoint make_FOR_Choices (rn : Ident) a b (A B : list ENV) : list (list ENV) :=
+    match A with
+    | An :: rest =>
         (* ([ A[n] - r ] * [ {ρ | ρ ∈ Δ, ρ.rn=tuple{ρ.r}} - r
                            | Δ ← ε⟦t1⟧r ]) – BVS(t0,t1) *)
-        [(([ An \ ⟅r⟆ ] * (((rn ≈ fun ρ => mkTup [ρ r]) ∩* B) [\] ⟅ r ⟆))
+        [(([ An \ ⟅r⟆ ] * (((fun ρ => ρ rn = mkTup [ρ r]) ∩* B) [\] ⟅ r ⟆))
                           [\] a [\] b) ++
 
         (* [ envs\A' [n] ] * [{ρ | ρ ∈ envs, ρ.rn=tuple{   }} ] *)
-        ([ Total_set - (An \ a \ ⟅r⟆) ] * [ rn ≈ ⟨ mkTup [] ⟩ ])]
+        ([ Total_set - (An \ a \ ⟅r⟆) ] * [ {{ rn ≈ SArray [] }} ])]
         ++ (make_FOR_Choices (1+rn) a b rest B)
     | [] => []
     end.
@@ -400,11 +286,7 @@ Fixpoint make_FOR_Choices rn a b (A B : list ENV) : list (list ENV) :=
    B  ε⟦t1⟧r
  *)
 
-Notation "Δ \* xs" := (hide_list xs Δ) (at level 70) : list_scope.
-
-
-
-Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV := 
+Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list ENV :=
 
   let Cs := make_FOR_Choices z a b A B in
 
@@ -413,15 +295,70 @@ Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list EN
      c  = fun ρ => ρ.r0+ρ.r1+ …   # NOTE: + is tuple concatentation
      CC = C0 * C1 * … * Cm
   *)
-  let step arg Ci : Ident * Scope.t * (env -> value) * list ENV := 
-      match arg with 
+  let step arg Ci : Ident * Scope.t * (env -> value) * list ENV :=
+      match arg with
         | (zk, zs, f, acc) =>
           (1+zk, Scope.add zk zs, fun ρ => append (f ρ) (ρ zk), acc * Ci) end in
-  let '(_,rs,c,CC) :=  
+  let '(_,rs,c,CC) :=
     List.fold_left step Cs (z, Scope.empty, fun ρ => mkTup [], [Total_set]) in
 
   (*  [ {ρ | ρ ← ρs, ρ.r=c ρ } | ρs ← CC ] – rs *)
-  ( ρ <- CC  ;; [ (r ≈ c) ∩ ρ ]) \* rs.
+  ( Δ <- CC  ;; [ (fun (ρ : env) => (ρ ∈ Δ) /\ (ρ r = c ρ)) ]) \* rs.
+
+
+Definition FOR_SPJ (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV)
+  : list ENV :=
+  let SS : list (list ENV) :=
+    pickl [ Δ ∩* B [\] (Scope.union a ⟅ r ⟆) | Δ <- squash A ] in
+  [ ].
+
+
+(* ----- semantics of IF ------------ *)
+
+(* Given the semantics of the condition of an IF expression,
+   produce a list of environments corresponding to successful
+   completion of each choice in the If.
+   Also produce an environment that corresponds to all choices
+   failing. *)
+Definition try (a : Scope.t) (A : list ENV) : list ENV * ENV :=
+  let step := fun '(success, avoid) Ai =>
+                (success ++ [Ai - avoid], avoid ∪ (Ai \ a)) in
+  List.fold_left step A ([],∅).
+
+(* NOTE:  A should be raw, B/C should be blocks with bound variables
+   already hidden. *)
+Definition IF (r : Ident) a (A B C : list ENV) : list ENV :=
+    let (success, avoid) := try a (A [\] ⟅r⟆) in
+     ((success * B) [\] a) ++
+     ([(Total_set - avoid)] * C).
+
+(* Koen's encoding of if *)
+
+(*
+if e1 e2 e3 =
+  exists y;
+  y = one{ (e1; z=⟨⟩) | z=0 }@z;
+  (y=⟨⟩; e2) | (y=0; e3)
+*)
+
+(* Translated to DPS style, with distinguished result r *)
+Definition koen_if y e1 e2 e3 : mini.Expr :=
+  mini.DefineV y :>:
+  y :=: mini.One ( (e1 :>: (r :=: mini.Array [])) :|: r :=: 0 ) :>:
+  (y :=: mini.Array [] :>: e2) :|: (y :=: 0 :>: e3).
+
+Definition IF_KOEN y (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
+  let D1 := ONE( SEQ S1 [{{r ≈ SArray []}}] ++ [ {{ r ≈ 0}}]) in
+  SEQ [ {{ y ≈ r}} ∩ D1 ]
+      (SEQ [ {{ y≈ SArray [] }} ] S2) ++ (SEQ [ {{ y ≈  0 }}] S3).
+
+(* Simon's version of If *)
+
+Definition IF_SPJ (xs:Scope.t) (S1 S2 S3 : list ENV) : list ENV :=
+    let GOOD := UNIONLIST (S1 [\] ⟅ r ⟆) in
+    ((List.map (fun D => D ∩ GOOD) S2) [\] xs) ++ 
+    (List.map (fun D => D - GOOD) S3).
+
 
 
 (* ----------- D-LS semantics -------------- *)
@@ -443,17 +380,15 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   match e with 
   | mini.DefineV _ => [ Total_set ]
 
-  | mini.ES a => [ r ≈ evalA a ]
+  | mini.ES a => SIMPLE a
 
   | mini.Fail => []  
 
   | mini.Choice e1 e2 => B e1 ++ B e2
 
-  | mini.Unify e1 e2 => 
-      E e1 * E e2
+  | mini.Unify e1 e2 =>  E e1 * E e2
 
-  | mini.Seq e1 e2 => 
-      (E e1 [\] ⟅r⟆) * (E e2) 
+  | mini.Seq e1 e2 =>  (E e1 [\] ⟅r⟆) * (E e2) 
 
   | mini.ApplyD a1 a2 => 
       APP r a1 a2
@@ -467,17 +402,15 @@ Fixpoint E (e : mini.Expr) : list ENV :=
     let ys := mini.I t1     in  (* BVS t1 *)
     let x  := mini.fresh t0 in
     let y  := mini.fresh t1 in 
-    let z  := 1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)   in  (* z is fresh for everything *)
+    let z  := 
+      1 + List.list_max ([x; y] ++ Scope.elements xs ++ Scope.elements ys)   in 
+    (* z is fresh for everything *)
 
     FOR z xs ys (E t0) (E t1)
 
-(*
-  | mini.Iter a1 a2 =>
-      k <- allNats ;;
-      ( r = 
-*)
 
-  (* TODO: should this be E or B? *)
+  | mini.Iter a1 a2 => ITER (evalA a1) (evalA a2)
+
   | mini.All a => 
       [ ALL (E a) \ mini.I a ] 
 
@@ -492,20 +425,22 @@ Fixpoint E (e : mini.Expr) : list ENV :=
 Definition  B (e : mini.Expr) :list ENV := 
     Δ <- E e ;; [Δ \ mini.I e]. 
 
-Lemma E_Var (i:Ident) : E i = [ fun ρ => ρ r = ρ i ]. reflexivity. Qed.
+Lemma E_Var (i:Ident) : E i = [ {{ r ≈ i }} ]. reflexivity. Qed.
 Lemma E_One e : E (mini.One e) = [ ONE (E e) \ mini.I e ]. reflexivity. Qed.
 Lemma E_Choice e1 e2 : E (e1 :|: e2) = (B e1) ++ (B e2). reflexivity. Qed.
 Lemma E_Seq e1 e2 : E (e1 :>: e2) = (E e1 [\] ⟅r⟆) * E e2. reflexivity. Qed.
 Lemma E_Unify e1 e2 : E (e1 :=: e2) = E e1 * E e2. reflexivity. Qed.
-
+Lemma E_Iter a1 a2 : E (mini.Iter a1 a2) = ITER (evalA a1) (evalA a2). reflexivity. Qed.
 Create HintDb E.
-Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify : E.
+Hint Rewrite E_Var E_One E_Choice E_Seq E_Unify E_Iter : E.
 
 End DLS.
 
 (* ----------- S-LS semantics Fig. 16 -------------- *)
 (* This is the essential verse semantics, where the definition is 
-   parameterized by an input and output variables (u and v). *)
+   parameterized by an input and output variables (u and v). 
+   This semantics is incomplete.
+*)
 
 Module SLS.
 
@@ -538,15 +473,15 @@ Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV :=
   match t with 
 
   | essential.Underscore => 
-      [ u ≈ evalA v ]
+      [ {{ u ≈ v }} ]
 
   | essential.ES a => 
-      [ (u ≈ evalA a) ∩ (v ≈ evalA a) ]
+      [ {{ u ≈ a }} ∩ {{ v ≈ a }} ]
 
   | essential.Array ts => [] (* TODO *)
 
   | essential.Define x t => 
-      (x ≈ evalA v) ∩* (S u t v)
+      {{ x ≈ v }} ∩* (S u t v)
 
   | essential.Fail => []  
 
@@ -558,15 +493,14 @@ Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV :=
 
   | essential.Iter a1 a2 => 
       i <- allNums ;;
-      [ (u ≈ ⟨Int i⟩) ∩ (v ≈ ⟨Int i⟩) 
-        ∩ (fun ρ => Value.leb (evalA a1 ρ) (Int i) = true) 
-        ∩ (fun ρ => Value.leb (Int i) (evalA a2 ρ) = true) ]
+      [ {{ u ≈ (i : nat) }}    ∩ {{ v ≈ i}}      
+        ∩ {{ a1 < i }} ∩ {{ i < a2 }} ]
 
   | essential.Unify t1 t2 => 
       S u t1 v * S u t2 v
 
   | essential.ApplyD t1 t2 => 
-      (u ≈ evalA v) ∩* (APP v t1 t2) 
+      {{ u ≈ v }} ∩* (APP v t1 t2) 
 
   | essential.If3 t0 t1 t2 =>  
 
@@ -597,29 +531,170 @@ Fixpoint S (u : Ident) (t : essential.Expr) (v : Ident) : list ENV :=
 
 End SLS.
 
-(* ----------- D-SLS semantics ------------------ *)
-(* This is a destination passing style verse semantics, using sets of lists of sets.
+(** ----------- D-SLS semantics ------------------ *)
+(* This is a destination passing style verse semantics, using sets of lists of
+sets.
 
-The advantage of this semantics:
-- infinite lists are not required. All infinite 
-quantification is at the set level. 
-- if does not need to be ordered. We can use the outer set for unordered choices.
+The advantages of this semantics:
+- infinite lists are not required. All infinite quantification is at the set
+  level.
+- "if" does not need to be ordered. We can use the outer set for unordered
+  choices.
+*)
 
-HOWEVER:
-In this "Thin" version, the interpretation of ITER / SIMPLE / APP restricts the 
-individual sets of environments to be as small as possible.
 
-This has the disadvantage that 1..2 does not have the same semantics as 1|2.
-The former is { [ {(r=1,rho)} ; {(r=2,rho)} ] | rho in envs }   -- many lists 
-the latter is { [ (r≈1) ; (r≈2) ] }                             -- only a single list
+Module DSLS.
 
-See below for a "thicker" version that gives both terms the latter semantics while 
-still avoiding infinite lists.
- *)
+(* To avoid the need of infinite lists, we update the definitions of ITER and
+   APP to not use a list comprehension over all integers. Instead we include a
+   set comprehension over all environments. *)
 
-Definition envs : ENV := Total_set.
+Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+  ρ ⭅ envs ;;
+  match v1 ρ , v2 ρ with 
+     | Int k1 , Int k2 => 
+         let ks := enumFrom k1 k2 in
+         ⌈  List.map (fun (k : nat)  => {{ r ≈ k }} ∩ 
+                            (* make sure each env agrees with ρ on v1 / v2 *)
+                            (fun ρ' => v1 ρ' = Int k1 /\ v2 ρ' = Int k2)) ks ⌉
+     | _ , _ => ∅
+     end.
+
+Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+  ρ1 ⭅ envs ;;
+  ⌈ match (v1 ρ1) with 
+  | Fun hs => 
+    h <- hs ;;
+    [ ρ2 ⭅ envs ;;
+      match (PFun.apply_opt _ _ Value.eqb h (v2 ρ2)) with 
+        | Some w => (fun ρ => ρ r = w) ∩ (fun ρ' => v1 ρ' = v1 ρ1 /\ v2 ρ' = v2 ρ2)
+        | None => ∅
+      end ]
+  | _ => []
+  end ⌉.
+
+
+(* This almost the same as IF above, except that it uses ∪ instead of ++ 
+   to join the two branches together. *)
+Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
+  T0 ⭅ TS0 ;;
+  T1 ⭅ TS1 ;;
+  T2 ⭅ TS2 ;;
+  let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
+  ⌈(successes * T1) [\] xs⌉ ∪ 
+  ⌈(Total_set - avoid) ∩* T2⌉.
+
+
+Fixpoint E (e : mini.Expr) : P (list ENV) := 
+
+  let B (e : mini.Expr) : P (list ENV) := 
+    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉
+    (* written with set comprehension:
+       { Δs \ I e | Δs ∈ E e } 
+     *)
+  in
+
+  match e with 
+
+  | mini.DefineV _ => 
+      ⌈ [ Total_set ] ⌉
+
+  | mini.ES a => 
+      ⌈ SIMPLE a ⌉
+
+  | mini.Fail => ⌈ [] ⌉
+
+  | mini.Choice e1 e2 => 
+      D1 ⭅ B e1 ;;
+      D2 ⭅ B e2 ;;
+      ⌈ D1 ++ D2 ⌉
+
+  | mini.Unify e1 e2 => 
+      D1 ⭅ E e1 ;;
+      D2 ⭅ E e2 ;;
+      ⌈ D1 * D2 ⌉
+
+  | mini.Seq e1 e2 => 
+      D1 ⭅ E e1 ;;  
+      D2 ⭅ E e2 ;;
+      ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
+
+  | mini.Iter a1 a2 =>
+     ITER (evalA a1) (evalA a2)
+
+  | mini.ApplyD a1 a2 => 
+     APP (evalA a1) (evalA a2)
+
+  | mini.If3 t0 t1 t2 =>  
+     IF (mini.I t0) (E t0) (B t1) (B t2)
+
+  | mini.All t0 => 
+     D ⭅ B t0 ;;  
+     ⌈ [ ALL D ] ⌉
+
+  | mini.One a => 
+     D ⭅ B a ;;  
+     ⌈ [ ONE D ] ⌉
+
+  | mini.For2 t0 t1 => 
+    let xs := mini.I t0     in  (* BVS t0 *)
+    let ys := mini.I t1     in  (* BVS t1 *)
+    let x  := mini.fresh t0 in
+    let y  := mini.fresh t1 in 
+    let z  := 1 + List.list_max ([x; y] 
+                                   ++ Scope.elements xs ++ Scope.elements ys)  
+       in  (* z is fresh for everything *)
+
+    T0 ⭅ E t0 ;;
+    T1 ⭅ E t1 ;;
+    ⌈ FOR z xs ys T0 T1 ⌉
+
+  (* TODO: functions *)
+
+  | _ => ∅
+  end.
+
+Definition  B (e : mini.Expr) : P (list ENV) := 
+    Δs ⭅ E e ;; ⌈ Δs [\] mini.I e ⌉.
+
+Lemma E_Choice e1 e2 : E (e1 :|: e2) = 
+    D1 ⭅ B e1 ;;
+    D2 ⭅ B e2 ;;
+    ⌈ D1 ++ D2 ⌉. reflexivity. Qed.
+
+Lemma E_Seq e1 e2 : E (e1 :>: e2) =
+   D1 ⭅ E e1 ;;
+   D2 ⭅ E e2 ;;
+   ⌈ (D1 [\] ⟅r⟆) * D2 ⌉.
+reflexivity. Qed.
+
+Lemma E_Unify e1 e2 : E (e1 :=: e2) = 
+  D1 ⭅ E e1 ;;
+  D2 ⭅ E e2 ;;
+  ⌈ D1 * D2 ⌉.
+ reflexivity. Qed.
+
+Create HintDb E.
+Hint Rewrite E_Choice E_Seq E_Unify : E.
+
+
+End DSLS.
+
+(** Old: Thin DSLS semantics  --------- *)
 
 Module Thin_DSLS.
+(*
+
+In this "Thin" version, below, the interpretation of ITER / SIMPLE /
+APP restricts the individual sets of environments to be as small as possible.
+
+This has the disadvantage that 1..2 does not have the same semantics as 1|2.
+The former is { [ {(r=1,rho)} ; {(r=2,rho)} ] | rho in envs } -- many lists
+the latter is { [ (r≈1) ; (r≈2) ] } -- only a single list
+
+See below for a "thicker" version that gives both terms the latter semantics
+while still avoiding infinite lists.  *)
+
 
 Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
   ρ ⭅ Total_set ;;
@@ -636,6 +711,22 @@ Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
    { [(rho,i=0,r=2)] | rho } ∪ { [(rho,i=1,r=3)] | rho } 
 *)
 
+(* apply domain function value f to x 
+   f is a list of partial functions, corresponding to 
+   iteration on the input. Any inputs that are in the 
+   domain of the function will produce output.
+ *)
+Definition apply (f : value) (v : value) : list value := 
+  match f with 
+  | Dom.Fun hs => 
+      h <- hs ;;
+      match (PFun.apply_opt _ _ Value.eqb h v) with 
+      | Some w => [w]
+      | None => []
+      end
+  | _ => []
+  end.
+
 Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
    ρ ⭅ envs ;;
    let vs := apply (v1 ρ) (v2 ρ) in
@@ -644,33 +735,6 @@ Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
 Definition SIMPLE (a : env -> value) := 
    ρ ⭅ envs ;;
    ⌈ [ ⌈ (r |-> a ρ, ρ) ⌉ ] ⌉.
-
-
-
-Import ConcreteVars.
-Example pair_app := mini.ApplyD (common.SArray [common.Lit 2; common.Lit 3]) 
-                       (common.Var x).
-Lemma example_pair_app :
-  APP (fun _ => mkTup [Int 2;Int 3]) (fun rho => rho x) = 
-    (ρ ⭅ envs ;; 
-     if Value.eqb (ρ x) (Int 0) then 
-     ⌈ [ ⌈ (r |-> Int 2, ρ) ⌉ ] ⌉
-     else if Value.eqb (ρ x) (Int 1) then
-     ⌈ [ ⌈ (r |-> Int 3, ρ) ⌉ ] ⌉
-     else ⌈ [] ⌉).
-Proof.    
-  unfold APP.
-  f_equal. extensionality ρ.
-  cbn.
-  destruct (Value.eqb (ρ x) (Int 0)) eqn:h0.
-  + have h1: (Value.eqb (ρ x) (Int 1) = false). admit.
-    rewrite h1.
-    cbn.
-    done.
-  + destruct (Value.eqb (ρ x) (Int 1)) eqn:h1.
-    cbn. done.
-    cbn. done.
-Admitted.
 
 (* This is NOT the same as IF above because it uses ∪ instead of ++ 
    to join the two branches together. *)
@@ -681,12 +745,6 @@ Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
   let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
   ⌈(successes * T1) [\] xs⌉ ∪ 
   ⌈(Total_set - avoid) ∩* T2⌉.
-
-Definition PFOR (z:Ident) (a b : Scope.t) (TS0 : P (list ENV)) 
-  (TS1 : P (list ENV)) : P (list ENV) := 
-  T0 ⭅ TS0 ;;
-  T1 ⭅ TS1 ;;
-  ⌈ FOR z a b T0 T1 ⌉.
 
 Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
@@ -760,6 +818,7 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 End Thin_DSLS.
 
 
+<<<<<<< HEAD
 (* ----------- D-SLS semantics ------------------ *)
 
 (* This is SLS semantics that makes the most sense. *)
@@ -1172,6 +1231,8 @@ Admitted.
 End Thicker_DSLS.
 
 
+=======
+>>>>>>> origin/main
 
 (* ------------------------------------------------------ *)
 (* ------  Sets of lists of values ---------------------- *)
@@ -1181,6 +1242,17 @@ Module ESL.
 (* Why doesn't a set of list of values or set of list of VAL 
    work? 
 *)
+
+Definition apply (f : value) (v : value) : list value := 
+  match f with 
+  | Dom.Fun hs => 
+      h <- hs ;;
+      match (PFun.apply_opt _ _ Value.eqb h v) with 
+      | Some w => [w]
+      | None => []
+      end
+  | _ => []
+  end.
 
 Definition intersect (xs : list value) (ys : list value) : list value := 
   x <- xs ;;
@@ -1282,7 +1354,7 @@ Fixpoint E (e : mini.Expr) : list ENV :=
   match e with 
   | mini.DefineV _ => [ Total_set ]
 
-  | mini.ES a => [ r ≈ evalA a ]
+  | mini.ES a => [ {{ r ≈ a }} ]
 
   | mini.Fail => [ ]
 
@@ -1320,6 +1392,19 @@ Definition X (e : mini.Expr) (ρ : env) : ENV :=
 (* ------  Fig 15 E-LV (uses dodgy union) --------------- *)
 
 Module ELV.
+
+Definition apply (f : value) (v : value) : list value := 
+  match f with 
+  | Dom.Fun hs => 
+      h <- hs ;;
+      match (PFun.apply_opt _ _ Value.eqb h v) with 
+      | Some w => [w]
+      | None => []
+      end
+  | _ => []
+  end.
+
+
 
 Definition Snoc (VS : VAL) (V : VAL) : VAL := 
   vs ⭅ VS ;; v ⭅ V ;; ⌈ Dom.snoc vs v ⌉.

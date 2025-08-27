@@ -1,4 +1,18 @@
-(* The domain of values for the denotational semantics *)
+(* The domain of values for the denotational semantics.
+
+   This domain approximates the domain that we need to interpret 
+   terminating verse program.
+
+   It assumes that there are a finite number of values (i.e. ints are bounded)
+   and a finite number of functions (i.e. by bounding their rank). 
+
+   This way, ordering and equality of values is decidable. And we can list 
+   them all out, if we need to.
+
+   The actual size of the domain is abstract and hopefully big enough to 
+   provide the correct answer to your program.
+
+ *)
 
 From Stdlib Require Import List.
 From Stdlib Require Import Sorting.Sorted.
@@ -27,18 +41,9 @@ Open Scope list_scope.
    We keep these definitions abstract.
 *)
 
-Definition largestNum := 1.
+Definition largestNum := 10.
 Definition limitNum := S largestNum.
 Definition largestRank := 1.
-
-
-(*
-Axiom ge10 : 10 <= largestNum.
-Definition ge0 : 0 <= largestNum. lia. Qed.
-Definition ge1 : 1 <= largestNum. move: ge10; lia. Qed.
-Definition ge2 : 2 <= largestNum. move: ge10; lia. Qed.
-Definition ge3 : 3 <= largestNum. move: ge10; lia. Qed.
-*)
 
 (* because there is a bound on the numbers, we can list them all *)
 Definition allNums := enumFrom 0 limitNum.
@@ -84,6 +89,7 @@ Definition snoc (tup : value) (v: value) : value :=
   | _ => tup
   end.
 
+(* combine two tuple values together *)
 Definition append (tup1 : value) (tup2: value) : value := 
   match tup1, tup2 with 
   | Fun hs1, Fun hs2 =>
@@ -134,13 +140,10 @@ Fixpoint compare (v1 : value) (v2 : value) : comparison :=
       list_compare (PFun.compare _ _ compare compare) fs1 fs2 
   end.
 
-
-
 Definition V_eq (v1 : value) (v2 : value) := 
   Value.eqb v1 v2 = true.
 Definition V_lt (v1 : value) (v2 : value) := 
   Value.compare v1 v2 = Lt.
-
 
 Lemma eqb_eq v1 v2 : Value.eqb v1 v2 = true <-> v1 = v2. Admitted.
 Lemma eqb_neq v1 v2 : Value.eqb v1 v2 = false <-> v1 <> v2. Admitted.
@@ -289,3 +292,31 @@ Notation "2" := v2 : value_scope.
 Notation "3" := v3 : value_scope.
 
 End ValueNotation.
+
+
+
+
+(** -------------- atomic/simple expressions  ---------------- *)
+
+Require Import common.
+
+Definition evalPrim (p : PrimOp) : value  := 
+  match p with 
+  | common.AddOne  => Prim.add1
+  | common.TimesTwo => Prim.times2
+  | common.ArrayLen => Prim.arrayLen
+  | common.Lt => Dom.Int 0  (* TODO *) 
+  | common.IsInt => Prim.isInt
+  | common.IsStr => Dom.Int 0 (* TODO *)
+  | common.IsArr => Prim.isArr
+  | common.IsFun => Prim.isFun
+  end.
+
+(* Evaluation function for simple values.  *)
+Fixpoint evalA (a : Simple) (ρ : Ident -> value) : value := 
+  match a with 
+  | common.Var x => ρ x
+  | common.Lit (common.Int i) => Dom.Int i
+  | common.EPrim p => evalPrim p
+  | common.SArray es => mkTup (List.map (fun e => evalA e ρ) es)
+  end.

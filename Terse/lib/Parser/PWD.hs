@@ -6,15 +6,17 @@ module Parser.PWD
   ( Parser
   , done
   , step
+  , fold
   , satisfy
   , token
   , chainl1
+  , Memo (..)
   ) where
 
 import Control.Applicative
 import Control.Category ((>>>))
 
-import Data.Foldable
+import Data.Foldable (foldl', toList)
 
 class Memo t where
   memo :: (t -> a) -> t -> a
@@ -66,11 +68,17 @@ step t = flip parse t >>> \ case
   (unwrap -> Empty) -> Nothing
   x -> Just x
 
-satisfy :: Memo t => (t -> Maybe a) -> Parser t a
-satisfy f = let y = Parser empty (parseSatisfy f) $ Satisfy f in y
+fold :: Foldable f => Parser t a -> f t -> [a]
+fold = (done' .) . foldl' step' . Just
+  where
+    step' z x =
+      step x =<< z
+    done' = \ case
+      Nothing -> []
+      Just x -> done x
 
-parseSatisfy :: Memo t => (t -> Maybe a) -> t -> Parser t a
-parseSatisfy f = maybe empty pure . f
+satisfy :: Memo t => (t -> Maybe a) -> Parser t a
+satisfy f = let y = Parser empty (maybe empty pure . f) $ Satisfy f in y
 
 token :: (Eq t, Memo t) => t -> Parser t t
 token x = satisfy $ \ y -> if

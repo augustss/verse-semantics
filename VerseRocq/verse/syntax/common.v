@@ -17,7 +17,7 @@ Definition Scope_concatMap {A}
                   (List.map f x).
 
 Inductive PrimOp : Type :=
-| Add : PrimOp
+| AddOne : PrimOp
 | TimesTwo : PrimOp
 | ArrayLen : PrimOp
 | Lt  : PrimOp

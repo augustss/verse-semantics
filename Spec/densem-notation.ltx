@@ -70,13 +70,11 @@ $$
   &&&& \hspace{3mm} \text{with disjoint domains} \\
   \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value
                                                    for \emph{in-scope}
-                                                   identifiers
-                                                   \benjamin{Out of date}
-                                                   } \\
-  \EV \in &\ENV & = & \powerset{ \Env } \makebox[0pt]{\hspace{2.5in}
-                                        % \benjamin{rename to Con (for Constraints)?}
-                                        }\\
-  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+                                                   identifiers \benjamin{Out
+                                                   of date}} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \makebox[0pt]{\hspace{2.5in}\benjamin{rename to
+                      Con (for Constraints)?}}\\
+  \{ \fpr{x_1}{y_1}, \mydots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
 \\
@@ -87,7 +85,7 @@ $$
 &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}}  \\
 &  & \vb & \conEmpty \vb \conUniv \\
 &  & \vb & \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \vb \conCompl(\EV) \\
-\text{Operators}&  op & ::= & < \vb \leq \vb \geq \vb > \vb + \vb - \vb * \vb / \vb 
+\text{Operators}&  op & ::= & < \vb \leq \vb \geq \vb > \vb + \vb - \vb * \vb / \vb
 \end{array}\\
 \\[-1mm]
 \textbf{Interpretation of simple values and constraints}\\
@@ -142,7 +140,7 @@ $$
 % --------------------- Syntax of Mini Verse ----------
 
 \begin{comment}   % comment out for now; it's in Fig 6 anyway
-  
+
 \ifeverything
 \begin{figure}
 $$

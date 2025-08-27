@@ -27,7 +27,7 @@ import Language.Verse.Loc (L (..))
 
 import Numeric (showHex)
 
-import Prelude (Double, Integer, error, foldr, show, (++))
+import Prelude (Eq, Double, Integer, error, foldr, show, (++))
 
 import Prettyprinter ( Pretty (..)
                      , Doc
@@ -155,6 +155,10 @@ deriving instance ( Show a
                   , Show (Pat a)
                   ) => Show (Exp a)
 
+deriving instance (Eq a
+                  , Eq (Path a)
+                  ) => Eq (Exp a)
+
 data Pat a
   = Name (IdentExp a)
   | Var [L (Exp a)] (L (IdentExp a)) [L (Exp a)]   -- expression lists are for attributes, can be both after "var" and after identifier
@@ -168,8 +172,12 @@ data Pat a
 deriving instance ( Show a
                   , Show (Exp a)
                   , Show (IdentExp a)
-                  , Show (Pat a)
                   ) => Show (Pat a)
+
+deriving instance ( Eq a
+                  , Eq (Exp a)
+                  , Eq (IdentExp a)
+                  ) => Eq (Pat a)
 
 data IdentExp a
  = IdentName a
@@ -180,7 +188,12 @@ deriving instance ( Show a
                   , Show (Exp a)
                   ) => Show (IdentExp a)
 
-data Path a = Path (L a) [(Maybe (Path a), L a)] deriving Show
+deriving instance ( Eq a
+                  , Eq (Path a)
+                  ) => Eq (IdentExp a)
+
+data Path a = Path (L a) [(Maybe (Path a), L a)]
+  deriving (Eq, Show)
 
 instance ( Pretty a
          , Pretty (Exp a)

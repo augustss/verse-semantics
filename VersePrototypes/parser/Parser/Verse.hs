@@ -4,8 +4,9 @@
 module Parser.Verse
   ( parseWithLoc
   , parseWithRewrite
-  , parse
+  , parse_
   , parseDie
+  , parseNoLoc
   , Parser
   , module Language.Verse.Ident
   , module Language.Verse.Exp
@@ -17,7 +18,9 @@ module Parser.Verse
   , Pos.Pos (..)
   , pKeyword -- See Note [Extensible Verse Parser]
   , pFile
-  , pIdent
+  , pIdent, pIdentT
+  , pNumT, pNum
+  , pBlock
   , pExpr
   , pEq
   , pBrace
@@ -25,7 +28,9 @@ module Parser.Verse
   , pLBrace
   , pBraces
   , pParens
+  , pPath
   , pComma
+  , pChar
   , pSemi
   , pString
   , pStringLit
@@ -38,6 +43,7 @@ module Parser.Verse
   , getLoc
   , rewrite
   -- , toPos
+  , pDigit
   ) where
 
 import Control.Comonad
@@ -131,20 +137,23 @@ instance (Monad m) => PPrim.Stream Word8String m Word8 where
 
 type Parser = P.Parsec Word8String ParserState
 
-parse :: Parser a -> String -> ByteString -> Either ParseError a
-parse p path content = runIdentity $ P.runParserT p beginPS path (WS content)
+parse_ :: Parser a -> String -> ByteString -> Either ParseError a
+parse_ p path content = runIdentity $ P.runParserT p beginPS path (WS content)
 
 parseDie :: Parser a -> String -> ByteString -> a
 parseDie p path content =
-  case parse p path content of
+  case parse_ p path content of
     Left err -> error $ show err
     Right x  -> x
+
+parseNoLoc :: Comonad w => Parser (w a) -> String -> ByteString -> a
+parseNoLoc p path bs = extract $ parseDie p path bs
 
 -- | Given a FilePath and the contents of the file, parse the file and return an
 -- @Exp@ annotated with Source Locations
 parseWithLoc :: Parser a -> String -> ByteString -> Either E.Error a
 parseWithLoc p path bytestring =
-  case parse p path bytestring of
+  case parse_ p path bytestring of
     Left err -> Left $ E.OtherError (toPos $ PE.errorPos err) (showWithoutPos err)
     Right x -> Right x
   where
@@ -152,12 +161,22 @@ parseWithLoc p path bytestring =
     showWithoutPos err =
       PE.showErrorMessages "or" "unknown parse error"  "expecting" "unexpected" "end of input" (PE.errorMessages err)
 
+-- | Given a FilePath and the contents of the file, parse the file and return an
+-- @Exp@ annotated with Source Locations
 parseWithRewrite
   :: Parser (L (Exp SimpleName))
   -> String
   -> ByteString
+  -- -> R.Exp L Ident
+  -> Either E.Error ((R.Exp L Ident))
+parseWithRewrite p path bs = fmap extract $ parseWithLocRewrite p path bs
+
+parseWithLocRewrite
+  :: Parser (L (Exp SimpleName))
+  -> String
+  -> ByteString
   -> Either E.Error (L (R.Exp L Ident))
-parseWithRewrite p path = runSupplyT . rewrite <=< parseWithLoc p path
+parseWithLocRewrite p path = runSupplyT . rewrite <=< parseWithLoc p path
 
 
 liftL2 :: (Apply f, Comonad f) => (f a -> f b -> c) -> f a -> f b -> f c
