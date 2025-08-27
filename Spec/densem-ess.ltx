@@ -274,7 +274,7 @@ $$
 \ \ \ \ \ \ \ \ \ \benjamin{fix}
 \\[0.6ex]
 %
-\rulename{siter} &  \semess{S}{u}{v}{|1 ..  a|}
+\rulename{sdotdot} &  \semess{S}{u}{v}{|1 ..  a|}
 & = & \{  [ \ \conBrack{u=v=k \wedge a=n}  |vbar| k \leftarrow [1..n] ]       \\
   &&& |vbar| \rho \in \Env,\ \semapp{A}{a}\rho = n \}
 %
@@ -286,7 +286,7 @@ $$
   \bigcup
 \begin{array}[t]{@@{}l@@{\,}l}
   \{
-       & \HIDE{(\begin{array}[t]{@@{}l}
+       & (\HIDE{(\begin{array}[t]{@@{}l}
               [ \; s[0], \;
                    s[1] \mathord{\SETMINUS} s[0] ,\;
                    \ldots
@@ -294,7 +294,9 @@ $$
                        \cup  s[n\mathord{-}1]) \;
               ]
            \end{array}
-       \!\!\! \prodE \! s_1)}{\xs},
+       \!\!\! \prodE  s_1)}{\xs})
+  \\
+  & \cup
   \\
        & {(\begin{array}[t]{@@{}l}
               [ \; \Env \SETMINUS (\HIDE{s[0]}{\xs}\cup\ldots\cup s[n])
@@ -334,6 +336,7 @@ $$
 %       \end{array}
 % \\
 \\
+\text{where...} \\
 & \semess{B}{u}{v}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
 & \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \,
                               \HIDE{\semapp{I}{|e|}}{\EV},\;
