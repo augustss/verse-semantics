@@ -933,6 +933,7 @@ getVisibleBinders = go
     go (Array es)     = concatMap go es
     go (Tuple es)     = concatMap go es
     go (Seq e1 e2)    = go e1 ++ go e2
+    go (Where e1 e2)  = go e1 ++ go e2
     go (ApplyS e1 e2) = go e1 ++ go e2
     go (ApplyD e1 e2) = go e1 ++ go e2
     go (Unify e1 e2)  = go e1 ++ go e2
