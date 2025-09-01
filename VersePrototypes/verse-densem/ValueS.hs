@@ -8,6 +8,7 @@ module ValueS(
   allInts',
   funNegate, funInt, funGt, funLt,
   funAdd, funSub, funMul, funDiv,
+  funXF,
   allTuples, allTuplesLen,
   ) where
 import Control.Monad
@@ -102,8 +103,16 @@ funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int ((i*j) `mod` numInt))
 funDiv :: PartialFun
 funDiv = PF "div" $ M.fromList [(Tuple [Int i, Int j], Int (i`div`j)) | i <- allInts'', j <- allInts'', j /= 0 ]
 
+funX12_3 :: PartialFun
+funX12_3 = PF "x12_3" $ M.fromList [(Int 1, Int 3), (Int 2, Int 3)]
+funX0_1  = PF "x0_1"  $ M.fromList [(Int 0, Int 1)]
+funXF :: FUN
+funXF = [funX12_3, funX0_1]
+
 allFUNs :: [FUN]
-allFUNs = [ [funNegate], [funInt], [funGt], [funLt], [funAdd], [funSub], [funMul], [funDiv] ]
+allFUNs = [ [funNegate], [funInt], [funGt], [funLt], [funAdd], [funSub], [funMul], [funDiv],
+            funXF
+          ]
 
 -- Integers and pairs of integers
 allValues :: [Value]
