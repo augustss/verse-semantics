@@ -8,6 +8,8 @@
 \newcommand{\allowfails}[1]{\mathbf{allowfails}(#1)}
 %% \newcommand{\dsplural}[1]{#1s}
 \newcommand{\dsplural}[1]{\overline{#1}}
+\newcommand{\mhideEs}[2]{\hideEs(#1,#2)}
+\newcommand{\mhideEsNL}[2]{\hideEs(#1,\\ & & & #2)}
 
 \begin{figure}
 $$
@@ -18,14 +20,15 @@ $$
 \rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \conBrack{u =v} ] \\
 \rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{u=v, v=a} ] \\
 \rulename{stuple} & \semess{S}{u}{v}{|array (t_1,xdots,t_n)|}
-& = & \hideEs \begin{array}[t]{@@{}l@@{\,}l}
-           ( & \{u_1,\mydots u_n,v_1 \mydots v_n\} \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}\\
-           , & \begin{array}[t]{@@{}l}
+& = & \mhideEsNL{ %%%\begin{array}[t]{@@{}l@@{\,}l}
+             \{u_1,\mydots u_n,v_1 \mydots v_n\} \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
+           }{  %%%\begin{array}[t]{@@{}l}
                  \conBrack{ u=|arr (u_1, xdots, u_n)|,
-                            v=|arr (v_1, xdots, v_n)|} \\
-                   \prodsingleE \semess{S}{u_1}{v_1}{t_1} \prodE \mydots \prodE \semess{S}{u_n}{v_n}{t_n}\; )
-      \end{array}
-      \end{array}
+                            v=|arr (v_1, xdots, v_n)|} 
+                   \prodsingleE \semess{S}{u_1}{v_1}{t_1} \prodE \mydots \prodE \semess{S}{u_n}{v_n}{t_n}\; 
+                   }
+%%      \end{array}
+%%      \end{array}
       \\
 \rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \prodsingleE \semess{S}{u}{v}{t} \\
 \rulename{ssquig} &  \semess{S}{u}{v}{|esssquig x t|} & = &
@@ -47,8 +50,8 @@ $$
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
   \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
-& = & \hideEs( xs, \EV_1  \prodsingleE \semess{B}{u}{v}{t_2}) |++| \\
-& & & \complE( \hideE(xs, \EV_1 )) \prodsingleE \semess{B}{u}{v}{t_3} \\
+& = & \mhideEs{ xs} { \EV_1  \prodsingleE \semess{B}{u}{v}{t_2}} |++| \\
+& & & \complE( \mhideEs{xs}{ \EV_1 }) \prodsingleE \semess{B}{u}{v}{t_3} \\
 &&& \text{where} \begin{array}[t]{l}
   xs = \semapp{I}{|t_1|} \\
   \EV_1 : \ENV = \firstE(xs, \semapp{C}{t_1}) \\
@@ -62,7 +65,7 @@ $$
       xs = \semapp{I}{t_1} \hspace{5mm} r,s \not\in \freevars{t_1,t_2} \\
       SS :: \seq{\seq{\ENV}}
       = \pickL \begin{array}[t]{@@{\;}l@@{\;}l}
-                     [ & \hideEs(xs \cup \{r\}, \EV \prodsingleE \semess{B}{r}{s}{t_2} ) \\
+                     [ & \mhideEs{xs \cup \{r\}}{ \EV \prodsingleE \semess{B}{r}{s}{t_2} } \\
                        \vb & \EV |<-| \squashE(\semapp{C}{t_1}) \; ])
                   \end{array}
 \end{array}
@@ -70,10 +73,10 @@ $$
 
 %  ------ ONE,ALL --------------
 \rulename{sone} & \semess{S}{u}{v}{|one t|}
- & = & \conBrack{ u=v } \prodsingleE [\,\hideE(xs, \firstE(xs, \hideEs(p, \semess{S}{p}{v}{|t|}))) \, ] \\
+ & = & \conBrack{ u=v } \prodsingleE [\,\mhideEs{xs}{ \firstE(xs, \mhideEs{p}{ \semess{S}{p}{v}{|t|})}} \, ] \\
  & & & \text{where}\; xs = \semapp{I}{|t|}, \; p \not\in \freevars{t} \\
 \rulename{sall} & \semess{S}{u}{v}{|all t|}
- & = & \conBrack{ u=v } \prodsingleE [\, \allE(q,\hideEs(p, \semess{B}{p}{q}{t}),v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\[2mm]
+ & = & \conBrack{ u=v } \prodsingleE [\, \allE(q,\mhideEs{p}{ \semess{B}{p}{q}{t}},v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\[2mm]
 
 \\
 %% \rulename{dlam} &
@@ -81,9 +84,9 @@ $$
 %%  & & = & ??? \\
 %% \\
 & \semess{B}{u}{v}{|t|} & : & \seq{ \ENV } \\
-& \semess{B}{u}{v}{|t|} & = & \hideEs(\semapp{I}{|t|}, \semess{S}{u}{v}{t}) \\[1mm]
+& \semess{B}{u}{v}{|t|} & = & \mhideEs{\semapp{I}{|t|}}{ \semess{S}{u}{v}{t}} \\[1mm]
 & \semapp{C}{|t|} & : & \seq{ \ENV } \\
-& \semapp{C}{|t|} & = & \hideEs(\{p,q\},\; \semess{S}{p}{q}{|t|}) \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+& \semapp{C}{|t|} & = & \mhideEs{\{p,q\}}{\semess{S}{p}{q}{|t|}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 \\
 & \semess{F}{a_a}{r}{a_f} & : & \seq{\ENV} \\
 & \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}} \vb i |<-| 0.. \; ] \\
@@ -98,7 +101,7 @@ $$
 \\[-2mm]
 & \firstE & : & \powerset{\Ident} \rightarrow [\ENV] \rightarrow \ENV \\
 & \firstE(xs,\; []) & = & \{\} \\
-& \firstE(xs,\; \EV : \EV{}s)  & = & \EV \cup (\firstE(xs, \EV{}s) \setminus \hideE(xs,\EV)) \\
+& \firstE(xs,\; \EV : \EV{}s)  & = & \EV \cup (\firstE(xs, \EV{}s) \setminus \mhideEs{xs}{\EV}) \\
 
 \end{array}
 \end{array}
@@ -139,7 +142,6 @@ $$
     \quad \quad \forall \rho_0 \inb \dsplural{\EV_{0}}[k].\, \rho_0(p) = I \\
     \quad \quad \quad \Rightarrow \\
     \quad \quad \exists \rho_1 \inb
-       % \squashE(\hideEs(\semapp{I}{|t_1|} \cup \{j,z\}, \{\rho_0\}) \prodsingleE \semess{S}{j}{z}{|t_1|})
        (\semapppp{Q}{t_1}{\rho_0}{j}{z})
             [0]. \\
     \quad \quad \quad (\fpr{\rho_1(w)}{\rho_1(j)} \in H[k] \land \rho_1(z)=Z \\
@@ -151,7 +153,7 @@ $$
   \\
  & \semapp{Q}{t} & : & \Env \rightarrow \Ident \rightarrow \Ident \rightarrow \seq{\ENV} \\
  & \semappppp{Q}{t}{\rho}{x}{y} & = &
- \squashE(\hideEs(\semapp{I}{|t|} \cup \{x,y\}, \{\rho\}) \prodsingleE \semess{S}{x}{y}{|t|}) \\
+ \squashE(\mhideEs{\semapp{I}{|t|} \cup \{x,y\}}{ \{\rho\}} \prodsingleE \semess{S}{x}{y}{|t|}) \\
 
 \end{array}
 \end{array}
@@ -169,7 +171,7 @@ $$
 \multicolumn{4}{l}{\rulename{dlam}\quad \semess{S}{h}{f}{|functionOCX q t_0 fx t_1|}} \\
 & & = & [
   \begin{array}[t]{ll}
-    \hideE(AllowFails, \\
+    \mhideEs{AllowFails}{ \\
     \{ \rho \, \vb \rho \inb \ENV, \\
     \letvar \fx = \semapp{X}{|fx|}, \, \fx \subseteq \{0,1\}, \\
     \exists H \inb Fun.\, \rho(h)=H, \\
@@ -199,11 +201,11 @@ $$
       \begin{array}[t]{l}
         \forall \rho_0 \inb \dsplural{\EV_0}[k]. \\
         \rho_0(p)=I, \\
-        \exists \rho_1 \inb (\hideEs(\{j,z\} \cup \semapp{I}{t_1},\{\rho_0\}) \prodsingleE \semapppp{Q}{t_1}{\rho_0}{j}{z})[0].\\
+        \exists \rho_1 \inb (\mhideEs{\{j,z\} \cup \semapp{I}{t_1}}{\{\rho_0\}} \prodsingleE \semapppp{Q}{t_1}{\rho_0}{j}{z})[0].\\
         (\fpr{\rho_1(w)}{\rho_1(j)}) \in H[k] \land \rho_1(z)=Z
         \\
       \end{array} & \text{\hspace{-6em}argument inside domain} \\
-      \quad\quad\quad ) \\
+      \quad\quad\quad } \\
  \})\; ]
   \end{array} \\
   & & & \text{where } p,w,j,z \not\in \semapp{I}{|t_0,t_1|} \\
