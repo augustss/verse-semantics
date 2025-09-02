@@ -75,69 +75,53 @@ dE t@(ApplyD t0 t1)                 i x =
           (j, y) = fresh2 ("j", "y") [i, x] t
 
 dE t@(If3 t0 t1 t2)                   i x = join
- [
-   let a0' :: [ENV]
-       a0' = a0 `remvL` bvs t0 `remvL` [j, y]
+ [ let a0' :: [ENV]
+       a0' = a0 `remvL` bvs t0
        Snoc bs b = go ENVS.empty a0 a0'
        go :: ENV -> [ENV] -> [ENV] -> [ENV]
        go s [] [] = [univ \\\ s]
        go s (a:as) (a':as') = (a \\\ s) : go (s \/ a') as as'
        go _ _ _ = undefined
-   in  ((singleton bs *** dB t1 i x) `remv` bvs t0 `remv` [j, y]) `union`
-       ((unit b       *** dB t2 i x) `remv` bvs t0 `remv` [j, y])
- | a0 :: [ENV] <- dE t0 j y
- ] where (j, y) = fresh2 ("j", "y") [i, x] t
-
+   in  ((singleton bs *** dB t1 i x) `remv` bvs t0) `union`
+       ((unit b       *** dB t2 i x) `remv` bvs t0)
+ | a0 :: [ENV] <- dC t0
+ ]
 {-
 -- For2
-
-{- WRONG
-dE t@(For2 t0 t1) i x =
-  [ bigUnion [ rhos /\ i .= conc iss /\ x .= conc xss
-             | iss <- sequence (map (extractVar rhos) is)
-             , xss <- sequence (map (extractVar rhos) xs) ]
-  | rhos <- rhoss
-  ] `remv` is `remv` xs
+dE t@(For2 t0 t1) i x = join
+  [ let rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
+        is     = take nAlts $ freshList "i_" (i : x : getAllBinders t)
+        xs     = take nAlts $ freshList "x_" (i : x : getAllBinders t)
+        a' :: [ENV]
+        a' = a `remvL` bvs t0 `remvL` [j, y]
+        nAlts = length a
+        c :: Int -> SL ENV
+        c n = ((unit (a `ix` n) *** [ bigUnion [rhos /\ k .= ki /\ z .= zi /\
+                                                (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
+                                               | ki <- allValues, zi <- allValues]
+                                    | rhos <- dE t1 k z])
+               `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
+{-XXX
+          ++
+              ((unit (univ \\\ (a' `ix` n)) *** unit ( (is!!n) .= empTup /\ (xs!!n) .= empTup )))
 -}
-dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
-                                      bigIntersect (zipWith (.=) is ss) /\
-                                      bigIntersect (zipWith (.=) xs ts)
-                                    | ss <- replicateM nAlts (valsOf is rhos)
-                                    , ts <- replicateM nAlts (valsOf xs rhos)
-                                    ]
-                         | rhos <- rhoss
-                         ] `remv` is `remv` xs
-{-
-dE t@(For2 t0 t1) i x = [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
-                                      bigIntersect (zipWith (.=) is ss) /\
-                                      bigIntersect (zipWith (.=) xs ts)
-                                    | ss <- replicateM nAlts tups
-                                    , ts <- replicateM nAlts tups
-                                    ]
-                         | rhos <- rhoss
-                         ] `remv` is `remv` xs
--}
+    in
+      [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
+                   bigIntersect (zipWith (.=) is ss) /\
+                   bigIntersect (zipWith (.=) xs ts)
+                 | ss <- replicateM nAlts tups
+                 , ts <- replicateM nAlts tups
+                 ]
+      | rhos <- rhoss
+      ] `remv` is `remv` xs    
+  | a <- dE t0 j y
+  ]
   where
-    rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
---    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
     (j, y) = fresh2 ("j", "y") [i, x] t
     (k, z) = fresh2 ("k", "z") [i, x] t
-    is     = take nAlts $ freshList "i_" (i : x : getAllBinders t)
-    xs     = take nAlts $ freshList "x_" (i : x : getAllBinders t)
+    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
     empTup = Tuple []
-    a, a' :: [ENV]
-    a = dE t0 j y   -- XXX No squash in Tim's version
-    a' = a `remv` bvs t0 `remv` [j, y]
-    nAlts = length a
-    c :: Int -> [ENV]
-    c n = (([a `ix` n] *** [ bigUnion [rhos /\ k .= ki /\ z .= zi /\ (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
-                                      | ki <- allValues, zi <- allValues]
-                           | rhos <- dE t1 k z])
-            `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
-         ++
-          (([univ \\\ (a' `ix` n)] *** [ (is!!n) .= empTup /\ (xs!!n) .= empTup ]))
 -}
-
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> SL ENV
@@ -150,11 +134,11 @@ dF f a r = [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
            | hs <- mkSetUnsafe allFUNs -- set
            ]
 
+{-
 -- A hack to avoid iterating over so many values
 valsOf :: [Ident] -> ENV -> [Value]
 valsOf is e = nub $ concatMap (extractVar e) is
-
-{-
+-}
 
 i=Ident noLoc "i"
 j=Ident noLoc "j"
@@ -171,6 +155,7 @@ k0=Lit (LInt 0)
 k1=Lit (LInt 1)
 k2=Lit (LInt 2)
 k3=Lit (LInt 3)
+{-
 --t0= EPrim Gt
 --t1= Array [Lit (LInt 1), Lit (LInt 0)]
 --t0=DefineE a (Choice (Lit (LInt 1)) (Lit (LInt 2))) `Seq` ApplyD (EPrim Gt) (Array [Variable a, Lit (LInt 0)])
@@ -178,11 +163,11 @@ t0=DefineE a (ApplyD (EPrim Gt) (Array [Lit (LInt 3), Variable x]) `Seq`
               ApplyD (EPrim Gt) (Array [Variable x, Lit (LInt 0)])
              )
 t1=Variable a
+-}
 
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
-        | otherwise = empty
--}
+        | otherwise = ENVS.empty
 
 conc :: [Value] -> Value
 conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
