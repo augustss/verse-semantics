@@ -52,10 +52,8 @@ dE t@(Array ts)                     i x =
                         ]
 dE (Block t)                        i x = dB t i x
 dE Fail                             _ _ = singleton []
-{-
 -- A speedup for x:int
-dE (Range (EPrim IsInt))            i x = [ bigUnion [ i .= v /\ x .= v | v <- allInts ] ]
--}
+dE (Range (EPrim IsInt))            i x = singleton [ bigUnion [ i .= v /\ x .= v | v <- allInts ] ]
 dE (Range t)                        i x =
   (dE t j y *** dF y i x) `remv` [j,y]
     where (j, y) = fresh2 ("j", "y") [i, x] t
