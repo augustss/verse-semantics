@@ -192,13 +192,14 @@ $$
     \forall k \inb \{0,\mydots,n-1\}.\, \forall I,Z \inb \Val. \\
     \quad\quad (\fpr{I}{Z}) \in F[k] \\
       \quad \Leftrightarrow \\
-      \quad\quad\quad \lnot (\exists i \inb \mathbb{N}. \exists \rho_0 \inb \dsplural{\EV_{0}}[i].\rho_0(p)=I) \land q=o \land (\fpr{I}{Z}) \in H[k] & \text{\hspace{-6em}argument outside domain}\\
+      \quad\quad\quad \lnot (\exists i \inb \mathbb{N}. \exists \rho_0 \inb \dsplural{\EV_{0}}[i].\rho_0(p)=I) \land q=o \land (\fpr{I}{Z}) \in H[k] & \text{argument outside domain}\\
       \quad\quad \lor \\
       \quad\quad\quad (\exists i \inb \mathbb{N}. \exists \rho_0 \inb \dsplural{\EV_{0}}[i].\rho_0(p)=I) \land
+      \\ \quad\quad\quad\quad
       \begin{array}[t]{l}
         \forall \rho_0 \inb \dsplural{\EV_0}[k]. \\
         \rho_0(p)=I, \\
-        \exists \rho_1 \inb \semapppp{Q}{t_1}{\rho_0}{j}{z}.\\
+        \exists \rho_1 \inb (\hideEs(\{j,z\} \cup \semapp{I}{t_1},\{\rho_0\}) \prodsingleE \semapppp{Q}{t_1}{\rho_0}{j}{z})[0].\\
         (\fpr{\rho_1(w)}{\rho_1(j)}) \in H[k] \land \rho_1(z)=Z
         \\
       \end{array} & \text{\hspace{-6em}argument inside domain} \\
