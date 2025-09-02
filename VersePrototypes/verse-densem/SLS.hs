@@ -59,6 +59,8 @@ dE (Range (EPrim IsInt))            i x = [ bigUnion [ i .= v /\ x .= v | v <- a
 dE (Range t)                        i x =
   (dE t j y *** dF y i x) `remv` [j,y]
     where (j, y) = fresh2 ("j", "y") [i, x] t
+dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
+  dE t0 i x `outerUnion` dE t1 i x
 dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
   (dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
   [ [ x .= Int v /\ l .= Int start /\ h .= Int end | v <- [ start .. end ] ]
@@ -74,7 +76,7 @@ dE t@(ApplyD t0 t1)                 i x =
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
-dE t@(If3 t0 t1 t2)                   i x = join
+dE (If3 t0 t1 t2)                   i x = join
  [ let a0' :: [ENV]
        a0' = a0 `remvL` bvs t0
        Snoc bs b = go ENVS.empty a0 a0'
@@ -82,11 +84,11 @@ dE t@(If3 t0 t1 t2)                   i x = join
        go s [] [] = [univ \\\ s]
        go s (a:as) (a':as') = (a \\\ s) : go (s \/ a') as as'
        go _ _ _ = undefined
-   in  ((singleton bs *** dB t1 i x) `remv` bvs t0) `union`
+   in  ((singleton bs *** dB t1 i x) `remv` bvs t0) `outerUnion`
        ((unit b       *** dB t2 i x) `remv` bvs t0)
  | a0 :: [ENV] <- dC t0
  ]
-{-
+
 -- For2
 dE t@(For2 t0 t1) i x = join
   [ let rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
@@ -96,24 +98,28 @@ dE t@(For2 t0 t1) i x = join
         a' = a `remvL` bvs t0 `remvL` [j, y]
         nAlts = length a
         c :: Int -> SL ENV
-        c n = ((unit (a `ix` n) *** [ bigUnion [rhos /\ k .= ki /\ z .= zi /\
+        c n = ((unit (a `ix` n) *** [ [ bigUnion [rhos /\ k .= ki /\ z .= zi /\
                                                 (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
                                                | ki <- allValues, zi <- allValues]
-                                    | rhos <- dE t1 k z])
+                                      | rhos <- s1
+                                      ]
+                                    | s1 <- dE t1 k z
+                                    ])
                `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
-{-XXX
-          ++
+          `outerUnion`
               ((unit (univ \\\ (a' `ix` n)) *** unit ( (is!!n) .= empTup /\ (xs!!n) .= empTup )))
--}
     in
-      [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
-                   bigIntersect (zipWith (.=) is ss) /\
-                   bigIntersect (zipWith (.=) xs ts)
-                 | ss <- replicateM nAlts tups
-                 , ts <- replicateM nAlts tups
-                 ]
-      | rhos <- rhoss
-      ] `remv` is `remv` xs    
+      [
+        [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
+                     bigIntersect (zipWith (.=) is ss) /\
+                     bigIntersect (zipWith (.=) xs ts)
+                   | ss <- replicateM nAlts tups
+                   , ts <- replicateM nAlts tups
+                   ]
+        | rhos <- s1
+        ]
+      | s1 <- rhoss
+      ] `remv` is `remv` xs
   | a <- dE t0 j y
   ]
   where
@@ -121,7 +127,7 @@ dE t@(For2 t0 t1) i x = join
     (k, z) = fresh2 ("k", "z") [i, x] t
     tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
     empTup = Tuple []
--}
+
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> SL ENV
@@ -140,6 +146,7 @@ valsOf :: [Ident] -> ENV -> [Value]
 valsOf is e = nub $ concatMap (extractVar e) is
 -}
 
+{-
 i=Ident noLoc "i"
 j=Ident noLoc "j"
 k=Ident noLoc "k"
@@ -155,7 +162,6 @@ k0=Lit (LInt 0)
 k1=Lit (LInt 1)
 k2=Lit (LInt 2)
 k3=Lit (LInt 3)
-{-
 --t0= EPrim Gt
 --t1= Array [Lit (LInt 1), Lit (LInt 0)]
 --t0=DefineE a (Choice (Lit (LInt 1)) (Lit (LInt 2))) `Seq` ApplyD (EPrim Gt) (Array [Variable a, Lit (LInt 0)])
@@ -216,6 +222,9 @@ infixl 8 +++
 (+++) :: SL ENV -> SL ENV -> SL ENV
 s1 +++ s2 = [ l1 ++ l2 | l1 <- s1, l2 <- s2 ]
   
+outerUnion :: SL ENV -> SL ENV -> SL ENV
+outerUnion = union
+
 lift2 :: forall a b c . (a -> b -> c) -> SL a -> SL b -> SL c
 lift2 op sl1 sl2 =
   [ concat ss 
@@ -247,6 +256,6 @@ bvs = getVisibleBinders
 -------
 
 den :: SrcEssential -> SL ENV
-den t = squash $ dE (Block t) i x -- `remv` [i]
+den t = filterSet (not . null) $ squash $ dE (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"
