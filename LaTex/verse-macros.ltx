@@ -284,6 +284,7 @@
 \newcommand{\Ident}{\M{\mathit{Iden}}}
 \newcommand{\Fun}{\M{\mathit{Fun}}}
 \newcommand{\Z}{\M{\mathbb Z}}
+\newcommand{\N}{\M{\mathbb N}}
 \newcommand{\Val}{\Value}
 \newcommand{\Value}{\M{\mathit{Val}}}
 \newcommand{\VAL}{\M{\mathit{VAL}}}
@@ -292,7 +293,8 @@
 %% Sets and sequences
 \newcommand{\powerset}[1]{\powersetnp{(#1)}}       % Sets
 \newcommand{\powersetnp}[1]{\M{\mathit{Set}#1}}   % Sets without parens
-\newcommand{\seq}[1]{\M{ [ #1 \,] }}              % Sequences
+\newcommand{\seq}[1]{\M{ [ #1] }}              % Sequences
+\newcommand{\SL}[1]{SL(#1)}
 
 %% Semantic function calls, e.g E[e]rho
 \newcommand{\semfun}[1]{\mathcal{#1}}
@@ -305,7 +307,7 @@
 \newcommand{\semappppp}[6]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5 \, #6}
 
 %% Semantics of Essential Verse
-\newcommand{\semess}[4]{\semfun{#1}\,#2\llbracket #4 \rrbracket #3}
+\newcommand{\semess}[4]{\semfun{#1}\llbracket #4 \rrbracket #2 #3}
 
 % Functions over ENV
 \newcommand{\EV}{\Delta}   % A variable that ranges over \ENV
@@ -336,6 +338,7 @@
 % \newcommand{\pickL}{\mathbf{pick}^{*}}
 \newcommand{\headE}{\mathbf{head}}
 \newcommand{\seqE}{\fatsemi}
+\newcommand{\seqSL}{\fatsemi_{SL}}
 \newcommand{\complE}{\mathbf{compl}}
 \newcommand{\prodsingleE}{\mathrel{\cap^{\!*}}}
 \newcommand{\prodEsingle}{\mathrel{\prescript{*\!}{}{\cap}}}
@@ -346,6 +349,7 @@
 \newcommand{\subseq}[1]{\mathbf{subsequence}(#1)}
 \newcommand{\lengthseq}[1]{\mathbf{length}(#1)}
 \newcommand{\DSifthenelse}[3]{\begin{array}[t]{@@{}l} \mathbf{if}\; #1 \\ \,\mathbf{then}\; #2 \\ \,\mathbf{else}\; #3 \end{array}}
+\newcommand{\liftATwo}{\mathbf{liftA2}}
 
 % Notation for ENV
 \newcommand{\sembrack}[1]{\llbracket #1 \rrbracket}
@@ -357,6 +361,8 @@
 
 % Functions over sequences
 \newcommand{\append}{+\!\!+\,}
+\newcommand{\flatten}{\mathbf{flatten}}
+\newcommand{\concat}{\mathbf{concat}}
 \newcommand{\dodgyunion}{\hat{\cup}}
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}

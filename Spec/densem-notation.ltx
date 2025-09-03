@@ -17,7 +17,8 @@ $$
 \begin{array}{r@@{\;}c@@{\;}ll}
   |[e_1,xdots,e_n]| & : & \seq{A} & \text{Sequence of items} \\
   |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{Sequence comprehension} \\
-  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\[2mm]
+  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \seq{A} & \text{Sequence concatenation} \\
+  \concat & : & \seq{\seq{A}} \rightarrow \seq{A} & \text{Sequence concatenation} \\
 \end{array}\\
 \\
 
@@ -34,6 +35,9 @@ $$
   \headE & : & [\powerset{A}] \rightarrow \powerset{A} \\
   \headE[] & = & \{ \} \\
   \headE(s:\_) & = & s \\[1mm]
+  \flatten & : & \seq{\powerset{A}} \rightarrow \powersetnp{\seq{A}} & \text{Pick one from each set} \\
+  \flatten( [] ) & = & \{ [] \} \\
+  \flatten(s:ss) & = & \{\; x:xs \vb x \in s, xs \in \flatten(ss)\; \} \\[1mm]
 
   \seqE & : & \powerset{A} \rightarrow \powerset{A} \rightarrow \powerset{A} \\
   s_1 \seqE s_2 & = & \{ a_2 \vb a_1 \in s_1, a_2 \in s_2 \} \\

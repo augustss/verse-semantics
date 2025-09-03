@@ -18,40 +18,40 @@ $$
 % ------------- Denotational semantics of Essential Verse ---------------
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
- & \semess{S}{u}{v}{t} & : & [ \ENV ] \\
-\rulename{swild} &  \semess{S}{u}{v}{|_|} & = & [ \conBrack{u =v} ] \\
-\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{u=v, v=a} ] \\
-\rulename{stuple} & \semess{S}{u}{v}{|array (t_1,xdots,t_n)|}
+ & \semess{E}{u}{v}{t} & : & [ \ENV ] \\
+\rulename{swild} &  \semess{E}{u}{v}{|_|} & = & [ \conBrack{u =v} ] \\
+\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & [ \conBrack{u=v, v=a} ] \\
+\rulename{stuple} & \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}
 & = & \mhideEsNL{ %%%\begin{array}[t]{@@{}l@@{\,}l}
              \{u_1,\mydots u_n,v_1 \mydots v_n\} \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
            }{  %%%\begin{array}[t]{@@{}l}
                  \conBrack{ u=|arr (u_1, xdots, u_n)|,
                             v=|arr (v_1, xdots, v_n)|} 
-                   \prodsingleE \semess{S}{u_1}{v_1}{t_1} \prodE \mydots \prodE \semess{S}{u_n}{v_n}{t_n}\; 
+                   \prodsingleE \semess{E}{u_1}{v_1}{t_1} \prodE \mydots \prodE \semess{E}{u_n}{v_n}{t_n}\; 
                    }
 %%      \end{array}
 %%      \end{array}
       \\
-\rulename{sbind} &  \semess{S}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \prodsingleE \semess{S}{u}{v}{t} \\
-\rulename{ssquig} &  \semess{S}{u}{v}{|esssquig x t|} & = &
-   \conBrack{x=u} \prodsingleE \semess{S}{u}{v}{t} \\
-\rulename{stype} &  \semess{S}{u}{v}{|:a|} & = & \semess{F}{u}{v}{a}  \\
-\rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & [ ] \\
-\rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
+\rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \prodsingleE \semess{E}{u}{v}{t} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+   \conBrack{x=u} \prodsingleE \semess{E}{u}{v}{t} \\
+\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semess{F}{u}{v}{a}  \\
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & [ ] \\
+\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
  & = & \semess{B}{u}{v}{t_1} \append \semess{B}{u}{v}{t_2}  \\
-\rulename{sdotdot} &  \semess{S}{u}{v}{|a_1 .. a_2|}
+\rulename{sdotdot} &  \semess{E}{u}{v}{|a_1 .. a_2|}
 & = & [ \conBrack{u=v, v=i, i \geq a_1, i \leq a_2}
       \vb i |<-| 0.. ] \\
-\rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
-& = &  \semess{S}{u}{v}{t_1} \prodE \semess{S}{u}{v}{t_2}  \\
-\rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
-& = &  \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}\\
-\rulename{sapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
+& = &  \semess{E}{u}{v}{t_1} \prodE \semess{E}{u}{v}{t_2}  \\
+\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|}
+& = &  \semapp{C}{t_1}\; \prodE \;\semess{E}{u}{v}{t_2}\\
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
  & = &  \conBrack{u=v} \prodsingleE \semess{F}{a_2}{v}{a_1} \\[1mm]
 
 %  ------ IF --------------
 \multicolumn{2}{@@{}l}{\rulename{dif} \; \hfill
-  \semess{S}{u}{v}{|if3 t_1 t_2 t_3|} }
+  \semess{E}{u}{v}{|if3 t_1 t_2 t_3|} }
 & = & \mhideEs{ xs} { \EV_1  \prodsingleE \semess{B}{u}{v}{t_2}} |++| \\
 & & & \complE( \mhideEs{xs}{ \EV_1 }) \prodsingleE \semess{B}{u}{v}{t_3} \\
 &&& \text{where} \begin{array}[t]{l}
@@ -61,8 +61,8 @@ $$
   \\ \\[-2mm]
 
 %  ------ FOR --------------
-\rulename{sfor} & \semess{S}{u}{v}{|fordo t_1 t_2|}
-& = & \conBrack{ u=v } \prodsingleE [ \, \allE(s, S, v)) \vb S |<-| SS \,] \\
+\rulename{sfor} & \semess{E}{u}{v}{|fordo t_1 t_2|}
+& = & \conBrack{ u=v } \prodsingleE [ \, \allE(s, E, v)) \vb E |<-| SS \,] \\
 & & & \text{where} \begin{array}[t]{l}
       xs = \semapp{I}{t_1} \hspace{5mm} r,s \not\in \freevars{t_1,t_2} \\
       SS :: \seq{\seq{\ENV}}
@@ -74,30 +74,30 @@ $$
 \\ \\[-2mm]
 
 %  ------ ONE,ALL --------------
-\rulename{sone} & \semess{S}{u}{v}{|one t|}
- & = & \conBrack{ u=v } \prodsingleE [\,\mhideEs{xs}{ \firstE(xs, \mhideEs{p}{ \semess{S}{p}{v}{|t|})}} \, ] \\
+\rulename{sone} & \semess{E}{u}{v}{|one t|}
+ & = & \conBrack{ u=v } \prodsingleE [\,\mhideEs{xs}{ \firstE(xs, \mhideEs{p}{ \semess{E}{p}{v}{|t|})}} \, ] \\
  & & & \text{where}\; xs = \semapp{I}{|t|}, \; p \not\in \freevars{t} \\
-\rulename{sall} & \semess{S}{u}{v}{|all t|}
+\rulename{sall} & \semess{E}{u}{v}{|all t|}
  & = & \conBrack{ u=v } \prodsingleE [\, \allE(q,\mhideEs{p}{ \semess{B}{p}{q}{t}},v) \, ] \hspace{5mm} p,q \not\in \freevars{t} \\[2mm]
 
 \\
 %% \rulename{dlam} &
-%% \multicolumn{3}{l}{\semess{S}{u}{v}{|functionOCX q t_1 fx t_2|}} \\
+%% \multicolumn{3}{l}{\semess{E}{u}{v}{|functionOCX q t_1 fx t_2|}} \\
 %%  & & = & ??? \\
 %% \\
 & \semess{B}{u}{v}{|t|} & : & \seq{ \ENV } \\
-& \semess{B}{u}{v}{|t|} & = & \mhideEs{\semapp{I}{|t|}}{ \semess{S}{u}{v}{t}} \\[1mm]
+& \semess{B}{u}{v}{|t|} & = & \mhideEs{\semapp{I}{|t|}}{ \semess{E}{u}{v}{t}} \\[1mm]
 & \semapp{C}{|t|} & : & \seq{ \ENV } \\
-& \semapp{C}{|t|} & = & \mhideEs{\{p,q\}}{\semess{S}{p}{q}{|t|}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+& \semapp{C}{|t|} & = & \mhideEs{\{p,q\}}{\semess{E}{p}{q}{|t|}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 \\
 & \semess{F}{a_a}{r}{a_f} & : & \seq{\ENV} \\
 & \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}} \vb i |<-| 0.. \; ] \\
 \\
 & \allE & : & \Ident  \rightarrow [\ENV] \rightarrow \Ident \rightarrow \ENV \\
-& \allE(q,S,r) & = & \begin{array}[t]{@@{}l@@{\;}l}
+& \allE(q,E,r) & = & \begin{array}[t]{@@{}l@@{\;}l}
            \{ & \rho \in \Env \\
              \vb & ws \in \pickE (\squashE
-               [ \; \{ w \in \Value \vb \rho[ \fpr{q}{w}] \in \EV \} \vb \EV \in S \; ]) \\
+               [ \; \{ w \in \Value \vb \rho[ \fpr{q}{w}] \in \EV \} \vb \EV \in E \; ]) \\
            , & \rho(r) = \tupE(ws) \; \} \\
 \end{array} \\
 \\[-2mm]
@@ -108,7 +108,7 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (S-LS)} \label{fig:s-ls}
+\caption{Denotational semantics of Essential Verse: plan (E-LS)} \label{fig:s-ls}
 \end{figure}
 
 
@@ -121,7 +121,7 @@ $$
 % -------- LAMBDA ------------
 \multicolumn{4}{l}{\text{special case for closed,succeeds}} \\
 \rulename{dlam-cs} &
-\multicolumn{3}{l}{\semess{S}{h}{f}{|functionOCX c t_0 succeeds t_1|}} \\
+\multicolumn{3}{l}{\semess{E}{h}{f}{|functionOCX c t_0 succeeds t_1|}} \\
 & & = & [
   \begin{array}[t]{ll}
  \{ \rho \, \vb \rho \inb \ENV, \\
@@ -155,12 +155,12 @@ $$
   \\
  & \semapp{Q}{t} & : & \Env \rightarrow \Ident \rightarrow \Ident \rightarrow \seq{\ENV} \\
  & \semappppp{Q}{t}{\rho}{x}{y} & = &
- \squashE(\mhideEs{\semapp{I}{|t|} \cup \{x,y\}}{ \{\rho\}} \prodsingleE \semess{S}{x}{y}{|t|}) \\
+ \squashE(\mhideEs{\semapp{I}{|t|} \cup \{x,y\}}{ \{\rho\}} \prodsingleE \semess{E}{x}{y}{|t|}) \\
 
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (S-LS), cont.} \label{fig:s-ls-cont}
+\caption{Denotational semantics of Essential Verse: plan (E-LS), cont.} \label{fig:s-ls-cont}
 \end{figure}
 
 \begin{figure}
@@ -170,7 +170,7 @@ $$
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
 
 % -------- LAMBDA ------------
-\multicolumn{4}{l}{\rulename{dlam}\quad \semess{S}{h}{f}{|functionOCX q t_0 fx t_1|}} \\
+\multicolumn{4}{l}{\rulename{dlam}\quad \semess{E}{h}{f}{|functionOCX q t_0 fx t_1|}} \\
 & & = & [
   \begin{array}[t]{ll}
     \mhideEs{AllowFails}{ \\
@@ -222,15 +222,38 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (S-LS), $cont^2$.} \label{fig:s-ls-cont}
+\caption{Denotational semantics of Essential Verse: plan (E-LS), $cont^2$.} \label{fig:s-ls-cont}
 \end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                              SLS style
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}
+$$
+% ------------- Denotational semantics of Essential Verse ---------------
+\begin{array}{l}
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+\multicolumn{3}{@@{}l}{\textbf{SL is an applicative functor}} \\
+\SL{A} & = & \powersetnp{ \seq{A} } \\
+\liftATwo & : & (A \rightarrow B \rightarrow C) \rightarrow \SL{A} \rightarrow \SL{B} \rightarrow\SL{C} \\
+\liftATwo(OP,E_1,E_2) & = &
+  \{ \; \concat(ss)
+     \begin{array}[t]{@@{}l@@{\;}l}
+     \vb & s_1 : \seq{A} \in E_1 \\
+     , & \letvar t : \seq{\powersetnp{\seq{C}}} = [\; \mapE(OP(\EV,\_), E_2) \vb \EV |<-| s_1 \; ] \\
+     , & \letvar r : \powersetnp{\seq{\seq{C}}} = \flatten(t) \\
+     , & ss : \seq{\seq{C}} \in r \; \}
+     \end{array} \\
+     \\
+ (\seqSL) & : & \SL{\ENV} \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
+ E_1 \seqSL E_2 & = & \liftATwo(\, \cap, \, E_1, \, E_2 \, ) \\
+\end{array}
+\end{array}
+$$
+\caption{Notation for E-SLS}
+\end{figure}
 
 \begin{figure}
 $$
@@ -243,75 +266,74 @@ $$
 \\
 \textbf{Denotational semantics} \\
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
-    & \semess{S}{u}{v}{|t|} & : & \powersetnp{\seq{ \ENV\! }} \\[1.3ex]
+    & \semess{E}{u}{v}{|t|} & : & \SL{\ENV} \\[1.3ex]
 %
-\rulename{satom} &  \semess{S}{u}{v}{|a|} & = & [ \conBrack{u=v=a} ]
+\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & \{ [ \conBrack{u=v=a} ] \}
 \\[0.6ex]
-% \rulename{edef} & \semess{S}{u}{v}{|defintro x|} & = & \singleE(\Env) \\
-% \rulename{eatom} &  \semess{S}{u}{v}{|a|} & = & \singleE( \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \}) \\
+% \rulename{edef} & \semess{E}{u}{v}{|defintro x|} & = & \singleE(\Env) \\
+% \rulename{eatom} &  \semess{E}{u}{v}{|a|} & = & \singleE( \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \}) \\
 %
-\rulename{sfail} &  \semess{S}{u}{v}{|fail|} & = & \{ [ ]  \}
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \{ [ ]  \}
 \\[0.6ex]
 %
-\rulename{schoice} &  \semess{S}{u}{v}{|t_1 `choice` t_2|}
+\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
  & = & \{ s_1 \append s_2 \vb s_1 \in \semap{B}{t_1}, s_2 \in \semap{B}{t_2}\}
 \\[0.6ex]
-% \rulename{eunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
+% \rulename{eunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
 %  & = & \begin{array}[t]{@@{}l@@{\,}l}
 %           \{     & [ \EV_1 \intersectE \EV_2 \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 ] \\
-%           |vbar| & s_1 \in \semess{S}{u}{v}{t_1}, s_2 \in \semess{S}{u}{v}{t_2} \; \}
+%           |vbar| & s_1 \in \semess{E}{u}{v}{t_1}, s_2 \in \semess{E}{u}{v}{t_2} \; \}
 %  \end{array} \\
 %
 %
-\rulename{sseq} &  \semess{S}{u}{v}{|t_1 ; t_2|}
-& = &
-  \begin{array}[t]{@@{}l@@{\,}l}
-          \{  \mathit{concat} \ ss
-
-            \\\;
-              |vbar|
-        \begin{array}[t]{@@{}l}
-            s_1 \in \semapp{C}{t_1}, \\
-            ss \in \mathit{flatten}
-                      [ \; \begin{array}[t]{@@{}l}
-                          \{ \; \begin{array}[t]{@@{}l}
-                              [\Delta_1\cap \Delta_2
-                                \mathrel{|vbar|}
-                               \Delta_2 \leftarrow s_2]
-                            \\ \mathrel{|vbar|}
-                      s_2 \in \semess{S}{u}{v}{t_2} \; \}
-                     \end{array}
-                   \\
-                   \mathrel{|vbar|} \Delta_1 \in s_1 \; ] \}
-                   \end{array}
-        \end{array}
-  \end{array}
+\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \seqSL \semess{E}{u}{v}{t_2}
+% & = &
+%   \begin{array}[t]{@@{}l@@{\,}l}
+%           \{  \mathit{concat} \ ss
+% 
+%             \\\;
+%               |vbar|
+%         \begin{array}[t]{@@{}l}
+%             s_1 \in \semapp{C}{t_1}, \\
+%             ss \in \mathit{flatten}
+%                       [ \; \begin{array}[t]{@@{}l}
+%                           \{ \; \begin{array}[t]{@@{}l}
+%                               [\Delta_1\cap \Delta_2
+%                                 \mathrel{|vbar|}
+%                                \Delta_2 \leftarrow s_2]
+%                             \\ \mathrel{|vbar|}
+%                       s_2 \in \semess{E}{u}{v}{t_2} \; \}
+%                      \end{array}
+%                    \\
+%                    \mathrel{|vbar|} \Delta_1 \in s_1 \; ] \}
+%                    \end{array}
+%         \end{array}
+%   \end{array}
   % \begin{array}[t]{@@{}l@@{\,}l}
-  %         \{     & \semapp{C}{t_1}\; \prodE \;\semess{S}{u}{v}{t_2}
-  %         \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+  %         \{     & \semapp{C}{t_1}\; \prodE \;\semess{E}{u}{v}{t_2}
+  %         \ |vbar|\  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
   % \end{array}
-  % &  \prodE \;\semess{S}{u}{v}{t_2}
-  %         \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+  % &  \prodE \;\semess{E}{u}{v}{t_2}
+  %         \ |vbar|\  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
   %
-\ \ \ \ \ \ \benjamin{per Koen, hopefully}
 \\[0.6ex]
 %
-\rulename{sunify} &  \semess{S}{u}{v}{|t_1 == t_2|}
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
 & = &  \begin{array}[t]{@@{}l@@{\,}l}
-          \{     & \semess{S}{u}{v}{t_1} \; \prodE \;\semess{S}{u}{v}{t_2}
-          \ |vbar|\  s_1 \in \semess{S}{u}{v}{t_1}, \ s_2 \in \semess{S}{u}{v}{t_2} \; \}
+          \{     & \semess{E}{u}{v}{t_1} \; \prodE \;\semess{E}{u}{v}{t_2}
+          \ |vbar|\  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
   \end{array}
 \\ &&& \ \ \ \benjamin{similar fix needed there?}
 \\[0.6ex]
 %
-\rulename{sdotdot} &  \semess{S}{u}{v}{|1 ..  a|}
-& = & \{  [ \ \conBrack{u=v=k \wedge a=n}  |vbar| k \leftarrow [1..n] ]       \\
-  &&& |vbar| \rho \in \Env,\ \semapp{A}{a}\rho = n \}
+\rulename{sdotdot} &  \semess{E}{u}{v}{|1 ..  a|}
+  & = & \{  \; [ \; \conBrack{u=v=k, a=n}  \vb k \leftarrow [1..n] \; ]       \\
+  &&& |vbar| \; n \in \N \}
 %
 \\[0.6ex]
 %
 \multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
-  \semess{S}{u}{v}{|if3 t_0 t_1 t_2|} }
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
 & = &
   \bigcup
 \begin{array}[t]{@@{}l@@{\,}l}
@@ -337,7 +359,7 @@ $$
      |vbar|  &
            \begin{array}[t]{@@{}l}
                 \xs = \semap{I}{|t_0|}, \\
-                s_0 \in \semess{S}{u}{v}{t_0}, \\
+                s_0 \in \semess{E}{u}{v}{t_0}, \\
                 s = \HIDE{s_0}{(\xs\mathord{\cup}\{u,v\})}, \\
                 n = ||s||, \\
                 s_1 \in \semess{B}{u}{v}{t_1}, \\
@@ -346,7 +368,7 @@ $$
            \end{array}
 \end{array}
 \\[0.6ex]
-\rulename{sapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
  & = &  \conBrack{u=v} \prodE \semess{F}{a_2}{v}{a_1}    \ \ \ \ \
        \benjamin{where to mix in $u=v$?}
 \\[0.6ex]
@@ -357,13 +379,13 @@ $$
 % \ \\
 % \ \\
 % %
-% \rulename{eapp} & \semess{S}{u}{v}{|apply1N a_1 a_2|}
+% \rulename{eapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
 % & = & \{ \; \begin{array}[t]{@@{}l}
 %          [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
 %          |vbar| i |<-| 0\mydots\, ] \; \}
 %          \end{array} \\
 % %
-% \rulename{eall} & \semess{S}{u}{v}{|all e|}
+% \rulename{eall} & \semess{E}{u}{v}{|all e|}
 % & = & \begin{array}[t]{@@{}l@@{\,}l}
 %        \{ & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(s), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ] \\
 %        |vbar| & s \in \semapsub{B}{c}{e} \; \}
@@ -375,11 +397,11 @@ $$
 & \semess{B}{u}{v}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
 & \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \,
                               \HIDE{\semapp{I}{|e|}}{\EV},\;
-                              \semess{S}{u}{v}{e})
+                              \semess{E}{u}{v}{e})
 \ \\[1.5ex]
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 &   \mapEs & : & (\ENV \rightarrow \ENV) \rightarrow \powersetnp {\seq{ \ENV }} \rightarrow \powersetnp {\seq{ \ENV }} \\
-&   \mapEs(f, S) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in S \; \}
+&   \mapEs(f, E) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in E \; \}
 \ \\[1.5ex]
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -395,6 +417,6 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (S-SLS)}
-\label{fig:S-sls1}
+\caption{Denotational semantics of Essential Verse: plan (E-SLS)}
+\label{fig:E-sls1}
 \end{figure}
