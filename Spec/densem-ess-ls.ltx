@@ -91,7 +91,7 @@ $$
 & \semapp{C}{|t|} & = & \mhideEs{\{p,q\}}{\semess{E}{p}{q}{|t|}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 \\
 & \semess{F}{a_a}{r}{a_f} & : & \seq{\ENV} \\
-& \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}} \vb i |<-| 0.. \; ] \\
+& \semess{F}{a_a}{r}{a_f} & = & [ \; \conBrack{\conFun{a_a}{r}{a_f}{i}{\_}} \vb N |<-| 0.. \; ] \\
 \\
 & \allE & : & \Ident  \rightarrow [\ENV] \rightarrow \Ident \rightarrow \ENV \\
 & \allE(q,E,r) & = & \begin{array}[t]{@@{}l@@{\;}l}
@@ -108,7 +108,7 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (E-LS)} \label{fig:s-ls}
+\caption{E-LS: denotational semantics of Essential Verse, LS style} \label{fig:s-ls}
 \end{figure}
 
 
@@ -160,7 +160,7 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (E-LS), cont.} \label{fig:s-ls-cont}
+\caption{E-LS (cont): denotational semantics of Essential Verse, LS style} \label{fig:s-ls-cont}
 \end{figure}
 
 \begin{figure}
@@ -222,201 +222,5 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse: plan (E-LS), $cont^2$.} \label{fig:s-ls-cont}
-\end{figure}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                              SLS style
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{figure}
-$$
-% ------------- Denotational semantics of Essential Verse ---------------
-\begin{array}{l}
-\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
-\multicolumn{3}{@@{}l}{\textbf{SL is an applicative functor}} \\
-\SL{A} & = & \powersetnp{ \seq{A} } \\
-\liftATwo & : & (A \rightarrow B \rightarrow C) \rightarrow \SL{A} \rightarrow \SL{B} \rightarrow\SL{C} \\
-\liftATwo(OP,E_1,E_2) & = &
-  \{ \; \concat(ss)
-     \begin{array}[t]{@@{}l@@{\;}l}
-     \vb & s_1 : \seq{A} \in E_1 \\
-     , & \letvar t : \seq{\powersetnp{\seq{C}}} = [\; \mapE(OP(\EV,\_), E_2) \vb \EV |<-| s_1 \; ] \\
-     , & \letvar r : \powersetnp{\seq{\seq{C}}} = \flatten(t) \\
-     , & ss : \seq{\seq{C}} \in r \; \}
-     \end{array} \\
-     \\
- (\seqSL) & : & \SL{\ENV} \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
- E_1 \seqSL E_2 & = & \liftATwo(\, \cap, \, E_1, \, E_2 \, ) \\
-\end{array}
-\end{array}
-$$
-\caption{Notation for E-SLS}
-\end{figure}
-
-\begin{figure}
-$$
-% ------------- Denotational semantics of Essential Verse in SLS style ---------------
-\begin{array}{l}
-\textbf{Domains} \\
-\begin{array}{r@@{\;}l@@{\;\;}c@@{\;\;}ll}
-  \rho \in & \Env & = & \Ident\rightarrow \Value  \\
-\end{array} \\
-\\
-\textbf{Denotational semantics} \\
-\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
-    & \semess{E}{u}{v}{|t|} & : & \SL{\ENV} \\[1.3ex]
-%
-\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & \{ [ \conBrack{u=v=a} ] \}
-\\[0.6ex]
-% \rulename{edef} & \semess{E}{u}{v}{|defintro x|} & = & \singleE(\Env) \\
-% \rulename{eatom} &  \semess{E}{u}{v}{|a|} & = & \singleE( \{ \rho \in \Env \vb \rho(\RES) = \semapp{A}{a}{\rho} \}) \\
-%
-\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \{ [ ]  \}
-\\[0.6ex]
-%
-\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
- & = & \{ s_1 \append s_2 \vb s_1 \in \semap{B}{t_1}, s_2 \in \semap{B}{t_2}\}
-\\[0.6ex]
-% \rulename{eunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
-%  & = & \begin{array}[t]{@@{}l@@{\,}l}
-%           \{     & [ \EV_1 \intersectE \EV_2 \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 ] \\
-%           |vbar| & s_1 \in \semess{E}{u}{v}{t_1}, s_2 \in \semess{E}{u}{v}{t_2} \; \}
-%  \end{array} \\
-%
-%
-\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \seqSL \semess{E}{u}{v}{t_2}
-% & = &
-%   \begin{array}[t]{@@{}l@@{\,}l}
-%           \{  \mathit{concat} \ ss
-% 
-%             \\\;
-%               |vbar|
-%         \begin{array}[t]{@@{}l}
-%             s_1 \in \semapp{C}{t_1}, \\
-%             ss \in \mathit{flatten}
-%                       [ \; \begin{array}[t]{@@{}l}
-%                           \{ \; \begin{array}[t]{@@{}l}
-%                               [\Delta_1\cap \Delta_2
-%                                 \mathrel{|vbar|}
-%                                \Delta_2 \leftarrow s_2]
-%                             \\ \mathrel{|vbar|}
-%                       s_2 \in \semess{E}{u}{v}{t_2} \; \}
-%                      \end{array}
-%                    \\
-%                    \mathrel{|vbar|} \Delta_1 \in s_1 \; ] \}
-%                    \end{array}
-%         \end{array}
-%   \end{array}
-  % \begin{array}[t]{@@{}l@@{\,}l}
-  %         \{     & \semapp{C}{t_1}\; \prodE \;\semess{E}{u}{v}{t_2}
-  %         \ |vbar|\  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
-  % \end{array}
-  % &  \prodE \;\semess{E}{u}{v}{t_2}
-  %         \ |vbar|\  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
-  %
-\\[0.6ex]
-%
-\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
-& = &  \begin{array}[t]{@@{}l@@{\,}l}
-          \{     & \semess{E}{u}{v}{t_1} \; \prodE \;\semess{E}{u}{v}{t_2}
-          \ |vbar|\  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
-  \end{array}
-\\ &&& \ \ \ \benjamin{similar fix needed there?}
-\\[0.6ex]
-%
-\rulename{sdotdot} &  \semess{E}{u}{v}{|1 ..  a|}
-  & = & \{  \; [ \; \conBrack{u=v=k, a=n}  \vb k \leftarrow [1..n] \; ]       \\
-  &&& |vbar| \; n \in \N \}
-%
-\\[0.6ex]
-%
-\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
-  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
-& = &
-  \bigcup
-\begin{array}[t]{@@{}l@@{\,}l}
-  \{
-       & (\HIDE{(\begin{array}[t]{@@{}l}
-              [ \; s[0], \;
-                   s[1] \mathord{\SETMINUS} s[0] ,\;
-                   \ldots
-                   s[n] \mathord{\SETMINUS} (s[0] \cup s[1] \ldots
-                       \cup  s[n\mathord{-}1]) \;
-              ]
-           \end{array}
-       \!\!\! \prodE  s_1)}{\xs})
-  \\
-  & \cup
-  \\
-       & {(\begin{array}[t]{@@{}l}
-              [ \; \Env \SETMINUS (\HIDE{s[0]}{\xs}\cup\ldots\cup s[n])
-              \; ]
-           \end{array}
-       \!\! \prodE s_2)}
-  \\
-     |vbar|  &
-           \begin{array}[t]{@@{}l}
-                \xs = \semap{I}{|t_0|}, \\
-                s_0 \in \semess{E}{u}{v}{t_0}, \\
-                s = \HIDE{s_0}{(\xs\mathord{\cup}\{u,v\})}, \\
-                n = ||s||, \\
-                s_1 \in \semess{B}{u}{v}{t_1}, \\
-                s_2 \in \semess{B}{u}{v}{t_2}
-           \; \}
-           \end{array}
-\end{array}
-\\[0.6ex]
-\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
- & = &  \conBrack{u=v} \prodE \semess{F}{a_2}{v}{a_1}    \ \ \ \ \
-       \benjamin{where to mix in $u=v$?}
-\\[0.6ex]
- \ \\
- \ \\
- \ \\
-% \ \\
-% \ \\
-% \ \\
-% %
-% \rulename{eapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
-% & = & \{ \; \begin{array}[t]{@@{}l}
-%          [ \{ \rho \in \Env \vb \semapp{A}{a_1}{\rho}=Fun(hs), (\fpr{\semapp{A}{a_2}{\rho}}{\rho(\RES)}) \in hs[i] \} \\
-%          |vbar| i |<-| 0\mydots\, ] \; \}
-%          \end{array} \\
-% %
-% \rulename{eall} & \semess{E}{u}{v}{|all e|}
-% & = & \begin{array}[t]{@@{}l@@{\,}l}
-%        \{ & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(s), \rho \in \EV, \rho(\RES)=\tupE(vs) \}\, ] \\
-%        |vbar| & s \in \semapsub{B}{c}{e} \; \}
-%       \end{array}
-% \\
-\\
-%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\text{where...} \\
-& \semess{B}{u}{v}{|e|} & : & \powersetnp{\seq{ \ENV }} \\
-& \semess{B}{u}{v}{|e|} & = & \mapEs( \lambda \EV. \,
-                              \HIDE{\semapp{I}{|e|}}{\EV},\;
-                              \semess{E}{u}{v}{e})
-\ \\[1.5ex]
-%%%%%%%%%%%%%%%%%%%%%%%%%%%
-&   \mapEs & : & (\ENV \rightarrow \ENV) \rightarrow \powersetnp {\seq{ \ENV }} \rightarrow \powersetnp {\seq{ \ENV }} \\
-&   \mapEs(f, E) & = & \{ \; [ f( \EV) \vb \EV |<-| s ] \vb s \in E \; \}
-\ \\[1.5ex]
-%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-  % F arg[fun]r = { [ {{ arg⇒r ∈ hs[i] }} | i<-[0..len(hs)] ]
-  %               | hs ∈ Fun
-  %               }
-& \semess{F}{a_a}{r}{a_f} & : & \powersetnp{\seq{\ENV}} \\
-& \semess{F}{a_a}{r}{a_f} & = &
-    \{ \ [ \; \conBrack{\conFun{a_a}{r}{hs}{i}} \vb i |<-| 0..||hs|| \; ]
-   \\ &&& \,|vbar| hs \in a_f
-      \; \}
-\ \\[1.5ex]
-\end{array}
-\end{array}
-$$
-\caption{Denotational semantics of Essential Verse: plan (E-SLS)}
-\label{fig:E-sls1}
+\caption{E-LS ($cont^2$): denotational semantics of Essential Verse, LS style} \label{fig:s-ls-cont}
 \end{figure}

@@ -72,21 +72,22 @@ $$
   v \in & \Value & = & \Z + \Fun \\\
   Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
   &&&& \hspace{3mm} \text{with disjoint domains} \\
-  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value
-                                                   for \emph{in-scope}{\color{red}??}
-                                                   identifiers} \\
+  \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value all identifiers} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
   \{ \fpr{x_1}{y_1}, \mydots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
 \\
 \textbf{The constraint language}\\
-\begin{array}{l@@{\;\;}c@@{\;\;}ll}
-  \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o| \vb |arr (a_0, xdots, a_n)| \vb |truth a| \hspace{5mm} \text{Can add strings, floats...} \\
-\text{Constraints} &  \EV & ::= & \conBrack{a_1 = a_2} \vb \conBrack{op[a_1,\mydots,a_n]} \\
-&  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}}  \\
-&  & \vb & \conEmpty \vb \conUniv \\
-&  & \vb & \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \vb \conCompl(\EV) \\
+\begin{array}{l@@{\;\;}rc@@{\;\;}ll}
+  \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o| \vb |arr (a_0, xdots, a_n)| \vb |truth a|
+    & \text{Can add strings, floats...} \\
+  \text{Constraints} &  \EV & ::= & \conBrack{a_1 = a_2} \\
+  & & \vb & \conBrack{op[a_1,\mydots,a_n]} \\
+  &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
+  &  & \vb & \conEmpty \vb \conUniv \vb \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
+  &  & \vb & \conCompl(\EV)  & \text{Complement} \\
+  &  & \vb & \HIDE{\EV}{xs} & \text{Hiding} \\
 \text{Operators}&  op & ::= & < \vb \leq \vb \geq \vb > \vb + \vb - \vb * \vb / \vb
 \end{array}\\
 \\[-1mm]
@@ -96,14 +97,15 @@ $$
   \sembrack{\conEmpty} & = & \{\} \\
   \sembrack{\conUniv} & = & \Env   & \text{Set of all environments} \\
   \sembrack{\conCompl(\EV)} & = & \complE( \sembrack{\EV} )\\
+  \sembrack{\HIDE{\EV}{xs}} & = & \{ \rho \in \Env \vb \exists \rho' \in \sembrack{\EV} .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
   \sembrack{\EV_1 \cup \EV_2} & = & \sembrack{\EV_1} \cup \sembrack{\EV_2} \\
   \sembrack{\EV_1 \cap \EV_2} & = & \sembrack{\EV_1} \cap \sembrack{\EV_2} \\
   \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
   \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \} \\
-  \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}}}
+  \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}{n}}}
   & = & \multicolumn{2}{@@{}l}
-           {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun(hs),
-                \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in hs[i] \}}\\[1mm]
+           {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun[h_1,\mydots,h_n],
+                \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in h_i \}}\\[1mm]
 \semapp{A}{|a|} & : & \Env \rightarrow \Val \\
 \semapp{A}{|x|}\rho & = & \rho(x) \\
 \semapp{A}{|k|}\rho & = & k \\
@@ -122,12 +124,8 @@ $$
 
 \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
 &  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
-\text{Complement} & \complE & : & \ENV \rightarrow \ENV \\
-& \complE(\EV) & = & \{ \rho \vb \rho \not\in \EV \} \\[1mm]
-\text{Hiding} & \hideE & : & \powerset{\Ident} \rightarrow \ENV \rightarrow \ENV \\
-& \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
- & \hideEs & : & \powerset{\Ident} \rightarrow \seq{\ENV} \rightarrow \seq{\ENV} \\
-& \hideEs(xs, s) & = & [\; \hideE(xs,\EV) \vb \EV \in s \; ]\\[1mm]
+\text{Hiding} & (\HIDESkw) & : &  \seq{\ENV} \rightarrow \powerset{\Ident} \rightarrow\seq{\ENV} \\
+& \HIDES{s}{xs} & = & [\; \HIDE{\EV}{xs} \vb \EV \in s \; ]\\[1mm]
 
 \text{Extract result} & \extractE & : & \Ident \rightarrow \ENV \rightarrow \powerset{\Val, \ENV} \\
 & \extractE(r,\EV) & = & \{ (v, \hideE(r, \EV'))

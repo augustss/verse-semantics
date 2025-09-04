@@ -538,6 +538,8 @@
 %format a_1
 %format a_2
 %format a_i
+%format a_f
+%format a_a
 %format a_n
 
 %format w_0

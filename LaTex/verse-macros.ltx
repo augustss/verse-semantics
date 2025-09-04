@@ -317,14 +317,21 @@
 \newcommand{\intersectE}{\cap}
 \newcommand{\unionE}{\cup}
 \newcommand{\unionEL}{\mathbf{unionEL}}
+
+%% \hideE and \hideEs are just the keywords; deprecated
 \newcommand{\hideE}{\mathbf{hide}}
-% \newcommand{\hideEs}{\mathbf{hides}}
 \newcommand{\hideEs}{\mathbf{hide}^{*}}
+%% \HIDE(env, xs) and \HIDES(envs, xs) are the two-place macros
+
+\newcommand{\HIDEkw}{\ggg}
+\newcommand{\HIDESkw}{\prescript{*\!}{}{\ggg}\,}
+\newcommand{\HIDE}[2]{#1 \HIDEkw #2}
+\newcommand{\HIDES}[2]{#1 \HIDESkw #2}
+
 \newcommand{\xs}{\mathit{xs}}
-\newcommand{\HIDE}[2]{#1\mathrel{-}#2}
 \newcommand{\SETMINUS}{\mathrel{\backslash}}
 \newcommand{\mapE}{\mathbf{map}}
-\newcommand{\mapEs}{\mathbf{maps}}
+\newcommand{\mapSL}{\mathbf{map}_{sl}}
 \newcommand{\singleE}{\mathbf{single}}
 \newcommand{\extractE}{\mathbf{extract}}
 \newcommand{\combineE}{\mathbf{combine}}
@@ -338,7 +345,10 @@
 % \newcommand{\pickL}{\mathbf{pick}^{*}}
 \newcommand{\headE}{\mathbf{head}}
 \newcommand{\seqE}{\fatsemi}
-\newcommand{\seqSL}{\fatsemi_{SL}}
+% \newcommand{\seqSL}{\fatsemi_{SL}}
+\newcommand{\seqSL}{\,\bigstar\,}
+\newcommand{\seqSLOne}{\prescript{1\!}{}{\bigstar\,}}
+
 \newcommand{\complE}{\mathbf{compl}}
 \newcommand{\prodsingleE}{\mathrel{\cap^{\!*}}}
 \newcommand{\prodEsingle}{\mathrel{\prescript{*\!}{}{\cap}}}
@@ -354,7 +364,7 @@
 % Notation for ENV
 \newcommand{\sembrack}[1]{\llbracket #1 \rrbracket}
 \newcommand{\conBrack}[1]{\{\!\{\, #1 \, \}\!\} }
-\newcommand{\conFun}[4]{(\fpr{#1}{#2}) \in \mathit{#3}[#4]}
+\newcommand{\conFun}[5]{(\fpr{#1}{#2}) \in \mathit{#3}[#4/#5]}
 \newcommand{\conCompl}{\mathbf{compl}}
 \newcommand{\conEmpty}{\mathbf{empty}}
 \newcommand{\conUniv}{\mathbf{univ}}

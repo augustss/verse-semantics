@@ -1,0 +1,122 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                              SLS style
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}
+$$
+% ------------- Denotational semantics of Essential Verse ---------------
+\begin{array}{l}
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+\multicolumn{3}{@@{}l}{\textbf{SL is an applicative functor}} \\
+\mathbf{type} \; \SL{A} & = & \powersetnp{ \seq{A} } \\[2mm]
+\liftATwo & : & (A \rightarrow B \rightarrow C) \rightarrow \SL{A} \rightarrow \SL{B} \rightarrow\SL{C} \\
+\liftATwo(OP,E_1,E_2) & = &
+  \{ \; \concat(ss)
+     \begin{array}[t]{@@{}l@@{\;}l}
+     \vb & s_1 : \seq{A} \in E_1 \\
+     , & \letvar t : \seq{\SL{C}} = [\; \mapSL(OP(\EV,\_), E_2) \vb \EV |<-| s_1 \; ] \\
+     , & \letvar r : \SL{\seq{C}} = \flatten(t) \\
+     , & ss : \seq{\seq{C}} \in r \; \}
+     \end{array} \\
+     \\
+ (\seqSL) & : & \SL{\ENV} \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
+ E_1 \seqSL E_2 & = & \liftATwo(\, \cap, \, E_1, \, E_2 \, ) \\[1mm]
+ (\seqSLOne) & : & \ENV \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
+ \EV_1 \seqSLOne E_2 & = & \{ [ \EV_1 ] \} \seqSL E_2 \\
+              & = & \mapSL(\;  \lambda \EV_2.\, \EV_1 \cap \EV_2, E_2 \;) \\[1mm]
+  \mapSL & : & (A \rightarrow B) \rightarrow \SL{A} \rightarrow \SL{B} \\
+  \mapSL(OP, E) & = & \{ \; [ OP( \EV) \vb \EV |<-| s ] \vb s \in E \; \}
+\ \\[1.5ex]
+\end{array}
+\end{array}
+$$
+\caption{The $\SL{A}$ applicative functor}
+\end{figure}
+
+\begin{figure}
+$$
+% ------------- Denotational semantics of Essential Verse in SLS style ---------------
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+    & \semess{E}{u}{v}{|t|} & : & \SL{\ENV} \\
+
+% Wildcards and atoms
+\rulename{swild} &  \semess{E}{u}{v}{|_|} & = & \{ [ \conBrack{u =v} ] \} \\
+\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & \{ [ \conBrack{u=v=a} ] \} \\
+
+% Capture input and output
+\rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \seqSLOne \semess{E}{u}{v}{t} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+   \conBrack{x=u} \seqSLOne \semess{E}{u}{v}{t} \\
+\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
+
+% Choice and failure
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \{ [ ]  \} \\
+\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
+  & = & \{ \; s_1 \append s_2 \vb s_1 \in \semess{B}{u}{v}{t_1}, s_2 \in \semess{B}{u}{v}{t_2} \; \} \\
+
+% Unification
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
+& = &  \begin{array}[t]{@@{}l@@{\,}l}
+          \{ \;    & s_1 \prodE s_2
+          \vb  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
+  \end{array} \\
+
+% Sequencing
+\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \seqSL \semess{E}{u}{v}{t_2} \\
+% Dot-dot
+\rulename{sdotdot} &  \semess{E}{u}{v}{|a_1 ..  a_2|}
+& = & \conBrack{u=v} \seqSLOne
+   \{  \; [\conBrack{v=a_1+i, i \leq a_2 - a_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \} \\
+
+% Application
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
+ & = &  \conBrack{u=v} \seqSLOne \semap{F}{|apply1N a_1 a_2|}v
+\\
+\\
+
+% IF
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = &   \bigcup\limits_{s_0 \in \semess{E}{u}{v}{|t_0|}}\left\{
+ \begin{array}{@@{\;}l@@{\,}l}
+(\HIDE{\EV_1 \seqSLOne \semess{B}{u}{v}{t_2})}{xs} \\
+\cup \\
+(\HIDE{\conCompl(\EV_1)}{xs}) \seqSLOne \semess{B}{u}{v}{t_3} \\
+\textbf{where} \; \xs = \semap{I}{|t_0|}
+ , \; \EV_1 = \firstE(xs,s_0)
+ \end{array}
+ \right\}
+\\
+
+\\
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       B, C, and F
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+& \semess{B}{u}{v}{|t|} & : & \SL{ \ENV } \\
+& \semess{B}{u}{v}{|t|} & = & \mapSL(\; \lambda \EV. \,
+                              \HIDE{\EV}{\semapp{I}{|e|}},\;
+                              \semess{E}{u}{v}{e} \;) \\[1mm]
+& \semapp{C}{|t|} & : & \SL{ \ENV } \\
+& \semapp{C}{|t|} & = & \HIDES{\semess{E}{p}{q}{|t|}}{\{p,q\}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+& \semap{F}{|apply1N a_1 a_2|}r & : & \SL{\ENV} \\
+& \semap{F}{|apply1N a_1 a_2|}r  & = &
+    \{ \ [ \; \conBrack{\conFun{a_2}{r}{a_1}{i}{n}} \vb i |<-| 0..n \; ] \vb n \in \N
+      \; \}
+ \\[1.5ex]
+
+& \firstE & : & \powerset{\Ident} \rightarrow [\ENV] \rightarrow \ENV \\
+& \firstE(xs,\; []) & = & \{\} \\
+& \firstE(xs,\; \EV : s)  & = & \EV \cup (\firstE(xs, s) \setminus (\HIDE{\EV}{xs})) \\
+\end{array}
+\end{array}
+$$
+\caption{E-SLS: denotational semantics of Essential Verse, in SLS style}
+\label{fig:E-sls1}
+\end{figure}

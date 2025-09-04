@@ -96,6 +96,17 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \input{verse-source}
 \ifeverything
 
+
+% -------------------------------------------------------------
+%               Denotational semantics: leading version
+% -------------------------------------------------------------
+
+\section{Denotational semantics: Essential Verse, using SLS}
+\input{densem-notation}
+\input{densem-ess-sls}
+\input{densem-ess-ls}
+
+
 % -------------------------------------------------------------
 %               Mini to Essential: wrapping
 % -------------------------------------------------------------
@@ -125,9 +136,8 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 % -------------------------------------------------------------
 
 \clearpage \newpage
-\section{Denotational semantics: notation}
+\section{Denotational semantics: overview}
 \fi % \ifeverything
-\input{densem-notation}
 
 Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and \Cref{fig:densem-notation}):
 \begin{itemize}
@@ -157,14 +167,6 @@ Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and
 \end{itemize}
 
 % -------------------------------------------------------------
-%               S-LS: Essential Verse
-% -------------------------------------------------------------
-
-% \clearpage \newpage
-\section{Denotational semantics: Essential Verse}
-\input{densem-ess}
-
-% -------------------------------------------------------------
 %               E-LS: expression-style sequences of sets
 % -------------------------------------------------------------
 
@@ -183,11 +185,11 @@ Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and
 % -------------------------------------------------------------
 %               D-SLS: DPS-style: sets of sequences of sets
 % -------------------------------------------------------------
-\clearpage \newpage
-\ifeverything
-\section{Denotational semantics: DPS (sets of sequences of sets)}
-\fi % \ifeverything
-\input{densem-set-seq-set}
+% \clearpage \newpage
+% \ifeverything
+% \section{Denotational semantics: DPS (sets of sequences of sets)}
+% \fi % \ifeverything
+% \input{densem-set-seq-set}
 
 \ifeverything
 % -------------------------------------------------------------
