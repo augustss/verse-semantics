@@ -31,8 +31,9 @@ $$
  \EV_1 \seqSLOne E_2 & = & \{ [ \EV_1 ] \} \seqSL E_2 \\
               & = & \mapSL(\;  \lambda \EV_2.\, \EV_1 \cap \EV_2, E_2 \;) \\[1mm]
   \mapSL & : & (A \rightarrow B) \rightarrow \SL{A} \rightarrow \SL{B} \\
-  \mapSL(OP, E) & = & \{ \; [ OP( \EV) \vb \EV |<-| s ] \vb s \in E \; \}
-\ \\[1.5ex]
+  \mapSL(OP, E) & = & \{ \; [ OP( \EV) \vb \EV |<-| s ] \vb s \in E \; \} \\[1mm]
+(\HIDESkw) & : &  \SL{\ENV} \rightarrow \powerset{\Ident} \rightarrow \SL{\ENV} \\
+\HIDES{s}{xs} & = & \mapSL( \lambda \EV.\, \HIDE{\EV}{xs}, \; s) \\
 \end{array}
 \end{array}
 $$
@@ -55,6 +56,18 @@ $$
 \rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
    \conBrack{x=u} \seqSLOne \semess{E}{u}{v}{t} \\
 \rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
+
+% Tuples
+\rulename{stuple} & \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}
+& = & \begin{array}[t]{@@{}l}
+         \conBrack{ u=|arr (u_1, xdots, u_n)|,
+                    v=|arr (v_1, xdots, v_n)|}
+         \seqSLOne \semess{E}{u_1}{v_1}{t_1}
+         \seqSL \mydots
+         \seqSL \semess{E}{u_n}{v_n}{t_n} \\
+         \HIDESkw { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
+      \end{array} \\
 
 % Choice and failure
 \rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \{ [ ]  \} \\
@@ -86,7 +99,7 @@ $$
   \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
 & = &   \bigcup\limits_{s_0 \in \semess{E}{u}{v}{|t_0|}}\left\{
  \begin{array}{@@{\;}l@@{\,}l}
-(\HIDE{\EV_1 \seqSLOne \semess{B}{u}{v}{t_2})}{xs} \\
+(\HIDES{\EV_1 \seqSLOne \semess{B}{u}{v}{t_2})}{xs} \\
 \cup \\
 (\HIDE{\conCompl(\EV_1)}{xs}) \seqSLOne \semess{B}{u}{v}{t_3} \\
 \textbf{where} \; \xs = \semap{I}{|t_0|}
@@ -100,9 +113,7 @@ $$
 %       B, C, and F
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 & \semess{B}{u}{v}{|t|} & : & \SL{ \ENV } \\
-& \semess{B}{u}{v}{|t|} & = & \mapSL(\; \lambda \EV. \,
-                              \HIDE{\EV}{\semapp{I}{|e|}},\;
-                              \semess{E}{u}{v}{e} \;) \\[1mm]
+& \semess{B}{u}{v}{|t|} & = & \HIDES{\semess{E}{u}{v}{e}}{\semapp{I}{|t|}} \\[1mm]
 & \semapp{C}{|t|} & : & \SL{ \ENV } \\
 & \semapp{C}{|t|} & = & \HIDES{\semess{E}{p}{q}{|t|}}{\{p,q\}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N a_1 a_2|}r & : & \SL{\ENV} \\
