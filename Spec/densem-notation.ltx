@@ -30,15 +30,16 @@ $$
   \squashE(ss) & = & [ s \vb s |<-| ss, s \not= \{ \} ] \\
   \squashTailE & : & \seq{\powerset{A}} \rightarrow \seq{\powerset{A}} \\
   \squashTailE(xs) & = & xs \text{ with trailing \{\} removed} \\[1mm]
-  \pickE & : & [\powerset{A}] \rightarrow \powersetnp{[A]} \\
-  \pickE[s_0, \mydots, s_n] & = & [ [v_0, \mydots, v_n]  \vb \forall 0 \leq i \leq n.\; v_i \in s_i ] \\[1mm]
+  \pickE & : & \seq{\powerset{A}} \rightarrow \powersetnp{\seq{A}} & \text{Pick one from each set} \\
+  \pickE[s_0, \mydots, s_n] & = & [ [v_0, \mydots, v_n]  \vb \forall 0 \leq i \leq n.\; v_i \in s_i ] \\
+\text{or} \\
+  \pickE( [] ) & = & \{ [] \} \\
+  \pickE(s:ss) & = & \{\; x:xs \vb x \in s, xs \in \flatten(ss)\; \} \\[1mm]
+
+\\[1mm]
   \headE & : & [\powerset{A}] \rightarrow \powerset{A} \\
   \headE[] & = & \{ \} \\
   \headE(s:\_) & = & s \\[1mm]
-  \flatten & : & \seq{\powerset{A}} \rightarrow \powersetnp{\seq{A}} & \text{Pick one from each set} \\
-  \flatten( [] ) & = & \{ [] \} \\
-  \flatten(s:ss) & = & \{\; x:xs \vb x \in s, xs \in \flatten(ss)\; \} \\[1mm]
-
   \seqE & : & \powerset{A} \rightarrow \powerset{A} \rightarrow \powerset{A} \\
   s_1 \seqE s_2 & = & \{ a_2 \vb a_1 \in s_1, a_2 \in s_2 \} \\
     & = & \textbf{if} \, (s_1 = \{\}) \, \textbf{then} \, \{\} \, \textbf{else} \, s_2 \\[1mm]
@@ -70,7 +71,7 @@ $$
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
-  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A \emph{finite} sequence of partial functions} \\
   &&&& \hspace{3mm} \text{with disjoint domains} \\
   \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value all identifiers} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
@@ -119,14 +120,14 @@ $$
 \textbf{Semantic functions} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
-\text{Binders of block} & \semap{I}{|e|} & : & \powerset{\Ident} \\
-&  \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
+\text{Binders of block} & \semap{I}{|t|} & : & \powerset{\Ident} \\
+&  \semap{I}{|t|} & = & \text{the outer $\exists$-bound variables in |t|} \\[1mm]
 
 \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
 &  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
-\text{Extract result} & \extractE & : & \Ident \rightarrow \ENV \rightarrow \powerset{\Val, \ENV} \\
-& \extractE(r,\EV) & = & \{ (v, \hideE(r, \EV'))
-                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(r)=v \} \} \\[1mm]
+% \text{Extract result} & \extractE & : & \Ident \rightarrow \ENV \rightarrow \powerset{\Val, \ENV} \\
+% & \extractE(r,\EV) & = & \{ (v, \hideE(r, \EV'))
+%                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(r)=v \} \} \\[1mm]
 \end{array} \\
 
 \end{array}

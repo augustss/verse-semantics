@@ -12,29 +12,61 @@
 $$
 % ------------- Denotational semantics of Essential Verse ---------------
 \begin{array}{l}
+% \multicolumn{c}{1}{\fbox{\mathbf{type} \; \SL{A}  =  \powersetnp{ \seq{A} }}} \\
+\multicolumn{1}{c}{\fbox{{\bf type} \; \SL{A} = \powersetnp{\seq{A}}}} \\
+
+\textbf{SL is an applicative functor} \\[1mm]
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
-\multicolumn{3}{@@{}l}{\textbf{SL is an applicative functor}} \\
-\mathbf{type} \; \SL{A} & = & \powersetnp{ \seq{A} } \\[2mm]
+     \pureSL & : & \ENV \rightarrow \SL{\ENV}  \\
+     \pureSL( \EV ) & = & \{ [ \EV ] \} \\[1mm]
+
 \liftATwo & : & (A \rightarrow B \rightarrow C) \rightarrow \SL{A} \rightarrow \SL{B} \rightarrow\SL{C} \\
-\liftATwo(OP,E_1,E_2) & = &
+\liftATwo(OP,S_1,S_2) & = &
   \{ \; \concat(ss)
      \begin{array}[t]{@@{}l@@{\;}l}
-     \vb & s_1 : \seq{A} \in E_1 \\
-     , & \letvar t : \seq{\SL{C}} = [\; \mapSL(OP(\EV,\_), E_2) \vb \EV |<-| s_1 \; ] \\
-     , & \letvar r : \SL{\seq{C}} = \flatten(t) \\
-     , & ss : \seq{\seq{C}} \in r \; \}
+     \vb & s_1 {:} \seq{A} \in S_1 \\
+     , & \letvar t {:} \seq{\SL{C}} = [\; \mapSL(OP(\EV,\_), S_2) \vb \EV |<-| s_1 \; ] \\
+     , & \letvar r {:} \SL{\seq{C}} = \pickE(t) \\
+     , & ss {:} \seq{\seq{C}} \in r \; \}
      \end{array} \\
-     \\
+     \\[-2mm]
+
  (\seqSL) & : & \SL{\ENV} \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
  E_1 \seqSL E_2 & = & \liftATwo(\, \cap, \, E_1, \, E_2 \, ) \\[1mm]
  (\seqSLOne) & : & \ENV \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
- \EV_1 \seqSLOne E_2 & = & \{ [ \EV_1 ] \} \seqSL E_2 \\
+ \EV_1 \seqSLOne E_2 & = & \pureSL(\EV_1) \seqSL E_2 \\
               & = & \mapSL(\;  \lambda \EV_2.\, \EV_1 \cap \EV_2, E_2 \;) \\[1mm]
   \mapSL & : & (A \rightarrow B) \rightarrow \SL{A} \rightarrow \SL{B} \\
   \mapSL(OP, E) & = & \{ \; [ OP( \EV) \vb \EV |<-| s ] \vb s \in E \; \} \\[1mm]
 (\HIDESkw) & : &  \SL{\ENV} \rightarrow \powerset{\Ident} \rightarrow \SL{\ENV} \\
 \HIDES{s}{xs} & = & \mapSL( \lambda \EV.\, \HIDE{\EV}{xs}, \; s) \\
 \end{array}
+\\
+\\
+\text{ \textbf{SL is also a monad (I think)} and bind is easier to think about than liftA2!} \\[1mm]
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+(\bindSL) & : & \SL{A} \rightarrow (A \rightarrow \SL{B}) \rightarrow \SL{B} \\
+S \bindSL K & = & \{ \; \concat(ss)
+\begin{array}[t]{@@{}l@@{\;}l}
+   \vb & s{:}[A] \in S \\
+   , & \letvar t {:} [\SL{C}] = [\, K(\EV) \vb \EV |<-| s\, ] \\
+   , & \letvar r {:} \SL{[C]} = \pickE(t) \\
+   , & ss{:}[[C]] \in r \; \}
+\end{array} \\
+& = & \{ \; \concat(ss) \vb s \in S, \; ss \in \pickE[\, K(\EV) \vb \EV |<-| s\, ] \; \} \hspace{3mm} \text{\emph{more compactly}}
+  \\[1mm]
+\liftATwo(OP,S_1, S_2) & = & \begin{array}[t]{@@{}l}
+  S_1 \bindSL (\lambda \EV_1. \\
+  S_2 \bindSL (\lambda \EV_2. \\
+  \pureSL( OP(\EV_1,\EV_2) )\,))
+  \end{array}
+\end{array} \\
+\\
+\parbox{8cm}{NB: this naive version of $\liftATwo$ is wrong:
+  $$\liftATwo(OP,S_1,S_2)
+  = \{ [ OP(\EV_1,\EV_2) \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 ] \vb s_1 \in S_1, s_2 \in S_2 \}$$
+...but there is no naive $\bindSL$.   True?}
+
 \end{array}
 $$
 \caption{The $\SL{A}$ applicative functor}
@@ -48,14 +80,13 @@ $$
     & \semess{E}{u}{v}{|t|} & : & \SL{\ENV} \\
 
 % Wildcards and atoms
-\rulename{swild} &  \semess{E}{u}{v}{|_|} & = & \{ [ \conBrack{u =v} ] \} \\
-\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & \{ [ \conBrack{u=v=a} ] \} \\
+\rulename{swild} &  \semess{E}{u}{v}{|_|} & = & \pureSL \conBrack{u =v} \\
+\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & \pureSL \conBrack{u=v=a} \\
 
 % Capture input and output
 \rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \seqSLOne \semess{E}{u}{v}{t} \\
 \rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
    \conBrack{x=u} \seqSLOne \semess{E}{u}{v}{t} \\
-\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
 
 % Tuples
 \rulename{stuple} & \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}
@@ -75,11 +106,7 @@ $$
   & = & \{ \; s_1 \append s_2 \vb s_1 \in \semess{B}{u}{v}{t_1}, s_2 \in \semess{B}{u}{v}{t_2} \; \} \\
 
 % Unification
-\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|}
-& = &  \begin{array}[t]{@@{}l@@{\,}l}
-          \{ \;    & s_1 \prodE s_2
-          \vb  s_1 \in \semess{E}{u}{v}{t_1}, \ s_2 \in \semess{E}{u}{v}{t_2} \; \}
-  \end{array} \\
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \seqSL \semess{E}{u}{v}{t_2} \\
 
 % Sequencing
 \rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \seqSL \semess{E}{u}{v}{t_2} \\
@@ -88,10 +115,10 @@ $$
 & = & \conBrack{u=v} \seqSLOne
    \{  \; [\conBrack{v=a_1+i, i \leq a_2 - a_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \} \\
 
-% Application
+% Application and type
 \rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
- & = &  \conBrack{u=v} \seqSLOne \semap{F}{|apply1N a_1 a_2|}v
-\\
+ & = &  \conBrack{u=v} \seqSLOne \semap{F}{|apply1N a_1 a_2|}v \\
+\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
 \\
 
 % IF
@@ -118,13 +145,13 @@ $$
 & \semapp{C}{|t|} & = & \HIDES{\semess{E}{p}{q}{|t|}}{\{p,q\}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N a_1 a_2|}r & : & \SL{\ENV} \\
 & \semap{F}{|apply1N a_1 a_2|}r  & = &
-    \{ \ [ \; \conBrack{\conFun{a_2}{r}{a_1}{i}{n}} \vb i |<-| 0..n \; ] \vb n \in \N
+    \{ \ [ \; \conBrack{\conFun{a_2}{r}{a_1}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
       \; \}
  \\[1.5ex]
 
 & \firstE & : & \powerset{\Ident} \rightarrow [\ENV] \rightarrow \ENV \\
 & \firstE(xs,\; []) & = & \{\} \\
-& \firstE(xs,\; \EV : s)  & = & \EV \cup (\firstE(xs, s) \setminus (\HIDE{\EV}{xs})) \\
+& \firstE(xs,\; \EV : s)  & = & \EV \cup (\firstE(xs, s) \cap \conCompl(\HIDE{\EV}{xs})) \\
 \end{array}
 \end{array}
 $$
