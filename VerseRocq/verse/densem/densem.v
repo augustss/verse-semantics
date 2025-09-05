@@ -32,7 +32,8 @@ Open Scope set_scope.
 
 (* --------------------------------------------------- *)
 
-Definition envs : ENV := Total_set.
+Definition envs : ENV := Total_set. (* Env *)
+Definition Nat : P nat := Total_set.
 
 Notation VAL := (P value).
 
@@ -120,7 +121,7 @@ Definition Head {A} (V : P (list A)) : P A :=
 Fixpoint pick {A} (xs : list (P A)) : P (list A) := 
   match xs with 
   | nil => ⌈ [] ⌉
-  | V :: VS => v  ⭅ V ;; vs ⭅ pick VS ;; ⌈ v :: vs⌉ 
+  | V :: VS => v  ⭅ V ;; vs ⭅ pick VS ;; ⌈ v :: vs ⌉ 
   end.
 
 (* pick for lists: 
@@ -307,12 +308,13 @@ Definition FOR (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) : list EN
   ( Δ <- CC  ;; [ (fun (ρ : env) => (ρ ∈ Δ) /\ (ρ r = c ρ)) ]) \* rs.
 
 
+(*
 Definition FOR_SPJ (z:Ident) (a b : Scope.t) (A : list ENV) (B : list ENV) 
   : list ENV := 
   let SS : list (list ENV) := 
     pickl [ Δ ∩* B [\] (Scope.union a ⟅ r ⟆) | Δ <- squash A ] in
   [ ].
-
+*)
 
 (* ----- semantics of IF ------------ *)
 
@@ -546,11 +548,23 @@ The advantages of this semantics:
 
 Module DSLS.
 
+(* New version of ITER, based on 9/5/25 discussion *)
+(* NOTE: specialized for a1 = 0 
+   more generally: should be {{ r = a1 + i, i <= a2 - a1 }} 
+   but we don't have simple primops in the 'Simple' language yet. 
+*)
+Definition ITER (a1 : common.Simple) (a2 : common.Simple) : P (list ENV) :=
+  n ⭅ Nat ;;
+  ⌈ ( i <- enumFrom 0 n ;;
+      [ {{ r ≈ Lit (common.Int i) }} ∩ {{ i < a2 }} ] ) ⌉.
+
+
+(* Previous version: thinner version of ITER *)
 (* To avoid the need of infinite lists, we update the definitions of ITER and
    APP to not use a list comprehension over all integers. Instead we include a
    set comprehension over all environments. *)
 
-Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+Definition ITER' (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
   ρ ⭅ envs ;;
   match v1 ρ , v2 ρ with 
      | Int k1 , Int k2 => 
@@ -561,7 +575,13 @@ Definition ITER (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
      | _ , _ => ∅
      end.
 
-Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
+(* New version of application, after 9/5 discussion. *)
+Definition F (a1 : common.Simple) (a2 : common.Simple) : P (list ENV) := 
+  n ⭅ Nat ;;
+  ⌈ ( i <- enumFrom 0 n ;;
+    [ {{ (a2 ⤇ r) ∈ a1 < i | n > }} ]) ⌉ .
+
+Definition APP' (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
   ρ1 ⭅ envs ;;
   ⌈ match (v1 ρ1) with 
   | Fun hs => 
@@ -575,15 +595,26 @@ Definition APP (v1 : env -> value) (v2 : env -> value) : P (list ENV) :=
   end ⌉.
 
 
-(* This almost the same as IF above, except that it uses ∪ instead of ++ 
-   to join the two branches together. *)
+(* Updated 9/5/25. Still need to compare try vs. first *)
 Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
   T0 ⭅ TS0 ;;
-  T1 ⭅ TS1 ;;
-  T2 ⭅ TS2 ;;
   let (successes, avoid) := try xs (T0 [\] ⟅ r ⟆) in
-  ⌈(successes * T1) [\] xs⌉ ∪ 
-  ⌈(Total_set - avoid) ∩* T2⌉.
+  (T1 ⭅ TS1 ;; ⌈(successes * T1) [\] xs⌉) ∪ 
+  (T2 ⭅ TS2 ;; ⌈((Total_set - avoid) ∩* T2)⌉).
+
+Definition map_sl { A B} : (A -> B) -> P (list A) -> P (list B) := 
+  fun op E => s ⭅ E ;;
+           ⌈ List.map op s ⌉.
+
+Definition liftA2 {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list C) := 
+  fun op E1 E2 => 
+    s1 ⭅ E1 ;;
+    let t : list (P (list C)) := 
+      Δ <- s1 ;;
+      [ map_sl (op Δ) E2 ] in
+    let r : P (list (list C)) := pick t in 
+    ss ⭅ r ;;
+    ⌈ List.concat ss ⌉.
 
 
 Fixpoint E (e : mini.Expr) : P (list ENV) := 

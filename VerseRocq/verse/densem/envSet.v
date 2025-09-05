@@ -49,6 +49,7 @@ Notation envs := (Total_set : ENV).
 (* Constrain a simple expr to be equal to another.
    All other mappings in the environment are unconstrained. 
 *)
+(* {{ a1 = a2 }} *)
 Definition constrain_eq (a1 : common.Simple) (a2 : common.Simple) : ENV := 
   fun ρ => evalA a1 ρ = evalA a2 ρ.
 Definition constrain_lt (a1 : common.Simple) (a2 : common.Simple) : ENV := 
@@ -56,10 +57,22 @@ Definition constrain_lt (a1 : common.Simple) (a2 : common.Simple) : ENV :=
 Definition constrain_ne (a1 : common.Simple) (a2 : common.Simple) : ENV := 
   fun ρ => not (evalA a1 ρ = evalA a2 ρ).
 
+(* {{ (a2 |=> a3) ∈ a1<i> }} *)
 Definition constrain_fun (a1 a2 a3 : common.Simple) (i : nat) : ENV := 
   fun ρ =>  exists hs h, evalA a1 ρ = Fun hs 
             /\ List.nth_error hs i = Some h 
             /\ List.In (evalA a2 ρ , evalA a3 ρ ) h.
+
+
+(* {{ (a2 |=> a3) ∈ a1<i/n> }} *)
+(* This version also constrains the length of the functions involved to 
+   be n *)
+Definition constrain_fun_length (a1 a2 a3 : common.Simple) (i : nat) (n : nat) : ENV := 
+  fun ρ =>  exists hs h, evalA a1 ρ = Fun hs 
+            /\ List.length hs = n 
+            /\ List.nth_error hs i = Some h 
+            /\ List.In (evalA a2 ρ , evalA a3 ρ ) h.
+
 
 (* ρ \ xs *)
 Definition hide_env (xs : Scope.t) (ρ : env) : ENV := 
@@ -93,9 +106,16 @@ Notation "{{ a1 < a2 }}" := (constrain_lt a1 a2) (at level 60, a1 at next level,
 (* Notation "x ≈ v" := (constrain_eq (Var x) v) (at level 60) : set_scope. *)
 (* Infix "≈" := constrain_eq (at level 60) : set_scope.
 Infix "≉" := constrain_ne (at level 60) : set_scope. *)
+
 Notation "{{ ( a2 ⤇ a3 ) ∈ a1 < i >  }}" := (constrain_fun a1 a2 a3 i)
     (at level 60, a1 at next level, a2 at next level, a3 at next level, 
     i at next level).
+
+Notation "{{ ( a2 ⤇ a3 ) ∈ a1 < i | n >  }}" := (constrain_fun_length a1 a2 a3 i n)
+    (at level 60, a1 at next level, a2 at next level, a3 at next level, 
+    i at next level, n at next level).
+
+
 (* Notation "⟨ n ⟩" := (fun ρ => n) (at level 40).
    Notation "⟪ x ⟫" := (fun ρ => ρ x) (at level 40). *)
 Notation "ρ \\ xs" := (hide_env xs ρ) (at level 70) : set_scope.
@@ -107,11 +127,11 @@ Coercion common.Var : Ident >-> Simple.
 Coercion common.Int : nat >-> LitType.
 Coercion common.Lit : LitType >-> Simple.
 
-
-(*
+(* 
 Parameter x : Ident.
 Check {{ x ≈ 3 }}.
-Check {{ (1 ⤇ 2) ∈ x < 0 > }}.  (* single brackets doesn't parse *)
+Check {{ (1 ⤇ 2) ∈ x < 0 > }}.      (* single brackets doesn't parse *)
+Check {{ (1 ⤇ 2) ∈ x < 0 | 2 > }}.  (* single brackets doesn't parse, / doesn't parse *)
 *)
 
 End envSetNotation.
