@@ -16,6 +16,7 @@ Require Export densem.Dom.    (* values are finite *)
 Require Export densem.tenv.   (* environments are total *)
 Require Export densem.envSet. (* def of ENV , hide, constraints *)
 Require Export densem.squash. (* definitions related to squashing *)
+Require Export densem.slmonad. (* lists of sets and sets of lists of sets *)
 
 Import mini.MiniNotation.
 Import SetNotations.
@@ -105,34 +106,6 @@ Notation "Δ \* xs" := (hide_list xs Δ) (at level 70) : list_scope.
 (* dodgy union *)
 Infix "⩅" := pointwise_union (at level 70) : list_scope.
 
-(* --------- pick/sequence ----------- *)
-   
-(* The set of all first elements from a list. *)
-(*   {{ v | (v :: _) <- V }}   *)
-Definition Head {A} (V : P (list A)) : P A := 
-  vs ⭅ V ;;
-  match vs with 
-  | v :: _ => ⌈ v ⌉
-  | _ => ∅
-  end. 
-
-(* pick for sets: given a list of sets, make the set of 
-   all lists where each element comes from each set. *)
-Fixpoint pick {A} (xs : list (P A)) : P (list A) := 
-  match xs with 
-  | nil => ⌈ [] ⌉
-  | V :: VS => v  ⭅ V ;; vs ⭅ pick VS ;; ⌈ v :: vs ⌉ 
-  end.
-
-(* pick for lists: 
-   NB: this is the list instance of 'sequence' from Haskell's 
-   Traversable class *)
-Fixpoint pickl {A} (xs : list (list A)) : list (list A) := 
-  match xs with 
-  | nil => [ [] ]
-  | V :: VS =>  v <- V ;; vs <- pickl VS ;; [ v :: vs ] 
-  end.
-
 (* --------- dodgy union ----------- *)
 
 (* another version of the dodgy big union *)
@@ -198,8 +171,6 @@ Definition ITER (a1 : env -> value) (a2 : env -> value) : list ENV :=
   i <- allNums ;;
   [ (fun ρ => (ρ r = Int i) /\ 
              exists n1 n2, (a1 ρ = Int n1) /\ n1 <= i /\ (a2 ρ = Int n2) /\ n2 >= i) ].
-
-
 
 (* --- semantics of ALL / ONE ------------ *)
 
@@ -602,20 +573,6 @@ Definition IF xs TS0 TS1 TS2 : P (list ENV) :=
   (T1 ⭅ TS1 ;; ⌈(successes * T1) [\] xs⌉) ∪ 
   (T2 ⭅ TS2 ;; ⌈((Total_set - avoid) ∩* T2)⌉).
 
-Definition map_sl { A B} : (A -> B) -> P (list A) -> P (list B) := 
-  fun op E => s ⭅ E ;;
-           ⌈ List.map op s ⌉.
-
-Definition liftA2 {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list C) := 
-  fun op E1 E2 => 
-    s1 ⭅ E1 ;;
-    let t : list (P (list C)) := 
-      Δ <- s1 ;;
-      [ map_sl (op Δ) E2 ] in
-    let r : P (list (list C)) := pick t in 
-    ss ⭅ r ;;
-    ⌈ List.concat ss ⌉.
-
 
 Fixpoint E (e : mini.Expr) : P (list ENV) := 
 
@@ -636,26 +593,39 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
 
   | mini.Fail => ⌈ [] ⌉
 
-  | mini.Choice e1 e2 => 
-      D1 ⭅ B e1 ;;
-      D2 ⭅ B e2 ;;
-      ⌈ D1 ++ D2 ⌉
+  | mini.Choice e1 e2 =>
+      Append (B e1) (B e2)
+(*      D1 ⭅ B e1 ;;
+        D2 ⭅ B e2 ;;
+        ⌈ D1 ++ D2 ⌉ *)
+        (* TODO: is Append the same as liftM2 (++) ? *)
 
   | mini.Unify e1 e2 => 
+      bind_sl (E e1) (fun D1 => 
+      bind_sl (E e2) (fun D2 => 
+        (pure_sl (D1 ∩ D2))))
+(*                             
       D1 ⭅ E e1 ;;
       D2 ⭅ E e2 ;;
-      ⌈ D1 * D2 ⌉
+      ⌈ D1 * D2 ⌉ *)
 
   | mini.Seq e1 e2 => 
+      bind_sl (E e1) (fun D1 => 
+      bind_sl (E e2) (fun D2 => 
+        (pure_sl ( (D1 \ ⟅r⟆) ∩ D2))))
+(*
       D1 ⭅ E e1 ;;  
       D2 ⭅ E e2 ;;
       ⌈ (D1 [\] ⟅r⟆) * D2 ⌉
+*)
 
   | mini.Iter a1 a2 =>
-     ITER (evalA a1) (evalA a2)
+      (* TODO UPDATE! *)
+     ITER' (evalA a1) (evalA a2)
 
   | mini.ApplyD a1 a2 => 
-     APP (evalA a1) (evalA a2)
+      (* TODO UPDATE! *)
+     APP' (evalA a1) (evalA a2)
 
   | mini.If3 t0 t1 t2 =>  
      IF (mini.I t0) (E t0) (B t1) (B t2)
@@ -694,6 +664,7 @@ Lemma E_Choice e1 e2 : E (e1 :|: e2) =
     D2 ⭅ B e2 ;;
     ⌈ D1 ++ D2 ⌉. reflexivity. Qed.
 
+(*
 Lemma E_Seq e1 e2 : E (e1 :>: e2) =
    D1 ⭅ E e1 ;;
    D2 ⭅ E e2 ;;
@@ -705,9 +676,10 @@ Lemma E_Unify e1 e2 : E (e1 :=: e2) =
   D2 ⭅ E e2 ;;
   ⌈ D1 * D2 ⌉.
  reflexivity. Qed.
+*)
 
 Create HintDb E.
-Hint Rewrite E_Choice E_Seq E_Unify : E.
+Hint Rewrite E_Choice (* E_Seq E_Unify *) : E.
 
 
 End DSLS.
