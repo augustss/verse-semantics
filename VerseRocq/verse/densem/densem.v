@@ -601,18 +601,18 @@ Fixpoint E (e : mini.Expr) : P (list ENV) :=
         (* TODO: is Append the same as liftM2 (++) ? *)
 
   | mini.Unify e1 e2 => 
-      bind_sl (E e1) (fun D1 => 
-      bind_sl (E e2) (fun D2 => 
-        (pure_sl (D1 ∩ D2))))
+      Bind (E e1) (fun D1 => 
+      Bind (E e2) (fun D2 => 
+        (Pure (D1 ∩ D2))))
 (*                             
       D1 ⭅ E e1 ;;
       D2 ⭅ E e2 ;;
       ⌈ D1 * D2 ⌉ *)
 
   | mini.Seq e1 e2 => 
-      bind_sl (E e1) (fun D1 => 
-      bind_sl (E e2) (fun D2 => 
-        (pure_sl ( (D1 \ ⟅r⟆) ∩ D2))))
+      Bind (E e1) (fun D1 => 
+      Bind (E e2) (fun D2 => 
+        (Pure ( (D1 \ ⟅r⟆) ∩ D2))))
 (*
       D1 ⭅ E e1 ;;  
       D2 ⭅ E e2 ;;
