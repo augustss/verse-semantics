@@ -131,10 +131,7 @@ Fixpoint pickl {A} (xs : list (list A)) : list (list A) :=
   | V :: VS =>  v <- V ;; vs <- pickl VS ;; [ v :: vs ] 
   end.
 
-Definition Concat' {A} : list (P (list A)) -> P (list A) := 
-  List.fold_right Append Nil.
-
-Definition CP {A} : list (P (list A)) -> P (list A) := 
+Definition ConcatPick {A} : list (P (list A)) -> P (list A) := 
  List.fold_right Append Nil.
 
 (** ------------- Functor/Applicative/Monad definitions ---------------- *)
@@ -148,8 +145,8 @@ Definition Map { A B} : (A -> B) -> P (list A) -> P (list B) :=
 Definition Bind {A B} : P (list A) -> (A -> P (list B)) -> P (list B) := 
   fun S K => 
     s ⭅ S ;;
-    let t : list (P (list B)) := List.map K s in
-    Concat (pick t).
+    ConcatPick (List.map K s).
+
 
 
 Definition liftA2 {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list C) := 
@@ -158,7 +155,7 @@ Definition liftA2 {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list
     let t : list (P (list C)) := 
       Δ <- s1 ;;
       [ Map (op Δ) E2 ] in
-    CP t.
+    ConcatPick t.
 
 
 Definition liftA2' {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list C) := 
@@ -230,12 +227,12 @@ Proof.
 Qed.
 
 Lemma Concat_pick {A} (xs : list (P (list A))) :
- Concat (pick xs) = List.fold_right Append Nil xs.
+ Concat (pick xs) = ConcatPick xs.
 Proof.
   induction xs. simpl. rewrite Concat_Nil. done.
   cbn. rewrite Concat_Cons.
   f_equal. 
-  unfold Concat' in IHxs. done.
+  unfold ConcatPick in IHxs. done.
 Qed.
 
 
@@ -471,8 +468,6 @@ Proof.
   unfold Pure, Bind, Cons, Nil.
   set_simpl.
   cbn.
-  rewrite Concat_Cons. 
-  rewrite Concat_Nil.
   rewrite Append_Nil_r.
   done.
 Qed.
@@ -483,8 +478,14 @@ Lemma bind_ret_r {A} (m : P (list A))  :
 Proof.
   unfold Bind, Pure.
   bind_equal s0.
-  rewrite pick_pure.
-  apply Concat_singleton.
+  unfold ConcatPick.
+  induction s0.
+  - cbn. done.
+  - cbn. rewrite IHs0. 
+    unfold Append.
+    set_simpl.
+    cbn.
+    done.
 Qed.
 
 
@@ -518,22 +519,23 @@ Proof.
 unfold Bind, Cons, Nil, Append.
 set_simpl. 
 bind_equal x0.
+repeat rewrite <- Concat_pick.
 rewrite pick_cons. 
 rewrite pick_nil.
 rewrite Concat_Cons. 
 rewrite Concat_Nil. 
 rewrite Append_Nil_r. 
 
-replace (x1 ⭅ l2;; s ⭅ ⌈ x0 :: x1 ⌉;; Concat (pick (f <$> s))) with 
-        (x1 ⭅ l2;; Concat (pick (f x0 :: f <$> x1))).
+replace (x1 ⭅ l2;; s ⭅ ⌈ x0 :: x1 ⌉;; ConcatPick (f <$> s)) with 
+        (x1 ⭅ l2;; ConcatPick (f x0 :: f <$> x1)).
 2: { bind_equal x1. f_equal. }
-replace (x1 ⭅ l2;; Concat (pick (f x0 :: f <$> x1))) with 
+replace (x1 ⭅ l2;; ConcatPick (f x0 :: f <$> x1)) with 
         (x1 ⭅ l2;; Concat (Cons (f x0) (pick (f <$> x1)))).
-2: { reflexivity. } 
+2: { bind_equal x1. rewrite <- Concat_pick. reflexivity. } 
 replace (x1 ⭅ l2;; Concat (Cons (f x0) (pick (f <$> x1)))) with 
-        (x1 ⭅ l2;; Append (f x0) (Concat (pick (f <$> x1)))).
-2: { bind_equal x1. rewrite Concat_Cons. done. } 
-rewrite (Set_Bind_Append l2 (f x0) (fun x1 => Concat (pick (f <$> x1)))).
+        (x1 ⭅ l2;; Append (f x0) (ConcatPick (f <$> x1))).
+2: { bind_equal x1. rewrite Concat_Cons. rewrite <- Concat_pick. done. } 
+rewrite (Set_Bind_Append l2 (f x0) (fun x1 => ConcatPick (f <$> x1))).
 done.
 Qed.
 
@@ -601,7 +603,7 @@ Proof.
   unfold Bind.
   set_simpl.
   bind_equal z.
-  rewrite (Set_Bind_Concat _ (fun s => (pick (g <$> s)))).
+(*  rewrite (Set_Bind_Concat _ (fun s => (pick (g <$> s)))).
   f_equal.
   eapply helper.
   - cbn. done.
@@ -610,7 +612,7 @@ Proof.
     rewrite pick_app.
     unfold Append.
     bind_equal y1.
-    f_equal.
+    f_equal. *)
     (* here the goal is (append y1) = (cons (concat y1)) 
        which doesn't seem provable. I guess the assumption in the
        helper lemma is too strong.
