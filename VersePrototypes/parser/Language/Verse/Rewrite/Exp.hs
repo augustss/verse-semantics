@@ -31,13 +31,12 @@ import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Loc
 import Language.Verse.Path (Path)
 import Language.Verse.SimpleName
-import qualified Language.Verse.Ident as I
 
 import Data.Word (Word8)
 
 import Numeric (showHex)
 
-import Prettyprinter
+import Prettyprinter hiding (braces, tupled)
 
 import GHC.Generics
 
@@ -65,7 +64,7 @@ data Exp f a
   | Block (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
-  | Exists (f a)
+  | Exists [(f a)] (f (Exp f a)) -- exists <names>^{+} body
   | Forall (f a)
   | Alloc2 !Access (f a) (f (Exp f a))
   | Alloc3 !Access (f a) (f (Exp f a)) (f (Exp f a))
@@ -133,7 +132,7 @@ instance ( Pretty (f (Exp f a))
     Struct e -> "struct" <> braces (pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
-    Exists x -> "exists" <+> pretty x
+    Exists names body -> "exists" <+> pretty names <> braces (pretty body)
     Forall x -> "forall" <+> pretty x
     Alloc2 access x e ->
       "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e

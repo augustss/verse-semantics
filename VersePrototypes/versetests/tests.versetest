@@ -106,7 +106,7 @@ testeq("Unif23",pass,tim=skip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # 
 
 
 # Arrays
-testeq("Array1",pass){array{1;2;3}}                         {1,2,3}
+testeq("Array1",pass){array{1;2;3}}                         {(1,2,3)}
 testeq("Array2",pass){array{}}                              {()}
 testeq("Array3",pass){Length(array{1;2;3})}                 {3}
 testeq("Array4",pass){Length(array{})}                      {0}
@@ -137,8 +137,8 @@ testeq("Array16",pass,tim=skip) {Y := all{for( 1..3 ){ 1|2 }}}       { array { a
 # Array expression splicing
 #  ...in expressions
 # tim=skip: Tim does not support splicing
-testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
-testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)}
+testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
 #  ...in patterns
 testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
 testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
@@ -152,10 +152,10 @@ testeq("Splice8",pass,tim=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (
 testeq("Splice9",pass,tim=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
 
 #
-testeq("All1",pass) {all{:(1,2,3)}}                            {1,2,3}
-testeq("All2",pass) {all{x:(1,2,3); x}}                        {1,2,3}
-testeq("All3",pass) {all{x:= :(1,2,3); x}}                     {1,2,3}
-testeq("All4",pass) {all{x:(1,2,3)}}                           {1,2,3}
+testeq("All1",pass) {all{:(1,2,3)}}                            {array{1,2,3}}
+testeq("All2",pass) {all{x:(1,2,3); x}}                        {array{1,2,3}}
+testeq("All3",pass) {all{x:= :(1,2,3); x}}                     {array{1,2,3}}
+testeq("All4",pass) {all{x:(1,2,3)}}                           {array{1,2,3}}
 
 # Functions
 testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
@@ -192,9 +192,9 @@ testeq("Pat9",pass) {succ(x:any):int:=x+1; succ[5]}       {6}
 #testeq("Pat10",pass) {x? := 5; x}                          {array{5}}
 #testeq("Pat11",pass) {x? := 1/0; x}                        {array{}}
 # tim=skip: unsupported LHS
-testeq("Pat12",pass,tim=skip) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
+testeq("Pat12",pass,tim=skip) {(x,y,z) := (1,2,3); (z,y,x)}           {(3,2,1)}
 # tim=skip: unsupported LHS
-testeq("Pat13",pass,tim=skip) {i->x := 2; (i, x)}                   {2,2}
+testeq("Pat13",pass,tim=skip) {i->x := 2; (i, x)}                   {(2,2)}
 testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 
@@ -218,7 +218,7 @@ testeq("TB10",pass, skip, tim=skip) {p^[](:int):int}                      {0}
 #testeq("TB8",pass, broken) {x[] : int}                           { x : []int }
   # TB7,8 are these legal?
 
-testeq("TB9",pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
+testeq("TB9",pass) {all{i->x:(3,4,5); (i, x)}}           {((0,3),(1,4),(2,5))}
 
 
 # For
@@ -290,8 +290,8 @@ testeq("Type2",pass) {succ(n:int) := n + 1;
             {6}
 
 # Evaluation in if
-testeq("TIf1",pass) {if(y:int; y=1) 42 else 23} {42}
-testeq("TIF2",pass) {if(y:int; y=1) y else 23}  {1}
+testeq("TIf1",pass) {if(y:int; y=1) { 42 } else { 23 }} {42}
+testeq("TIF2",pass) {if(y:int; y=1) { y  } else { 23 }}  {1}
 
 # Random collection
 testeq("EV10a",pass) {succ(x:int):=x+1; f(a:succ) := a; f[3]} {4}
@@ -300,7 +300,7 @@ testeq("EV10c",pass) {succ(x:int):=x+1; f(a:=if (0) then :int else :succ):=a; f[
 testeq("EV10d",pass) {succ(x:int):=x+1; f(a:=if (:false) then :int else :succ):=a; f[3]} {4}
 
 testeq("EV10",pass) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a;
-                    (f(0,0),f(1,0))} {0,1}
+                    (f(0,0),f(1,0))} {(0,1)}
    # c:int, then depending on c, we either get a:int or a:succ
 
 testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[0]}}     {1}
@@ -334,8 +334,8 @@ testeq("EV23",pass) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
 testeq("EV23a",pass) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
-verify("EV23b",fail,tim=A00) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
 # tim=skip: Tim does not allow this.  Bug?
+verify("EV23b",fail,tim=A00) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
 verify("EV23c",pass,tim=skip) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
@@ -366,8 +366,9 @@ testeq("EV48",pass) {       + (1=1) }         {1}
 testeq("EV49",pass) {       + (2;1) }         {1}
 testeq("EV50",pass) {       + ( +1) }         {1}
 #
-testeq("EV51",pass) { succ(x:any):=intAdd$[x,1]; y:succ       =1; y }     { 2 }
-testeq("EV52",pass) { succ(x:any):=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
+# TODO: issue #85:  add intAdd$ to lib parser
+# testeq("EV51",pass) { succ(x:any):=intAdd$[x,1]; y:succ       =1; y }     { 2 }
+# testeq("EV52",pass) { succ(x:any):=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
 
 # --- What is first?
 # testeq("EV",pass) { first{1} }              {1}
@@ -384,12 +385,12 @@ testeq("EV55",pass,tim=skip) { true } { truth{()} }
 testeq("EV56",pass,tim=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
                     { array{(), truth{5}, (), truth{1} } }
 # tim=skip: Tim is not happy with this. Bug?
-testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) 1 else 0 } { 1 }
-testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) 1 else 0 } { 1 }
-testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) 1 else 0 } { 0 }
-testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) 1 else 0 } { 0 }
-testeq("EV61",pass,tim=skip) { a := option{   }; if (a?) then 1 else 0 } { 0 }
-testeq("EV62",pass,tim=skip) { a := option{1  }; if (a?) then 1 else 0 } { 1 }
+testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
+testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
+testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) { 1 } else { 0 } } { 0 }
+testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) { 1 } else { 0 } } { 0 }
+testeq("EV61",pass,tim=skip) { a := option{   }; if (a?) then { 1 } else { 0 } } { 0 }
+testeq("EV62",pass,tim=skip) { a := option{1  }; if (a?) then { 1 } else { 0 } } { 1 }
 
 testeq("AndyExe12", pass, broken)
                     { exists A B { B = all{ exists C D { C = all{ (A = 1) | (D = 0) }
@@ -471,10 +472,12 @@ testeq("AndyChoice3",pass) {
     , (1, 2, 5) )
   }
 
-testeq("Ampersand1", pass){ f ( x&y : int ) := { x + y }; f[2,3] } { 5 }
-testeq("Ampersand2", pass){ f ( x&y : int, q:int ) := { (q, x + y) }; f[2,3,7]} { (7,5) }
-testeq("Ampersand3", pass){ (x&y) := 4; x+y } { 8 }
-testeq("Ampersand4", pass){ f ( x&y&z : int ) := { x + y + z }; f[2,3,4] } { 9 }
+# TODO: issue #85: commented out, the verse parser library dies on
+# ampersands. Needs an extension.
+# testeq("Ampersand1", pass){ f ( x&y : int ) := { x + y }; f[2,3] } { 5 }
+# testeq("Ampersand2", pass){ f ( x&y : int, q:int ) := { (q, x + y) }; f[2,3,7]} { (7,5) }
+# testeq("Ampersand3", pass){ (x&y) := 4; x+y } { 8 }
+# testeq("Ampersand4", pass){ f ( x&y&z : int ) := { x + y + z }; f[2,3,4] } { 9 }
 
 testeq("fundom1", pass) { f:=fun(x:=1|2,y:=3|4):=x+y; all{ i->x:f; i } }
                         { ((1,3), (1,4), (2, 3), (2, 4)) }

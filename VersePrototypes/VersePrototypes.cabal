@@ -328,7 +328,6 @@ library verse-parser
             Control.Monad.Wrong
             Language.Verse.Access
             Language.Verse.Contract
-            Language.Verse.Desugar
             Language.Verse.Desugar.Exp
             Language.Verse.Effect.Split
             Language.Verse.Error
@@ -348,6 +347,7 @@ library verse-parser
             Language.Verse.Token
             Language.Verse.Val
             Parser.Verse
+            Parser.Compat
     other-modules:
 
     build-depends: parser-combinators
@@ -374,14 +374,15 @@ test-suite verse-parser-test
     other-modules: Paths_VersePrototypes
                  , Utils
                  , TestSuite.All
+                 , TestSuite.Compat
                  , TestSuite.Syntax
+                 , TestSuite.VerseTest
     build-depends: base
                  , bytestring
                  , containers
                  , comonad
                  , directory
                  , filepath
-                 , parsec
                  , prettyprinter
                  , tasty
                  , tasty-hunit

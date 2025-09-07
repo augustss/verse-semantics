@@ -23,10 +23,7 @@ import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pPare
 import FrontEnd.Prelude( findPrelude )
 
 import qualified Parser.Verse               as V
-import qualified Language.Verse.Rewrite     as R
-import qualified Language.Verse.Rewrite.Exp as R
-import qualified Control.Monad.Supply       as C
-import qualified Control.Monad.Wrong        as C
+import qualified Parser.Compat              as PC
 
 import Core.Expr as Core
 import Core.Traced
@@ -57,19 +54,18 @@ import GHC.Stack( HasCallStack )
 
 import Data.List( isPrefixOf )
 import Data.Char( toLower )
-import Data.Scientific (fromFloatDigits)
 import Data.Maybe
-import Control.Monad( unless, when, guard, ap, (>=>))
+import Control.Monad( unless, when, guard, (>=>))
 import System.Directory( doesFileExist, removeFile )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
 import qualified Data.Map as M
-import qualified Data.HashMap.Strict as HM
 
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
 
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as B
 
 -----------------------------------------------
@@ -815,15 +811,13 @@ pTimSkip = do
  OA.<|>
   pure TimNone
 
------------------------------------------------
+--------------------------------------------------------------------------------
 --
---     Read the test file, and parse with the
---     verse-parser library
---     many functions in this section are
---     duplicates until verse-parser is at
---     feature parity
+--     Read the test file, and parse with the verse-parser library many
+--     functions in this section are duplicates until verse-parser is at feature
+--     parity
 --
------------------------------------------------
+--------------------------------------------------------------------------------
 
 {- Note [Ticks in Tester]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -835,114 +829,13 @@ This is purposeful and part of the plan to integrate the verse-parser in
 $ROOT/VersePrototypes/parser into the tester. When the parser is at parity with
 the frontend parser we will remove the duplication.
 
-This work in tracked in #66.
+This work in tracked in issue #66.
 -}
 
 
--- | adapter that translates the Parser.Language.Verse to SrcExpr
-expToSrcExpr :: V.Loc -> R.Exp V.L V.Ident -> Src.SrcExpr
-expToSrcExpr l (e1 R.:=:  e2) = Src.InfixOp (lexp e1) (inOp l "=")  (lexp e2)
--- expToSrcExpr l (e1 R.:.:  e2) = Src.InfixOp (lexp e1) (inOp l ".")  (lexp e2)
-expToSrcExpr l (e1 R.:|:  e2) = Src.InfixOp (lexp e1) (inOp l "|")  (lexp e2)
-expToSrcExpr _ (R.List es) = Src.eSeq (map lexp es)
-expToSrcExpr l (R.Where e1 e2) = Src.InfixOp (lexp e1) (inOp l "where") (lexp e2)
-expToSrcExpr _ R.Fail = Src.Fail
-expToSrcExpr l (R.One e) = Src.Macro1 (macro l "one") [] (lexp e)
-expToSrcExpr l (R.All e) = Src.Macro1 (macro l "all") [] (lexp e)
-expToSrcExpr l (R.Not e) = Src.PrefixOp (preOp l "not") (lexp e)
-expToSrcExpr l (R.Verify e)    = Src.Macro1 (macro l "verify") [] (lexp e)
-expToSrcExpr _ (R.Check eff e) = Src.Check (refImplEffToSrcEff eff) (lexp e)
-expToSrcExpr _ (R.OfType e1 e2) = --Src.InfixOp (lexp e1) (inOp l ":") (lexp e2)
-           Src.OfType (lexp e1) Src.effTop (lexp e2)
-expToSrcExpr l (R.Assume e) = Src.Macro1 (macro l "assume") [] (lexp e)
--- expToSrcExpr l (R.Module e) = XXX
--- expToSrcExpr l (R.Struct e) = XXX
--- expToSrcExpr l (R.Class e) = XXX
--- expToSrcExpr l (R.Inst e1 e2) = XXX
--- expToSrcExpr l (R.Enum e) = XXX
-expToSrcExpr _ (R.IfThenElse e1 e2 e3) = Src.If3 (lexp e1) (lexp e2) (lexp e3)
-expToSrcExpr _ (R.ForDo e1 e2) = Src.For2 (lexp e1) (lexp e2)
-expToSrcExpr _ (R.Block e) = Src.Block (lexp e)
-expToSrcExpr _ (R.BracketInvoke f a) = Src.ApplyD (lexp f) (lexp a)
-expToSrcExpr _ (R.ParenInvoke f a) = Src.ApplyS (lexp f) (lexp a)
-expToSrcExpr _ (R.Exists (V.L l i)) = Src.DefineV (ident l i)
--- expToSrcExpr _ (Forall e) = XXX
--- expToSrcExpr _ (Alloc2 ) = XXX
--- expToSrcExpr _ (Alloc3 ) = XXX
-expToSrcExpr l (R.Set (V.L l' x) e) = Src.Set (Src.Variable (ident l' x)) (ident l "=") (lexp e)
-expToSrcExpr _ (R.Tuple es) = Src.Tuple (map lexp es)
-expToSrcExpr _ (R.Truth e) = Src.Truth (lexp e)
-expToSrcExpr _ (R.Int i) = Src.Lit (Src.LInt i)
-expToSrcExpr _ (R.Float f) = Src.Lit (Src.LRat (fromFloatDigits f) (show f))
-expToSrcExpr _ (R.Char c) = Src.Lit (Src.LChar (toEnum (fromEnum c)))
-expToSrcExpr _ (R.Char32 c) = Src.Lit (Src.LChar c)
-expToSrcExpr _ (R.Lam e1 oc eff e2) = Src.Function ap_ (lexp e1) rs (lexp e2)
-  where
-    ap_ = case oc of { R.O -> Src.Open; R.C -> Src.Closed }
-    rs = refImplEffToSrcEff eff
-expToSrcExpr l (R.InfixColonEqual _ q (V.L l' x) e) | ok q = Src.InfixOp (Src.Variable (ident l' x)) (inOp l ":=") (lexp e)
-  where ok R.Var = False
-        ok _ = True
-expToSrcExpr l (R.PrefixColon e) = Src.PrefixOp (preOp l ":") (lexp e)
-expToSrcExpr l (R.MixfixArrowColonEqual (V.L lx x) (V.L ly y) e) = Src.InfixOp lhs (ident l ":=") (lexp e)
-  where lhs = Src.InfixOp (Src.Variable (ident lx x)) (strIdent l "->") (Src.Variable (ident ly y))
-expToSrcExpr l (R.Name n) = Src.Variable (ident l n)
--- expToSrcExpr QualName
-expToSrcExpr _ (R.IfArchetypeName _ e1 e2) | x1 == x2 = x1
-  where x1 = lexp e1; x2 = lexp e2
-expToSrcExpr _ (R.IfArchetypeName _ _ e2) = lexp e2
--- expToSrcExpr Domain
--- TODO: Jeff: parser does not export pretty instances
--- expToSrcExpr _ e = error $ "expToSrcExpr: unimp " ++ show (pretty e) ++ "\n" ++ show e
-expToSrcExpr _ e = error $ "expToSrcExpr: unimp " ++ "\n" ++ show e
-
-newtype M a = M { unM :: V.Label -> (V.Label, a) }
-instance Functor M where
-  fmap f ma = M $ \ l -> case unM ma l of (l', a) -> (l', f a)
-instance Applicative M where
-  pure a = M $ \ l -> (l, a)
-  (<*>) = ap
-instance Monad M where
-  ma >>= k = M $ \ l -> case unM ma l of (l', a) -> unM (k a) l'
-instance C.MonadWrong V.Error M where
-  wrong e = error $ show e
-instance C.MonadSupply V.Label M where
-  supply = M $ \ l -> let !l' = l + 1 in (l', l)
-
-runM :: M a -> a
-runM (M a) = snd (a 0)
-
-desugar' :: V.L (V.Exp V.SimpleName) -> V.L (R.Exp V.L V.Ident)
-desugar' = runM . R.rewrite
-
-lexp :: V.L (R.Exp V.L V.Ident) -> Src.SrcExpr
-lexp (V.L l e) = expToSrcExpr l e
-
-strIdent :: V.Loc -> String -> Src.Ident
-strIdent (V.Loc (V.Pos l c _) _) s = Src.Ident (Src.mkLoc "?" l c) s
-
-inOp :: V.Loc -> V.Ident -> Src.Ident
-inOp l s = ident l s
-
-preOp :: V.Loc -> V.Ident -> Src.Ident
-preOp l s = ident l s
-
-ident :: V.Loc -> V.Ident -> Src.Ident
-ident l i = strIdent l (f i)
-  where
-    f :: V.Ident -> String
-    f (V.Name s)   = T.unpack s
-    f (V.Label l') = "_" ++ show l'
-
-macro :: V.Loc -> V.Ident -> Src.Ident
-macro l s = ident l s
-
-refImplEffToSrcEff :: V.Effect -> Src.Eff
-refImplEffToSrcEff V.Fails    = Src.effFails
-refImplEffToSrcEff V.Succeeds = Src.effSucceeds
-refImplEffToSrcEff V.Decides  = Src.effDecides
 
 -- Read the test file, and parse it
+-- START: figure out these errors
 readTests' :: FilePath -> IO [Test']
 readTests' fn = do
   tests <- V.parseDie pTestFile' fn <$> B.readFile fn
@@ -955,24 +848,24 @@ pTestFile' = V.skip *> V.many pTest' <* V.eof
 
 -- Parse a test
 pTest' :: V.Parser Test'
-pTest' = pTestEq' OA.<|> pTestVerify' OA.<|> pTimTest'
+pTest' = V.skip *> (pTestEq' OA.<|> pTestVerify' OA.<|> pTimTest') <* V.skip
 
 -- Parse an expression evaluation equality test
 pTestEq' :: V.Parser Test'
 pTestEq' =
-  V.pKeyword "testeq" *> do
-    let pdExpr = fmap desugar' V.pExpr
-    tId <- V.pParens pTestInfo'
-    TestEvalEq' tId <$> V.pBraces pdExpr <*> V.pBraces pdExpr
+  V.lexeme (V.pKeyword "testeq") *> do
+    let pdExpr = PC.toSrcExpr <$> V.pcExpr
+    tId <- V.lexeme $ V.pParens pTestInfo'
+    TestEvalEq' tId <$> (V.lexeme $ V.pcBraces pdExpr) <*> V.lexeme (V.pBraces pdExpr)
 
 -- Parse an expression verification test
 pTestVerify' :: V.Parser Test'
 pTestVerify' =
   V.pKeyword "verify" *> do
-    tId <- V.pParens pTestInfo'
-    src <- V.pBraces (V.pExpr <* V.optionMaybe V.pSemi)
+    tId <- V.lexeme $ V.pParens pTestInfo'
+    src <- V.lexeme $ V.pcBraces (fmap PC.toSrcExpr V.pcExpr <* V.optionMaybe V.pSemi)
     locEnd <- V.getLoc
-    pure $ TestVerify' (tId { testLocEnd' = locEnd }) $ desugar' src
+    pure $ TestVerify' (tId { testLocEnd' = locEnd }) src
 
 pTimTest' :: V.Parser Test'
 pTimTest' =
@@ -982,15 +875,16 @@ pTimTest' =
     src <- V.pLBrace *> V.pExpr <* V.optionMaybe V.pSemi <* V.pRBrace
     locE <- V.getLoc
     let ti = timTestInfo' locB locE tag
-    pure $ TestVerify' ti $ desugar' src
+    pure $ TestVerify' ti $ PC.toSrcExpr src
 
 pTestInfo' :: V.Parser TestInfo'
 pTestInfo' = do
   locB  <- V.getLoc
-  mname <- V.optionMaybe (V.pStringLit <* V.pComma)
-  typ   <- pTestType'
-  stat  <- V.try (V.pComma *> pTestStatus') OA.<|> pure TS_Normal
-  tim   <- (V.pComma *> pTimSkip') OA.<|> pure TimNone
+  let pComma = V.lexeme V.pComma
+  mname <- V.optionMaybe (V.pStringLit <* V.lexeme V.pComma)
+  typ   <- pTestType' <* V.optional pComma
+  stat  <- V.try (pTestStatus' <* V.optional pComma) OA.<|> pure TS_Normal
+  tim   <- V.try (pTimSkip') OA.<|> pure TimNone
   locE  <- V.getLoc
   pure (TestInfo' { testMName'    = fmap (T.unpack . projectLoc) mname
                   , testLocStart' = locB
@@ -1001,16 +895,16 @@ pTestInfo' = do
                   })
 
 pTestType' :: V.Parser TestType
-pTestType' = do
-  i <- V.pIdent
-  case projectLoc $ fmap T.toLower i of
+pTestType' = V.lexeme $ do
+  i <- V.many V.pAlpha -- cannot use V.pIdent, "fail" is a reserved
+  case T.toLower $ TE.decodeLatin1 $ B.pack $ i of
     "pass"    -> pure TPass
     "fail"    -> pure TFail
     "loop"    -> pure TLoop
     _         -> fail "pTestType"
 
 pTestStatus' :: V.Parser TestStatus
-pTestStatus' = do
+pTestStatus' = V.lexeme $ do
   i <- V.pIdent
   case projectLoc $ fmap T.toLower i of
     "skip"    -> pure TS_Skip
@@ -1021,7 +915,7 @@ pTimSkip' :: V.Parser TimSkip
 pTimSkip' = do
   i <- V.pIdent
   guard (projectLoc (fmap T.toLower i) == "tim")
-  _ <- V.pEq
+  _  <- V.pEqual
   sk <- V.pIdent
   case T.unpack $ projectLoc sk of
     's':'k':'i':'p':s -> pure (TimSkip s)
@@ -1050,7 +944,7 @@ pSkipped' :: V.Parser SkippedTest'
 pSkipped' = do
   status <- pSkipTestStatus'
   (mname, reason) <- V.pParens pSkipInfo'
-  code   <- desugar' <$> V.pExpr <* V.optionMaybe V.pSemi
+  code   <- PC.toSrcExpr <$> V.pExpr <* V.optionMaybe V.pSemi
   pure (MkSkippedTest' mname status reason code)
 
 pSkipInfo' :: V.Parser (Maybe String, String)
@@ -1074,13 +968,13 @@ pSkipTestStatus' = do
     _         -> fail "pSkipType"
 
 -- A Exp from the parser with location metadata that uses simplenames
-type LSExp = V.L (R.Exp V.L V.Ident)
+type LSExp = Src.SrcExpr
 
 -- | Convert from a @Test'@ to a @Test@, name is purposefully left ugly so that
 -- the temporary does not become permanent
 test'ToTest :: Test' -> Test
-test'ToTest (TestEvalEq' ti l r) = TestEvalEq (convert ti) (lexp l) (lexp r)
-test'ToTest (TestVerify' ti a)   = TestVerify (convert ti) (lexp a)
+test'ToTest (TestEvalEq' ti l r) = TestEvalEq (convert ti) l r
+test'ToTest (TestVerify' ti a)   = TestVerify (convert ti) a
 
 locToLoc :: FilePath -> V.Loc -> Loc
 locToLoc name (V.Loc pos_start pos_end) = SourcePos { sourceName   = name
@@ -1147,8 +1041,8 @@ testSrc' (TestVerify' _ e)    = e
 skipping' :: [Test'] -> Skipped' -> [Test']
 skipping' tests skips = skip1 <$> tests
   where
-    m     = HM.fromList [ (skipCode' s, skipStatus' s) | s <- skips ]
-    skip1 test = case HM.lookup (testSrc' test) m of
+    m          = M.fromList [ (skipCode' s, skipStatus' s) | s <- skips ]
+    skip1 test = case M.lookup (testSrc' test) m of
                    Just status -> test `testWithStatus'` status
                    Nothing     -> test
 

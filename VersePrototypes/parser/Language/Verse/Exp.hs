@@ -82,7 +82,7 @@ data Exp a
   | Continue
   | Do (L (Exp a)) (L (Exp a))
   | Enum [L (Exp a)] [([L (Exp a)], L a)]  -- expression lists are for attributes on enum and names
-  | Exists (L a)
+  | Exists [L a] (L (Exp a))               -- exists A B C { body }
   | ExpInfixColon (L (Exp a)) (L (Exp a))
   | Fail
   | Fails (L (Exp a))
@@ -272,7 +272,7 @@ instance ( Pretty a
     Block e -> braces (pretty e)
     ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
-    Exists x -> "exists" <+> pretty x
+    Exists names body -> "exists" <+> pretty names <> braces (pretty body)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     SetInfixPlusEqual p e -> "set" <+> pretty p <+> "+=" <+> pretty e
     SetInfixMinusEqual p e -> "set" <+> pretty p <+> "-=" <+> pretty e

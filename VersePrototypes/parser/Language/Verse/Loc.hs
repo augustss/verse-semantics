@@ -5,7 +5,7 @@
 module Language.Verse.Loc
   ( Loc (..)
   , minBound
-  , L (..)
+  , L (..), mkL
   , loc
   , uncurryL
   , liftL1
@@ -65,6 +65,9 @@ instance Pretty a => Pretty (L a) where
 
 loc :: L a -> Loc
 loc (L x _) = x
+
+mkL :: Loc -> a -> L a
+mkL = L
 
 uncurryL :: (Loc -> a -> b) -> L a -> b
 uncurryL f (L x y) = f x y

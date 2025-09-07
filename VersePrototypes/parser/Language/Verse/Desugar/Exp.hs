@@ -14,12 +14,12 @@ module Language.Verse.Desugar.Exp
   , forall'
   , bracketInvoke
   , olam
-  , name
   , then'
   , seq'
   , domain
   ) where
 
+-- TODO: issue #84: Continue to remove the desugarer
 import Data.ByteString.Internal (w2c)
 import Data.Char (ord)
 import Data.Functor.Apply
@@ -37,7 +37,7 @@ import Language.Verse.SimpleName
 
 import Numeric (showHex)
 
-import Prettyprinter
+import Prettyprinter hiding (tupled)
 
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
@@ -72,7 +72,7 @@ data Exp f a
   | Lam a (f (Exp f a))
   | OLam (f (Exp f a)) !(Env a) (f (Exp f a)) (f (Exp f a))
   | Intrinsic !Intrinsic
-  | Name a
+  | Name [a]
   | QualName (f (Exp f a)) {-# UNPACK #-} !SimpleName
   | Path !Path
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
@@ -106,27 +106,27 @@ instance ( Pretty (f (Exp f a))
     e :.: x -> pretty e <> dot <> pretty x
     e1 :|: e2 -> parens $ pretty e1 <+> pipe <+> pretty e2
     Fail -> "fail"
-    One e -> "one" <+> braces (pretty e)
-    All e -> "all" <+> braces (pretty e)
+    One e -> "one" <+> braces_ (pretty e)
+    All e -> "all" <+> braces_ (pretty e)
     Not e -> "not" <+> parens (pretty e)
-    Verify e -> "verify" <+> braces (pretty e)
-    Check eff e -> "check" <> angles (pretty eff) <+> braces (pretty e)
-    Assume eff e -> "assume" <> angles (pretty eff) <+> braces (pretty e)
+    Verify e -> "verify" <+> braces_ (pretty e)
+    Check eff e -> "check" <> angles (pretty eff) <+> braces_ (pretty e)
+    Assume eff e -> "assume" <> angles (pretty eff) <+> braces_ (pretty e)
     Module i xs e ->
-      "module" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
+      "module" <> pretty '#' <> prettyLabel i <> braces_ (bindings xs $ pretty e)
     Struct i xs e ->
-      "struct" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
+      "struct" <> pretty '#' <> prettyLabel i <> braces_ (bindings xs $ pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>
-      braces (bindings xs $ pretty e2)
-    Inst e1 xs e2 -> parens (pretty e1) <+> braces (bindings xs $ pretty e2)
+      braces_ (bindings xs $ pretty e2)
+    Inst e1 xs e2 -> parens (pretty e1) <+> braces_ (bindings xs $ pretty e2)
     IfThenElse xs e1 e2 e3 ->
       "if" <+> parens (bindings xs $ pretty e1) <+>
-      braces (pretty e2) <+>
-      braces (pretty e3)
+      braces_ (pretty e2) <+>
+      braces_ (pretty e3)
     ForDo xs e1 e2 ->
-      "for" <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
+      "for" <+> parens (bindings xs $ pretty e1) <+> braces_ (pretty e2)
     Def access t x e ->
       align $
       prettyBindingAccess (access,t) x <> ssemi <>
@@ -136,28 +136,28 @@ instance ( Pretty (f (Exp f a))
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Tuple es -> tupled $ pretty <$> es
-    Truth e -> "truth" <+> braces (pretty e)
+    Truth e -> "truth" <+> braces_ (pretty e)
     Int x -> pretty x
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'" -- FIXME add escape
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Lam x e2 ->
-      backslash <+> pretty x <+> braces (pretty e2)
+      backslash <+> pretty x <+> braces_ (pretty e2)
     OLam f xs e1 e2 ->
-      "olam" <+> pretty f <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
+      "olam" <+> pretty f <+> parens (bindings xs $ pretty e1) <+> braces_ (pretty e2)
     Intrinsic x -> pretty x
     Name x -> pretty x
     QualName x y -> "(" <> pretty x <> ":)" <> pretty y
     Path x -> pretty x
     IfArchetypeName  x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
-      braces (pretty e1) <+>
-      "else" <+> braces (pretty e2)
+      braces_ (pretty e1) <+>
+      "else" <+> braces_ (pretty e2)
     ArchetypeName x -> "archetype" <> parens (pretty x)
     TopLevel xs e ->
       bindings xs $ pretty e
     Domain e ->
-      "domain" <+> braces (pretty e)
+      "domain" <+> braces_ (pretty e)
     _ -> "unimplemented"
     where
       ssemi = flatAlt hardline (semi <> space)
@@ -168,7 +168,7 @@ instance ( Pretty (f (Exp f a))
         (flatAlt "( " lparen)
         (flatAlt (hardline <> rparen) rparen)
         ", "
-      braces x =
+      braces_ x =
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
       bindings xs y = align $
@@ -214,9 +214,6 @@ olam
   -> f (Exp f a)
   -> f (Exp f a)
 olam f env e1 e2 = OLam f env e1 e2 <$ f <. e1 <. e2
-
-name :: Functor f => f a -> f (Exp f a)
-name = fmap Name
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
