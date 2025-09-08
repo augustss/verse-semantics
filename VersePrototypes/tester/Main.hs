@@ -82,36 +82,39 @@ main = do
 
 runTests :: TestFlags -> IO ()
 runTests test_flags
-  | parseOnly test_flags && useLibParser test_flags
-  = mapM_ parseSourceOnly' (fileNames test_flags)
-
+  -- Parsing only
   | parseOnly test_flags
-  = mapM_ parseSourceOnly (fileNames test_flags)
+  = mapM_ parse_source_only (fileNames test_flags)
 
+  -- ToDo: explain what this is
   | Just expr_string <- testExpr test_flags
   , let fn = "<command-line>"
   = runTestFile test_flags (fn, parseDie pTestFile fn expr_string)
 
+  -- ToDo: explain what this is
   | timOutput test_flags
   = mapM_ read_and_display (fileNames test_flags)
 
+  -- ToDo: explain what this is
   | timCSV test_flags
   = mapM_ read_and_csv (fileNames test_flags)
 
-  | useLibParser test_flags
-  = mapM_ read_and_run' (fileNames test_flags)
-
+  -- Run a file-ful of tests
   | otherwise
   = mapM_ read_and_run (fileNames test_flags)
   where
-    read_and_run :: FilePath -> IO ()
-    read_and_run fn = do { tests <- readTests fn
-                         ; runTestFile test_flags (fn, tests) }
+    parse_source_only    -- See Note [Choosing the parser]
+      | useLibParser test_flags = parseSourceOnly'
+      | otherwise               = parseSourceOnly
 
-    -- See Note [Ticks in Tester] -- TODO: Jeff
-    read_and_run' :: FilePath -> IO ()
-    read_and_run' fn = do { tests <- readTests' fn
-                          ; runTestFile test_flags (fn, fmap test'ToTest tests) }
+    read_and_run :: FilePath -> IO ()
+    read_and_run fn
+      | useLibParser test_flags  -- See Note [Choosing the parser]
+      = do { tests <- readTests' fn
+           ; runTestFile test_flags (fn, fmap test'ToTest tests) }
+      | otherwise
+      = do { tests <- readTests fn
+           ; runTestFile test_flags (fn, tests) }
 
     read_and_display :: FilePath -> IO ()
     read_and_display fn = do { tests <- readTests fn
@@ -131,7 +134,6 @@ runTests test_flags
 
 {- Note [Testing densem in the tester]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
   * To test the semantic functions for different denotational semantics we abuse
     'TestType' in 'TestInfo' to track which semantic function to call. This is
     purely a descision to enable the tester to use the semantic functions as
@@ -691,7 +693,7 @@ parseSourceOnly fn = do
   putStrLn "SUCCESS"
   pure ()
 
--- See Note [Ticks in Tester]
+-- See Note [Choosing the parser]
 parseSourceOnly' :: FilePath -> IO ()
 parseSourceOnly' fn = do
   _ <- V.parseDie V.pFile fn <$> B.readFile fn
@@ -819,15 +821,19 @@ pTimSkip = do
 --
 --------------------------------------------------------------------------------
 
-{- Note [Ticks in Tester]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Choosing the parser]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 You will find that many functions and data types in the tester are duplicates
 with a "'". For example, there is 'readFile' and 'readFile''.
 
+* The unprimed version, `readFile`, uses the old MegaParsec parser in FrontEnd.Parse
+* The primed version, `readFile'`, uses the shared parser in Parser.Verse.
+
+You can control which one is used via the flag `--use-lib-parser`.
+
 This is purposeful and part of the plan to integrate the verse-parser in
-$ROOT/VersePrototypes/parser into the tester. When the parser is at parity with
-the frontend parser we will remove the duplication.
+$ROOT/VersePrototypes/parser into the tester. When Parser.Verse is at parity with
+FrontEnd.Parse we will remove the duplication.
 
 This work in tracked in issue #66.
 -}
