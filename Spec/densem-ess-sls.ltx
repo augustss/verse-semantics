@@ -145,7 +145,8 @@ $$
 \hspace{5mm} \HIDESkw \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \\
 \textbf{where} \\
 \;  \begin{array}[t]{l}
-  [\EV_1,\mydots,\EV_n] = s_0 \\
+  \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \not\in \freevars{u,v,t_0,t_1} \\
+  {} [\EV_1,\mydots,\EV_n] = s_0 \\
   S1 = \semess{B}{p}{q}{t_1} \\
   C_i = \begin{array}[t]{@@{}l}
       \HIDES{(\EV_i \seqSLOne \conBrack{u_i=|arr p|, v_i=|arr q|} \seqSLOne S1)}{\{p,q\}} \\
