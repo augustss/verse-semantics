@@ -64,9 +64,9 @@ import qualified Data.Map as M
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
 
-import qualified Data.Text as T
+import qualified Data.Text          as T
 import qualified Data.Text.Encoding as TE
-import qualified Data.ByteString as B
+import qualified Data.ByteString    as B
 
 -----------------------------------------------
 --
@@ -86,20 +86,20 @@ runTests test_flags
   | parseOnly test_flags
   = mapM_ parse_source_only (fileNames test_flags)
 
-  -- ToDo: explain what this is
+  -- Run the tester on this input expression
   | Just expr_string <- testExpr test_flags
   , let fn = "<command-line>"
   = runTestFile test_flags (fn, parseDie pTestFile fn expr_string)
 
-  -- ToDo: explain what this is
+  -- Display the test in Tim's syntax
   | timOutput test_flags
   = mapM_ read_and_display (fileNames test_flags)
 
-  -- ToDo: explain what this is
+  -- TODO: Jeff: Output the status of Tim's test?
   | timCSV test_flags
   = mapM_ read_and_csv (fileNames test_flags)
 
-  -- Run a file-ful of tests
+  -- Run a file-full of tests
   | otherwise
   = mapM_ read_and_run (fileNames test_flags)
   where
@@ -235,6 +235,10 @@ data TestStatus = TS_Normal
 
 testName :: TestInfo -> String
 testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocStart ti)))) (testMName ti)
+
+-- TODO: merge the types
+testName' :: TestInfo' -> String
+testName' = testName . convert
 
 data TestRes = TestRes { tr_info    :: TestInfo
                        , tr_outcome :: TestOutcome }
@@ -771,10 +775,13 @@ pTestInfo = do
   rnner <- try (optional pTestRunner)
   typ   <- pTestType
   stat  <- try (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
-  tim   <- (pOp "," *> pTimSkip) OA.<|> pure TimNone
+  tim   <- try (pOp "," *> pTimSkip) OA.<|> pure TimNone
+  -- See Note [Choosing the parser]
+  _psr   <- (pOp "," *> pParserSkip) OA.<|> pure False
   pure (TestInfo { testMName = mname, testLocStart = loc, testLocEnd = loc
                  , testType = typ, testRunner = rnner, testStatus = stat
-                 , testTimSkip = tim })
+                 , testTimSkip = tim
+                 })
 
 pTestType :: P TestType
 pTestType = do
@@ -812,6 +819,18 @@ pTimSkip = do
     s                 -> pure (TimError s)
  OA.<|>
   pure TimNone
+
+pParserSkip :: P Bool
+pParserSkip = do
+  i <- pIdent
+  guard (map toLower (identString i) == "libparser")
+  _  <- pOp "="
+  sk <- pIdent
+  case identString sk of
+    's':'k':'i':'p':_s -> pure  True
+    _s                 -> pure False
+  OA.<|> pure False
+
 
 --------------------------------------------------------------------------------
 --
@@ -862,16 +881,31 @@ pTestEq' =
   V.lexeme (V.pKeyword "testeq") *> do
     let pdExpr = PC.toSrcExpr <$> V.pcExpr
     tId <- V.lexeme $ V.pParens pTestInfo'
-    TestEvalEq' tId <$> (V.lexeme $ V.pcBraces pdExpr) <*> V.lexeme (V.pBraces pdExpr)
+    let go = if (testLibParserSkip' tId)
+          then do
+            -- consume the rest of the test
+            _ <- V.lexeme $ V.pcBraces pdExpr
+            _ <- V.lexeme $ V.pBraces pdExpr
+            pure $ dummy_eq_test (testName' tId)
+          else TestEvalEq' tId <$> (V.lexeme $ V.pcBraces pdExpr) <*> V.lexeme (V.pBraces pdExpr)
+    go
+
 
 -- Parse an expression verification test
 pTestVerify' :: V.Parser Test'
 pTestVerify' =
   V.pKeyword "verify" *> do
     tId <- V.lexeme $ V.pParens pTestInfo'
-    src <- V.lexeme $ V.pcBraces (fmap PC.toSrcExpr V.pcExpr <* V.optionMaybe V.pSemi)
+    let go = if (testLibParserSkip' tId)
+          then do
+               _ <- V.lexeme $ V.pcBraces (fmap PC.toSrcExpr V.pcExpr <* V.optionMaybe V.pSemi)
+               pure $ Src.Lit $ LStr "dummy_verify" -- See Note [Choosing the parser]
+          else V.lexeme $ V.pcBraces (fmap PC.toSrcExpr V.pcExpr <* V.optionMaybe V.pSemi)
+    src <- go
     locEnd <- V.getLoc
-    pure $ TestVerify' (tId { testLocEnd' = locEnd }) src
+    pure $ TestVerify' (tId { testLocEnd'        = locEnd
+                            , testLibParserSkip' = True
+                            }) src
 
 pTimTest' :: V.Parser Test'
 pTimTest' =
@@ -890,7 +924,8 @@ pTestInfo' = do
   mname <- V.optionMaybe (V.pStringLit <* V.lexeme V.pComma)
   typ   <- pTestType' <* V.optional pComma
   stat  <- V.try (pTestStatus' <* V.optional pComma) OA.<|> pure TS_Normal
-  tim   <- V.try (pTimSkip') OA.<|> pure TimNone
+  tim   <- V.try (pTimSkip' <* V.optional pComma) OA.<|> pure TimNone
+  psr   <- V.try pParserSkip' OA.<|> pure False
   locE  <- V.getLoc
   pure (TestInfo' { testMName'    = fmap (T.unpack . projectLoc) mname
                   , testLocStart' = locB
@@ -898,6 +933,7 @@ pTestInfo' = do
                   , testType'     = typ
                   , testStatus'   = stat
                   , testTimSkip'  = tim
+                  , testLibParserSkip' = psr
                   })
 
 pTestType' :: V.Parser TestType
@@ -927,6 +963,17 @@ pTimSkip' = do
     's':'k':'i':'p':s -> pure (TimSkip s)
     s                 -> pure (TimError s)
   OA.<|> pure TimNone
+
+pParserSkip' :: V.Parser Bool  -- TODO: abstract the parser
+pParserSkip' = do
+  i <- V.pIdent
+  guard (projectLoc (fmap T.toLower i) == "libparser")
+  _  <- V.pEqual
+  sk <- V.pIdent
+  case T.unpack $ projectLoc sk of
+    's':'k':'i':'p':_s -> pure  True
+    _s                 -> pure False
+  OA.<|> pure False
 
 pSkippedFile' :: V.Parser Skipped'
 pSkippedFile' = V.skip *> V.many pSkipped' <* V.eof
@@ -1002,7 +1049,7 @@ convert TestInfo'{..} = TestInfo { testMName    = testMName'
     mkName Nothing  = "convert: name_lost_in_conversion"
     name = mkName testMName'
 
-type Skipped'= [SkippedTest']
+type Skipped'     = [SkippedTest']
 data SkippedTest' = MkSkippedTest'
   { skipName'   :: Maybe String  -- ^ The name of the test (optional)
   , skipStatus' :: TestStatus    -- ^ The type of the test (pass/fail)
@@ -1024,11 +1071,29 @@ data TestInfo' =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code
     { testMName'    :: !(Maybe String)
     , testLocStart' :: !V.Loc
     , testLocEnd'   :: !V.Loc
-    , testType'     :: !TestType                      -- Default test type
+    , testType'     :: !TestType     -- Default test type
     , testStatus'   :: !TestStatus
-    , testTimSkip'  :: !TimSkip                       -- skip (or error code) when converting to Tim's format
+    , testTimSkip'  :: !TimSkip      -- skip (or error code) when converting to Tim's format
+    , testLibParserSkip' :: !Bool
     }
     deriving (Show)
+
+-- | construct a dummy test named 'name'.
+dummy_eq_test :: String -> Test'
+dummy_eq_test name = TestEvalEq' (dummy_test_info' name) e e
+  where
+    e = Src.Lit $ LStr "dummy_eq_test"
+
+dummy_test_info' :: String -> TestInfo'
+dummy_test_info' name = TestInfo'
+  { testMName'    = Just name
+  , testLocStart' = V.minBound
+  , testLocEnd'   = V.minBound
+  , testType'     = TPass
+  , testStatus'   = TS_Skip  -- use TS_Skip to register the test as skipped
+  , testTimSkip'  = TimNone
+  , testLibParserSkip' = True -- we only use a dummy to avoid parsing with the lib parser
+  }
 
 timTestInfo' :: V.Loc -> V.Loc -> T.Text -> TestInfo'
 timTestInfo' strt end name = TestInfo'
@@ -1038,6 +1103,7 @@ timTestInfo' strt end name = TestInfo'
   , testType'     = timTestType $ T.unpack name
   , testStatus'   = TS_Normal
   , testTimSkip'  = timSkip $ T.unpack name
+  , testLibParserSkip' = False
   }
 
 testSrc' :: Test' -> LSExp

@@ -84,7 +84,7 @@ module Parser.Verse
   , P.many, P.sepBy1, P.try, P.chainl, P.optional, P.manyTill
   , optionMaybe
   , eof
-  , getLoc
+  , getLoc, minBound
   , rewrite
   -- , toPos
   , lexeme, spaces
@@ -95,7 +95,7 @@ import qualified Parser.Compat as PC
 import qualified FrontEnd.Expr as Src
 
 import Language.Verse.Error qualified as E
-import Language.Verse.Loc (L (..), Loc(..), loc, mkL)
+import Language.Verse.Loc (L (..), Loc(..), loc, mkL, minBound)
 import Language.Verse.Label
 import Language.Verse.SimpleName
 import Language.Verse.Exp ( Exp
@@ -152,7 +152,7 @@ import Text.Parsec.Pos qualified as PPos
 import Text.Parsec.Prim qualified as PPrim
 import Text.Parsec.Combinator (optionMaybe,eof)
 
-import Prelude hiding (exp)
+import Prelude hiding (exp, minBound)
 
 -- Nice to have when debugging
 

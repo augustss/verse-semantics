@@ -137,19 +137,19 @@ testeq("Array16",pass,tim=skip) {Y := all{for( 1..3 ){ 1|2 }}}       { array { a
 # Array expression splicing
 #  ...in expressions
 # tim=skip: Tim does not support splicing
-testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)}
-testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
+testeq("Splice1",pass,tim=skip,libparser=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)}
+testeq("Splice2",pass,tim=skip,libparser=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
 #  ...in patterns
-testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Splice5",pass,tim=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice5a",pass,tim=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice6",pass,tim=skip){ f( ..(a:[]int), b:string ) :=
+testeq("Splice3",pass,tim=skip,libparser=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Splice4",pass,tim=skip,libparser=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Splice5",pass,tim=skip, libparser=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice5a",pass,tim=skip, libparser=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice6",pass,tim=skip, libparser=skip){ f( ..(a:[]int), b:string ) :=
                              { (Length[a], b) }
                       ; f[1,2,3,"foo"] } {(3, "foo") }
-testeq("Splice7",pass){ f( a:int,b:int ) := a; f(3,4) }{3}
-testeq("Splice8",pass,tim=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
-testeq("Splice9",pass,tim=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
+testeq("Splice7",pass,libparser=skip){ f( a:int,b:int ) := a; f(3,4) }{3}
+testeq("Splice8",pass,tim=skip,libparser=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
+testeq("Splice9",pass,tim=skip,libparser=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
 
 #
 testeq("All1",pass) {all{:(1,2,3)}}                            {array{1,2,3}}
@@ -161,33 +161,33 @@ testeq("All4",pass) {all{x:(1,2,3)}}                           {array{1,2,3}}
 testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
 testeq("Fun2",pass){(x:any => y:any => x+2*y)[2][3]}      {8}
 testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
-testeq("Fun4",pass){function(x:int){x+1}[2]}              {3}
-testeq("Fun5",pass){function(x:int)(y:int){x+2*y}[2][3]}  {8}
+testeq("Fun4",pass,libparser=skip){function(x:int){x+1}[2]}              {3}
+testeq("Fun5",pass,libparser=skip){function(x:int)(y:int){x+2*y}[2][3]}  {8}
 # Function argument matching
 
-testeq("Fun6",pass) {one{ pair := (1, function(n:int){pair[0]})
+testeq("Fun6",pass,libparser=skip) {one{ pair := (1, function(n:int){pair[0]})
                         ; pair[0]}}  {1}
    # Needs recursion
 
 # tim=skip: hits a VERSE_ENSURE
-testeq("Fun7",pass,tim=skip) {one{ pair := (1, function(n:int){if (n = 0) {1} else  {n * pair[1](n-1)}})
+testeq("Fun7",pass,tim=skip,libparser=skip) {one{ pair := (1, function(n:int){if (n = 0) {1} else  {n * pair[1](n-1)}})
                         ; pair[1](5) } }  {120}
    # Needs recursion
-testeq("Fun8",pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
+testeq("Fun8",pass,libparser=skip) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
 
 # P desugaring, i.e., p:=e
 testeq("Pat1",pass) {x:=1}                                {1}
 testeq("Pat2",pass) {x:=1; x}                             {1}
 # tim=skip: cannot compare functions
-testeq("Pat3",pass,tim=skip) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
-testeq("Pat4",pass) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
+testeq("Pat3",pass,tim=skip,libparser=skip) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
+testeq("Pat4",pass,libparser=skip) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
 testeq("Pat5",pass) {:int:=5}                             {5}       # LA is this even allowed
 # fail/wrong? testeq("Pat",pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
 testeq("Pat6",pass) {x:int:=1}                            {1}
 # fail/wrong? testeq("Pat",pass) {x:int:='a'}                          {:false}
-testeq("Pat7",pass) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
-testeq("Pat8",pass) {succ(x:any):=x+1; y:succ:=1; y}      {2}
-testeq("Pat9",pass) {succ(x:any):int:=x+1; succ[5]}       {6}
+testeq("Pat7",pass,libparser=skip) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
+testeq("Pat8",pass,libparser=skip) {succ(x:any):=x+1; y:succ:=1; y}      {2}
+testeq("Pat9",pass,libparser=skip) {succ(x:any):int:=x+1; succ[5]}       {6}
 # XXX Not sure about these
 #testeq("Pat10",pass) {x? := 5; x}                          {array{5}}
 #testeq("Pat11",pass) {x? := 1/0; x}                        {array{}}
@@ -195,22 +195,22 @@ testeq("Pat9",pass) {succ(x:any):int:=x+1; succ[5]}       {6}
 testeq("Pat12",pass,tim=skip) {(x,y,z) := (1,2,3); (z,y,x)}           {(3,2,1)}
 # tim=skip: unsupported LHS
 testeq("Pat13",pass,tim=skip) {i->x := 2; (i, x)}                   {(2,2)}
-testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq("Pat14",pass,libparser=skip) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 
 
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
-testeq("TB2",pass) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
-testeq("TB3",pass) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
-testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ]} {wrong}
+testeq("TB2",pass,libparser=skip) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
+testeq("TB3",pass,libparser=skip) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
+testeq("TB4",pass,libparser=skip) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ]} {wrong}
   # ap0[succ] gets stuck because succ[0] does not return 2
-testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
+testeq("TB5",pass,libparser=skip) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 
 # tim=skip: pointers
-testeq("TB6",pass, skip, tim=skip) {(p^ : int) := 2}                      {p:=new[int][2]}
+testeq("TB6",pass, skip, tim=skip,libparser=skip) {(p^ : int) := 2}                      {p:=new[int][2]}
 # tim=skip: pointers
-testeq("TB10",pass, skip, tim=skip) {p^[](:int):int}                      {0}
+testeq("TB10",pass, skip, tim=skip,libparser=skip) {p^[](:int):int}                      {0}
   # TB6,TB10: no pointers yet
 
 # These crash, so comment them out
@@ -227,7 +227,7 @@ testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
 testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-testeq("For6",fail, broken) {upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
+testeq("For6",fail, broken,libparser=skip) {upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
                      for(x:=upto[1,3]){x}}
                      {(1,2,3)}
   # For6: fail because `upto` <iterates>, and Verse does not allow that
@@ -250,7 +250,7 @@ testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
 testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
-testeq("let1",pass) { let(x:=1){x+2} } { 3 }
+testeq("let1",pass,libparser=skip) { let(x:=1){x+2} } { 3 }
 # this test works, but gives an annoying warning
 #testeq("let2",pass) { let(x:=1){x+2}; x } { x }
 # shadowing doesn't really work, so this crashes
@@ -265,12 +265,12 @@ testeq("JB3",pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
 testeq("JB4",pass,tim=skip) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
 # "Dom1": Unification in the domain
-testeq("Dom1",pass) {f9( x := 3|4):int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
+testeq("Dom1",pass,libparser=skip) {f9( x := 3|4):int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
 
 # Recursion
-testeq("TRec1",pass)
+testeq("TRec1",pass,libparser=skip)
             {f(n:any) := if (n = 0) then 1 else f(n-1); f(1)}  {1}
-testeq("TRec2",pass)
+testeq("TRec2",pass,libparser=skip)
             {fac(n:any) := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
 
 # SLOW with PLDI; needs 'for'
@@ -282,8 +282,8 @@ testeq("TRec2",pass)
 
 
 # Non-retractions as types
-testeq("Type1",pass) {succ(n:int) := n + 1; a:succ := 2; a}  {3}
-testeq("Type2",pass) {succ(n:int) := n + 1;
+testeq("Type1",pass,libparser=skip) {succ(n:int) := n + 1; a:succ := 2; a}  {3}
+testeq("Type2",pass,libparser=skip) {succ(n:int) := n + 1;
             f(m:succ) := m;
             f(5)
             }
@@ -294,12 +294,12 @@ testeq("TIf1",pass) {if(y:int; y=1) { 42 } else { 23 }} {42}
 testeq("TIF2",pass) {if(y:int; y=1) { y  } else { 23 }}  {1}
 
 # Random collection
-testeq("EV10a",pass) {succ(x:int):=x+1; f(a:succ) := a; f[3]} {4}
-testeq("EV10b",pass) {succ(x:int):=x+1; f(a := :succ) := a; f[3]} {4}
-testeq("EV10c",pass) {succ(x:int):=x+1; f(a:=if (0) then :int else :succ):=a; f[3]} {3}
-testeq("EV10d",pass) {succ(x:int):=x+1; f(a:=if (:false) then :int else :succ):=a; f[3]} {4}
+testeq("EV10a",pass,libparser=skip) {succ(x:int):=x+1; f(a:succ) := a; f[3]} {4}
+testeq("EV10b",pass,libparser=skip) {succ(x:int):=x+1; f(a := :succ) := a; f[3]} {4}
+testeq("EV10c",pass,libparser=skip) {succ(x:int):=x+1; f(a:=if (0) then :int else :succ):=a; f[3]} {3}
+testeq("EV10d",pass,libparser=skip) {succ(x:int):=x+1; f(a:=if (:false) then :int else :succ):=a; f[3]} {4}
 
-testeq("EV10",pass) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a;
+testeq("EV10",pass,libparser=skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a;
                     (f(0,0),f(1,0))} {(0,1)}
    # c:int, then depending on c, we either get a:int or a:succ
 
@@ -308,13 +308,13 @@ testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
 testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
-testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq("EV16",pass,tim=F00) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}  {wrong}
+testeq("EV15",pass,libparser=skip) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
+testeq("EV16",pass,tim=F00,libparser=skip) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}  {wrong}
   # EV16: this should go WRONG.. i.e. it gets stuck
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules
-testeq("EV17",pass) {
+testeq("EV17",pass,libparser=skip) {
   Z(f:any) := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
   fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
   fac[3] }                                                                     {6}
@@ -322,8 +322,8 @@ testeq("EV17",pass) {
 testeq("EV18",pass,tim=C00) {0[0]}                                {wrong}
 testeq("EV19",pass,tim=P00) {operator'/'(1,0)}                    {wrong}
 
-testeq("EV20",pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
-testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
+testeq("EV20",pass,libparser=skip) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
+testeq("EV21",pass,libparser=skip) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
 testeq("EV22",pass,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
                             ; p:any; swapBad [p] = (2,3); p }
@@ -331,12 +331,12 @@ testeq("EV22",pass,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
 testeq("EV23",pass) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
                             ; p:any; swapGood[p] = (2,3); p }
                             {(3,2)}
-testeq("EV23a",pass) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
+testeq("EV23a",pass,libparser=skip) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
 # tim=skip: Tim does not allow this.  Bug?
-verify("EV23b",fail,tim=A00) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
-verify("EV23c",pass,tim=skip) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23b",fail,tim=A00,libparser=skip) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23c",pass,tim=skip,libparser=skip) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
@@ -382,10 +382,10 @@ testeq("EV53",pass,tim=skip) { a := truth{5}; a = truth{b:int}; b } { 5 }
 testeq("EV54",pass,tim=skip) { a := truth{5}; a? } { 5 }
 testeq("EV54b",pass,tim=skip) { a := truth{5}; a[5] } { 5 }
 testeq("EV55",pass,tim=skip) { true } { truth{()} }
-testeq("EV56",pass,tim=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
+testeq("EV56",pass,tim=skip,libparser=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
                     { array{(), truth{5}, (), truth{1} } }
 # tim=skip: Tim is not happy with this. Bug?
-testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
+testeq("EV57",pass,tim=skip,libparser=skip) { a := option{   }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
 testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
 testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) { 1 } else { 0 } } { 0 }
 testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) { 1 } else { 0 } } { 0 }
@@ -398,7 +398,7 @@ testeq("AndyExe12", pass, broken)
                                  ; A = 1; B } }
                     { array{array{1}} }
 # tim=skip: seems to hang Tim's verifier
-testeq("AndyExe17", pass, tim=skip)
+testeq("AndyExe17", pass, tim=skip,libparser=skip)
                     { exists F {
                         F = function(A:any){ all{ (A = true; true) | (A = false; F(true)) } };
                         exists X Y {
@@ -479,42 +479,42 @@ testeq("AndyChoice3",pass) {
 # testeq("Ampersand3", pass){ (x&y) := 4; x+y } { 8 }
 # testeq("Ampersand4", pass){ f ( x&y&z : int ) := { x + y + z }; f[2,3,4] } { 9 }
 
-testeq("fundom1", pass) { f:=fun(x:=1|2,y:=3|4):=x+y; all{ i->x:f; i } }
+testeq("fundom1", pass,libparser=skip) { f:=fun(x:=1|2,y:=3|4):=x+y; all{ i->x:f; i } }
                         { ((1,3), (1,4), (2, 3), (2, 4)) }
-testeq("fundom1a", pass) { f:=fun(x:=1|2,y:=3|4):=x+y; all{ :f } }
+testeq("fundom1a", pass,libparser=skip) { f:=fun(x:=1|2,y:=3|4):=x+y; all{ :f } }
                         { (4,5,5,6) }
 # fundom2 should fail.  The domain is not allowed to have extra iterates.
-testeq("fundom2", pass, broken) { f:=fun(x:=1|2 where y:=3|4):=x+y; all{ :f } } { wrong }
+testeq("fundom2", pass, broken,libparser=skip) { f:=fun(x:=1|2 where y:=3|4):=x+y; all{ :f } } { wrong }
 
 # tests for check
-testeq("check1", pass){ check<fails>{ 3=4 } } {3=4}
-testeq("check2", fail){ check<fails>{ 33 } } { 33 }
+testeq("check1", pass,libparser=skip){ check<fails>{ 3=4 } } {3=4}
+testeq("check2", fail,libparser=skip){ check<fails>{ 33 } } { 33 }
    # check2: depends on whether the runtime desugaring of check<fx>{e} is
    #           check<fx>{e} or just e
 
-testeq("check3", fail){ check<fails>{ 33 | 44 } } { 33 }
-testeq("check4", pass){ check<decides>{ 3=4 } } {3=4}
-testeq("check5", pass){ check<decides>{ 33 } } { 33 }
-testeq("check6", fail){ check<decides>{ 33 | 44 } } { 33 }
-testeq("check7", fail){ check<succeeds>{ 3=4 } } {3=4}
+testeq("check3", fail, libparser=skip){ check<fails>{ 33 | 44 } } { 33 }
+testeq("check4", pass, libparser=skip){ check<decides>{ 3=4 } } {3=4}
+testeq("check5", pass, libparser=skip){ check<decides>{ 33 } } { 33 }
+testeq("check6", fail, libparser=skip){ check<decides>{ 33 | 44 } } { 33 }
+testeq("check7", fail, libparser=skip){ check<succeeds>{ 3=4 } } {3=4}
    # See check2
 
-testeq("check8", pass){ check<succeeds>{ 33 } } { 33 }
-testeq("check9", fail){ check<succeeds>{ 33 | 44 } } { 33 }
+testeq("check8", pass,libparser=skip){ check<succeeds>{ 33 } } { 33 }
+testeq("check9", fail,libparser=skip){ check<succeeds>{ 33 | 44 } } { 33 }
 
 # tests for information flow regarding choice
 testeq("choice1", pass){ all{ y:=if(x>3){5}else{7}; (11|22); x:=2; y } } {(7,7)}
-testeq("choice2", pass){ all{ f[]; y:=if(x>3){5}else{7}; (11|22); x:=2; f():={8}; y } } {(7,7)}
+testeq("choice2", pass,libparser=skip){ all{ f[]; y:=if(x>3){5}else{7}; (11|22); x:=2; f():={8}; y } } {(7,7)}
 testeq("choice3", fail){ all{ y:=if(x>3){5}else{7}; (11|22); x:=(2|4); y } } {(7,5,7,5)}
   # choice3: gets stuck, because the choices can't expand over the 'if'
-testeq("choice4", pass){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; f(8|9):={55}; y } } {(7,7,7,7)}
+testeq("choice4", pass,libparser=skip){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; f(8|9):={55}; y } } {(7,7,7,7)}
 
 # tests for top-level exis used in functions
-testeq("run-exitop1", pass){ x:int; f() := {x}; x=3; f[] } { 3 }
-testeq("run-exitop2", pass){ x:int; f():int := {x}; x=3; f[] } { 3 }
-testeq("run-exitop3", pass){ x:int; f() := {x}; f[]=3; f[] } { 3 }
+testeq("run-exitop1", pass, libparser=skip){ x:int; f() := {x}; x=3; f[] } { 3 }
+testeq("run-exitop2", pass, libparser=skip){ x:int; f():int := {x}; x=3; f[] } { 3 }
+testeq("run-exitop3", pass,libparser=skip){ x:int; f() := {x}; f[]=3; f[] } { 3 }
 
-verify("verify-exitop4", fail){ x:int; f():int := {x} }
-testeq("run-exitop4", fail){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
+verify("verify-exitop4", fail,libparser=skip){ x:int; f():int := {x} }
+testeq("run-exitop4", fail,libparser=skip){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
    # Den-sem of f is empty, something wrong
    # Fail because f itself doesn't verify

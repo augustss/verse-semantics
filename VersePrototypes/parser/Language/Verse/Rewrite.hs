@@ -307,6 +307,8 @@ rewriteExp e = for e $ \ case
               new = mkL (loc e) $ Parse.List inner
           res <- rewrite new
           return $ extract res
+        -- TODO: see #86
+        s -> notImplemented "rewriteExp" s
   Parse.Lam e1 e2 -> do
     e1 <- rewriteExp e1
     e2 <- rewriteExp e2
