@@ -81,13 +81,13 @@ module Parser.Verse
   , pString
   , pStringLit
   , pIf
-  , P.many, P.sepBy1, P.try, P.chainl, P.optional, P.manyTill
+  , P.many, P.sepBy1, P.try, P.chainl, P.optional, P.manyTill, P.anyChar, P.between
   , optionMaybe
-  , eof
+  , eof, match
   , getLoc, minBound
   , rewrite
   -- , toPos
-  , lexeme, spaces
+  , lexeme, spaces, P.choice, anySingleBut, single
   ) where
 
 import qualified Parser.Compat as PC
@@ -1409,6 +1409,9 @@ pKeyword kwd = P.try $ do
 match :: Char -> Parser (L String)
 match c = wrapLoc <$> pos <*> ([c] <$ byte (c2w c)) <*> pos
 
+single :: Char -> Parser Word8
+single = char
+
 char :: Char -> Parser Word8
 char c = byte (c2w c) <?> show c
 
@@ -1536,6 +1539,9 @@ satisfy :: (Word8 -> Bool) -> Parser Word8
 satisfy f   = tokenPrim (\c -> showW8s [c])
                         (\pos c _cs -> updatePosWord pos c)
                         (\w -> if f w then Just w else Nothing)
+
+anySingleBut :: Char -> Parser Char
+anySingleBut c = w2c <$> satisfy ((c2w c) /= )
 
 string :: String -> Parser (L String)
 string s = P.try $ wrapLoc <$> pos <*> (s <$ tokens showW8s updatePosWords (map c2w s)) <*> pos
