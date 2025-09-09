@@ -84,8 +84,10 @@ $$
     & \semess{E}{u}{v}{|t|} & : & \SL{\ENV} \\
 
 % Wildcards and atoms
-\rulename{swild} &  \semess{E}{u}{v}{|_|} & = & \pureSL \conBrack{u =v} \\
-\rulename{satom} &  \semess{E}{u}{v}{|a|} & = & \pureSL \conBrack{u=v=a} \\
+\rulename{swild}  &  \semess{E}{u}{v}{|_|} & = & \pureSL \conBrack{u =v} \\
+\rulename{svar}   &  \semess{E}{u}{v}{|x|} & = & \pureSL \conBrack{u=v=x} \\
+\rulename{sconst} &  \semess{E}{u}{v}{|k|} & = & \pureSL \conBrack{u=v=k} \\
+\rulename{sprim}  &  \semess{E}{u}{v}{|o|} & = & \pureSL \conBrack{u=v=o} \\
 
 % Capture input and output
 \rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \seqSLOne \semess{E}{u}{v}{t} \\

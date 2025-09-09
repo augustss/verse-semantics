@@ -45,8 +45,8 @@
 %format nofail = "\textbf{nofail}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
-%format closed = "\textbf{c}"
-%format open = "\textbf{o}"
+%format closed = "\textbf{closed}"
+%format open = "\textbf{open}"
 %format openeff = "\textbf{open}"
 %format closedeff = "\textbf{closed}"
 %format diverges = "\textbf{diverges}"
@@ -400,8 +400,8 @@
 %format funk k (e) (rhs) = functionKW "_"k"(" e ")\{" rhs "\}"
 
 %% functionOC has open/closed subscript
-%format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
-%format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")\langle" fx "\rangle\{" rhs "\}"
+%format functionOC (oc) (x) (rhs) = functionKW "(" x ")\langle" oc "\rangle \{" rhs "\}"
+%format functionOCX (oc) (x) (fx) (rhs) = functionKW "(" x ")\langle" oc "\rangle\langle" fx "\rangle\{" rhs "\}"
 %format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
 %format lamOCv (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".\begin{array}[t]{@{}l} (" t1 ") \\ \{" t2 "\} \end{array}"
 
@@ -855,7 +855,7 @@
 %format forall (x) (y) = "\forall" x ".\," y
 
 %% Effects checking, like succeeds{e}
-%format checkKW = "{\bf chk}"
+%format checkKW = "{\bf check}"
 %format (check (r) (b)) = checkKW "\langle" r "\rangle\{" b "\}"
 %format rcheckKW = "{\bf rchk}"
 %format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"

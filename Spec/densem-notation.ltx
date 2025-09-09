@@ -81,15 +81,15 @@ $$
 \\
 \textbf{The constraint language}\\
 \begin{array}{l@@{\;\;}rc@@{\;\;}ll}
-  \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o| \vb |arr (a_0, xdots, a_n)| \vb |truth a|
-    & \text{Can add strings, floats...} \\
-  \text{Constraints} &  \EV & ::= & \conBrack{a_1 = a_2} \\
-  & & \vb & \conBrack{op[a_1,\mydots,a_n]} \\
+  \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o|  \vb op[a_1,\mydots,a_n] \\
+  & & \vb & |arr (a_0, xdots, a_n)| \vb |truth a|\\
+  \text{Constraints} &  \EV & ::= & \conBrack{relop[a_1,\mydots,a_n]} \\
   &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
   &  & \vb & \conEmpty \vb \conUniv \vb \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
   &  & \vb & \conCompl(\EV)  & \text{Complement} \\
   &  & \vb & \HIDE{\EV}{xs} & \text{Hiding} \\
-\text{Operators}&  op & ::= & < \vb \leq \vb \geq \vb > \vb + \vb - \vb * \vb / \vb
+  \text{Relational ops} &  relop & ::= & = \vb < \vb \leq \vb \geq \vb > \\
+  \text{Value ops} & op & ::= & + \vb - \vb * \vb / \\
 \end{array}\\
 \\[-1mm]
 \textbf{Interpretation of simple values and constraints}\\
@@ -102,7 +102,8 @@ $$
   \sembrack{\EV_1 \cup \EV_2} & = & \sembrack{\EV_1} \cup \sembrack{\EV_2} \\
   \sembrack{\EV_1 \cap \EV_2} & = & \sembrack{\EV_1} \cap \sembrack{\EV_2} \\
   \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
-  \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \} \\
+  \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \}
+      \hspace{4mm} \text{...and similarly other $relops$} \\
   \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}{n}}}
   & = & \multicolumn{2}{@@{}l}
            {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun[h_1,\mydots,h_n],
@@ -111,6 +112,8 @@ $$
 \semapp{A}{|x|}\rho & = & \rho(x) \\
 \semapp{A}{|k|}\rho & = & k \\
 \semapp{A}{|o|}\rho & = & \semap{O}{o} \\
+\semapp{A}{|a_1 + a_2|}\rho & = & \semapp{A}{a_1}\rho + \semapp{A}{a_2}\rho
+    \hspace{4mm} \text{...and similarly other $ops$} \\
 \semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
 \semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
 \semap{O}{|o|} & : & \Val \\
