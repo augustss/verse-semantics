@@ -11,12 +11,15 @@ import Core.Verifier as Verifier
 import Core.Traced   as Core
 
 import FrontEnd.CopyHook
-import FrontEnd.Flags( Flags(..), defaultFlags )
-import FrontEnd.Expr as Src
 import FrontEnd.Desugar
+import FrontEnd.Expr as Src
+import FrontEnd.Flags( Flags(..), defaultFlags )
 import FrontEnd.ToCore
-import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( findPrelude )
+
+-- TODO: See #66: For now we live with two parsers.
+import qualified FrontEnd.Parse as FP
+import qualified Parser.Verse   as LP
 --import FrontEnd.Error
 
 -- verse-densem
@@ -47,6 +50,7 @@ import qualified Options.Applicative as OA
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Char (isSpace, isAlphaNum)
+import qualified Data.ByteString.Char8 as B
 
 --------------------------------------------------------
 --
@@ -304,6 +308,11 @@ flagTable =
   [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
   ,("trace-eval",  (fTraceEval,    \ b s -> s{fTraceEval=b}))
   ,("ds-uniform",  (fDsUniform,    \ b s -> s{fDsUniform=b}))
+  -- TODO: See #66: The repl is equipped with two parsers until the verse-parser
+  -- is at feature parity to FrontEnd.Parser. The default parser is
+  -- FrontEnd.Parse. Use ':set use-lib-parser' to enable verse-parser
+  -- interactively at the repl.
+  ,("use-lib-parser", (fUseLibParser, \ b s -> s{fUseLibParser=b}))
 --  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
 --  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
 --  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
@@ -326,7 +335,8 @@ cRead afn s = do
       s' = s{ cs_lastFile = Just fn }
   tryIt (\_exc -> pure s') (updateLastExpr s') $ do
     file <- readFile fn
-    let prog = parseDie pFile fn file
+    let prog | fUseLibParser $ cs_flags s = LP.parseToSrcExpr fn (B.pack file)
+             | otherwise                  = FP.parseDie       FP.pFile fn file
     when (prog == prog) $
       putStrLn "OK"
     pure prog
@@ -336,7 +346,9 @@ cParseLine :: CmdRunner CState
 cParseLine line' s
   = tryIt (\_exc -> pure s) (updateLastExpr s) $ do
     let !line = substitute (cs_variables s) line'
-        !prog = parseDie pFile "<interactive>" line
+        !use_lib_parser = fUseLibParser $ cs_flags s
+        !prog | use_lib_parser = LP.parseToSrcExpr "<interactive>" (B.pack line)
+              | otherwise      = FP.parseDie FP.pFile "<interactive>" line
     pure prog
 
 variableSigil :: Char

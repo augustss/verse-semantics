@@ -37,6 +37,7 @@ executable verse-repl
     build-depends:    verse-libs,
                       verse-densem,
                       verse-plancc,
+                      verse-parser,
                       haskeline,
                       optparse-applicative,
 
