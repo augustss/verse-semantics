@@ -6,8 +6,15 @@
 -- Maintainer: jeffrey.young@epicgames.com
 -- Stability : experimental
 --
--- TODO:
+-- This module provides a naive implementation of a PomSet: a partially ordered
+-- multiset. See the PLS lab page: https://www.pls-lab.org/en/pomset and the
+-- original plotkin paper:
+-- https://homepages.inf.ed.ac.uk/gdp/publications/Teams.pdf
 --
+-- TODO:
+-- - add appendUnordered and append
+-- - add and test the ordering property to TestSuite.Epic.PomSet
+-- - refine Eq instance to not be structural equality
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE ViewPatterns  #-}
@@ -34,7 +41,7 @@ import Data.Monoid
 
 -- Invariants:
 -- Union is commutative
--- Empty is unit
+-- Empty is unit value
 -- order is preserved in +++
 
 -- Pom is value and spine strict
@@ -58,7 +65,7 @@ instance Show a => Show (Pom a) where
 infixl 5 |||
 infixl 6 +++
 
--- Jeff: these mimic the fixity of (:), no idea if that's right
+-- Jeff: these mimic the fixity of (:)
 infixr 5 +:+
 infixr 5 |:|
 
@@ -74,12 +81,6 @@ unit = Unit
 (|||) Empty r     = r
 (|||) l     Empty = l
 (|||) l     r     = PomUnion l r
-
-(+:+) :: a -> Pom a -> Pom a
-(+:+) x xs = unit x +++ xs
-
-(|:|) :: a -> Pom a -> Pom a
-(|:|) x xs = unit x ||| xs
 
 distribute :: Pom a -> Pom a
 distribute (PomAppend (PomUnion a b) c) = (a +++ c) ||| (b +++ c) -- case 1
@@ -121,10 +122,6 @@ isEmpty :: Pom a -> Bool
 isEmpty Empty = True
 isEmpty _     = False
 
--- (-255 +++ (-255 +++ ((-255 +++ (-255 +++ -255)) ∪ (-255 +++ (-255 +++ -255)))))
--- ((-255 +++ ((-255 +++ ((-255 +++ -255) ∪ (-255 +++ -255))) ∪ (-255 +++ -255))) ∪ (-255 +++ -255))
-
-
 isNormalForm :: Pom a -> Bool
 isNormalForm l = isEmpty l || getAll (go False l)
   where
@@ -141,7 +138,6 @@ instance Applicative Pom where
   pure = unit
   {-# INLINE (<*>) #-}
   (<*>) = ap -- TODO: get a better definition
-
 
 instance Monad Pom where
   return = pure
