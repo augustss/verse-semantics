@@ -13,6 +13,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# OPTIONS_GHC -Wall -Werror  #-}
 
 module TestSuite.Epic.PomSet
   ( properties
@@ -21,7 +22,7 @@ module TestSuite.Epic.PomSet
 import Epic.PomSet
 
 import Test.Tasty
-import Test.Tasty.Falsify (testProperty, Gen, testFailed, assert)
+import Test.Tasty.Falsify (testProperty, Gen, assert)
 
 import Test.Falsify.Property            (Property, gen)
 import qualified Test.Falsify.Predicate as P
@@ -29,7 +30,6 @@ import qualified Test.Falsify.Generator as Gen
 -- import Test.Falsify.Range               (Range)
 import qualified Test.Falsify.Range     as Range
 
-import Control.Monad
 import qualified Data.List.NonEmpty as NE
 --------------------------------------------------------------------------------
 --
@@ -50,21 +50,26 @@ properties = testGroup "PomSet"
   , testProperty "||| is commutative" union_commut
   , testProperty "||| is associative" union_assoc
   , testProperty "id = factor . distribute" factor_is_distrib_inverse
+  , testProperty "all pomsets can be normalized" all_pomsets_normalize
   ]
 
 append_left_unit :: Property ()
 append_left_unit = do
   ps <- gen pom
   r  <- gen $ genEmpty
-  unless ((r +++ ps) == ps)
-    $ testFailed "left unit"
+  assert $
+    P.eq
+    P..$ ("lhs", r +++ ps)
+    P..$ ("rhs", ps)
 
 append_right_unit :: Property ()
 append_right_unit = do
   ps <- gen pom
   r  <- gen $ genEmpty
-  unless ((ps +++ r) == ps)
-    $ testFailed "right unit"
+  assert $
+    P.eq
+    P..$ ("lhs", ps +++ r)
+    P..$ ("rhs", ps)
 
 append_assoc :: Property ()
 append_assoc = do
@@ -105,6 +110,13 @@ factor_is_distrib_inverse = do
     P..$ ("lhs", ((a ||| b) +++ c))
     P..$ ("rhs", factor $ distribute ((a ||| b) +++ c))
 
+all_pomsets_normalize :: Property ()
+all_pomsets_normalize = do
+  x <- gen pom
+  assert $
+    P.satisfies ("normalize", isNormalForm . normalize)
+    P..$ ("x", normalize x)
+
 genEmpty :: Gen (Pom a)
 genEmpty = pure Empty
 
@@ -118,7 +130,6 @@ pomSet :: (Word, Word) -> Gen a -> Gen (Pom a)
 pomSet size genElem = do
   depth <- Gen.inRange (Range.between size)
   let genUnit  = Unit <$> genElem
-      genEmpty = pure Empty
       composite n = Gen.oneof
         $ NE.fromList [ genUnit
                       , genEmpty

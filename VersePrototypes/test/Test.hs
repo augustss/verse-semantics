@@ -25,6 +25,7 @@ import qualified TestSuite.Epic.PomSet
 main :: IO ()
 main = do
   setEnv "TASTY_COLOR" "ALWAYS"
+  setEnv "TASTY_FALSIFY_TESTS" "1000"
   defaultMain tests
 
 tests :: TestTree
