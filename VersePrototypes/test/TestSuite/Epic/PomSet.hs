@@ -51,6 +51,7 @@ properties = testGroup "PomSet"
   , testProperty "||| is associative" union_assoc
   , testProperty "id = factor . distribute" factor_is_distrib_inverse
   , testProperty "all pomsets can be normalized" all_pomsets_normalize
+  , testProperty "membership preserved under normalization" membership
   ]
 
 append_left_unit :: Property ()
@@ -115,7 +116,19 @@ all_pomsets_normalize = do
   x <- gen pom
   assert $
     P.satisfies ("normalize", isNormalForm . normalize)
-    P..$ ("x", normalize x)
+    P..$ ("x", x)
+
+membership :: Property ()
+membership = do
+  x  <- gen genInt
+  xs <- gen pom
+  assert $
+    P.relatedBy ( "x \x2208 unit x +++ xs"
+                , \a as -> a `member` (a +:+ as)
+                )
+    P..$ ("x",  x)
+    P..$ ("xs", xs)
+
 
 genEmpty :: Gen (Pom a)
 genEmpty = pure Empty
@@ -123,19 +136,23 @@ genEmpty = pure Empty
 genInt :: Gen Int
 genInt = Gen.inRange (Range.between (-0xFF,0xFF))
 
+genUnit :: Gen a -> Gen (Pom a)
+genUnit = fmap Unit
+
 pom :: Gen (Pom Int)
 pom = pomSet (0, 512) genInt
 
 pomSet :: (Word, Word) -> Gen a -> Gen (Pom a)
 pomSet size genElem = do
   depth <- Gen.inRange (Range.between size)
-  let genUnit  = Unit <$> genElem
+  let
+      genUnit' = genUnit genElem
       composite n = Gen.oneof
-        $ NE.fromList [ genUnit
+        $ NE.fromList [ genUnit genElem
                       , genEmpty
                       , PomAppend <$> go (n-1) <*> go (n-1)
                       , PomUnion  <$> go (n-1) <*> go (n-1)
                       ]
       go 0 = genEmpty
-      go n = Gen.choose genUnit (composite n)
+      go n = Gen.choose genUnit' (composite n)
   go depth

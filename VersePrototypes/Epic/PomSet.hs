@@ -27,6 +27,7 @@ module Epic.PomSet
   , toList, fromList, fromListUnordered, unit
   , normalize, isNormalForm
   , Pom(..)
+  , member
   ) where
 
 import Control.Monad (ap)
@@ -81,6 +82,12 @@ unit = Unit
 (|||) Empty r     = r
 (|||) l     Empty = l
 (|||) l     r     = PomUnion l r
+
+(+:+) :: a -> Pom a -> Pom a
+(+:+) a = (unit a +++)
+
+(|:|) :: a -> Pom a -> Pom a
+(|:|) a = (unit a |||)
 
 distribute :: Pom a -> Pom a
 distribute (PomAppend (PomUnion a b) c) = (a +++ c) ||| (b +++ c) -- case 1
@@ -146,6 +153,12 @@ instance Monad Pom where
   (Unit a) >>= h        = h a
   (PomAppend l r) >>= h = (l >>= h) +++ (r >>= h)
   (PomUnion  l r) >>= h = (l >>= h) ||| (r >>= h)
+
+anyPomSet :: (a -> Bool) -> Pom a -> Bool
+anyPomSet p = getAny . foldMap (Any . p)
+
+member :: Eq a => a -> Pom a -> Bool
+member e = anyPomSet (== e)
 
 fromListUnordered :: [a] -> Pom a
 fromListUnordered [] = Empty
