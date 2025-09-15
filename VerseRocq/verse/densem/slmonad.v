@@ -43,7 +43,6 @@ Ltac bind_equal w :=
   end.
 
 
-
 (* some list properties. *)
 Lemma fold_right_map {A B C} (f : A -> C) g (b : B) (z : list A) :
   List.fold_right g b (List.map f z) = List.fold_right (fun x => g (f x)) b z.
@@ -53,10 +52,8 @@ Lemma flat_map_cons {A B} (f : A -> list B) (x : A) xs :
 Proof. rewrite <- flat_map_app. cbn. done. Qed.
 
 
-
-
-
 (** ------- operations on sets of lists ------ *)
+
 
 (* The set of all first elements from a list. *)
 (*   {{ v | (v :: _) <- V }}   *)
@@ -147,8 +144,6 @@ Definition Bind {A B} : P (list A) -> (A -> P (list B)) -> P (list B) :=
     s ⭅ S ;;
     ConcatPick (List.map K s).
 
-
-
 Definition liftA2 {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list C) := 
   fun op E1 E2 => 
     s1 ⭅ E1 ;;
@@ -156,6 +151,21 @@ Definition liftA2 {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list
       Δ <- s1 ;;
       [ Map (op Δ) E2 ] in
     ConcatPick t.
+
+
+(* ---------------------------------------------------------- *)
+
+Module Notation.
+Infix "++" := Append.
+Notation "∅" := Nil.
+Notation "⌊ x ⌋" := (Pure x).
+Infix "★" := (liftA2 Ensembles.Intersection) (at level 70).
+Infix ">>=" := Bind (at level 70).
+End Notation.
+
+Import Notation.
+
+
 
 
 Definition liftA2' {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (list C) := 
@@ -168,17 +178,16 @@ Definition liftA2' {A B C} : (A -> B -> C) -> P (list A) -> P (list B) -> P (lis
 
 (* --------------- Append/Concat Properties ------------------- *)
 
-
-Lemma Append_Nil_l {A} (XS : P (list A)) : Append Nil XS = XS.
+Lemma Append_Nil_l {A} (XS : P (list A)) : ∅ ++ XS = XS.
 Proof. unfold Nil, Append. set_simpl. done. Qed.
-Lemma Append_Nil_r {A} (XS : P (list A)) : Append XS Nil = XS.
+Lemma Append_Nil_r {A} (XS : P (list A)) : XS ++ ∅ = XS.
 Proof.
 unfold Nil, Append. 
 bind_equal z.
 eapply List.app_nil_r.
 Qed.
 Lemma Append_Append {A} (XS YS ZS : P (list A)) : 
-  Append (Append XS YS) ZS = Append XS (Append YS ZS).
+  (XS ++ YS) ++ ZS = XS ++ (YS ++ ZS).
 Proof.
   unfold Append.
   set_simpl.
@@ -189,7 +198,7 @@ Proof.
   done.
 Qed.
 
-Lemma Concat_Nil {A} : Concat (Nil : P (list (list A))) = Nil.
+Lemma Concat_Nil {A} : Concat (∅ : P (list (list A))) = ∅.
 Proof. unfold Concat, Nil. set_simpl. reflexivity. Qed.
 Lemma Concat_Cons {A} (x:P (list A)) xs : Concat (Cons x xs) = Append x (Concat xs).
 Proof. unfold Concat, Cons, Append. 
@@ -265,9 +274,8 @@ Proof.
   done.
 Qed.
 
-
-
 (* ------ set bind Cons/Append ---------------- *)
+
 
 Lemma Set_Bind_Cons {A B} (l1 : P (list A)) (l2 : P B) (k : list A -> P (list B)) :
  x1 ⭅ l1;; Cons l2 (k x1) =  Cons l2 (x1 ⭅ l1;; k x1).
@@ -387,7 +395,7 @@ Proof. unfold Map.
   done.
 Qed.
 
-(** ---------------- *)
+(** ---------Applicative laws ------- *)
 
 Definition comp {A B C}  (f : B -> C) (g : A -> B) := fun x => f ( g x).
 
@@ -539,12 +547,156 @@ rewrite (Set_Bind_Append l2 (f x0) (fun x1 => ConcatPick (f <$> x1))).
 done.
 Qed.
 
+
+
+
+(* -------------------------------------------------------------------- *)
+
+Section Axioms.
+
+Variable (A : Type).
+
+(* Already exists above *)
 (*
-Lemma foo {A} 
-  (L1 : P (list A))
-  (L2 : P (list (list A)) :
-   s ⭅ Append L1 (Concat L2);; K s = Cons (s ⭅ L1;; Concat (K s)) (s ⭅ Concat L2;; K s).
-  *)
+Lemma Append_Nil_l (S : P (list A)) : ∅ ++ S = S.
+unfold Nil, Append. set_simpl. done. Qed.
+Lemma Append_Nil_r (S : P (list A)) : S ++ ∅ = S.
+unfold Nil, Append. 
+rewrite <- (@Sets.bind_singleton_r _ S) at 2.
+f_equal. extensionality y1.
+set_simpl.
+eapply List.app_nil_r.
+Qed.
+
+Lemma Append_Append (S T R : P (list A)) : 
+  (S ++ T) ++ R = S ++ (T ++ R).
+Proof.
+  unfold Append.
+  set_simpl.
+  f_equal. extensionality x0.
+  set_simpl.
+  f_equal. extensionality x1.
+  set_simpl.
+  rewrite <- Sets.bind_singleton_map.
+  f_equal. extensionality x2.
+  set_simpl.
+  rewrite app_assoc.
+  done.
+Qed.
+*)
+Lemma Nil_Union_l (S : P (list A)) : ∅ ∪ S = S.
+Proof. set_simpl. done. Qed.
+Lemma Nil_Union_r (S : P (list A)) : S ∪ ∅ = S.
+Proof. set_simpl. done. Qed.
+
+Lemma Union_commutes (S T : P (list A)) : S ∪ T = T ∪ S.
+Proof.
+  set_ext x. split.
+  intros h. inv h. right; auto. left; auto.
+  intros h. inv h. right; auto. left; auto.
+Qed.
+
+Lemma Union_assoc (S T R : P (list A)) : (S ∪ T) ∪ R =  S ∪ (T ∪ R). Proof. eapply union_assoc. Qed.
+
+Lemma distrib_l (R S T : P (list A)) : (S ∪ T) ++ R = (S ++ R) ∪ (T ++ R).
+Proof.
+  unfold Append.
+  rewrite <- Sets.bind_union.
+  done.
+Qed.
+
+Lemma distrib_r (R S T : P (list A)) : S ++ (T ∪ R) = (S ++ T) ∪ (S ++ R).
+Proof.
+  unfold Append.
+  set_ext x.
+  repeat rewrite in_bind.
+  split.
+  - intros h. set_crunch. inv H0. left. 
+    rewrite in_bind. exists x0. split. auto. 
+    rewrite in_bind. exists x1. split. auto.
+    eapply in_singleton.
+    right; rewrite in_bind. exists x0. split; auto.
+    rewrite in_bind. exists x1. split; eauto. eapply in_singleton.
+  - intros h. inv h. set_crunch.
+    exists x0. split. auto. 
+    rewrite in_bind. exists x1. split. left. auto.
+    eapply in_singleton.
+    set_crunch.
+    exists x0. split; auto.
+    rewrite in_bind. exists x1. split. right. eauto. eapply in_singleton.   
+Qed.
+
+End Axioms.
+
+Section Canonicalisation.
+
+(* This isn't really possible to express without having a deep 
+embedding of the pomset operators. *)
+
+Create HintDb canon.
+Hint Rewrite Nil_Union_l distrib_l Union_assoc : canon.
+
+End Canonicalisation.
+
+Section Sequencing.
+
+Variable A:Type.
+
+Variable S T : P (list (P A)).
+
+End Sequencing.
+
+
+Lemma bind_ret_l {A B} (x : A) (k : A -> P (list B))  : 
+  bind_sl (pure_sl x) k = k x.
+Proof.
+  unfold pure_sl, bind_sl.
+  set_simpl.
+  cbn.
+  replace (v0 ⭅ k x;; vs ⭅ ⌈ [] ⌉;; ⌈ v0 :: vs ⌉) with (v0 ⭅ k x;; ⌈ v0 :: [] ⌉).
+  set_simpl.
+  cbn.
+  replace (fun x0 => x0 ++ []) with (fun (x0 : list B) => x0).
+  set_simpl.
+  done.
+  extensionality y. rewrite List.app_nil_r. done.
+  f_equal.
+  extensionality v0.
+  set_simpl.
+  done.
+Qed.
+
+Lemma pick_pure {A} (s : list A) : 
+  pick (pure_sl <$> s) =  ⌈ List.map (fun x => [x]) s ⌉.
+Proof.
+  induction s.
+  - cbn. done.
+  - cbn. set_simpl. rewrite IHs.
+    unfold pure_sl.
+    set_simpl.
+    done.
+Qed.
+
+Lemma bind_ret_r {A} (m : P (list A))  : 
+  bind_sl m pure_sl = m.
+Proof.
+  unfold bind_sl.
+  replace (s ⭅ m;; ss ⭅ pick (pure_sl <$> s) ;;  ⌈ concat ss ⌉) with 
+          (s ⭅ m;; ss ⭅ ⌈ List.map (fun x => [x]) s ⌉ ;;  ⌈ concat ss ⌉).
+  replace (s ⭅ m;; ss ⭅ ⌈ List.map (fun x => [x]) s ⌉ ;;  ⌈ concat ss ⌉) with
+          (s ⭅ m;; ⌈ concat (List.map (fun x => [x]) s) ⌉).
+  set_simpl.
+  replace (fun x0 : list A => concat ((fun x1 : A => [x1]) <$> x0)) with (fun (x0 : list A) => x0).
+  set_simpl.
+  done.
+  - extensionality x0. rewrite <- flat_map_concat_map. list_simpl. done.
+  - f_equal. extensionality s. set_simpl. done.
+  - f_equal. extensionality s. set_simpl.
+    rewrite pick_pure.
+    set_simpl.
+    done.
+Qed.
+
 
 Lemma Sets_bind_commute { A B C } (S1 : P A) (S2 : P B) (K : A -> B -> P C) :
 (x ⭅ S1 ;; y ⭅ S2 ;; K x y = y ⭅ S2 ;; x ⭅ S1 ;; K x y).
@@ -559,65 +711,6 @@ Proof.
     exists c1. split; auto. unfold Ensembles.In. exists c0. split; auto.
 Qed.
 
-Lemma helper {A B C} 
-  (f : A -> P (list B))
-  (z : list A) 
-  (K : list B -> P (list (list C))) 
-  (P1 : K [] = Nil)
-  (P2 : forall (x2 x3 : (list B)), 
-      K (x2 ++ x3) = x ⭅ K x2;; y2 ⭅ K x3;; ⌈ concat x :: y2 ⌉) :
-
-  s ⭅ Concat (pick (f <$> z));; K s = 
-  pick ((fun x => s ⭅ f x;; Concat (K s)) <$> z).
-Proof.
-  induction z.
-  - cbn. unfold Concat, Nil. set_simpl. rewrite concat_nil. apply P1.
-  - cbn.
-    rewrite Concat_Cons.
-    rewrite <- IHz.
-    remember (pick (f <$> z)) as L2.
-    remember (f a) as L1.
-
-    rewrite <- Concat_Cons.
-    rewrite <- Set_Bind_Cons.
-    unfold Concat , Cons.
-    set_simpl. 
-
-    replace (x ⭅ L1;; x0 ⭅ (y2 ⭅ L2;; ⌈ x :: y2 ⌉);; s ⭅ ⌈ concat x0 ⌉;; K s) with 
-            (x ⭅ L1;; y2 ⭅ L2;; x0 ⭅ ⌈ x :: y2 ⌉;; K (concat x0)). 
-    2: { bind_equal x. bind_equal y2. done. }
-
-    rewrite Sets_bind_commute.
-    bind_equal x1.
-    bind_equal x2.
-    replace (x ⭅ K x2;; y1 ⭅ ⌈ concat x ⌉;; y2 ⭅ K (concat x1);; ⌈ y1 :: y2 ⌉) with 
-            (x ⭅ K x2;; y2 ⭅ K (concat x1);; ⌈ concat x :: y2 ⌉ ).
-    2: { bind_equal x. done. }
-    eapply P2.
-Qed.
-
-Lemma bind_bind: forall {A B C : Type} {ma : P (list A)} {f : A -> P (list B)} {g : B -> P (list C)}, 
-   Bind (Bind ma f) g = Bind ma (fun x => Bind (f x) g).
-Proof.
-  intros.
-  unfold Bind.
-  set_simpl.
-  bind_equal z.
-(*  rewrite (Set_Bind_Concat _ (fun s => (pick (g <$> s)))).
-  f_equal.
-  eapply helper.
-  - cbn. done.
-  - intros x2 x3.
-    rewrite map_app.
-    rewrite pick_app.
-    unfold Append.
-    bind_equal y1.
-    f_equal. *)
-    (* here the goal is (append y1) = (cons (concat y1)) 
-       which doesn't seem provable. I guess the assumption in the
-       helper lemma is too strong.
-     *)
-Abort.
 
 Module Examples.
 
