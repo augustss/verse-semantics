@@ -242,6 +242,7 @@ library verse-libs
                       Epic.Repl
                       Epic.OpParser
                       Epic.List
+                      Epic.PomSet
                       Epic.UnionFind
                       Epic.BellmanFord
                       FrontEnd.CopyHook
@@ -260,6 +261,7 @@ library verse-libs
                       Core.Blocked
                       Core.Traced
                       Core.Verifier
+
 
 --                      Epic.Applicative
 --                      Epic.Lens
@@ -311,6 +313,28 @@ library verse-libs
                       scientific,
                       transformers
 
+test-suite verse-libs-test
+    import:           general-libs
+    hs-source-dirs:   test
+    type: exitcode-stdio-1.0
+    main-is:          Test.hs
+    default-language: GHC2021
+    ghc-options:      -Wall -Wno-name-shadowing
+
+    other-modules: Paths_VersePrototypes
+                 -- , Utils
+                 , TestSuite.Epic.PomSet
+    build-depends: base
+                 , bytestring
+                 , containers
+                 , comonad
+                 , directory
+                 , filepath
+                 , prettyprinter
+                 , tasty
+                 , falsify
+                 , text
+                 , verse-libs
 
 
 -- shared parser for various verse implementations and experiments

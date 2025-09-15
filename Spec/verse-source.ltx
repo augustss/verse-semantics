@@ -156,10 +156,10 @@ $$
 \multicolumn{4}{l}{\textbf{Rewriting |p := t|}} \\
 \rulename{dswild1} & |_ := t| & \rightarrow & |t|  \\
 \rulename{dswild2} &  |: t_1 := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
-\rulename{dsfun1} &  |apply1np p t_1 (eff (q,fx)) := t_2|
-    & \rightarrow & |p := functionOCX q (t_1) fx t_2| \\
-\rulename{dsfun2} &  |apply1np p t_1 := t_2|
-  & \rightarrow & |apply1np p t_1 (eff (openeff,succeeds)) := t_2| \\
+\rulename{dspfun1} &  |apply1np p t_1 (eff (oc,fx)) := t_2|
+    & \rightarrow & |p := functionOCX oc (t_1) fx t_2| \\
+\rulename{dspfun2} &  |apply1np p t_1 := t_2|
+    & \rightarrow & |p := functionOCX open (t_1) succeeds t_2| \\
 \rulename{dsty1} & |p : t_1 (eff fx) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1|  \\
 \rulename{dsty2}\asktim & |p : t_1  := t_2| & \rightarrow & |p : t_1 (eff decides) := t_2|  \\
 \rulename{dssquig} &  |(squig p_1 p_2) := t| & \rightarrow
@@ -181,7 +181,7 @@ $$
 \multicolumn{5}{l}{\textbf{Application and unification}} \\
 % \rulename{dswhere} &  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
 % Don't desugar where
-\rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |check succeeds (t_1^[t_2])| \\
+\rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |f := t_1; a := t_2; check succeeds (f^[a])| \\
 \\
 \multicolumn{5}{l}{\textbf{Array splice}} \\
 \rulename{dssplice} & \multicolumn{3}{l}{\quad|ar (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\

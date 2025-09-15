@@ -19,6 +19,8 @@ module Parser.Compat
   , lexp
   , desugar
   , toSrcExpr
+  , mkSrcIdent
+  , locToSrcLoc
   ) where
 
 import qualified Language.Verse.Exp         as P
@@ -146,6 +148,13 @@ ident l i = strIdent l (f i)
     f (Name s)   = T.unpack s
     f (Label l') = "_" ++ show l'
 
+mkSrcIdent :: L SimpleName -> Src.Ident
+mkSrcIdent (L (Loc (Pos line col _offset) _end_pos) idnt) = Src.Ident loc new
+  where
+    loc = Src.mkLoc "?" line col
+    new = T.unpack idnt
+
+
 macro :: Loc -> Ident -> Src.Ident
 macro l s = ident l s
 
@@ -153,3 +162,6 @@ refImplEffToSrcEff :: Effect -> Src.Eff
 refImplEffToSrcEff Fails    = Src.effFails
 refImplEffToSrcEff Succeeds = Src.effSucceeds
 refImplEffToSrcEff Decides  = Src.effDecides
+
+locToSrcLoc :: Loc -> Src.Loc
+locToSrcLoc (Loc (Pos l c _o) _endPos) = Src.mkLoc "?" l c -- ? becomes the file name
