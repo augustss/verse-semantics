@@ -296,6 +296,15 @@
 \newcommand{\seq}[1]{\M{ [ #1] }}              % Sequences
 \newcommand{\SL}[1]{SL(#1)}
 
+\newcommand{\pom}[1]{{\mathbf{P}}(#1)}
+\newcommand{\pomempty}{\emptyset}
+\newcommand{\pomunion}{\cup}
+\newcommand{\pomcat}{\append}
+\newcommand{\pomunit}[1]{\lfloor #1 \rfloor}
+\newcommand{\pomcanon}{\mathbf{canon}}
+\newcommand{\pomseq}{\,\bigstar\,}
+\newcommand{\pombind}{\gg \! =_{p}}
+
 %% Semantic function calls, e.g E[e]rho
 \newcommand{\semfun}[1]{\mathcal{#1}}
 \newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket}
@@ -359,7 +368,7 @@
 \newcommand{\subseq}[1]{\mathbf{subsequence}(#1)}
 \newcommand{\lengthseq}[1]{\mathbf{length}(#1)}
 \newcommand{\DSifthenelse}[3]{\begin{array}[t]{@@{}l} \mathbf{if}\; #1 \\ \,\mathbf{then}\; #2 \\ \,\mathbf{else}\; #3 \end{array}}
-\newcommand{\pureSL}{\mathbf{pure}_{sl}}
+\newcommand{\pureSL}{\mathbf{unit}_{sl}}
 \newcommand{\bindSL}{\gg \! =_{sl}}
 \newcommand{\liftATwo}{\mathbf{liftA2}_{sl}}
 

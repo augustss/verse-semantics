@@ -8,9 +8,14 @@
 %                              SLS style
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% ------------------------------------------------------------------------------------
+%
+%           The SL monad
+%
+% ------------------------------------------------------------------------------------
+
 \begin{figure}
 $$
-% ------------- Denotational semantics of Essential Verse ---------------
 \begin{array}{l}
   \multicolumn{1}{c}{\fbox{\parbox{8cm}{
    \begin{center}
@@ -76,9 +81,88 @@ $$
 \caption{The $\SL{A}$ applicative functor}
 \end{figure}
 
+% ------------------------------------------------------------------------------------
+%
+%           Pomsets
+%
+% ------------------------------------------------------------------------------------
+
 \begin{figure}
 $$
-% ------------- Denotational semantics of Essential Verse in SLS style ---------------
+\begin{array}{l}
+
+  \multicolumn{1}{c}{\fbox{
+  \begin{minipage}{5cm}
+  $$\begin{array}{rcl}
+  \multicolumn{3}{c}{{\bf type} \; \pom{A}} \\[1mm]
+  \pomempty & : & \pom{A} \\
+  \pomunit{\_}  & : & A \rightarrow \pom{A} \\
+  \pomcat   & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
+  \pomunion & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
+  \end{array}$$
+  \end{minipage}
+ }} \\ \\
+
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+
+\multicolumn{3}{l}{\textbf{Axioms}} \\
+\pomempty \pomcat S      & = & S \\
+S \pomcat \pomempty      & = & S \\
+(S \pomcat T) \pomcat R	 & = & S \pomcat (T \pomcat R) \\[1mm]
+\pomempty \pomunion S	 & = & S \\
+S \pomunion \pomempty	 & = & S \\
+S \pomunion T		 & = & T \pomunion S \\
+(S \pomunion T) \pomunion R & = & S \pomunion (T \pomunion R) \\[1mm]
+(S \pomunion T) \pomcat R   & = & (S \pomcat R) \pomunion (T \pomcat R) \\
+S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
+
+\multicolumn{3}{l}{\mathbf{Canonicalisation.}
+  \begin{array}[t]{l}
+    \text{Theorem: $\pomcanon$ satisfies axioms.} \\
+    \text{Theorem: Every sequence $s \in \pomcanon(S)$ is non-empty}
+      \end{array}} \\
+\pomcanon & : & \pom{A} \rightarrow \powerset{\seq{A}} \\
+\pomcanon( \pomempty ) & = & \{ \} \\
+\pomcanon( \pomunit{a} ) & = & \{ [ a ] \} \\
+\pomcanon( S \pomunion T ) & = & \pomcanon(S) \cup \pomcanon(T) \\
+\pomcanon( \pomempty \pomcat S ) & = & \pomcanon(S) \\
+\pomcanon( (S \pomunion T) \pomcat R ) & = & \pomcanon(S \pomcat R) \cup \pomcanon(S \pomcat R) \\
+\pomcanon( (S \pomcat T) \pomcat R ) & = & \pomcanon(S \pomcat (T \pomcat R)) \\
+\pomcanon( \pomunit{a} \pomcat S ) & = & \{ a:as \vb as \in \pomcanon(S) \} \\[2mm]
+
+\multicolumn{3}{l}{\text{\textbf{Sequencing.}  Theorem: $\pomseq$ satisfies axioms.}} \\
+(\pomseq) & : & \pom{\ENV} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
+  \pomempty \pomseq S                     & = & \pomempty \\
+  S \pomseq \pomempty                     & = & \pomempty \\
+  (S \pomunion T) \pomseq R               & = & (S \pomseq R) \pomunion (T \pomseq R) \\
+  (S \pomcat T) \pomseq R                 & = & (S \pomseq R) \pomcat (T \pomseq R) \\
+  \pomunit{\EV_1} \pomseq \pomunit{\EV_2} & = & \pomunit{\EV_1 \cap \EV_2} \\
+  \pomunit{\EV} \pomseq (S \pomunion T)  & = & (\pomunit{\EV} \pomseq S) \pomunion (\pomunit{\EV} \pomseq T) \\
+  \pomunit{\EV} \pomseq (S \pomcat T)    & = & (\pomunit{\EV} \pomseq S) \pomcat (\pomunit{\EV} \pomseq T) \\[2mm]
+
+  \multicolumn{3}{l}{\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms}} \\
+  (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom(B) \\
+  \pomempty \pombind h		& = & \pomempty \\
+  \pomunit{a} \pombind h  	& = & h(x) \\
+  (S \pomcat T) \pombind h      & = & (S \pombind h) \pomcat (T \pombind h) \\
+  (S \pomunion T) \pombind h    & = & (S \pombind h) \pomunion (T \pombind h) \\
+\end{array} \\
+
+\end{array}
+$$
+\caption{Pomsets $\pom{A}$}
+\end{figure}
+
+
+
+% ------------------------------------------------------------------------------------
+%
+%           Denotational semantics of Essential Verse in SLS style
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
     & \semess{E}{u}{v}{|t|} & : & \SL{\ENV} \\
@@ -130,7 +214,7 @@ $$
 % IF
 \multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
   \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
-& = &   \bigcup\limits_{s_0 \in \semess{E}{u}{v}{|t_0|}}\left\{
+& = &   \bigcup\limits_{s_0 \in \semap{C}{|t_0|}}\left\{
  \begin{array}{@@{\;}l@@{\,}l}
 (\HIDES{\EV_1 \seqSLOne \semess{B}{u}{v}{t_2})}{xs} \\
 \cup \\
