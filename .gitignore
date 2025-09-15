@@ -76,3 +76,5 @@ Spec/verse-densem-planA.tex
 
 /VerseRocq/verse/.CoqSrc.mk.d
 /VerseRocq/verse/.lia.cache
+Spec/densem-ess-sls.tex
+Spec/densem-ess-ls.tex
