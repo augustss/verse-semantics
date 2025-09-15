@@ -10,6 +10,216 @@
 
 % ------------------------------------------------------------------------------------
 %
+%           Pomsets
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+
+  \multicolumn{1}{c}{\fbox{
+  \begin{minipage}{5cm}
+  $$\begin{array}{rcl}
+  \multicolumn{3}{c}{{\bf type} \; \pom{A}} \\[1mm]
+  \pomempty & : & \pom{A} \\
+  \pomunit{\_}  & : & A \rightarrow \pom{A} \\
+  \pomcat   & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
+  \pomunion & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
+  \end{array}$$
+  \end{minipage}
+ }} \\ \\
+
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
+
+\multicolumn{3}{l}{\textbf{Axioms}} \\
+\pomempty \pomcat S      & = & S \\
+S \pomcat \pomempty      & = & S \\
+(S \pomcat T) \pomcat R	 & = & S \pomcat (T \pomcat R) \\[1mm]
+\pomempty \pomunion S	 & = & S \\
+S \pomunion \pomempty	 & = & S \\
+S \pomunion T		 & = & T \pomunion S \\
+(S \pomunion T) \pomunion R & = & S \pomunion (T \pomunion R) \\[1mm]
+(S \pomunion T) \pomcat R   & = & (S \pomcat R) \pomunion (T \pomcat R) \\
+S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
+
+\multicolumn{3}{l}{\mathbf{Canonicalisation.}
+  \begin{array}[t]{l}
+    \text{Theorem: $\pomcanon$ satisfies axioms.} \\
+    \text{Theorem: $\forall s \in \pomcanon(S).\; s \not=[] \text{and}\; \forall \EV \in s. \; \EV \not= \{\}$}
+      \end{array}} \\
+\pomcanon & : & \pom{\ENV} \rightarrow \powerset{\seq{\ENV}} \\
+\pomcanon( \pomempty ) & = & \{ \} \\
+\pomcanon( \pomunit{\EV} ) & = & \left\{\begin{array}{ll}
+\{ \} & \text{if $\EV = \{\}$} \\
+\{ [ \EV ] \} & \text{otherwise}
+\end{array}
+\right. \\
+\pomcanon( S \pomunion T ) & = & \pomcanon(S) \cup \pomcanon(T) \\
+\pomcanon( \pomempty \pomcat S ) & = & \pomcanon(S) \\
+\pomcanon( (S \pomunion T) \pomcat R ) & = & \pomcanon(S \pomcat R) \cup \pomcanon(S \pomcat R) \\
+\pomcanon( (S \pomcat T) \pomcat R ) & = & \pomcanon(S \pomcat (T \pomcat R)) \\
+\pomcanon( \pomunit{\EV} \pomcat S ) & = &
+\left\{ \begin{array}{ll}
+    \pomcanon(S) & \text{if $\EV = \{\}$} \\
+    \pomunit{\EV} & \text{if $S = \{\}$} \\
+    \{ a:as \vb as \in \pomcanon(S) \} & \text{otherwise}
+ \end{array} \right.
+\\[2mm]
+
+\multicolumn{3}{l}{\text{\textbf{Sequencing.}  Theorem: $\pomseq$ satisfies axioms.}} \\
+(\pomseq) & : & \pom{\ENV} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
+  \pomempty \pomseq S                     & = & \pomempty \\
+  S \pomseq \pomempty                     & = & \pomempty \\
+  (S \pomunion T) \pomseq R               & = & (S \pomseq R) \pomunion (T \pomseq R) \\
+  (S \pomcat T) \pomseq R                 & = & (S \pomseq R) \pomcat (T \pomseq R) \\
+  \pomunit{\EV_1} \pomseq \pomunit{\EV_2} & = & \pomunit{\EV_1 \cap \EV_2} \\
+  \pomunit{\EV} \pomseq (S \pomunion T)  & = & (\pomunit{\EV} \pomseq S) \pomunion (\pomunit{\EV} \pomseq T) \\
+  \pomunit{\EV} \pomseq (S \pomcat T)    & = & (\pomunit{\EV} \pomseq S) \pomcat (\pomunit{\EV} \pomseq T) \\[2mm]
+
+  \multicolumn{3}{l}{\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms}} \\
+  (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom{B} \\
+  \pomempty \pombind h		& = & \pomempty \\
+  \pomunit{a} \pombind h  	& = & h(x) \\
+  (S \pomcat T) \pombind h      & = & (S \pombind h) \pomcat (T \pombind h) \\
+  (S \pomunion T) \pombind h    & = & (S \pombind h) \pomunion (T \pombind h) \\
+  \\
+  S \pomseq T & = & S \pombind (\lambda \EV_1.\, T \pombind (\lambda \EV_2. \, \pomunit{\EV_1 \cap \EV_2})) \\
+              & = & [ \EV_1 \cap \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T ]  \hspace{6mm} \text{Using pomset-comprehensions}\\
+\end{array} \\
+
+\end{array}
+$$
+\caption{Pomsets $\pom{A}$}
+\end{figure}
+
+
+
+% ------------------------------------------------------------------------------------
+%
+%           Denotational semantics of Essential Verse in SLS style
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+    & \semess{E}{u}{v}{|t|} & : & \pom{\ENV} \\
+
+% Wildcards and atoms
+\rulename{swild}  &  \semess{E}{u}{v}{|_|} & = & \pomunit{ \conBrack{u =v} } \\
+\rulename{svar}   &  \semess{E}{u}{v}{|x|} & = & \pomunit{ \conBrack{u=v=x} } \\
+\rulename{sconst} &  \semess{E}{u}{v}{|k|} & = & \pomunit{ \conBrack{u=v=k} }\\
+\rulename{sprim}  &  \semess{E}{u}{v}{|o|} & = & \pomunit{ \conBrack{u=v=o} } \\
+
+% Capture input and output
+\rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &  \pomunit{\conBrack{x=v}} \pomseq \semess{E}{u}{v}{t} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+   \pomunit{\conBrack{x=u}} \pomseq \semess{E}{u}{v}{t} \\
+
+% Tuples
+\multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}}
+& = & \begin{array}[t]{@@{}l}
+         \pomunit{\conBrack{ u=|arr (u_1, xdots, u_n)|,
+                            v=|arr (v_1, xdots, v_n)|}}
+         \pom \semess{E}{u_1}{v_1}{t_1}
+         \pomseq \mydots
+         \pomseq \semess{E}{u_n}{v_n}{t_n} \\
+         \HIDESkw { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
+      \end{array} \\
+
+% Choice and failure
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \pomempty \\
+\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
+  & = & \semess{B}{u}{v}{t_1} \pomcat \semess{B}{u}{v}{t_2} \\
+
+% Unification
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \pomseq \semess{E}{u}{v}{t_2} \\
+
+% Sequencing
+\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \pomseq \semess{E}{u}{v}{t_2} \\
+% Dot-dot
+\rulename{sdotdot} &  \semess{E}{u}{v}{|a_1 ..  a_2|}
+& = & \pomunions \{\;  \pomcats [ \conBrack{u=v=a_1+i, i \leq a_2 - a_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
+
+% Application and type
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
+ & = &  \conBrack{u=v} \seqSLOne \semap{F}{|apply1N a_1 a_2|}v \\
+\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
+\\
+
+% IF
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = & \begin{array}[t]{@@{\;}l@@{\,}l}
+        (S0 \pomseq \semess{B}{u}{v}{t_2}) \pomHIDE xs)
+            \cup
+          ((\pomNOT(S0) \pomHIDE xs) \pomseq \semess{B}{u}{v}{t_3} \\
+        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
+      \end{array}
+\\ \\
+\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_1 t_2|}}
+& = &   \bigcup\limits_{s_0 \in \semap{C}{|t_0|}} \left\{
+ \begin{array}{@@{\;}l@@{\,}l}
+   \conBrack{ u=(u_1 \oplus \mydots \oplus u_n), v=(v_1 \oplus \mydots \oplus v_n)}
+   \seqSLOne D_1 \seqSL \mydots \seqSL D_n \\
+\hspace{5mm} \HIDESkw \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \\
+\textbf{where} \\
+\;  \begin{array}[t]{l}
+  \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \not\in \freevars{u,v,t_0,t_1} \\
+  {} [\EV_1,\mydots,\EV_n] = s_0 \\
+  S1 = \semess{B}{p}{q}{t_1} \\
+  C_i = \begin{array}[t]{@@{}l}
+      \HIDES{(\EV_i \seqSLOne \conBrack{u_i=|arr p|, v_i=|arr q|} \seqSLOne S1)}{\{p,q\}} \\
+      \cup \\
+      \conCompl( \EV_i ) \seqSLOne \pureSL \conBrack{u_i=|arr ()|, v_i=|arr ()|}
+      \end{array} \\
+  D_i = \HIDES{C_i}{xs} \\ 
+  \xs = \semap{I}{|t_0|}
+ \end{array}
+ \end{array}
+ \right\}
+\end{array}
+\\
+
+\\
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       B, C, and F
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+& \semess{B}{u}{v}{|t|} & : & \SL{ \ENV } \\
+& \semess{B}{u}{v}{|t|} & = & \HIDES{\semess{E}{u}{v}{e}}{\semapp{I}{|t|}} \\[1mm]
+& \semapp{C}{|t|} & : & \SL{ \ENV } \\
+& \semapp{C}{|t|} & = & \HIDES{\semess{E}{p}{q}{|t|}}{\{p,q\}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+& \semap{F}{|apply1N a_1 a_2|}r & : & \SL{\ENV} \\
+& \semap{F}{|apply1N a_1 a_2|}r  & = &
+    \{ \ [ \; \conBrack{\conFun{a_2}{r}{a_1}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
+      \; \}
+ \\[1.5ex]
+
+ & \pomONE & : & \powerset{\Ident} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV}
+       \hspace{5mm} \text{Result has no $(\pomseq)$}\\
+
+ & \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
+ & \pomONE( xs, \pomempty )  & = & \pomempty \\
+ & \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
+ & \pomONE( xs, S \pomcat T )  & = & S1 \pomunion ((\pomNOT(S1) \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
+ &                             & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
+ & NOT & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
+ & NOT(S) & = & \pommap( \conCompl, S) \hspace{5mm} \text{Complement each ENV}
+
+\end{array}
+\end{array}
+$$
+\caption{E-POM: denotational semantics of Essential Verse, using pomsets}
+\label{fig:E-sls1}
+\end{figure}
+
+
+% ------------------------------------------------------------------------------------
+%
 %           The SL monad
 %
 % ------------------------------------------------------------------------------------
@@ -80,80 +290,6 @@ S \bindSL K & = & \{ \; \concat(ss)
 $$
 \caption{The $\SL{A}$ applicative functor}
 \end{figure}
-
-% ------------------------------------------------------------------------------------
-%
-%           Pomsets
-%
-% ------------------------------------------------------------------------------------
-
-\begin{figure}
-$$
-\begin{array}{l}
-
-  \multicolumn{1}{c}{\fbox{
-  \begin{minipage}{5cm}
-  $$\begin{array}{rcl}
-  \multicolumn{3}{c}{{\bf type} \; \pom{A}} \\[1mm]
-  \pomempty & : & \pom{A} \\
-  \pomunit{\_}  & : & A \rightarrow \pom{A} \\
-  \pomcat   & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
-  \pomunion & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
-  \end{array}$$
-  \end{minipage}
- }} \\ \\
-
-\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
-
-\multicolumn{3}{l}{\textbf{Axioms}} \\
-\pomempty \pomcat S      & = & S \\
-S \pomcat \pomempty      & = & S \\
-(S \pomcat T) \pomcat R	 & = & S \pomcat (T \pomcat R) \\[1mm]
-\pomempty \pomunion S	 & = & S \\
-S \pomunion \pomempty	 & = & S \\
-S \pomunion T		 & = & T \pomunion S \\
-(S \pomunion T) \pomunion R & = & S \pomunion (T \pomunion R) \\[1mm]
-(S \pomunion T) \pomcat R   & = & (S \pomcat R) \pomunion (T \pomcat R) \\
-S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
-
-\multicolumn{3}{l}{\mathbf{Canonicalisation.}
-  \begin{array}[t]{l}
-    \text{Theorem: $\pomcanon$ satisfies axioms.} \\
-    \text{Theorem: Every sequence $s \in \pomcanon(S)$ is non-empty}
-      \end{array}} \\
-\pomcanon & : & \pom{A} \rightarrow \powerset{\seq{A}} \\
-\pomcanon( \pomempty ) & = & \{ \} \\
-\pomcanon( \pomunit{a} ) & = & \{ [ a ] \} \\
-\pomcanon( S \pomunion T ) & = & \pomcanon(S) \cup \pomcanon(T) \\
-\pomcanon( \pomempty \pomcat S ) & = & \pomcanon(S) \\
-\pomcanon( (S \pomunion T) \pomcat R ) & = & \pomcanon(S \pomcat R) \cup \pomcanon(S \pomcat R) \\
-\pomcanon( (S \pomcat T) \pomcat R ) & = & \pomcanon(S \pomcat (T \pomcat R)) \\
-\pomcanon( \pomunit{a} \pomcat S ) & = & \{ a:as \vb as \in \pomcanon(S) \} \\[2mm]
-
-\multicolumn{3}{l}{\text{\textbf{Sequencing.}  Theorem: $\pomseq$ satisfies axioms.}} \\
-(\pomseq) & : & \pom{\ENV} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
-  \pomempty \pomseq S                     & = & \pomempty \\
-  S \pomseq \pomempty                     & = & \pomempty \\
-  (S \pomunion T) \pomseq R               & = & (S \pomseq R) \pomunion (T \pomseq R) \\
-  (S \pomcat T) \pomseq R                 & = & (S \pomseq R) \pomcat (T \pomseq R) \\
-  \pomunit{\EV_1} \pomseq \pomunit{\EV_2} & = & \pomunit{\EV_1 \cap \EV_2} \\
-  \pomunit{\EV} \pomseq (S \pomunion T)  & = & (\pomunit{\EV} \pomseq S) \pomunion (\pomunit{\EV} \pomseq T) \\
-  \pomunit{\EV} \pomseq (S \pomcat T)    & = & (\pomunit{\EV} \pomseq S) \pomcat (\pomunit{\EV} \pomseq T) \\[2mm]
-
-  \multicolumn{3}{l}{\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms}} \\
-  (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom(B) \\
-  \pomempty \pombind h		& = & \pomempty \\
-  \pomunit{a} \pombind h  	& = & h(x) \\
-  (S \pomcat T) \pombind h      & = & (S \pombind h) \pomcat (T \pombind h) \\
-  (S \pomunion T) \pombind h    & = & (S \pombind h) \pomunion (T \pombind h) \\
-\end{array} \\
-
-\end{array}
-$$
-\caption{Pomsets $\pom{A}$}
-\end{figure}
-
-
 
 % ------------------------------------------------------------------------------------
 %
