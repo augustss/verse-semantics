@@ -28,6 +28,7 @@ module Epic.PomSet
   , normalize, isNormalForm
   , Pom(..)
   , member
+  , sequenceWith
   ) where
 
 import Control.Monad (ap)
@@ -89,6 +90,15 @@ unit = Unit
 (|:|) :: a -> Pom a -> Pom a
 (|:|) a = (unit a |||)
 
+sequenceWith :: (a -> a -> a) -> Pom a -> Pom a -> Pom a
+sequenceWith _ Empty x                  = x
+sequenceWith _ x     Empty              = x
+sequenceWith f (Unit l) (Unit r)        = unit $! f l r
+sequenceWith f (PomUnion s t)  r        = sequenceWith f s r ||| sequenceWith f t r
+sequenceWith f (PomAppend s t) r        = sequenceWith f s r +++ sequenceWith f t r
+sequenceWith f l@Unit{} (PomUnion s t)  = sequenceWith f l s ||| sequenceWith f l t
+sequenceWith f l@Unit{} (PomAppend s t) = sequenceWith f l s +++ sequenceWith f l t
+
 distribute :: Pom a -> Pom a
 distribute (PomAppend (PomUnion a b) c) = (a +++ c) ||| (b +++ c) -- case 1
 distribute (PomAppend a (PomUnion b c)) = (a +++ b) ||| (a +++ c) -- case 2
@@ -118,6 +128,8 @@ normalize = until (\x -> go x == x) go
     go (PomUnion  l Empty) = l
     go (PomAppend Empty r) = r
     go (PomUnion Empty r)  = r
+    -- associative rules
+    go (PomAppend (PomAppend s t) r) = s +++ (t +++ r)
     -- Normalization invariants
     go app@(PomAppend PomUnion{} _) = distribute app
     go app@(PomAppend _ PomUnion{}) = distribute app
@@ -144,7 +156,7 @@ isNormalForm l = isEmpty l || getAll (go False l)
 instance Applicative Pom where
   pure = unit
   {-# INLINE (<*>) #-}
-  (<*>) = ap -- TODO: get a better definition
+  (<*>) = ap
 
 instance Monad Pom where
   return = pure
