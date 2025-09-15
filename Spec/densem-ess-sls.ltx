@@ -123,7 +123,7 @@ $$
 & = & \begin{array}[t]{@@{}l}
          \pomunit{\conBrack{ u=|arr (u_1, xdots, u_n)|,
                             v=|arr (v_1, xdots, v_n)|}}
-         \pom \semess{E}{u_1}{v_1}{t_1}
+         \pomseq \semess{E}{u_1}{v_1}{t_1}
          \pomseq \mydots
          \pomseq \semess{E}{u_n}{v_n}{t_n} \\
          \HIDESkw { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
@@ -161,26 +161,7 @@ $$
       \end{array}
 \\ \\
 \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_1 t_2|}}
-& = &   \bigcup\limits_{s_0 \in \semap{C}{|t_0|}} \left\{
- \begin{array}{@@{\;}l@@{\,}l}
-   \conBrack{ u=(u_1 \oplus \mydots \oplus u_n), v=(v_1 \oplus \mydots \oplus v_n)}
-   \seqSLOne D_1 \seqSL \mydots \seqSL D_n \\
-\hspace{5mm} \HIDESkw \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \\
-\textbf{where} \\
-\;  \begin{array}[t]{l}
-  \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \not\in \freevars{u,v,t_0,t_1} \\
-  {} [\EV_1,\mydots,\EV_n] = s_0 \\
-  S1 = \semess{B}{p}{q}{t_1} \\
-  C_i = \begin{array}[t]{@@{}l}
-      \HIDES{(\EV_i \seqSLOne \conBrack{u_i=|arr p|, v_i=|arr q|} \seqSLOne S1)}{\{p,q\}} \\
-      \cup \\
-      \conCompl( \EV_i ) \seqSLOne \pureSL \conBrack{u_i=|arr ()|, v_i=|arr ()|}
-      \end{array} \\
-  D_i = \HIDES{C_i}{xs} \\ 
-  \xs = \semap{I}{|t_0|}
- \end{array}
- \end{array}
- \right\}
+& = & \pomFOR( \semap{I}{t_0}, \semapp{C}{t_1}, \semess{E}{p}{q}{t_2} ) \\
 \end{array}
 \\
 
@@ -200,15 +181,30 @@ $$
  \\[1.5ex]
 
  & \pomONE & : & \powerset{\Ident} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV}
-       \hspace{5mm} \text{Result has no $(\pomseq)$}\\
+       \hspace{5mm} \text{Result has no $(\pomcat)$}\\
 
- & \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
  & \pomONE( xs, \pomempty )  & = & \pomempty \\
+ & \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
  & \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
  & \pomONE( xs, S \pomcat T )  & = & S1 \pomunion ((\pomNOT(S1) \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
  &                             & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
  & NOT & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
- & NOT(S) & = & \pommap( \conCompl, S) \hspace{5mm} \text{Complement each ENV}
+ & NOT(S) & = & \pommap( \conCompl, S) \hspace{5mm} \text{Complement each ENV} \\[1mm]
+
+ & \semap{\pomFOR}{xs,t_2}uv & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
+
+ & \semess{\pomFOR}{u}{v}{xs, t_2}\; \pomempty  & = & \pomempty \\
+ & \semess{\pomFOR}{u}{v}{xs, t_2}\; \pomunit{\EV} 
+       &  = & (\pomunit{\EV}
+         \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
+         \pomseq \semess{E}{p}{q}{t_2}) \pomHIDE \{p,q,xs\}   \\
+ & \semess{\pomFOR}{u}{v}{ xs, t_2 }\; (S \pomunion T) & = & \semess{\pomFOR}{u}{v}{xs,t_2}\;S \pomunion \semess{\pomFOR}{u}{v}{xs,t_2}\; T \\
+ & \semess{\pomFOR}{u}{v}{ xs, t_2 }\; (S \pomcat T)
+         & = & \begin{array}[t]{@@{}l}
+          \pomunit{\conBrack{u=u_1 \oplus u_2, v=v_1 \oplus v_2}} \\
+          \pomseq \semess{\pomFOR}{u_1}{v_1}{xs, _2}\;S \\
+          \pomseq (\pomNOT(S) \pomHIDE xs) \pomseq \semess{\pomFOR}{u_2}{v_2}{xs,t_2}\;T
+          \end{array}
 
 \end{array}
 \end{array}
