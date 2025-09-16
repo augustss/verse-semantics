@@ -17,10 +17,10 @@ data P a
   | Unit a
   | P a :++ P a
   | P a :\/ P a
---  deriving (Show)
+  deriving (Show)
 
-instance (Show a, Ord a) => Show (P a) where
-  showsPrec p s = showsPrec p (canon $ absorbEmpty s)
+--instance (Show a, Ord a) => Show (P a) where
+--  showsPrec p s = showsPrec p (canon $ absorbEmpty s)
 
 instance (Ord a) => Eq (P a) where
   x == y  =  compare x y == EQ
@@ -100,8 +100,28 @@ oNE :: [Ident] -> P ENV -> P ENV
 oNE _ Empty = Empty
 oNE _ (Unit d) = Unit d
 oNE xs (s :\/ t) = oNE xs s :\/ oNE xs t
-oNE xs (s :++ t) = s1 :\/ ((fmap compl s1 >>> xs) *** oNE xs t)
+oNE xs (s :++ t) = s1 :\/ (nOT xs s1 *** oNE xs t)
   where s1 = oNE xs s
+
+nOT :: [Ident] -> P ENV -> P ENV
+nOT xs s = fmap compl s >>> xs
+
+nil :: Value
+nil = Tuple []
+
+fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
+fOR _  Empty     _ _ _ = unit (u .= nil /\ v .= nil)
+fOR xs d@Unit{}  t _ _ =
+  ((d *** unit (u .=% sing p /\ v .=% sing q) *** dE t p q) >>> (p:q:xs))
+  :\/
+  (nOT xs d *** unit (u .=% nil /\ v .=% nil))
+  where (p, q) = fresh2 ("p", "q") (i:x:xs) t
+fOR xs (a :\/ b) t i x = fOR xs a t i x :\/ fOR xs b t i x
+fOR xs (a :++ b) t i x =
+  unit (u .=% u1 `app` u2 /\ v .=% v1 `app` v2) ***
+  fOR xs a t u1 v1 *** fOR xs b t u2 v2
+  where (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
+        (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
 
 dE :: SrcEssential -> Ident -> Ident -> P ENV
 dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
@@ -123,10 +143,10 @@ dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
 dE (If3 t0 t1 t2)                   i x =
   s0 *** dB t1 i x >>> xs
   `union`
-  (fmap compl s0 >>> xs) *** dB t2 i x
+  nOT xs s0 *** dB t2 i x
   where xs = bvs t0
         s0 = oNE xs (dC t0)
---dE t@(For2 t0 t1) i x =
+dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
 {-
 dE t@(Array ts)                     i x =
   foldl1 (***) (et : es) `remv` (is ++ xs)
