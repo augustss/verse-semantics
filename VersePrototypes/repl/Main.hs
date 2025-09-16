@@ -32,6 +32,7 @@ import SExpC(srcExprToExp)
 -- Tim densem
 import qualified TimE (den)
 import qualified SLS (den)
+import qualified Pom (den)
 import ENVDesugar (envDesugar)
 
 -- Epic libraries
@@ -219,6 +220,7 @@ theCommandSet = CommandSet
       , Cmd "dls-densem [EXPR]"    "Evaluate [last] expression"            cDlsDensem
       , Cmd "tim-densem [EXPR]"    "Evaluate [last] expression"            cTimDensem
       , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
+      , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -527,7 +529,7 @@ cSlsDensem
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- eSlsDesugar e_ess
        ; let res = SLS.den e_ds
-       ; let den_sem = addHeader "Tim Den-sem" $ text $ show res
+       ; let den_sem = addHeader "Sls Den-sem" $ text $ show res
 {-
                if null res then text "No solutions"
                else vcat $ fmap (text . show) res
@@ -535,6 +537,23 @@ cSlsDensem
 
        ; displayDoc den_sem
 
+       ; return () }
+
+cPomDensem :: CmdRunner CState
+cPomDensem
+  = getInputExpr $ \e s ->
+    tryIt (\_ -> pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- eSlsDesugar e_ess
+       ; let res = Pom.den e_ds
+       ; let den_sem = addHeader "Pom Den-sem" $ text $ show res
+       ; displayDoc den_sem
+{-       
+       ; let resU = Pom.denU e_ds
+       ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
+       ; displayDoc den_semU
+-}
        ; return () }
 
 --------------------------------------------------------

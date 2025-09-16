@@ -195,6 +195,7 @@ library verse-densem
                       SemSeqENV
                       ENVS
                       TimE
+                      Pom
                       SLS
                       Set
                       ValueS
