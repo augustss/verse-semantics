@@ -729,30 +729,58 @@ const pBase: Parser<L<Exp>> = choice([
         optional(pSpecifierList), // Parse optional specifiers after module
         _specifiers => flatMap(
           lexeme(char(':')),
-          () => {
-            // Create an empty module body
-            const emptyBody = withLoc(
-              createLoc(createPos(0, 0, 0), createPos(0, 0, 0)),
-              { kind: 'List', elements: [] } as Exp
-            );
-            return succeed({ kind: 'Module', body: emptyBody } as Exp);
-          }
+          () => map(
+            parseIndentedBlock, // Parse indented module body
+            body => ({ kind: 'Module', body } as Exp)
+          )
         )
       )
     )
   ),
-  // Class literals: class<specs>:
+  // Class literals: class<specs>: or class(parent)<specs>: or class(parent){}
   withLocation(
     flatMap(
       keyword('class'),
       () => flatMap(
-        optional(pSpecifierList), // Parse optional specifiers after class
-        _specifiers => flatMap(
-          lexeme(char(':')),
-          () => map(
-            parseIndentedBlock,
-            body => ({ kind: 'Class', body } as Exp)
+        optional(
+          // Parse optional parent class: (parent_name)
+          flatMap(
+            lexeme(char('(')),
+            () => flatMap(
+              pIdent, // Parse parent class name
+              _parent => map(
+                lexeme(char(')')),
+                () => _parent // Return parent for potential future use
+              )
+            )
           )
+        ),
+        _parent => flatMap(
+          optional(pSpecifierList), // Parse optional specifiers after class
+          _specifiers => choice([
+            // Case 1: class(...): with indented block
+            flatMap(
+              lexeme(char(':')),
+              () => map(
+                parseIndentedBlock,
+                body => ({ kind: 'Class', body } as Exp)
+              )
+            ),
+            // Case 2: class(...){} with inline empty body
+            flatMap(
+              pLBrace,
+              () => flatMap(
+                pRBrace,
+                () => {
+                  const emptyBody = withLoc(
+                    createLoc(createPos(0, 0, 0), createPos(0, 0, 0)),
+                    { kind: 'List', elements: [] } as Exp
+                  );
+                  return succeed({ kind: 'Class', body: emptyBody } as Exp);
+                }
+              )
+            )
+          ])
         )
       )
     )
@@ -1354,38 +1382,23 @@ const pSpecifierList: Parser<Specifier[]> = map(
   })
 );
 
-// Parse <override> specifier specifically for function declarations
-const pOverrideSpecifier: Parser<boolean> = choice([
-  map(
-    lexeme(
-      between(
-        char('<'),
-        char('>'),
-        string('override')
-      )
-    ),
-    () => true
-  ),
-  succeed(false) // No override specifier
-]);
+// Note: Override specifier is now handled through general pSpecifierList
 
 // Function declaration parser with return type support
 const pFuncDeclWithReturnType: Parser<L<Exp>> = withLocation(
   flatMap(
     pIdent,
     name => flatMap(
-      pOverrideSpecifier, // Parse optional <override> after function name
-      hasOverride => flatMap(
+      optional(pSpecifierList), // Parse optional specifiers after function name
+      preSpecifiers => flatMap(
         pFuncParams,
         params => flatMap(
           optional(pSpecifierList), // Parse optional specifiers after parameters
           postSpecifiers => flatMap(
             optional(flatMap(pColon, () => pType)),
             returnType => {
-              // Combine override flag with post specifiers
-              const allSpecifiers = postSpecifiers || [];
-              // Add override to specifiers if present
-              const finalSpecifiers = hasOverride ? ['override' as Specifier, ...allSpecifiers] : allSpecifiers;
+              // Combine pre and post specifiers
+              const finalSpecifiers = [...(preSpecifiers || []), ...(postSpecifiers || [])];
 
           if (returnType) {
             // If we have a return type, both := and = are allowed
