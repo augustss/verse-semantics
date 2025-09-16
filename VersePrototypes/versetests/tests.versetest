@@ -137,14 +137,14 @@ testeq("Array16",pass,tim=skip) {Y := all{for( 1..3 ){ 1|2 }}}       { array { a
 # Array expression splicing
 #  ...in expressions
 # tim=skip: Tim does not support splicing
-testeq("Splice1",pass,tim=skip,libparser=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)}
-testeq("Splice2",pass,tim=skip,libparser=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
+testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)}
+testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
 #  ...in patterns
-testeq("Splice3",pass,tim=skip,libparser=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
 testeq("Splice4",pass,tim=skip,libparser=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Splice5",pass,tim=skip, libparser=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice5a",pass,tim=skip, libparser=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice6",pass,tim=skip, libparser=skip){ f( ..(a:[]int), b:string ) :=
+testeq("Splice5",pass,tim=skip,libparser=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice5a",pass,tim=skip,libparser=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice6",pass,tim=skip,libparser=skip){ f( ..(a:[]int), b:string ) :=
                              { (Length[a], b) }
                       ; f[1,2,3,"foo"] } {(3, "foo") }
 testeq("Splice7",pass,libparser=skip){ f( a:int,b:int ) := a; f(3,4) }{3}

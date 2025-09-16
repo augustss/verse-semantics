@@ -85,6 +85,7 @@ expToSrcExpr' _ (R.Exists idents (L bl body)) =
   in Src.Exists (handle_ident <$> idents) (expToSrcExpr' bl body)
 expToSrcExpr' l (R.Set (L l' x) e)   = Src.Set (Src.Variable (ident l' x)) (ident l "=") (lexp e)
 expToSrcExpr' _ (R.Tuple es)         = Src.Tuple (fmap lexp es)
+expToSrcExpr' _ (R.Splice e)         = Src.Splice (lexp e)
 expToSrcExpr' _ (R.Array es)         = Src.Array (fmap lexp es)
 expToSrcExpr' _ (R.Truth e)          = Src.Truth (lexp e)
 expToSrcExpr' _ (R.Int i)            = Src.Lit (Src.LInt i)

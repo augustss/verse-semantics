@@ -159,14 +159,17 @@ deriving instance (Eq a
                   , Eq (Path a)
                   ) => Eq (Exp a)
 
+
 data Pat a
-  = Name (IdentExp a)
+  = Name (IdentExp a)                   -- a
   | Var [L (Exp a)] (L (IdentExp a)) [L (Exp a)]   -- expression lists are for attributes, can be both after "var" and after identifier
-  | PrefixColon (L (Exp a))
-  | InfixColon (L (Pat a)) (L (Exp a))
-  | InfixArrow (L (Pat a)) (L (Pat a))
-  | Invoke (L (Pat a)) (L (Exp a))
-  | Specs (L (Pat a)) [L (Exp a)]
+  | PrefixColon (L (Exp a))             -- :foo
+  | PatTuple   [L (Pat a)]              -- (a,...,z)
+  | PatSplice  (L (Pat a))              -- ..a
+  | InfixColon (L (Pat a)) (L (Exp a))  -- foo:bar
+  | InfixArrow (L (Pat a)) (L (Pat a))  -- foo -> bar
+  | Invoke (L (Pat a)) (L (Exp a))      -- ???
+  | Specs (L (Pat a)) [L (Exp a)]       -- ???
   | Extension (L (Exp a)) (L (Pat a)) -- The lhs is always a name
 
 deriving instance ( Show a
@@ -242,7 +245,6 @@ instance ( Pretty a
     PrefixBracket e1 e2 -> "[" <> pretty e1 <> "]" <> pretty e2
     PrefixQuery e -> "?" <> pretty e
     PrefixAmpersand e -> "&" <> pretty e
-    PrefixDotDot e -> ".." <> pretty e
     PostfixQuery e -> parens (pretty e) <> pretty '?'
     PrefixCaret e -> "^" <> pretty e
     PostfixCaret e -> parens (pretty e) <> pretty '^'
@@ -336,10 +338,12 @@ instance ( Pretty a
          , Show (IdentExp a)
          , Show (Pat a)
          ) => Pretty (Pat a) where
-  pretty = \ case
+  pretty = \case
     Name ident -> pretty ident
     Var es1 x es2 -> "var" <> specs es1 <+> pretty x <> specs es2
     PrefixColon e -> parens(colon <> pretty e)
+    PatTuple es -> parens $ pretty es
+    PatSplice e -> ".." <> pretty e
     InfixColon p e -> parens (pretty p <> colon <> pretty e)
     InfixArrow p1 p2 -> parens( pretty p1 <+> "->" <+> pretty p2)
     Invoke p e1 -> pretty p <> parens (pretty e1)
@@ -378,15 +382,17 @@ instance ( Pretty a
     prettyPath (Nothing, ident) doc = "/" <> pretty (extract ident) <> doc
     prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty (extract ident) <> doc
 
-expToPat :: L (Exp a) -> Maybe (L (Pat a))
+expToPat :: Show a => L (Exp a) -> Maybe (L (Pat a))
 expToPat = traverse $ \ case
   Pat p -> Just p
   Paren e -> extract <$> expToPat e
   List [e] -> extract <$> expToPat e
   ParenInvoke e1 e2 -> expToPat e1 <&> \ p1 -> Invoke p1 e2
+  Tuple es       -> PatTuple <$> traverse expToPat es
+  PrefixDotDot e -> PatSplice <$> expToPat e
   ExpInfixColon e1 e2 -> expToPat e1 <&> \ p1 -> InfixColon p1 e2
-  ExpVar (expToPat -> Just p@(extract -> Name x)) -> Just . (\ x -> Var [] x []) $ x <$ p
-  ExpVar (expToPat -> Just (extract -> Specs p@(extract -> Name x) e2)) -> Just . (\ x -> Var [] x e2) $ x <$ p
+  ExpVar (expToPat -> Just p@(extract -> Name x)) -> Just . (\ y -> Var [] y []) $ x <$ p
+  ExpVar (expToPat -> Just (extract -> Specs p@(extract -> Name x) e2)) -> Just . (\ y -> Var [] y e2) $ x <$ p
   ExpSpecs e es -> expToPat e <&> \ p -> Specs p es
   e1 :->: e2 -> InfixArrow <$> expToPat e1 <*> expToPat e2
   _ -> Nothing

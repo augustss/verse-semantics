@@ -84,9 +84,8 @@ module Parser.Verse
   , P.many, P.sepBy1, P.try, P.chainl, P.optional, P.manyTill, P.anyChar, P.between
   , optionMaybe
   , eof, match
-  , getLoc, minBound
+  , getLoc
   , rewrite
-  -- , toPos
   , lexeme, spaces, P.choice, anySingleBut, single
   ) where
 
@@ -134,7 +133,6 @@ import Control.Monad.Supply
 
 import Data.ByteString(ByteString)
 import qualified Data.ByteString       as ByteString
-import qualified Data.ByteString.Char8 as BC
 import Data.ByteString.Internal(c2w, w2c)
 import Data.Char qualified as Char
 import Data.Char(isAlpha, isAlphaNum)
@@ -549,8 +547,8 @@ pPrintable' = pPrintable >>= fix
         Right txt ->
           case Text.uncons txt of
             Nothing -> fail $ "utf8 decoder returned empty text for: " ++ show ws
-            Just (c,ws) ->
-              if ws == Text.empty then
+            Just (c,ws') ->
+              if ws' == Text.empty then
                 return $ Exp.Char32 c
               else
                 fail $ "utf8 decoder returned more than one character for: " ++ show ws
@@ -584,10 +582,10 @@ pIdentT = P.try $ do  -- This P.try is needed for now since it will fail for key
                      <|>
                      return []
 
-  special :: Text.Text
-  special = "\\{}\"'"
+  spcl :: Text.Text
+  spcl = "\\{}\"'"
 
-  ok = P.notFollowedBy ( string "<#" <|> string "#>" ) *> satisfy ( \ w8 -> w8 >= 0x20 && w8 <= 0x7E && not (Text.elem (w2c w8) special))
+  ok = P.notFollowedBy ( string "<#" <|> string "#>" ) *> satisfy ( \ w8 -> w8 >= 0x20 && w8 <= 0x7E && not (Text.elem (w2c w8) spcl))
 
   fix w8s = c2w '\'' : w8s ++ [c2w '\'']
 
@@ -649,7 +647,7 @@ pStringLit :: Parser (L Text)
 pStringLit = do
   p1 <- pos
   s1 <- (match '"') *> pStringText
-  xs <- pStringRest <* match '"'
+  _xs <- pStringRest <* match '"'
   p2 <- pos
   return $ L (toLoc p1 p2) $ extract s1
 
@@ -677,8 +675,8 @@ pPrintable'' = pPrintable >>= fix
         Right txt ->
           case Text.uncons txt of
             Nothing -> fail $ "utf8 decoder returned empty text for: " ++ show ws
-            Just (c,ws) ->
-              if ws == Text.empty then
+            Just (c,ws') ->
+              if ws' == Text.empty then
                 return c
               else
                 fail $ "utf8 decoder returned more than one character for: " ++ show ws
@@ -1106,8 +1104,8 @@ pFun = pDef <* pSpace >>= pFun'
 
 -- TODO Not all implmented
 pFun' :: L (Exp SimpleName) -> Parser (L (Exp SimpleName))
-pFun' e1 =
-  repeatChoiceNoTry e1 [ \e1 -> liftL2 Exp.Lam e1 <$ pFatArrow <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
+pFun' e =
+  repeatChoiceNoTry e [ \e1 -> liftL2 Exp.Lam e1 <$ pFatArrow <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
                        , \e1 -> liftL2 Exp.Next e1 <$ pKeyword "next" <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
                        , \e1 -> liftL2 Exp.Over e1 <$ pKeyword "over" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
                        , \e1 -> liftL2 Exp.When e1 <$ pKeyword "when" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
@@ -1186,7 +1184,7 @@ pCommas = do
 
 mkTuple :: Loc -> [L (Exp SimpleName)] -> L (Exp SimpleName)
 mkTuple _loc [x] = x
-mkTuple loc xs = L loc $ Exp.Tuple xs
+mkTuple lc xs = L lc $ Exp.Tuple xs
 
 
 -- Separator := (';' | Ending) Scan
@@ -1196,9 +1194,6 @@ pSeparator = (pSemi <|> pEnding) *> pScan
 -- List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
 pList :: Parser (L [L (Exp SimpleName)])
 pList = doList pCommas pSeparator
-
-pDotList :: Parser (L [L (Exp SimpleName)])
-pDotList = doList pChoose pSeparator
 
 pNameList :: Parser (L [([L (Exp SimpleName)], L SimpleName)])
 pNameList = doList pAtName pNameSeparator
@@ -1211,9 +1206,9 @@ pNameSeparator :: Parser ()
 pNameSeparator = (pSemi <|> pComma <|> pEnding) *> pScan
 
 
--- The pSeparator and pItem must not consume any characters if they fail
+-- The pSep and pItem must not consume any characters if they fail
 doList :: Parser a -> Parser b -> Parser (L [a])
-doList pItem pSeparator = do
+doList pItem pSep = do
   push
   setLinePrefix ByteString.empty
   pScan
@@ -1228,7 +1223,7 @@ doList pItem pSeparator = do
     case qItem of
       Nothing -> return []
       Just item -> do
-        qSeparator <- P.optionMaybe pSeparator
+        qSeparator <- P.optionMaybe pSep
         case qSeparator of
           Nothing -> return [item]
           Just _ -> do
@@ -1279,27 +1274,27 @@ doBinary pLhs pRhs choices = do
     fixBinary (p, f) = \ e1 -> liftL2 f e1 <$ p <* pScan <*> pRhs <* pSpace
 
 repeatChoice :: a -> [a -> Parser a] -> Parser a
-repeatChoice e choices = do
-  tryChoices e choices
+repeatChoice a choices = do
+  tryChoices a choices
  where
   tryChoices e [] = return e
   tryChoices e (p:ps) = do
     qE <- P.optionMaybe $ P.try $ p e
     case qE of
-      Nothing -> tryChoices e ps
-      Just e -> tryChoices e choices
+      Nothing -> tryChoices e  ps
+      Just e' -> tryChoices e' choices
 
 
 repeatChoiceNoTry :: a -> [a -> Parser a] -> Parser a
-repeatChoiceNoTry e choices = do
-  tryChoices e choices
+repeatChoiceNoTry a choices = do
+  tryChoices a choices
  where
   tryChoices e [] = return e
   tryChoices e (p:ps) = do
     qE <- P.optionMaybe $ p e
     case qE of
-      Nothing -> tryChoices e ps
-      Just e -> tryChoices e choices
+      Nothing -> tryChoices e  ps
+      Just e' -> tryChoices e' choices
 
 
 pLParen :: Parser (L String)
@@ -1537,7 +1532,7 @@ wrapLoc p1 x p2 = L (toLoc p1 p2) x
 
 satisfy :: (Word8 -> Bool) -> Parser Word8
 satisfy f   = tokenPrim (\c -> showW8s [c])
-                        (\pos c _cs -> updatePosWord pos c)
+                        (\ps c _cs -> updatePosWord ps c)
                         (\w -> if f w then Just w else Nothing)
 
 anySingleBut :: Char -> Parser Char
@@ -1547,8 +1542,8 @@ string :: String -> Parser (L String)
 string s = P.try $ wrapLoc <$> pos <*> (s <$ tokens showW8s updatePosWords (map c2w s)) <*> pos
 
 updatePosWord :: PPos.SourcePos -> Word8 -> PPos.SourcePos
-updatePosWord pos w =
-  PPos.updatePosChar pos (if w < 127 then w2c w else ' ')
+updatePosWord p w =
+  PPos.updatePosChar p (if w < 127 then w2c w else ' ')
 
 updatePosWords :: PPos.SourcePos -> [Word8] -> PPos.SourcePos
 updatePosWords = foldl updatePosWord
