@@ -86,6 +86,7 @@ S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
   \\
   S \pomseq T & = & S \pombind (\lambda \EV_1.\, T \pombind (\lambda \EV_2. \, \pomunit{\EV_1 \cap \EV_2})) \\
               & = & [ \EV_1 \cap \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T ]  \hspace{6mm} \text{Using pomset-comprehensions}\\
+  \pommap & : & (A \rightarrow)
 \end{array} \\
 
 \end{array}
@@ -156,12 +157,12 @@ $$
 & = & \begin{array}[t]{@@{\;}l@@{\,}l}
         (S0 \pomseq \semess{B}{u}{v}{t_2}) \pomHIDE xs)
             \cup
-          ((\pomNOT(S0) \pomHIDE xs) \pomseq \semess{B}{u}{v}{t_3} \\
+          (\pomNOT(xs,S0) \pomseq \semess{B}{u}{v}{t_3} \\
         \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
       \end{array}
 \\ \\
 \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_1 t_2|}}
-& = & \pomFOR( \semap{I}{t_0}, \semapp{C}{t_1}, \semess{E}{p}{q}{t_2} ) \\
+& = &  \pomFOR{\semapp{C}{t_1}}{\semap{I}{t_1}}{u}{v}{t_2} \\
 \end{array}
 \\
 
@@ -186,26 +187,25 @@ $$
  & \pomONE( xs, \pomempty )  & = & \pomempty \\
  & \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
  & \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
- & \pomONE( xs, S \pomcat T )  & = & S1 \pomunion ((\pomNOT(S1) \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
+ & \pomONE( xs, S \pomcat T )  & = & S1 \pomunion (\pomNOT(xs,S1) \pomseq \pomONE(xs, T)) \\
  &                             & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
- & NOT & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
- & NOT(S) & = & \pommap( \conCompl, S) \hspace{5mm} \text{Complement each ENV} \\[1mm]
+ & NOT & : & \powerset{\Ident} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
+ & NOT(xs,S) & = & \pommap( \conCompl, S) \pomHIDE xs \hspace{5mm} \text{Complement each ENV, and hide} \\[1mm]
 
- & \semap{\pomFOR}{xs,t_2}uv & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
-
- & \semess{\pomFOR}{u}{v}{xs, t_2}\; \pomempty  & = & \pomempty \\
- & \semess{\pomFOR}{u}{v}{xs, t_2}\; \pomunit{\EV} 
-       &  = & (\pomunit{\EV}
-         \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
-         \pomseq \semess{E}{p}{q}{t_2}) \pomHIDE \{p,q,xs\}   \\
- & \semess{\pomFOR}{u}{v}{ xs, t_2 }\; (S \pomunion T) & = & \semess{\pomFOR}{u}{v}{xs,t_2}\;S \pomunion \semess{\pomFOR}{u}{v}{xs,t_2}\; T \\
- & \semess{\pomFOR}{u}{v}{ xs, t_2 }\; (S \pomcat T)
+ & \pomFOR{\_}{xs}{u}{v}{t_2} & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
+ & \pomFOR{\pomempty}{xs}{u}{v}{t_2} & = & \pomempty \\
+  & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} \\
+ & \pomFOR{\pomunit{\EV}}{xs}{u}{v}{t_2}
+       &  = & \begin{array}[t]{@@{}l}
+                (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
+                  \pomseq \semess{E}{p}{q}{t_2}) \pomHIDE \{p,q,xs\}   \\
+                \pomunion \; \pomNOT(xs, \pomunit{\EV}) \pomseq \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}
+              \end{array} \\
+ & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2}
          & = & \begin{array}[t]{@@{}l}
           \pomunit{\conBrack{u=u_1 \oplus u_2, v=v_1 \oplus v_2}} \\
-          \pomseq \semess{\pomFOR}{u_1}{v_1}{xs, _2}\;S \\
-          \pomseq (\pomNOT(S) \pomHIDE xs) \pomseq \semess{\pomFOR}{u_2}{v_2}{xs,t_2}\;T
+          \pomseq \pomFOR{S}{xs}{u_1}{v_1}{t_2} \pomseq \pomFOR{T}{xs}{u_2}{v_2}{t_2}
           \end{array}
-
 \end{array}
 \end{array}
 $$
