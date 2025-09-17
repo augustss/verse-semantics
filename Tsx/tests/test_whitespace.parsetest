@@ -1,0 +1,940 @@
+# Whitespace Variation Tests for Verse Parser - Wrapped in Functions
+# Tests that the parser correctly handles various amounts of whitespace in function bodies
+
+#! Valid
+# Basic binary expression - no spaces
+TestFunc1():void=
+    5+3
+
+#! Valid
+# Basic binary expression - single spaces
+TestFunc2():void=
+    5 + 3
+
+#! Valid
+# Basic binary expression - double spaces
+TestFunc3():void=
+    5  +  3
+
+#! Valid
+# Basic binary expression - triple spaces
+TestFunc4():void=
+    5   +   3
+
+#! Valid
+# Basic binary expression - tabs
+TestFunc5():void=
+	5	+	3
+
+#! Valid
+# Basic binary expression - mixed whitespace
+TestFunc6():void=
+    5  +  3
+
+#! Valid
+# Compound expression - no spaces
+TestFunc7():void=
+    x*y+z
+
+#! Valid
+# Compound expression - single spaces
+TestFunc8():void=
+    x * y + z
+
+#! Valid
+# Compound expression - double spaces
+TestFunc9():void=
+    x  *  y  +  z
+
+#! Valid
+# Compound expression - triple spaces
+TestFunc10():void=
+    x   *   y   +   z
+
+#! Valid
+# Compound expression - tabs
+TestFunc11():void=
+	x	*	y	+	z
+
+#! Valid
+# Parenthesized expression - no spaces
+TestFunc12():void=
+    (a+b)*c
+
+#! Valid
+# Parenthesized expression - single spaces
+TestFunc13():void=
+    ( a + b ) * c
+
+#! Valid
+# Parenthesized expression - double spaces
+TestFunc14():void=
+    (  a  +  b  )  *  c
+
+#! Valid
+# Parenthesized expression - triple spaces
+TestFunc15():void=
+    (   a   +   b   )   *   c
+
+#! Valid
+# Parenthesized expression - tabs
+TestFunc16():void=
+	(	a	+	b	)	*	c
+
+#! Valid
+# Assignment - no spaces
+TestFunc17():void=
+    x=5
+
+#! Valid
+# Assignment - single spaces
+TestFunc18():void=
+    x = 5
+
+#! Valid
+# Assignment - double spaces
+TestFunc19():void=
+    x  =  5
+
+#! Valid
+# Assignment - triple spaces
+TestFunc20():void=
+    x   =   5
+
+#! Valid
+# Assignment - tabs
+TestFunc21():void=
+	x	=	5
+
+#! Valid
+# Assignment - mixed whitespace
+TestFunc22():void=
+    x  =  5
+
+#! Valid
+# Compound assignment - no spaces
+TestFunc23():void=
+    result=x+y
+
+#! Valid
+# Compound assignment - single spaces
+TestFunc24():void=
+    result = x + y
+
+#! Valid
+# Compound assignment - double spaces
+TestFunc25():void=
+    result  =  x  +  y
+
+#! Valid
+# Compound assignment - triple spaces
+TestFunc26():void=
+    result   =   x   +   y
+
+#! Valid
+# Function call - no spaces
+TestFunc27():void=
+    f(x,y)
+
+#! Valid
+# Function call - spaces around parentheses
+TestFunc28():void=
+    f( x, y )
+
+#! Valid
+# Function call - double spaces
+TestFunc29():void=
+    f(  x,  y  )
+
+#! Valid
+# Function call - triple spaces
+TestFunc30():void=
+    f(   x,   y   )
+
+#! Valid
+# Function call - tabs
+TestFunc31():void=
+	f	(	x	,	y	)
+
+#! Valid
+# Function call - mixed whitespace
+TestFunc32():void=
+    f  (  x  ,  y  )
+
+#! Valid
+# Method call - no spaces
+TestFunc33():void=
+    Math.Add(1,2)
+
+#! Valid
+# Method call - single spaces
+TestFunc34():void=
+    Math.Add( 1, 2 )
+
+#! Valid
+# Method call - double spaces
+TestFunc35():void=
+    Math.Add(  1,  2  )
+
+#! Valid
+# Method call - spaces around dot
+TestFunc36():void=
+    Math  .  Add  (  1  ,  2  )
+
+#! Valid
+# Logical and - single spaces
+TestFunc37():void=
+    x and y
+
+#! Valid
+# Logical and - double spaces
+TestFunc38():void=
+    x  and  y
+
+#! Valid
+# Logical and - triple spaces
+TestFunc39():void=
+    x   and   y
+
+#! Valid
+# Logical and - tabs
+TestFunc40():void=
+	x	and	y
+
+#! Valid
+# Logical and - mixed whitespace
+TestFunc41():void=
+    x  and  y
+
+#! Valid
+# Logical or and - single spaces
+TestFunc42():void=
+    a or b and c
+
+#! Valid
+# Logical or and - double spaces
+TestFunc43():void=
+    a  or  b  and  c
+
+#! Valid
+# Logical or and - triple spaces
+TestFunc44():void=
+    a   or   b   and   c
+
+#! Valid
+# Logical or and - tabs
+TestFunc45():void=
+	a	or	b	and	c
+
+#! Valid
+# Less than - no spaces
+TestFunc46():void=
+    x<5
+
+#! Valid
+# Less than - single spaces
+TestFunc47():void=
+    x < 5
+
+#! Valid
+# Less than - double spaces
+TestFunc48():void=
+    x  <  5
+
+#! Valid
+# Less than - triple spaces
+TestFunc49():void=
+    x   <   5
+
+#! Valid
+# Less than - tabs
+TestFunc50():void=
+	x	<	5
+
+#! Valid
+# Greater than or equal - no spaces
+TestFunc51():void=
+    a>=b
+
+#! Valid
+# Greater than or equal - single spaces
+TestFunc52():void=
+    a >= b
+
+#! Valid
+# Greater than or equal - double spaces
+TestFunc53():void=
+    a  >=  b
+
+#! Valid
+# Greater than or equal - triple spaces
+TestFunc54():void=
+    a   >=   b
+
+#! Valid
+# Greater than or equal - tabs
+TestFunc55():void=
+	a	>=	b
+
+#! Valid
+# Tuple - no spaces
+TestFunc56():void=
+    (x,y)
+
+#! Valid
+# Tuple - single spaces
+TestFunc57():void=
+    ( x, y )
+
+#! Valid
+# Tuple - double spaces
+TestFunc58():void=
+    (  x,  y  )
+
+#! Valid
+# Tuple - triple spaces
+TestFunc59():void=
+    (   x,   y   )
+
+#! Valid
+# Tuple - tabs
+TestFunc60():void=
+	(	x	,	y	)
+
+#! Valid
+# Triple tuple - no spaces
+TestFunc61():void=
+    (1,2,3)
+
+#! Valid
+# Triple tuple - single spaces
+TestFunc62():void=
+    ( 1, 2, 3 )
+
+#! Valid
+# Triple tuple - double spaces
+TestFunc63():void=
+    (  1,  2,  3  )
+
+#! Valid
+# Triple tuple - triple spaces
+TestFunc64():void=
+    (   1,   2,   3   )
+
+#! Valid
+# Specifier with identifier - no leading space
+TestFunc65():void=
+    <public>x
+
+#! Valid
+# Specifier with identifier - leading spaces
+TestFunc66<public>():void=
+    x
+
+#! Valid
+# Specifier with identifier - space after specifier
+TestFunc67 <public>():void=
+    x
+
+#! Valid
+# Specifier with identifier - spaces on both sides
+TestFunc68 <public> ():void=
+    x
+
+#! Valid
+# Specifier with identifier - tabs
+TestFunc69 <public>   ():void=
+	x
+
+#! Valid
+# String literal - no spaces
+TestFunc75():void=
+    "hello"
+
+#! Valid
+# String literal - leading spaces
+TestFunc76():void=
+    "hello"
+
+#! Valid
+# String literal - trailing spaces
+TestFunc77():void=
+    "hello"
+
+#! Valid
+# String literal - spaces on both sides
+TestFunc78():void=
+    "hello"
+
+#! Valid
+# String literal - tabs
+TestFunc79():void=
+	"hello"
+
+#! Valid
+# String with space - no external spaces
+TestFunc80():void=
+    "test string"
+
+#! Valid
+# String with space - leading spaces
+TestFunc81():void=
+    "test string"
+
+#! Valid
+# String with space - trailing spaces
+TestFunc82():void=
+    "test string"
+
+#! Valid
+# String with space - spaces on both sides
+TestFunc83():void=
+    "test string"
+
+#! Valid
+# If expression - no spaces
+TestFunc84():void=
+    if(x>0):true
+
+#! Valid
+# If expression - spaces around parentheses
+TestFunc85():void=
+    if( x > 0 ):true
+
+#! Valid
+# If expression - spaces around all tokens
+TestFunc86():void=
+    if ( x > 0 ) : true
+
+#! Valid
+# If expression - double spaces
+TestFunc87():void=
+    if  (  x  >  0  )  :  true
+
+#! Valid
+# If expression - triple spaces
+TestFunc88():void=
+    if   (   x   >   0   )   :   true
+
+#! Valid
+# If expression - tabs
+TestFunc89():void=
+	if	(	x	>	0	)	:	true
+
+#! Valid
+# For loop - no spaces
+TestFunc90():void=
+    for(i:=0..10):i
+
+#! Valid
+# For loop - spaces around parentheses
+TestFunc91():void=
+    for( i := 0 .. 10 ):i
+
+#! Valid
+# For loop - spaces around all tokens
+TestFunc92():void=
+    for ( i := 0 .. 10 ) : i
+
+#! Valid
+# For loop - double spaces
+TestFunc93():void=
+    for  (  i  :=  0  ..  10  )  :  i
+
+#! Valid
+# For loop - tabs
+TestFunc94():void=
+	for	(	i	:=	0	..	10	)	:	i
+
+#! Valid
+# Lambda - no spaces
+TestFunc95():void=
+    x=>x+1
+
+#! Valid
+# Lambda - spaces around arrow
+TestFunc96():void=
+    x => x + 1
+
+#! Valid
+# Lambda - double spaces
+TestFunc97():void=
+    x  =>  x  +  1
+
+#! Valid
+# Lambda - triple spaces
+TestFunc98():void=
+    x   =>   x   +   1
+
+#! Valid
+# Lambda - tabs
+TestFunc99():void=
+	x	=>	x	+	1
+
+#! Valid
+# Lambda with tuple params - no spaces
+TestFunc100():void=
+    (a,b)=>a*b
+
+#! Valid
+# Lambda with tuple params - single spaces
+TestFunc101():void=
+    ( a, b ) => a * b
+
+#! Valid
+# Lambda with tuple params - double spaces
+TestFunc102():void=
+    (  a,  b  )  =>  a  *  b
+
+#! Valid
+# Lambda with tuple params - triple spaces
+TestFunc103():void=
+    (   a,   b   )   =>   a   *   b
+
+#! Valid
+# Property access - no spaces
+TestFunc104():void=
+    player.Name
+
+#! Valid
+# Property access - spaces around dot
+TestFunc105():void=
+    player . Name
+
+#! Valid
+# Property access - double spaces
+TestFunc106():void=
+    player  .  Name
+
+#! Valid
+# Property access - triple spaces
+TestFunc107():void=
+    player   .   Name
+
+#! Valid
+# Property access - tabs
+TestFunc108():void=
+	player	.	Name
+
+#! Valid
+# Chained property access - no spaces
+TestFunc109():void=
+    obj.field.subfield
+
+#! Valid
+# Chained property access - single spaces
+TestFunc110():void=
+    obj . field . subfield
+
+#! Valid
+# Chained property access - double spaces
+TestFunc111():void=
+    obj  .  field  .  subfield
+
+#! Valid
+# Chained property access - triple spaces
+TestFunc112():void=
+    obj   .   field   .   subfield
+
+#! Valid
+# Alternative expression - no spaces (case not supported in function bodies)
+TestFunc113():void=
+    x:=if(true):result
+
+#! Valid
+# Alternative expression - spaces around parentheses
+TestFunc114():void=
+    x:=if( true ):result
+
+#! Valid
+# Alternative expression - spaces around all tokens
+TestFunc115():void=
+    x:=if ( true ) : result
+
+#! Valid
+# Alternative expression - double spaces
+TestFunc116():void=
+    x:=if  (  true  )  :  result
+
+#! Valid
+# Alternative expression - tabs
+TestFunc117():void=
+	x:=if	(	true	)	:	result
+
+#! Valid
+# Complex nested expression - no spaces
+TestFunc118():void=
+    (a+b)*(c-d)
+
+#! Valid
+# Complex nested expression - single spaces
+TestFunc119():void=
+    ( a + b ) * ( c - d )
+
+#! Valid
+# Complex nested expression - double spaces
+TestFunc120():void=
+    (  a  +  b  )  *  (  c  -  d  )
+
+#! Valid
+# Complex nested expression - triple spaces
+TestFunc121():void=
+    (   a   +   b   )   *   (   c   -   d   )
+
+#! Valid
+# Nested function calls - no spaces
+TestFunc122():void=
+    f(g(x),h(y))
+
+#! Valid
+# Nested function calls - single spaces
+TestFunc123():void=
+    f( g( x ), h( y ) )
+
+#! Valid
+# Nested function calls - double spaces
+TestFunc124():void=
+    f(  g(  x  ),  h(  y  )  )
+
+#! Valid
+# Nested function calls - triple spaces
+TestFunc125():void=
+    f(   g(   x   ),   h(   y   )   )
+
+#! Valid
+# Lambda with complex body - no spaces
+TestFunc126():void=
+    x=>(x+1)*2
+
+#! Valid
+# Lambda with complex body - single spaces
+TestFunc127():void=
+    x => ( x + 1 ) * 2
+
+#! Valid
+# Lambda with complex body - double spaces
+TestFunc128():void=
+    x  =>  (  x  +  1  )  *  2
+
+#! Valid
+# Lambda with complex body - triple spaces
+TestFunc129():void=
+    x   =>   (   x   +   1   )   *   2
+
+#! Valid
+# For loop with identifiers - no spaces
+TestFunc130():void=
+    for(i:=start..end):process(i)
+
+#! Valid
+# For loop with identifiers - single spaces
+TestFunc131():void=
+    for( i := start .. end ):process( i )
+
+#! Valid
+# For loop with identifiers - spaces around all tokens
+TestFunc132():void=
+    for ( i := start .. end ) : process ( i )
+
+#! Valid
+# For loop with identifiers - double spaces
+TestFunc133():void=
+    for  (  i  :=  start  ..  end  )  :  process  (  i  )
+
+#! Valid
+# If with logical operators - no spaces (except required around 'and')
+TestFunc134():void=
+    if(x>0 and y<100):true
+
+#! Valid
+# If with logical operators - single spaces
+TestFunc135():void=
+    if( x > 0 and y < 100 ):true
+
+#! Valid
+# If with logical operators - spaces around all tokens
+TestFunc136():void=
+    if ( x > 0 and y < 100 ) : true
+
+#! Valid
+# If with logical operators - double spaces
+TestFunc137():void=
+    if  (  x  >  0  and  y  <  100  )  :  true
+
+#! Valid
+# Tuple with function calls - no spaces
+TestFunc138():void=
+    (f(x),g(y),h(z))
+
+#! Valid
+# Tuple with function calls - single spaces
+TestFunc139():void=
+    ( f( x ), g( y ), h( z ) )
+
+#! Valid
+# Tuple with function calls - double spaces
+TestFunc140():void=
+    (  f(  x  ),  g(  y  ),  h(  z  )  )
+
+#! Valid
+# Tuple with function calls - triple spaces
+TestFunc141():void=
+    (   f(   x   ),   g(   y   ),   h(   z   )   )
+
+#! Valid
+# Edge case - tabs for indentation
+TestFunc142():void=
+	5	+	3
+
+#! Valid
+# Edge case - double tabs
+TestFunc143():void=
+		x		*		y
+
+#! Valid
+# Edge case - triple tabs
+TestFunc144():void=
+			(		a		+		b		)
+
+#! Valid
+# Multiple operators - no spaces
+TestFunc145():void=
+    a+b*c-d
+
+#! Valid
+# Multiple operators - single spaces
+TestFunc146():void=
+    a + b * c - d
+
+#! Valid
+# Multiple operators - double spaces
+TestFunc147():void=
+    a  +  b  *  c  -  d
+
+#! Valid
+# Multiple operators - triple spaces
+TestFunc148():void=
+    a   +   b   *   c   -   d
+
+#! Valid
+# Chained property with method - no spaces
+TestFunc149():void=
+    obj.prop.subProp.value
+
+#! Valid
+# Chained property with method - single spaces
+TestFunc150():void=
+    obj . prop . subProp . value
+
+#! Valid
+# Chained property with method - double spaces
+TestFunc151():void=
+    obj  .  prop  .  subProp  .  value
+
+#! Valid
+# Chained property with method - triple spaces
+TestFunc152():void=
+    obj   .   prop   .   subProp   .   value
+
+#! Valid
+# Double parentheses - no spaces
+TestFunc153():void=
+    ((x+y)*z)
+
+#! Valid
+# Double parentheses - single spaces
+TestFunc154():void=
+    ( ( x + y ) * z )
+
+#! Valid
+# Double parentheses - double spaces
+TestFunc155():void=
+    (  (  x  +  y  )  *  z  )
+
+#! Valid
+# Double parentheses - triple spaces
+TestFunc156():void=
+    (   (   x   +   y   )   *   z   )
+
+#! Valid
+# Leading whitespace - spaces
+TestFunc157():void=
+      5 + 3
+
+#! Valid
+# Leading whitespace - tab
+TestFunc158():void=
+	x * y
+
+#! Valid
+# Leading whitespace - multiple spaces
+TestFunc159():void=
+      ( a + b ) * c
+
+#! Valid
+# Leading whitespace - tab with function
+TestFunc160():void=
+	f ( x , y )
+
+#! Valid
+# Extreme spacing - five spaces
+TestFunc161():void=
+         5     +     3
+
+#! Valid
+# Extreme spacing - ten spaces
+TestFunc162():void=
+              x          *          y
+
+#! Valid
+# Extreme spacing - fifteen spaces
+TestFunc163():void=
+                   (          a          +          b          )
+
+#! Valid
+# Minimal spacing - addition
+TestFunc164():void=
+    x+y
+
+#! Valid
+# Minimal spacing - function call
+TestFunc165():void=
+    f(a,b)
+
+#! Valid
+# Minimal spacing - tuple
+TestFunc166():void=
+    (1,2,3)
+
+#! Valid
+# Minimal spacing - lambda
+TestFunc167():void=
+    x=>x+1
+
+#! Valid
+# Minimal spacing - if
+TestFunc168():void=
+    if(x>0):true
+
+#! Valid
+# Minimal spacing - for loop
+TestFunc169():void=
+    for(i:=0..10):i
+
+#! Valid
+# Identifier with underscore - no spaces
+TestFunc170():void=
+    var_1
+
+#! Valid
+# Identifier with underscore - addition with spaces
+TestFunc171():void=
+    var_1 + var_2
+
+#! Valid
+# Identifier with underscore - double spaces
+TestFunc172():void=
+    var_1  +  var_2
+
+#! Valid
+# Identifier with underscore - tabs
+TestFunc173():void=
+	var_1	+	var_2
+
+#! Valid
+# Function with underscores - no spaces
+TestFunc174():void=
+    my_func(param_1, param_2)
+
+#! Valid
+# Function with underscores - spaces
+TestFunc175():void=
+    my_func( param_1 , param_2 )
+
+#! Valid
+# Function with underscores - double spaces
+TestFunc176():void=
+    my_func  (  param_1  ,  param_2  )
+
+#! Valid
+# Mixed logical and arithmetic - required spaces
+TestFunc177():void=
+    x and y or z
+
+#! Valid
+# Mixed logical and arithmetic - double spaces
+TestFunc178():void=
+    x  and  y  or  z
+
+#! Valid
+# Mixed logical and arithmetic - triple spaces
+TestFunc179():void=
+    x   and   y   or   z
+
+#! Valid
+# Complex mixed operations - single spaces
+TestFunc180():void=
+    a + b and c * d
+
+#! Valid
+# Complex mixed operations - double spaces
+TestFunc181():void=
+    a  +  b  and  c  *  d
+
+#! Valid
+# Complex mixed operations - triple spaces
+TestFunc182():void=
+    a   +   b   and   c   *   d
+
+#! Valid
+# Triple parentheses - no spaces
+TestFunc183():void=
+    (((x)))
+
+#! Valid
+# Triple parentheses - single spaces
+TestFunc184():void=
+    ( ( ( x ) ) )
+
+#! Valid
+# Triple parentheses - double spaces
+TestFunc185():void=
+    (  (  (  x  )  )  )
+
+#! Valid
+# Triple parentheses - triple spaces
+TestFunc186():void=
+    (   (   (   x   )   )   )
+
+#! Valid
+# Function with multiple whitespace variations in parameters
+TestFunc187( x : int , y : float ):void=
+    x + y
+
+#! Valid
+# Function with no spaces in parameters
+TestFunc188(x:int,y:float):void=
+    x+y
+
+#! Valid
+# Function with tabs in parameters
+TestFunc189(	x	:	int	,	y	:	float	):void=
+	x	+	y
+
+#! Valid
+# Function with specifiers and spacing
+TestFunc190<public>():void=
+    42
+
+#! Valid
+# Function with specifiers and more spacing
+TestFunc191  <public>  (  )  :  void  =
+    42
+
+#! Valid
+# Complex function with everything
+TestFunc192<public>(x:int, y:float) : string =
+    if(x>0 and y<1.0):
+        "positive"
+    else:
+        "negative"

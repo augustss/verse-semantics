@@ -13,12 +13,12 @@ This is a TypeScript implementation of a lossless parser for the Verse programmi
 npm run build        # Compile TypeScript to JavaScript (dist/)
 npm run dev          # Run src/index.ts directly with ts-node
 npm test             # Run all tests
+npm run test:parse   # Run parse tests with ts-node
 npm run lint         # Run TypeScript type checking (tsc --noEmit)
 npm run clean        # Remove dist/ directory
 
 # Run specific tests
 npm test -- parser.test.ts                   # Run specific test file
-npm test -- integration.test.ts              # Run integration tests
 npm test -- --testNamePattern="logical"      # Run tests matching pattern
 npm test -- --coverage                       # Run tests with coverage report
 ```
@@ -77,23 +77,23 @@ All AST nodes use the `L<T>` wrapper type for location tracking:
 - Some UI-related Verse constructs (struct fields, @editable attributes)
 - Generic types with brackets: `[player]widget_map`
 
-### Lossless Parsing
+### Lossless Parsing & Output
 
 - **src/lossless-parser.ts**: Lossless parsing implementation that preserves all source information
 - **src/printer/pretty-printer.ts**: AST pretty-printing (partially implemented, has type issues)
+- **src/simple-printer.ts**: Simple AST printer implementation
+- **src/working-printer.ts**: Working printer implementation
 - **src/error-reporting.ts**: Error reporting and diagnostic utilities
 
 ## Test Organization
 
 Tests use Jest with ts-jest for TypeScript support:
 
-- **tests/parser.test.ts**: Core parser functionality tests (200+ tests)
-- **tests/integration.test.ts**: Integration tests for all new features (31 tests)
-- **tests/logical-operators.test.ts**: Logical operator specific tests
+- **tests/parser.test.ts**: Core parser functionality tests
 - **tests/golden.test.ts**: Golden reference tests comparing against expected outputs
-- **tests/specifier.test.ts**: Tests for Verse specifier parsing
+- **tests/parsetest-runner.ts**: Parse test runner for bulk Verse file testing
 
-Test coverage: ~99.6% (242/243 tests passing)
+Test coverage: 100% (181/181 tests passing)
 
 ## Working with Verse Files
 

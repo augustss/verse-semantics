@@ -1,13 +1,12 @@
 // Trivia-aware parser combinators for lossless parsing
 import {
-  Parser, ParseResult, ParseState, map, flatMap, satisfy, string, many,
-  optional, choice, succeed, fail, withLocation
+  Parser, ParseResult, ParseState, map, flatMap, many, choice, withLocation
 } from './combinators';
-import { L, Loc, Position, createPos, createLoc, withLoc } from '../ast/location';
+import { L, createPos, withLoc } from '../ast/location';
 import {
-  Trivia, TriviaList, TriviaKind,
+  Trivia, TriviaList,
   createWhitespace, createNewline, createLineComment, createBlockComment,
-  createTriviaList, combine
+  createTriviaList
 } from '../ast/trivia';
 
 // Character predicates
@@ -16,143 +15,159 @@ const isNewline = (c: number): boolean => c === 0x0A || c === 0x0D; // LF, CR
 
 // Parse a single trivia token
 const pWhitespaceTrivia: Parser<Trivia> = (state: ParseState): ParseResult<Trivia> => {
-  const start = createPos(state.line, state.column, state.offset);
+  const start = createPos(state.line, state.column, state.position);
   let current = state;
   let chars: number[] = [];
 
-  while (current.offset < current.input.length) {
-    const c = current.input.charCodeAt(current.offset);
+  while (current.position < current.input.length) {
+    const c = current.input[current.position];
     if (!isSpace(c)) break;
 
     chars.push(c);
     current = {
       ...current,
-      offset: current.offset + 1,
+      position: current.position + 1,
       column: current.column + 1
     };
   }
 
   if (chars.length === 0) {
-    return { success: false, error: { message: 'No whitespace', position: current.offset } };
+    return {
+      success: false,
+      error: {
+        message: 'No whitespace',
+        position: createPos(current.line, current.column, current.position)
+      }
+    };
   }
 
-  const end = createPos(current.line, current.column, current.offset);
+  const end = createPos(current.line, current.column, current.position);
   const text = String.fromCharCode(...chars);
 
   return {
     success: true,
     value: createWhitespace(text, start, end),
-    newState: current
+    state: current
   };
 };
 
 const pNewlineTrivia: Parser<Trivia> = (state: ParseState): ParseResult<Trivia> => {
-  const start = createPos(state.line, state.column, state.offset);
+  const start = createPos(state.line, state.column, state.position);
   let current = state;
   let chars: number[] = [];
 
-  while (current.offset < current.input.length) {
-    const c = current.input.charCodeAt(current.offset);
+  while (current.position < current.input.length) {
+    const c = current.input[current.position];
     if (!isNewline(c)) break;
 
-    chars.push(c);
-    current = {
-      ...current,
-      offset: current.offset + 1,
-      column: c === 0x0A ? 1 : current.column, // Reset column on LF
-      line: c === 0x0A ? current.line + 1 : current.line
-    };
-
-    // Handle CRLF as single newline
-    if (c === 0x0D && current.offset < current.input.length &&
-        current.input.charCodeAt(current.offset) === 0x0A) {
-      chars.push(0x0A);
+    // Handle CRLF as single newline sequence but preserve both characters for lossless parsing
+    if (c === 0x0D && current.position + 1 < current.input.length &&
+        current.input[current.position + 1] === 0x0A) {
+      // CRLF sequence - preserve both characters
+      // console.log('DEBUG: Found CRLF, preserving both characters');
+      chars.push(0x0D); // CR
+      chars.push(0x0A); // LF
       current = {
         ...current,
-        offset: current.offset + 1,
+        position: current.position + 2, // Skip both CR and LF
         column: 1,
         line: current.line + 1
+      };
+    } else {
+      // Single character newline (LF or standalone CR)
+      chars.push(c);
+      current = {
+        ...current,
+        position: current.position + 1,
+        column: c === 0x0A ? 1 : current.column, // Reset column on LF
+        line: c === 0x0A ? current.line + 1 : current.line
       };
     }
     break; // One newline sequence at a time
   }
 
   if (chars.length === 0) {
-    return { success: false, error: { message: 'No newline', position: current.offset } };
+    return {
+      success: false,
+      error: {
+        message: 'No newline',
+        position: createPos(current.line, current.column, current.position)
+      }
+    };
   }
 
-  const end = createPos(current.line, current.column, current.offset);
+  const end = createPos(current.line, current.column, current.position);
   const text = String.fromCharCode(...chars);
 
   return {
     success: true,
     value: createNewline(text, start, end),
-    newState: current
+    state: current
   };
 };
 
 const pLineCommentTrivia: Parser<Trivia> = (state: ParseState): ParseResult<Trivia> => {
-  const start = createPos(state.line, state.column, state.offset);
+  const start = createPos(state.line, state.column, state.position);
 
   // Check for '#' at start
-  if (state.offset >= state.input.length || state.input.charCodeAt(state.offset) !== 0x23) {
-    return { success: false, error: { message: 'No line comment', position: state.offset } };
+  if (state.position >= state.input.length || state.input[state.position] !== 0x23) {
+    return { success: false, error: { message: 'No line comment', position: createPos(state.line, state.column, state.position) } };
   }
 
   let current = state;
   let chars: number[] = [];
 
   // Consume until newline or end of input
-  while (current.offset < current.input.length) {
-    const c = current.input.charCodeAt(current.offset);
+  while (current.position < current.input.length) {
+    const c = current.input[current.position];
     if (isNewline(c)) break;
 
     chars.push(c);
     current = {
       ...current,
-      offset: current.offset + 1,
+      position: current.position + 1,
       column: current.column + 1
     };
   }
 
-  const end = createPos(current.line, current.column, current.offset);
+  const end = createPos(current.line, current.column, current.position);
   const text = String.fromCharCode(...chars);
 
   return {
     success: true,
     value: createLineComment(text, start, end),
-    newState: current
+    state: current
   };
 };
 
 const pBlockCommentTrivia: Parser<Trivia> = (state: ParseState): ParseResult<Trivia> => {
-  const start = createPos(state.line, state.column, state.offset);
+  const start = createPos(state.line, state.column, state.position);
 
   // Check for '<#' at start
-  if (state.offset + 1 >= state.input.length ||
-      state.input.charCodeAt(state.offset) !== 0x3C ||
-      state.input.charCodeAt(state.offset + 1) !== 0x23) {
-    return { success: false, error: { message: 'No block comment', position: state.offset } };
+  if (state.position + 1 >= state.input.length ||
+      state.input[state.position] !== 0x3C ||
+      state.input[state.position + 1] !== 0x23) {
+    return { success: false, error: { message: 'No block comment', position: createPos(state.line, state.column, state.position) } };
   }
 
   let current = {
     ...state,
-    offset: state.offset + 2,
+    position: state.position + 2,
     column: state.column + 2
   };
   let chars: number[] = [0x3C, 0x23]; // Include opening '<#'
 
   // Find closing '#>'
-  while (current.offset + 1 < current.input.length) {
-    const c = current.input.charCodeAt(current.offset);
+  while (current.position + 1 < current.input.length) {
+    const c = current.input[current.position];
     chars.push(c);
 
-    if (c === 0x23 && current.input.charCodeAt(current.offset + 1) === 0x3E) {
+    if (c === 0x23 && current.input[current.position + 1] === 0x3E) {
       // Found '#>', include it and finish
       chars.push(0x3E);
       current = {
         ...current,
-        offset: current.offset + 2,
+        position: current.position + 2,
         column: isNewline(c) ? 1 : current.column + 2,
         line: isNewline(c) ? current.line + 1 : current.line
       };
@@ -161,19 +176,19 @@ const pBlockCommentTrivia: Parser<Trivia> = (state: ParseState): ParseResult<Tri
 
     current = {
       ...current,
-      offset: current.offset + 1,
+      position: current.position + 1,
       column: isNewline(c) ? 1 : current.column + 1,
       line: isNewline(c) ? current.line + 1 : current.line
     };
   }
 
-  const end = createPos(current.line, current.column, current.offset);
+  const end = createPos(current.line, current.column, current.position);
   const text = String.fromCharCode(...chars);
 
   return {
     success: true,
     value: createBlockComment(text, start, end),
-    newState: current
+    state: current
   };
 };
 

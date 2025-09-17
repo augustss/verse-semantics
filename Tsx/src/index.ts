@@ -111,6 +111,22 @@ if (require.main === module) {
         console.log('✓ PARSING SUCCESSFUL');
         const jsonSafe = astToJSON(result.value);
         console.log('AST:', JSON.stringify(jsonSafe, null, 2));
+
+        // Also show pretty printed output for comparison
+        try {
+          const { PrettyPrinter } = require('./printer/pretty-printer');
+          const printer = new PrettyPrinter(undefined, fileContent);
+          const printed = printer.print(result.value);
+          console.log('\n' + '='.repeat(50));
+          console.log('PRETTY PRINTED OUTPUT:');
+          console.log(printed);
+          console.log('\nORIGINAL vs PRINTED:');
+          console.log('Original:', fileContent.trim());
+          console.log('Printed: ', printed);
+          console.log('Match:   ', fileContent.trim() === printed ? '✓' : '✗');
+        } catch (e) {
+          console.log('Pretty printing failed:', e);
+        }
       } else {
         console.log('✗ PARSING FAILED');
         console.log(formatErrorWithContext(result.error, fileContent));

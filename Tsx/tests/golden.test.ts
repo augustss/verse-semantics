@@ -406,7 +406,7 @@ describe('Golden Tests - Replicating Haskell Parser Tests', () => {
             }
 
             if (specifierCount !== undefined) {
-              expect(decl.specifiers.length).toBe(specifierCount);
+              expect(decl.preSpecifiers.length + decl.postSpecifiers.length).toBe(specifierCount);
             }
           }
         }

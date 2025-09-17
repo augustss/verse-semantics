@@ -1,0 +1,1467 @@
+
+> verse-parser@1.0.0 test:parse
+> ts-node tests/parsetest-runner.ts tests/verse-valid.parsetest
+
+
+============================================================
+Running tests from: verse-valid.parsetest
+============================================================
+✓ Test 1 (line 1): Valid
+  Basic variable declarations with correct syntax
+✓ Test 2 (line 5): Valid
+  Optional types with correct assignment operator
+✓ Test 3 (line 11): Valid
+  Generic type parameters
+✓ Test 4 (line 17): Valid
+  Enum declarations with specifiers
+✓ Test 5 (line 23): Valid
+  Multiple class parents
+✓ Test 6 (line 29): Valid
+  Class with single parent
+✓ Test 7 (line 35): Valid
+  Complex field declarations
+✓ Test 8 (line 46): Valid
+  Function declarations with specifiers
+✓ Test 9 (line 52): Valid
+  For loops
+✓ Test 10 (line 60): Valid
+  Array indexing with valid identifiers
+✓ Test 11 (line 66): Valid
+  If statements with complex conditions
+✓ Test 12 (line 75): Valid
+  Using statements
+✓ Test 13 (line 80): Valid
+  Set operations
+✓ Test 14 (line 87): Valid
+  Module declarations
+✓ Test 15 (line 92): Valid
+  Constructor calls
+✓ Test 16 (line 99): Valid
+  Event declarations
+✓ Test 17 (line 104): Valid
+  Lambda expressions
+✓ Test 18 (line 110): Valid
+  Case statements
+✗ Test 19 (line 118): Valid - FAILED
+  Correct generic type syntax
+✓ Test 20 (line 123): Valid
+  Spawn blocks
+✓ Test 21 (line 129): Valid
+  String interpolation
+✓ Test 22 (line 136): Valid
+  Decorators
+✓ Test 23 (line 144): Valid
+  Array and map literals
+✓ Test 24 (line 152): Valid
+  Method chaining and property access
+✓ Test 25 (line 159): Valid
+  Various control structures that should be allowed if-variety
+✓ Test 26 (line 166): Valid
+  Arithmetic expressions and operator precedence
+✓ Test 27 (line 174): Valid
+  Comparison operators
+✓ Test 28 (line 184): Valid
+  Logical expressions with and/or
+✓ Test 29 (line 192): Valid
+  Function calls and method invocation
+✓ Test 30 (line 199): Valid
+  Tuple and array syntax
+✓ Test 31 (line 207): Valid
+  Complex nested expressions
+✓ Test 32 (line 213): Valid
+  Range expressions
+✓ Test 33 (line 220): Valid
+  Comments and whitespace handling
+✓ Test 34 (line 230): Valid
+  String literals and escapes
+✓ Test 35 (line 238): Valid
+  Character literals
+✓ Test 36 (line 246): Valid
+  Lambda expressions with different parameter styles
+✓ Test 37 (line 254): Valid
+  Match/case expressions
+✗ Test 38 (line 262): Valid - FAILED
+  While and loop constructs
+✗ Test 39 (line 272): Valid - FAILED
+  Try-catch error handling
+✓ Test 40 (line 280): Valid
+  Interface and struct-like declarations
+✗ Test 41 (line 287): Valid - FAILED
+  Generic function syntax
+✓ Test 42 (line 291): Valid
+  Complex generic expressions
+✓ Test 43 (line 297): Valid
+  Operator overloading syntax
+✓ Test 44 (line 304): Valid
+  Property accessors
+✓ Test 45 (line 311): Valid
+  Async and concurrent operations
+✓ Test 46 (line 321): Valid
+  Module and namespace syntax
+✓ Test 47 (line 328): Valid
+  Type annotations and conversions
+✓ Test 48 (line 335): Valid
+  Basic if-then-else expressions (expression form)
+✓ Test 49 (line 342): Valid
+  If-then without else (expression form)
+✓ Test 50 (line 349): Valid
+  If-then-else with parentheses variations
+✓ Test 51 (line 356): Valid
+  If-then-else statement form with blocks
+✓ Test 52 (line 368): Valid
+  If-then-else with complex conditions
+✓ Test 53 (line 376): Valid
+  Nested if-then-else expressions
+✓ Test 54 (line 383): Valid
+  Nested if-then-else statements
+✓ Test 55 (line 397): Valid
+  If-then-else ladder (else if pattern)
+✗ Test 56 (line 411): Valid - FAILED
+  If-then-else with function calls and method chaining
+✓ Test 57 (line 418): Valid
+  If-then-else with assignment operations
+✓ Test 58 (line 430): Valid
+  If-then-else with different return types (same base type)
+✓ Test 59 (line 437): Valid
+  If-then-else with block expressions
+✗ Test 60 (line 447): Valid - FAILED
+  If-then-else with multiline formatting
+✗ Test 61 (line 461): Valid - FAILED
+  If-then-else with ranges and arrays
+✓ Test 62 (line 469): Valid
+  If-then-else with lambda expressions
+✗ Test 63 (line 475): Valid - FAILED
+  If-then-else with case expressions
+✗ Test 64 (line 487): Valid - FAILED
+  Deeply nested complex if-then-else
+✗ Test 65 (line 506): Valid - FAILED
+  If-then-else with loop control
+✗ Test 66 (line 523): Valid - FAILED
+  If-then-else with error handling
+✗ Test 67 (line 535): Valid - FAILED
+  If-then-else with assignment in condition (properly parenthesized)
+✓ Test 68 (line 540): Valid
+  If-then-else with curly brace blocks (statement form)
+✓ Test 69 (line 551): Valid
+  If-then with single curly brace block
+✓ Test 70 (line 559): Valid
+  Nested if-then-else with curly braces
+✓ Test 71 (line 575): Valid
+  If-then-else ladder with curly braces
+✓ Test 72 (line 592): Valid
+  Mixed colon and curly brace syntax
+✓ Test 73 (line 606): Valid
+  If-then-else with curly braces and complex expressions
+✓ Test 74 (line 621): Valid
+  If-then-else with curly braces containing loops
+✓ Test 75 (line 633): Valid
+  If-then-else with curly braces and function calls
+✗ Test 76 (line 648): Valid - FAILED
+  If-then-else with empty curly brace blocks
+✗ Test 77 (line 656): Valid - FAILED
+  If-then-else with curly braces and variable declarations
+✓ Test 78 (line 667): Valid
+  Deeply nested if-then-else with curly braces
+✓ Test 79 (line 688): Valid
+  If-then-else with curly braces and return statements
+✗ Test 80 (line 699): Valid - FAILED
+  If-then-else with curly braces and error handling
+✗ Test 81 (line 716): Valid - FAILED
+  Basic class declarations
+✓ Test 82 (line 727): Valid
+  Class inheritance and specifiers
+✓ Test 83 (line 739): Valid
+  Classes with creative device inheritance
+✓ Test 84 (line 752): Valid
+  Classes with multiple inheritance
+✓ Test 85 (line 761): Valid
+  Interface declarations
+✓ Test 86 (line 775): Valid
+  Complex interface with multiple methods
+✓ Test 87 (line 791): Valid
+  Struct declarations
+✓ Test 88 (line 804): Valid
+  Nested struct definitions
+✓ Test 89 (line 817): Valid
+  Classes with properties and methods
+✓ Test 90 (line 835): Valid
+  Classes with constructors and destructors
+✓ Test 91 (line 849): Valid
+  Classes with static and instance members
+✗ Test 92 (line 860): Valid - FAILED
+  Generic classes and interfaces
+✓ Test 93 (line 872): Valid
+  Classes with attributes and specifiers
+✓ Test 94 (line 887): Valid
+  Interface implementation and composition
+✓ Test 95 (line 904): Valid
+  Struct with methods and computed properties
+✓ Test 96 (line 915): Valid
+  Complex class hierarchy
+✗ Test 97 (line 943): Valid - FAILED
+  Abstract classes and virtual methods
+✓ Test 98 (line 956): Valid
+  Enum classes and specialized types
+✓ Test 99 (line 973): Valid
+  Classes with events and delegates
+✓ Test 100 (line 986): Valid
+  Mixin and trait-like patterns
+✗ Test 101 (line 1011): Valid - FAILED
+  Classes with operator overloading
+✗ Test 102 (line 1024): Valid - FAILED
+  Class templates and specialization
+✗ Test 103 (line 1041): Valid - FAILED
+  Function declarations with various specifiers
+✗ Test 104 (line 1056): Valid - FAILED
+  Functions with multiple specifiers
+✗ Test 105 (line 1068): Valid - FAILED
+  Functions with specifiers and parameters
+✗ Test 106 (line 1080): Valid - FAILED
+  Functions with specifiers and return types
+✓ Test 107 (line 1092): Valid
+  Class methods with specifiers
+✓ Test 108 (line 1108): Valid
+  Interface methods with specifiers
+✗ Test 109 (line 1118): Valid - FAILED
+  Functions with specifiers in different contexts
+✓ Test 110 (line 1133): Valid
+  Lambda expressions with specifiers (if supported)
+✗ Test 111 (line 1140): Valid - FAILED
+  Complex specifier combinations
+✗ Test 112 (line 1152): Valid - FAILED
+  Specifiers with generic functions
+✗ Test 113 (line 1164): Valid - FAILED
+  Specifiers in function overloads and variants
+✗ Test 114 (line 1176): Valid - FAILED
+  Specifiers with default parameters
+✗ Test 115 (line 1188): Valid - FAILED
+  Nested function calls with specifiers
+✗ Test 116 (line 1201): Valid - FAILED
+  Specifiers with error handling
+✓ Test 117 (line 1216): Valid
+  Class inheritance with specifier preservation
+✓ Test 118 (line 1233): Valid
+  Module-level functions with specifiers
+✗ Test 119 (line 1249): Valid - FAILED
+  Event system with specifiers
+✗ Test 120 (line 1263): Valid - FAILED
+  Concurrent operations with specifiers
+✗ Test 121 (line 1278): Valid - FAILED
+  Basic class declarations with curly braces
+✗ Test 122 (line 1292): Valid - FAILED
+  Classes with curly brace methods
+✗ Test 123 (line 1310): Valid - FAILED
+  Classes with curly brace constructors and destructors
+✗ Test 124 (line 1330): Valid - FAILED
+  Inherited classes with curly braces
+✗ Test 125 (line 1349): Valid - FAILED
+  Creative device classes with curly braces
+✗ Test 126 (line 1375): Valid - FAILED
+  Classes with curly brace event handlers
+✗ Test 127 (line 1396): Valid - FAILED
+  Classes with nested curly brace blocks
+✗ Test 128 (line 1433): Valid - FAILED
+  Classes with curly brace property accessors
+✗ Test 129 (line 1460): Valid - FAILED
+  Generic classes with curly braces
+✗ Test 130 (line 1486): Valid - FAILED
+  Classes with curly brace error handling
+✗ Test 131 (line 1531): Valid - FAILED
+  Mixed colon and curly brace syntax in classes
+✗ Test 132 (line 1566): Valid - FAILED
+  Classes with curly brace loops and control flow
+✗ Test 133 (line 1598): Valid - FAILED
+  Interface implementations with curly braces
+✗ Test 134 (line 1623): Valid - FAILED
+  Struct definitions with curly braces
+✗ Test 135 (line 1651): Valid - FAILED
+  String interpolation - empty and edge cases
+✓ Test 136 (line 1660): Valid
+  String interpolation in different contexts
+✓ Test 137 (line 1679): Valid
+  String interpolation with method calls
+✓ Test 138 (line 1690): Valid
+  String interpolation with complex expressions
+✓ Test 139 (line 1701): Valid
+  String interpolation in class methods
+✗ Test 140 (line 1714): Valid - FAILED
+  String interpolation with operators and arithmetic
+✓ Test 141 (line 1726): Valid
+  String interpolation with conditionals
+✓ Test 142 (line 1737): Valid
+  String interpolation with array and map access
+
+============================================================
+Results: 93 passed, 49 failed out of 142 tests
+Pass rate: 65.5%
+
+============================================================
+Failed Tests:
+============================================================
+
+1. Line 118 - Expected success but got error
+   Description: Correct generic type syntax
+   Code:
+      1 | var TestVar : weak_map(session, int) = map{}
+      2 | var TestVar2 := map{}
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 1
+   Context:
+   1 | var TestVar : weak_map(session, int) = map{}
+   >>>   2 | var TestVar2 := map{}
+          ^ Error here
+
+2. Line 262 - Expected success but got error
+   Description: While and loop constructs
+   Code:
+      1 | TestLoops():void=
+      2 |     while (condition):
+      3 |         DoSomething()
+      4 | 
+      5 |     loop:
+      6 |         if (exitCondition): break
+      7 |         Process()
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 1, Column 17
+   Context:
+   >>>   1 | TestLoops():void=
+         2 |     while (condition):
+                          ^ Error here
+
+3. Line 272 - Expected success but got error
+   Description: Try-catch error handling
+   Code:
+      1 | TestErrorHandling():void=
+      2 |     result := try:
+      3 |         RiskyOperation()
+      4 |     catch:
+      5 |         DefaultValue()
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 4, Column 5
+   Context:
+   3 |         RiskyOperation()
+   >>>   4 |     catch:
+         5 |         DefaultValue()
+              ^ Error here
+
+4. Line 287 - Expected success but got error
+   Description: Generic function syntax
+   Code:
+      1 | GenericFunc<T>(value: T): T = value
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 1, Column 25
+   Context:
+   >>>   1 | GenericFunc<T>(value: T): T = value
+                                  ^ Error here
+
+5. Line 411 - Expected success but got error
+   Description: If-then-else with function calls and method chaining
+   Code:
+      1 | TestIfWithFunctions():void=
+      2 |     result := if (GetValue() > threshold) then ProcessHigh(data) else ProcessLow(data)
+      3 |     status := if (obj.IsValid()) then obj.GetStatus() else "invalid"
+      4 |     value := if (array.Length() > 0) then array[0] else defaultValue
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 4, Column 12
+   Context:
+   3 |     status := if (obj.IsValid()) then obj.GetStatus() else "invalid"
+   >>>   4 |     value := if (array.Length() > 0) then array[0] else defaultValue
+                     ^ Error here
+
+6. Line 447 - Expected success but got error
+   Description: If-then-else with multiline formatting
+   Code:
+      1 | TestIfMultiline():void=
+      2 |     result := if (
+      3 |         veryLongCondition and
+      4 |         anotherCondition or
+      5 |         thirdCondition
+      6 |     ) then (
+      7 |         complexCalculation() +
+      8 |         anotherCalculation()
+      9 |     ) else (
+     10 |         simpleDefault
+     11 |     )
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 13
+   Context:
+   1 | TestIfMultiline():void=
+   >>>   2 |     result := if (
+         3 |         veryLongCondition and
+                      ^ Error here
+
+7. Line 461 - Expected success but got error
+   Description: If-then-else with ranges and arrays
+   Code:
+      1 | TestIfWithCollections():void=
+      2 |     range := if (ascending) then 1..10 else 10..1
+      3 |     array := if (empty) then array{} else array{1, 2, 3}
+      4 |     element := if (index < array.Length()) then array[index] else defaultElement
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 4, Column 14
+   Context:
+   3 |     array := if (empty) then array{} else array{1, 2, 3}
+   >>>   4 |     element := if (index < array.Length()) then array[index] else defaultElement
+                       ^ Error here
+
+8. Line 475 - Expected success but got error
+   Description: If-then-else with case expressions
+   Code:
+      1 | TestIfWithCase():void=
+      2 |     result := if (useCase) then (
+      3 |         case (value):
+      4 |             1 => "one"
+      5 |             2 => "two"
+      6 |             _ => "other"
+      7 |     ) else (
+      8 |         defaultString
+      9 |     )
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 6, Column 7
+   Context:
+   5 |             2 => "two"
+   >>>   6 |             _ => "other"
+         7 |     ) else (
+                ^ Error here
+
+9. Line 487 - Expected success but got error
+   Description: Deeply nested complex if-then-else
+   Code:
+      1 | TestDeeplyNested():void=
+      2 |     result := if (level1) then (
+      3 |         if (level2a) then (
+      4 |             if (level3a) then (
+      5 |                 if (level4) then deepValue1 else deepValue2
+      6 |             ) else (
+      7 |                 midValue1
+      8 |             )
+      9 |         ) else if (level2b) then (
+     10 |             if (level3b) then midValue2 else midValue3
+     11 |         ) else (
+     12 |             shallowValue
+     13 |         )
+     14 |     ) else (
+     15 |         if (altCondition) then altValue else defaultValue
+     16 |     )
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 27
+   Context:
+   1 | TestDeeplyNested():void=
+   >>>   2 |     result := if (level1) then (
+         3 |         if (level2a) then (
+                                    ^ Error here
+
+10. Line 506 - Expected success but got error
+   Description: If-then-else with loop control
+   Code:
+      1 | TestIfWithLoops():void=
+      2 |     for (item : collection):
+      3 |         if (item.IsValid()):
+      4 |             ProcessItem(item)
+      5 |         else:
+      6 |             SkipItem(item)
+      7 | 
+      8 |     while (condition):
+      9 |         if (shouldBreak):
+     10 |             break
+     11 |         else if (shouldContinue):
+     12 |             continue
+     13 |         else:
+     14 |             ProcessNormally()
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 5, Column 5
+   Context:
+   4 |             ProcessItem(item)
+   >>>   5 |         else:
+         6 |             SkipItem(item)
+              ^ Error here
+
+11. Line 523 - Expected success but got error
+   Description: If-then-else with error handling
+   Code:
+      1 | TestIfWithErrorHandling():void=
+      2 |     result := if (canProcess) then (
+      3 |         try:
+      4 |             ProcessData()
+      5 |         catch:
+      6 |             HandleError()
+      7 |     ) else (
+      8 |         SkipProcessing()
+      9 |     )
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 31
+   Context:
+   1 | TestIfWithErrorHandling():void=
+   >>>   2 |     result := if (canProcess) then (
+         3 |         try:
+                                        ^ Error here
+
+12. Line 535 - Expected success but got error
+   Description: If-then-else with assignment in condition (properly parenthesized)
+   Code:
+      1 | TestProperAssignmentInCondition():void=
+      2 |     result := if (x := getValue(); x > 0) then x else 0
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 13
+   Context:
+   1 | TestProperAssignmentInCondition():void=
+   >>>   2 |     result := if (x := getValue(); x > 0) then x else 0
+                      ^ Error here
+
+13. Line 648 - Expected success but got error
+   Description: If-then-else with empty curly brace blocks
+   Code:
+      1 | TestEmptyCurlyBraces():void=
+      2 |     if (condition) then {        
+      3 |     } else {
+      4 |         # Another empty block
+      5 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 3, Column 7
+   Context:
+   2 |     if (condition) then {        
+   >>>   3 |     } else {
+         4 |         # Another empty block
+                ^ Error here
+
+14. Line 656 - Expected success but got error
+   Description: If-then-else with curly braces and variable declarations
+   Code:
+      1 | TestCurlyBracesVariableDecl():void=
+      2 |     if (createNewScope) then {
+      3 |         var localVar : int = 42
+      4 |         var anotherVar := "local"
+      5 |         ProcessWithLocalVars(localVar, anotherVar)
+      6 |     } else {
+      7 |         ProcessWithGlobalVars()
+      8 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 25
+   Context:
+   1 | TestCurlyBracesVariableDecl():void=
+   >>>   2 |     if (createNewScope) then {
+         3 |         var localVar : int = 42
+                                  ^ Error here
+
+15. Line 699 - Expected success but got error
+   Description: If-then-else with curly braces and error handling
+   Code:
+      1 | TestCurlyBracesErrorHandling():void=
+      2 |     if (riskyOperation) then {
+      3 |         try:
+      4 |             result := PerformRiskyOperation()
+      5 |             if (result.IsSuccess()) then {
+      6 |                 HandleSuccess(result)
+      7 |             } else {
+      8 |                 HandleFailure(result)
+      9 |             }
+     10 |         catch:
+     11 |             HandleException()
+     12 |     } else {
+     13 |         SafeOperation()
+     14 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 25
+   Context:
+   1 | TestCurlyBracesErrorHandling():void=
+   >>>   2 |     if (riskyOperation) then {
+         3 |         try:
+                                  ^ Error here
+
+16. Line 716 - Expected success but got error
+   Description: Basic class declarations
+   Code:
+      1 | TestBasicClasses():void=
+      2 |     SimpleClass := class:
+      3 |         Value : int = 0
+      4 | 
+      5 |     EmptyClass := class{}
+      6 | 
+      7 |     ClassWithMethod := class:
+      8 |         Method():void = Print("Hello")
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 4, Column 17
+   Context:
+   3 |         Value : int = 0
+   >>>   4 | 
+         5 |     EmptyClass := class{}
+
+17. Line 860 - Expected success but got error
+   Description: Generic classes and interfaces
+   Code:
+      1 | TestGenerics():void=
+      2 |     Container<T> := class:
+      3 |         Item : T
+      4 | 
+      5 |         SetItem(newItem:T):void = set Item = newItem
+      6 |         GetItem():T = Item
+      7 | 
+      8 |     Processor<TInput, TOutput> := interface:
+      9 |         Process(input:TInput):TOutput
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 16
+   Context:
+   1 | TestGenerics():void=
+   >>>   2 |     Container<T> := class:
+         3 |         Item : T
+                         ^ Error here
+
+18. Line 943 - Expected success but got error
+   Description: Abstract classes and virtual methods
+   Code:
+      1 | TestAbstractClasses():void=
+      2 |     Animal := class:
+      3 |         Name : string = ""
+      4 | 
+      5 |         <virtual>MakeSound():void = Print("Generic animal sound")
+      6 |         <abstract>GetSpecies():string
+      7 | 
+      8 |     Dog := class(Animal):
+      9 |         <override>MakeSound():void = Print("Woof!")
+     10 |         <override>GetSpecies():string = "Canis"
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 4, Column 29
+   Context:
+   3 |         Name : string = ""
+   >>>   4 | 
+         5 |         <virtual>MakeSound():void = Print("Generic animal sound")
+
+19. Line 1011 - Expected success but got error
+   Description: Classes with operator overloading
+   Code:
+      1 | TestOperatorOverloading():void=
+      2 |     Vector := class:
+      3 |         X : float = 0.0
+      4 |         Y : float = 0.0
+      5 | 
+      6 |         operator+(other:Vector):Vector =
+      7 |             Vector{X := X + other.X, Y := Y + other.Y}
+      8 | 
+      9 |         operator*(scalar:float):Vector =
+     10 |             Vector{X := X * scalar, Y := Y * scalar}
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 5, Column 32
+   Context:
+   4 |         Y : float = 0.0
+   >>>   5 | 
+         6 |         operator+(other:Vector):Vector =
+
+20. Line 1024 - Expected success but got error
+   Description: Class templates and specialization
+   Code:
+      1 | TestClassTemplates():void=
+      2 |     Stack<T> := class:
+      3 |         Items : []T = array{}
+      4 | 
+      5 |         Push(item:T):void =
+      6 |             set Items = Items + array{item}
+      7 | 
+      8 |         Pop():?T =
+      9 |             if (Items.Length > 0):
+     10 |                 Result := Items[Items.Length - 1]
+     11 |                 set Items = Items.RemoveLast()
+     12 |                 Result
+     13 |             else:
+     14 |                 false
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 12
+   Context:
+   1 | TestClassTemplates():void=
+   >>>   2 |     Stack<T> := class:
+         3 |         Items : []T = array{}
+                     ^ Error here
+
+21. Line 1041 - Expected success but got error
+   Description: Function declarations with various specifiers
+   Code:
+      1 | TestFunctionSpecifiers():void=
+      2 |     DecideFunction()<decides>:logic = true
+      3 |     SucceedFunction()<succeeds>:void = Print("Success")
+      4 |     FailFunction()<fails>:void = Print("Fail")
+      5 |     TransactFunction()<transacts>:void = DoTransaction()
+      6 |     ComputeFunction()<computes>:int = 42
+      7 |     AmbiguateFunction()<ambiguates>:int = RandomValue()
+      8 |     ReadFunction()<reads>:string = GetStoredValue()
+      9 |     WriteFunction()<writes>:void = SaveValue("data")
+     10 |     AllocateFunction()<allocates>:object = CreateNewObject()
+     11 |     SuspendFunction()<suspends>:void = WaitForEvent()
+     12 |     ClosedFunction()<closed>:void = FinalizeOperation()
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 30
+   Context:
+   1 | TestFunctionSpecifiers():void=
+   >>>   2 |     DecideFunction()<decides>:logic = true
+         3 |     SucceedFunction()<succeeds>:void = Print("Success")
+                                       ^ Error here
+
+22. Line 1056 - Expected success but got error
+   Description: Functions with multiple specifiers
+   Code:
+      1 | TestMultipleSpecifiers():void=
+      2 |     ComplexFunction()<suspends><transacts>:void =
+      3 |         PerformAsyncTransaction()
+      4 | 
+      5 |     ReadWriteFunction()<reads><writes>:void =
+      6 |         ProcessDataInPlace()
+      7 | 
+      8 |     DecideComputeFunction()<decides><computes>:int =
+      9 |         CalculateDecision()
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 43
+   Context:
+   1 | TestMultipleSpecifiers():void=
+   >>>   2 |     ComplexFunction()<suspends><transacts>:void =
+         3 |         PerformAsyncTransaction()
+                                                    ^ Error here
+
+23. Line 1068 - Expected success but got error
+   Description: Functions with specifiers and parameters
+   Code:
+      1 | TestSpecifiersWithParameters():void=
+      2 |     ProcessPlayer(player:agent)<suspends><writes>:void =
+      3 |         UpdatePlayerData(player)
+      4 | 
+      5 |     CalculateScore(base:int, multiplier:float)<computes><reads>:int =
+      6 |         GetStoredBonus() * base * multiplier
+      7 | 
+      8 |     ValidateInput(input:string)<decides><reads>:logic =
+      9 |         IsValidAgainstRules(input)
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 50
+   Context:
+   1 | TestSpecifiersWithParameters():void=
+   >>>   2 |     ProcessPlayer(player:agent)<suspends><writes>:void =
+         3 |         UpdatePlayerData(player)
+                                                           ^ Error here
+
+24. Line 1080 - Expected success but got error
+   Description: Functions with specifiers and return types
+   Code:
+      1 | TestSpecifiersWithReturnTypes():void=
+      2 |     GetRandomValue()<ambiguates><computes>:int =
+      3 |         GenerateRandomNumber()
+      4 | 
+      5 |     AllocateMemory(size:int)<allocates><transacts>:memory_block =
+      6 |         RequestMemoryBlock(size)
+      7 | 
+      8 |     CheckPermission(user:agent)<decides><reads>:logic =
+      9 |         HasUserPermission(user)
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 43
+   Context:
+   1 | TestSpecifiersWithReturnTypes():void=
+   >>>   2 |     GetRandomValue()<ambiguates><computes>:int =
+         3 |         GenerateRandomNumber()
+                                                    ^ Error here
+
+25. Line 1118 - Expected success but got error
+   Description: Functions with specifiers in different contexts
+   Code:
+      1 | TestSpecifierContexts():void=
+      2 |     # Event handlers with specifiers
+      3 |     OnPlayerJoin(player:agent)<suspends><writes>:void =
+      4 |         RegisterPlayerInSystem(player)
+      5 | 
+      6 |     # Async operations with specifiers
+      7 |     LoadGameData()<suspends><reads><allocates>:game_data =
+      8 |         LoadFromPersistentStorage()
+      9 | 
+     10 |     # Validation functions with specifiers
+     11 |     IsValidMove(move:game_move)<decides><reads>:logic =
+     12 |         CheckMoveAgainstRules(move)
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 3, Column 49
+   Context:
+   2 |     # Event handlers with specifiers
+   >>>   3 |     OnPlayerJoin(player:agent)<suspends><writes>:void =
+         4 |         RegisterPlayerInSystem(player)
+                                                          ^ Error here
+
+26. Line 1140 - Expected success but got error
+   Description: Complex specifier combinations
+   Code:
+      1 | TestComplexSpecifierCombinations():void=
+      2 |     DatabaseOperation(query:string)<suspends><reads><writes><transacts>:result =
+      3 |         ExecuteComplexQuery(query)
+      4 | 
+      5 |     AIDecision(context:game_context)<decides><computes><ambiguates><reads>:action =
+      6 |         CalculateOptimalAction(context)
+      7 | 
+      8 |     SystemShutdown()<closed><writes><suspends>:void =
+      9 |         PerformGracefulShutdown()
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 72
+   Context:
+   1 | TestComplexSpecifierCombinations():void=
+   >>>   2 |     DatabaseOperation(query:string)<suspends><reads><writes><transacts>:result =
+         3 |         ExecuteComplexQuery(query)
+                                                                                 ^ Error here
+
+27. Line 1152 - Expected success but got error
+   Description: Specifiers with generic functions
+   Code:
+      1 | TestGenericSpecifiers():void=
+      2 |     ProcessData<T>(data:T)<computes><writes>:T =
+      3 |         TransformAndStore(data)
+      4 | 
+      5 |     ValidateGeneric<T>(item:T, validator:(T)<decides>:logic)<decides><reads>:logic =
+      6 |         validator(item) and IsValidType(item)
+      7 | 
+      8 |     AllocateContainer<T>(initialSize:int)<allocates><transacts>:container<T> =
+      9 |         CreateTypedContainer<T>(initialSize)
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 45
+   Context:
+   1 | TestGenericSpecifiers():void=
+   >>>   2 |     ProcessData<T>(data:T)<computes><writes>:T =
+         3 |         TransformAndStore(data)
+                                                      ^ Error here
+
+28. Line 1164 - Expected success but got error
+   Description: Specifiers in function overloads and variants
+   Code:
+      1 | TestSpecifierOverloads():void=
+      2 |     ProcessAsync(data:string)<suspends><writes>:void =
+      3 |         AsyncProcessString(data)
+      4 | 
+      5 |     ProcessSync(data:string)<computes><reads>:void =
+      6 |         SyncProcessString(data)
+      7 | 
+      8 |     ProcessDecide(data:string)<decides><reads>:logic =
+      9 |         ShouldProcessString(data)
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 48
+   Context:
+   1 | TestSpecifierOverloads():void=
+   >>>   2 |     ProcessAsync(data:string)<suspends><writes>:void =
+         3 |         AsyncProcessString(data)
+                                                         ^ Error here
+
+29. Line 1176 - Expected success but got error
+   Description: Specifiers with default parameters
+   Code:
+      1 | TestSpecifiersWithDefaults():void=
+      2 |     ConfigureSystem(timeout:int = 30)<writes><suspends>:void =
+      3 |         SetSystemTimeout(timeout)
+      4 | 
+      5 |     AllocateWithSize(size:int = 1024)<allocates><transacts>:buffer =
+      6 |         CreateBuffer(size)
+      7 | 
+      8 |     ValidateWithMode(data:string, strict:logic = true)<decides><reads>:logic =
+      9 |         if (strict) then StrictValidate(data) else LooseValidate(data)
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 56
+   Context:
+   1 | TestSpecifiersWithDefaults():void=
+   >>>   2 |     ConfigureSystem(timeout:int = 30)<writes><suspends>:void =
+         3 |         SetSystemTimeout(timeout)
+                                                                 ^ Error here
+
+30. Line 1188 - Expected success but got error
+   Description: Nested function calls with specifiers
+   Code:
+      1 | TestNestedSpecifierCalls():void=
+      2 |     result := ProcessData(
+      3 |         TransformInput("raw_data")<computes>,
+      4 |         ValidateFormat("format")<decides><reads>
+      5 |     )<writes><suspends>
+      6 | 
+      7 |     finalValue := CalculateResult(
+      8 |         GetBaseValue()<reads>,
+      9 |         GetMultiplier()<computes><ambiguates>
+     10 |     )<decides><computes>
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 26
+   Context:
+   1 | TestNestedSpecifierCalls():void=
+   >>>   2 |     result := ProcessData(
+         3 |         TransformInput("raw_data")<computes>,
+                                   ^ Error here
+
+31. Line 1201 - Expected success but got error
+   Description: Specifiers with error handling
+   Code:
+      1 | TestSpecifiersWithErrorHandling():void=
+      2 |     SafeOperation()<suspends><transacts><fails>:?result =
+      3 |         try:
+      4 |             PerformRiskyOperation()<suspends><transacts>
+      5 |         catch:
+      6 |             false
+      7 | 
+      8 |     ValidatedProcess(input:string)<decides><reads><fails>:?output =
+      9 |         if (IsValid(input)<decides><reads>) then:
+     10 |             ProcessValid(input)<computes><writes>
+     11 |         else:
+     12 |             false
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 48
+   Context:
+   1 | TestSpecifiersWithErrorHandling():void=
+   >>>   2 |     SafeOperation()<suspends><transacts><fails>:?result =
+         3 |         try:
+                                                         ^ Error here
+
+32. Line 1249 - Expected success but got error
+   Description: Event system with specifiers
+   Code:
+      1 | TestEventSpecifiers():void=
+      2 |     PlayerJoinedEvent : event(agent) = event(agent){}
+      3 | 
+      4 |     OnPlayerJoined(player:agent)<suspends><writes>:void =
+      5 |         PlayerJoinedEvent.Signal(player)
+      6 |         UpdatePlayerDatabase(player)
+      7 | 
+      8 |     ProcessPlayerEvents()<reads><computes>:void =
+      9 |         for (player : GetAllPlayers()):
+     10 |             if (ShouldProcessPlayer(player)<decides><reads>):
+     11 |                 ProcessPlayerUpdate(player)<writes><computes>
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 8, Column 49
+   Context:
+   7 | 
+   >>>   8 |     ProcessPlayerEvents()<reads><computes>:void =
+         9 |         for (player : GetAllPlayers()):
+                                                          ^ Error here
+
+33. Line 1263 - Expected success but got error
+   Description: Concurrent operations with specifiers
+   Code:
+      1 | TestConcurrentSpecifiers():void=
+      2 |     ParallelProcess(items:[]string)<suspends><writes><computes>:[]result =
+      3 |         race:
+      4 |             ProcessBatch1(items[0..items.Length()/2])<suspends><computes>
+      5 |             ProcessBatch2(items[items.Length()/2..items.Length()])<suspends><computes>
+      6 | 
+      7 |     ConcurrentValidation(inputs:[]string)<decides><reads><suspends>:logic =
+      8 |         spawn:
+      9 |             for (input : inputs):
+     10 |                 if (not ValidateInput(input)<decides><reads>):
+     11 |                     return false
+     12 |         return true
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 64
+   Context:
+   1 | TestConcurrentSpecifiers():void=
+   >>>   2 |     ParallelProcess(items:[]string)<suspends><writes><computes>:[]result =
+         3 |         race:
+                                                                         ^ Error here
+
+34. Line 1278 - Expected success but got error
+   Description: Basic class declarations with curly braces
+   Code:
+      1 | TestCurlyBraceClasses():void=
+      2 |     SimpleClass := class {
+      3 |         Value : int = 0
+      4 |     }
+      5 | 
+      6 |     EmptyClass := class {}
+      7 | 
+      8 |     ClassWithInitializer := class {
+      9 |         Name : string = "Default"
+     10 |         Count : int = 1
+     11 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 18
+   Context:
+   1 | TestCurlyBraceClasses():void=
+   >>>   2 |     SimpleClass := class {
+         3 |         Value : int = 0
+                           ^ Error here
+
+35. Line 1292 - Expected success but got error
+   Description: Classes with curly brace methods
+   Code:
+      1 | TestCurlyBraceClassMethods():void=
+      2 |     Calculator := class {
+      3 |         Result : int = 0
+      4 | 
+      5 |         Add(a : int, b : int) : int = {
+      6 |             set Result = a + b
+      7 |             Result
+      8 |         }
+      9 | 
+     10 |         Multiply(x : int, y : int) : int = {
+     11 |             temp := x * y
+     12 |             set Result = temp
+     13 |             temp
+     14 |         }
+     15 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 17
+   Context:
+   1 | TestCurlyBraceClassMethods():void=
+   >>>   2 |     Calculator := class {
+         3 |         Result : int = 0
+                          ^ Error here
+
+36. Line 1310 - Expected success but got error
+   Description: Classes with curly brace constructors and destructors
+   Code:
+      1 | TestCurlyBraceLifecycle():void=
+      2 |     ManagedClass := class {
+      3 |         Id : int = 0
+      4 |         Active : logic = false
+      5 | 
+      6 |         Initialize(newId : int) : void = {
+      7 |             set Id = newId
+      8 |             set Active = true
+      9 |             Print("Initialized with ID: {Id}")
+     10 |         }
+     11 | 
+     12 |         Cleanup() : void = {
+     13 |             Print("Cleaning up ID: {Id}")
+     14 |             set Active = false
+     15 |             set Id = 0
+     16 |         }
+     17 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 19
+   Context:
+   1 | TestCurlyBraceLifecycle():void=
+   >>>   2 |     ManagedClass := class {
+         3 |         Id : int = 0
+                            ^ Error here
+
+37. Line 1330 - Expected success but got error
+   Description: Inherited classes with curly braces
+   Code:
+      1 | TestCurlyBraceInheritance():void=
+      2 |     BaseClass := class {
+      3 |         BaseValue : int = 100
+      4 | 
+      5 |         GetBaseValue() : int = {
+      6 |             BaseValue
+      7 |         }
+      8 |     }
+      9 | 
+     10 |     DerivedClass := class(BaseClass) {
+     11 |         DerivedValue : string = "derived"
+     12 | 
+     13 |         GetCombinedInfo() : string = {
+     14 |             "Base: {BaseValue}, Derived: {DerivedValue}"
+     15 |         }
+     16 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 16
+   Context:
+   1 | TestCurlyBraceInheritance():void=
+   >>>   2 |     BaseClass := class {
+         3 |         BaseValue : int = 100
+                         ^ Error here
+
+38. Line 1349 - Expected success but got error
+   Description: Creative device classes with curly braces
+   Code:
+      1 | TestCurlyBraceCreativeDevice():void=
+      2 |     GameDevice := class(creative_device) {
+      3 |         PlayersConnected : int = 0
+      4 |         GameActive : logic = false
+      5 | 
+      6 |         StartGame() : void = {
+      7 |             set GameActive = true
+      8 |             Print("Game started with {PlayersConnected} players")
+      9 |         }
+     10 | 
+     11 |         AddPlayer() : void = {
+     12 |             set PlayersConnected = PlayersConnected + 1
+     13 |             if (PlayersConnected >= 2) {
+     14 |                 StartGame()
+     15 |             }
+     16 |         }
+     17 | 
+     18 |         EndGame() : void = {
+     19 |             set GameActive = false
+     20 |             set PlayersConnected = 0
+     21 |             Print("Game ended")
+     22 |         }
+     23 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 17
+   Context:
+   1 | TestCurlyBraceCreativeDevice():void=
+   >>>   2 |     GameDevice := class(creative_device) {
+         3 |         PlayersConnected : int = 0
+                          ^ Error here
+
+39. Line 1375 - Expected success but got error
+   Description: Classes with curly brace event handlers
+   Code:
+      1 | TestCurlyBraceEvents():void=
+      2 |     EventHandler := class {
+      3 |         EventCount : int = 0
+      4 |         PlayerJoined : event(agent) = event(agent){}
+      5 | 
+      6 |         OnPlayerConnect(player : agent) : void = {
+      7 |             set EventCount = EventCount + 1
+      8 |             Print("Player connected: {EventCount} total events")
+      9 |             PlayerJoined.Signal(player)
+     10 |         }
+     11 | 
+     12 |         ProcessEvents() : void = {
+     13 |             if (EventCount > 0) {
+     14 |                 Print("Processing {EventCount} events")
+     15 |                 set EventCount = 0
+     16 |             }
+     17 |         }
+     18 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 19
+   Context:
+   1 | TestCurlyBraceEvents():void=
+   >>>   2 |     EventHandler := class {
+         3 |         EventCount : int = 0
+                            ^ Error here
+
+40. Line 1396 - Expected success but got error
+   Description: Classes with nested curly brace blocks
+   Code:
+      1 | TestNestedCurlyBraceBlocks():void=
+      2 |     GameManager := class {
+      3 |         Score : int = 0
+      4 |         Lives : int = 3
+      5 | 
+      6 |         ProcessTurn(playerAction : string) : logic = {
+      7 |             if (playerAction = "attack") {
+      8 |                 enemyHealth := 10
+      9 |                 damage := 5
+     10 |                 set enemyHealth = enemyHealth - damage
+     11 | 
+     12 |                 if (enemyHealth <= 0) {
+     13 |                     set Score = Score + 100
+     14 |                     Print("Enemy defeated! Score: {Score}")
+     15 |                     true
+     16 |                 } else {
+     17 |                     Print("Enemy health: {enemyHealth}")
+     18 |                     false
+     19 |                 }
+     20 |             } else if (playerAction = "defend") {
+     21 |                 Print("Player defending")
+     22 |                 true
+     23 |             } else {
+     24 |                 set Lives = Lives - 1
+     25 |                 if (Lives <= 0) {
+     26 |                     Print("Game Over!")
+     27 |                     false
+     28 |                 } else {
+     29 |                     Print("Invalid action! Lives remaining: {Lives}")
+     30 |                     true
+     31 |                 }
+     32 |             }
+     33 |         }
+     34 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 18
+   Context:
+   1 | TestNestedCurlyBraceBlocks():void=
+   >>>   2 |     GameManager := class {
+         3 |         Score : int = 0
+                           ^ Error here
+
+41. Line 1433 - Expected success but got error
+   Description: Classes with curly brace property accessors
+   Code:
+      1 | TestCurlyBraceProperties():void=
+      2 |     PlayerStats := class {
+      3 |         var Health : int = 100
+      4 |         var Mana : int = 50
+      5 | 
+      6 |         GetHealthPercent() : float = {
+      7 |             Health / 100.0
+      8 |         }
+      9 | 
+     10 |         SetHealth(newHealth : int) : void = {
+     11 |             if (newHealth >= 0 and newHealth <= 100) {
+     12 |                 set Health = newHealth
+     13 |             }
+     14 |         }
+     15 | 
+     16 |         RestoreMana(amount : int) : void = {
+     17 |             newMana := Mana + amount
+     18 |             if (newMana > 100) {
+     19 |                 set Mana = 100
+     20 |             } else {
+     21 |                 set Mana = newMana
+     22 |             }
+     23 |         }
+     24 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 18
+   Context:
+   1 | TestCurlyBraceProperties():void=
+   >>>   2 |     PlayerStats := class {
+         3 |         var Health : int = 100
+                           ^ Error here
+
+42. Line 1460 - Expected success but got error
+   Description: Generic classes with curly braces
+   Code:
+      1 | TestCurlyBraceGenerics():void=
+      2 |     Container<T> := class {
+      3 |         Items : []T = array{}
+      4 |         Count : int = 0
+      5 | 
+      6 |         Add(item : T) : void = {
+      7 |             set Items = Items + array{item}
+      8 |             set Count = Count + 1
+      9 |         }
+     10 | 
+     11 |         Get(index : int) : ?T = {
+     12 |             if (index >= 0 and index < Count) {
+     13 |                 Items[index]
+     14 |             } else {
+     15 |                 false
+     16 |             }
+     17 |         }
+     18 | 
+     19 |         Clear() : void = {
+     20 |             set Items = array{}
+     21 |             set Count = 0
+     22 |         }
+     23 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 16
+   Context:
+   1 | TestCurlyBraceGenerics():void=
+   >>>   2 |     Container<T> := class {
+         3 |         Items : []T = array{}
+                         ^ Error here
+
+43. Line 1486 - Expected success but got error
+   Description: Classes with curly brace error handling
+   Code:
+      1 | TestCurlyBraceErrorHandling():void=
+      2 |     SafeCalculator := class {
+      3 |         LastResult : ?float = false
+      4 |         ErrorMessage : string = ""
+      5 | 
+      6 |         Divide(a : float, b : float) : ?float = {
+      7 |             if (b = 0.0) {
+      8 |                 set ErrorMessage = "Division by zero"
+      9 |                 set LastResult = false
+     10 |                 false
+     11 |             } else {
+     12 |                 result := a / b
+     13 |                 set LastResult = result
+     14 |                 set ErrorMessage = ""
+     15 |                 result
+     16 |             }
+     17 |         }
+     18 | 
+     19 |         SafeOperation(operation : string, x : float, y : float) : ?float = {
+     20 |             try {
+     21 |                 if (operation = "divide") {
+     22 |                     Divide(x, y)
+     23 |                 } else if (operation = "sqrt") {
+     24 |                     if (x >= 0.0) {
+     25 |                         result := x ^ 0.5
+     26 |                         set LastResult = result
+     27 |                         result
+     28 |                     } else {
+     29 |                         set ErrorMessage = "Negative square root"
+     30 |                         false
+     31 |                     }
+     32 |                 } else {
+     33 |                     set ErrorMessage = "Unknown operation"
+     34 |                     false
+     35 |                 }
+     36 |             } catch {
+     37 |                 set ErrorMessage = "Operation failed"
+     38 |                 set LastResult = false
+     39 |                 false
+     40 |             }
+     41 |         }
+     42 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 21
+   Context:
+   1 | TestCurlyBraceErrorHandling():void=
+   >>>   2 |     SafeCalculator := class {
+         3 |         LastResult : ?float = false
+                              ^ Error here
+
+44. Line 1531 - Expected success but got error
+   Description: Mixed colon and curly brace syntax in classes
+   Code:
+      1 | TestMixedClassSyntax():void=
+      2 |     HybridClass := class(creative_device): {
+      3 |         # Colon for inheritance, curly brace for body
+      4 |         PublicValue : int = 42
+      5 | 
+      6 |         Initialize() : void = {
+      7 |             Print("Hybrid class initialized")
+      8 |         }
+      9 |     }
+     10 | 
+     11 |     AnotherHybrid := class {
+     12 |         # Curly brace for main body
+     13 |         Settings : map(string, int) = map{}
+     14 | 
+     15 |         ConfigureSettings() : void = {
+     16 |             if (Settings.Length = 0): {
+     17 |                 # Colon for if condition, curly for body
+     18 |                 set Settings = map{"default" -> 1, "advanced" -> 2}
+     19 |             }
+     20 |         }
+     21 | 
+     22 |         ProcessConfig(mode : string) : void = {
+     23 |             for (key : Settings.Keys) {
+     24 |                 if (key = mode) {
+     25 |                     value := Settings[key]
+     26 |                     Print("Processing {key} with value {value}")
+     27 |                 } else {
+     28 |                     Print("Skipping {key}")
+     29 |                 }
+     30 |             }
+     31 |         }
+     32 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 11, Column 20
+   Context:
+   10 | 
+   >>>  11 |     AnotherHybrid := class {
+        12 |         # Curly brace for main body
+                             ^ Error here
+
+45. Line 1566 - Expected success but got error
+   Description: Classes with curly brace loops and control flow
+   Code:
+      1 | TestCurlyBraceControlFlow():void=
+      2 |     LoopProcessor := class {
+      3 |         Data : []int = array{1, 2, 3, 4, 5}
+      4 |         var ProcessedCount : int = 0
+      5 | 
+      6 |         ProcessAllData() : void = {
+      7 |             for (item : Data) {
+      8 |                 if (item > 2) {
+      9 |                     Print("Processing item: {item}")
+     10 |                     set ProcessedCount = ProcessedCount + 1
+     11 |                 } else {
+     12 |                     Print("Skipping item: {item}")
+     13 |                 }
+     14 |             }
+     15 |         }
+     16 | 
+     17 |         ProcessWithWhile() : void = {
+     18 |             var index :int= 0
+     19 |             while (index < Data.Length) {
+     20 |                 current := Data[index]
+     21 |                 if (current % 2 = 0) {
+     22 |                     Print("Even number: {current}")
+     23 |                 } else {
+     24 |                     Print("Odd number: {current}")
+     25 |                 }
+     26 |                 set index = index + 1
+     27 |             }
+     28 |         }
+     29 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 20
+   Context:
+   1 | TestCurlyBraceControlFlow():void=
+   >>>   2 |     LoopProcessor := class {
+         3 |         Data : []int = array{1, 2, 3, 4, 5}
+                             ^ Error here
+
+46. Line 1598 - Expected success but got error
+   Description: Interface implementations with curly braces
+   Code:
+      1 | TestCurlyBraceInterfaces():void=
+      2 |     Drawable := interface {
+      3 |         Draw() : void
+      4 |         GetBounds() : vector3
+      5 |     }
+      6 | 
+      7 |     Sprite := class(Drawable) {
+      8 |         Position : vector3 = vector3{}
+      9 |         Size : vector3 = vector3{X := 1.0, Y := 1.0, Z := 1.0}
+     10 | 
+     11 |         Draw() : void = {
+     12 |             Print("Drawing sprite at {Position}")
+     13 |         }
+     14 | 
+     15 |         GetBounds() : vector3 = {
+     16 |             vector3{
+     17 |                 X := Position.X + Size.X,
+     18 |                 Y := Position.Y + Size.Y,
+     19 |                 Z := Position.Z + Size.Z
+     20 |             }
+     21 |         }
+     22 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 15
+   Context:
+   1 | TestCurlyBraceInterfaces():void=
+   >>>   2 |     Drawable := interface {
+         3 |         Draw() : void
+                        ^ Error here
+
+47. Line 1623 - Expected success but got error
+   Description: Struct definitions with curly braces
+   Code:
+      1 | TestCurlyBraceStructs():void=
+      2 |     Point := struct {
+      3 |         X : float = 0.0
+      4 |         Y : float = 0.0
+      5 | 
+      6 |         DistanceFromOrigin() : float = {
+      7 |             (X * X + Y * Y) ^ 0.5
+      8 |         }
+      9 |     }
+     10 | 
+     11 |     GameState := struct {
+     12 |         CurrentLevel : int = 1
+     13 |         Score : int = 0
+     14 |         Lives : int = 3
+     15 | 
+     16 |         IsGameOver() : logic = {
+     17 |             Lives <= 0
+     18 |         }
+     19 | 
+     20 |         AdvanceLevel() : void = {
+     21 |             set CurrentLevel = CurrentLevel + 1
+     22 |             Print("Advanced to level {CurrentLevel}")
+     23 |         }
+     24 |     }
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 2, Column 12
+   Context:
+   1 | TestCurlyBraceStructs():void=
+   >>>   2 |     Point := struct {
+         3 |         X : float = 0.0
+                     ^ Error here
+
+48. Line 1651 - Expected success but got error
+   Description: String interpolation - empty and edge cases
+   Code:
+      1 | F():= 
+      2 |     ""
+      3 |     "{}"
+      4 |     "No interpolation here"
+      5 |     "Just {var}"
+      6 |     "{a}{b}{c}"
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 3, Column 5
+   Context:
+   2 |     ""
+   >>>   3 |     "{}"
+         4 |     "No interpolation here"
+              ^ Error here
+
+49. Line 1714 - Expected success but got error
+   Description: String interpolation with operators and arithmetic
+   Code:
+      1 | TestInterpolationArithmetic():void=
+      2 |     x := 10
+      3 |     y := 20
+      4 |     multiplier := 1.5
+      5 | 
+      6 |     result1 := "Sum: {x + y}"
+      7 |     result2 := "Product: {x * y * multiplier}"
+      8 |     result3 := "Comparison: {x} < {y} is {x < y}"
+      9 |     result4 := "Modulo: {y % x} remainder"
+   Error: Expected expression (identifier, number, string, function call, etc.)
+   Error Position: Line 9, Column 14
+   Context:
+   8 |     result3 := "Comparison: {x} < {y} is {x < y}"
+   >>>   9 |     result4 := "Modulo: {y % x} remainder"
+                       ^ Error here

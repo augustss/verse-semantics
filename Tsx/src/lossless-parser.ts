@@ -3,6 +3,7 @@ import { parseVersee as originalParseVersee } from './parser/parser';
 import { L, Pos } from './ast/location';
 import { Exp } from './ast/expression';
 import { printAST } from './printer/pretty-printer';
+import { detectLineEnding, normalizeLineEndings } from './line-ending-detector';
 
 export interface LosslessParseOptions {
   preserveTrivia: boolean;
@@ -45,7 +46,15 @@ export function parseLossless(
   // If trivia preservation is enabled, attempt round-trip
   if (options.preserveTrivia) {
     try {
-      const roundTripText = printAST(ast, { preserveOriginalFormatting: true });
+      // Detect the line ending style used in the input
+      const inputLineEnding = detectLineEnding(input);
+
+      // Generate the AST output (which will have normalized line endings)
+      let roundTripText = printAST(ast, { preserveOriginalFormatting: true });
+
+      // Normalize the output to match the input's line ending style
+      roundTripText = normalizeLineEndings(roundTripText, inputLineEnding);
+
       const isExact = input === roundTripText;
 
       return {

@@ -1,0 +1,1694 @@
+#! Valid
+# Basic variable declarations with correct syntax
+var x : int = 5
+
+#! Valid
+# Optional types with correct assignment operator
+var MyOptional : ?int = false
+var Container : ?cancellable = false
+var Result : ?string = false
+
+#! Valid
+# Generic type parameters
+var TestMap : weak_map(int, string) = map{}
+var MyList : list(float) = array{}
+var Cache : map(string, int) = map{}
+
+#! Valid
+# Enum declarations with specifiers
+TestEnum<public> := enum{First, Second, Third}
+MyEnum := enum<persistable>{Active, Inactive, Pending}
+SimpleEnum := enum{A, B, C}
+
+#! Valid
+# Multiple class parents
+BaseClass<public> := class(creative_device, ITickable):
+    OnBegin<override>()<suspends>:void=
+        Print("Started")
+
+#! Valid
+# Class with single parent
+MyDevice := class(creative_device):
+    Score : int = 0
+    Name : string = "Default"
+
+#! Valid
+# Complex field declarations
+SomeClass := class:
+    @editable
+    PropToBuy: creative_prop = creative_prop{}
+
+    @editable
+    Barrier<private> : barrier_device = barrier_device{}
+
+    Vector : vector3 = vector3{X:=19.0, Y:=45.0, Z:=580.0}
+
+#! Valid
+# Function declarations with specifiers
+MyFunction<public>(Agent : agent)<suspends> : void =
+    if (Agent.GetFortCharacter[]):
+        Print("Character found")
+
+#! Valid
+# For loops
+TestLoop():void=
+    for (x : Items):
+        Print("Item")
+    for (i := 0..10):
+        Print("Index")
+
+#! Valid
+# Array indexing with valid identifiers
+myArray[5]
+obj.field[0]
+GetArray()[index]
+
+#! Valid
+# If statements with complex conditions
+TestConditions():void=
+    if (Barrier.TeleportTo[Vector, rotation{}]):
+        Print("Teleport successful")
+
+    if (x > 5 and y < 10):
+        DoSomething()
+
+#! Valid
+# Using statements
+using { /Fortnite.com/Characters }
+using { /Verse.org/Simulation }
+
+#! Valid
+# Set operations
+TestSet(Agent : agent):void=
+    set Plr = option{Agent}
+    set Character = option{Agent.GetFortCharacter[]}
+    set Counter += 1
+
+#! Valid
+# Module declarations
+test_module<public> := module:
+    TestFunction():void = Print("Hello")
+
+#! Valid
+# Constructor calls
+TestConstructors():void=
+    MyRotation := rotation{}
+    MyVector := vector3{X:=1.0, Y:=2.0, Z:=3.0}
+    MyTransform := transform{Translation:=vector3{}, Rotation:=rotation{}}
+
+#! Valid
+# Event declarations
+RaceStartEvent<public>:event() = event{}
+PlayerJoinedEvent:event(agent) = event(agent){}
+
+#! Valid
+# Lambda expressions
+TestLambda():void=
+    lambda x: x + 1
+    lambda (a, b): a * b
+
+#! Valid
+# Case statements
+TestCase(Value : int):void=
+    case (Value):
+        1 => Print("One")
+        2 => Print("Two")
+        _ => Print("Other")
+
+#! Valid
+# Correct generic type syntax
+var TestVar : weak_map(session, int) = map{}
+var TestVar2 :map= map{}
+
+#! Valid
+# Spawn blocks
+TestSpawn(Agent : agent):void=
+    spawn{AddPlayerToValidAudioTargets(Agent)}
+    spawn{ProcessAsync()}
+
+#! Valid
+# String interpolation
+TestStrings():void=
+    Name := "Player"
+    Print("Hello {Name}")
+    Print("Score: {Score} points")
+
+#! Valid
+# Decorators
+@editable
+TestDevice : creative_device = creative_device{}
+
+@editable{ToolTip := "This is a test"}
+ComplexDecorator : button_device = button_device{}
+
+#! Valid
+# Array and map literals
+TestLiterals():void=
+    MyArray := array{1, 2, 3, 4, 5}
+    MyMap := map{}
+    EmptyArray := array{}
+    EmptyMap := map{}
+
+#! Valid
+# Method chaining and property access
+TestChaining():void=
+    Result := Object.Method1().Method2().Property
+    Value := GetPlayer().GetFortCharacter[].GetHealth()
+
+
+#! Valid
+# Various control structures that should be allowed if-variety
+TestBasicIfVariety():void=
+    result1 := if 1 then 2 else 3
+    result2 := if (true) then "yes" else "no"
+    Print("Basic if-then-else expressions work")
+
+#! Valid
+# Arithmetic expressions and operator precedence
+TestArithmetic():void=
+    x := 1 + 2 * 3
+    y := (4 + 5) * 6
+    z := 10 / 2 - 3
+    w := 2 ^ 8 + 1
+
+#! Valid
+# Comparison operators
+TestComparisons():void=
+    a := x < y
+    b := x <= y
+    c := x > y
+    d := x >= y
+    e := x = y
+    f := x <> y
+
+#! Valid
+# Logical expressions with and/or
+TestLogical():void=
+    result1 := true and false
+    result2 := x > 0 and y < 10
+    result3 := flag1 or flag2
+    result4 := (a and b) or (c and d)
+
+#! Valid
+# Function calls and method invocation
+TestFunctionCalls():void=
+    result := SomeFunction(arg1, arg2)
+    value := obj.Method(param)
+    chained := GetObject().DoSomething().GetResult()
+
+#! Valid
+# Tuple and array syntax
+TestTuples():void=
+    tuple1 := (1, 2, 3)
+    tuple2 := (x, y)
+    empty := ()
+    single := (42,)
+
+#! Valid
+# Complex nested expressions
+TestNested():void=
+    complex := ((x + y) * z) / ((a - b) + c)
+    conditional := if (x > 0) then (y + 1) else (y - 1)
+
+#! Valid
+# Range expressions
+TestRanges():void=
+    range1 := 1..10
+    range2 := start..end
+    range3 := 0..maxIndex
+
+#! Valid
+# Comments and whitespace handling
+TestComments():void=
+    x := 5 # inline comment
+    <#block comment #>
+    y := 10
+    <# multi-line
+       block comment #>
+    z := 15
+
+#! Valid
+# Character literals
+TestChars():void=
+    letter := 'a'
+    digit := '5'
+    escaped := '\n'
+    unicode := '\u0041'
+
+#! Valid
+# Lambda expressions with different parameter styles
+TestLambdas():void=
+    simple := x => x + 1
+    multi := (a, b) => a * b
+    typed := (x: int) => x * 2
+    complex := (x, y) => if (x > y) then x else y
+
+#! Valid
+# Match/case expressions
+TestMatch():void=
+    result := case(value):
+        1 => "one"
+        2 => "two"
+        _ => "other"
+
+#! Valid
+# While and loop constructs
+TestLoops():void=
+    while (condition):
+        DoSomething()
+
+    loop:
+        if (exitCondition): break
+        Process()
+
+#! Valid
+# Try-catch error handling
+TestErrorHandling():void=
+    result := try:
+        RiskyOperation()
+    catch:
+        DefaultValue()
+
+#! Valid
+# Interface and struct-like declarations
+TestInterface():void=
+    Interface := interface:
+        Method1(): int
+        Method2(param: string): void
+ 
+ 
+#! Valid
+# Operator overloading syntax
+TestOperators():void=
+    result := obj1 + obj2
+    comparison := obj1 < obj2
+    indexed := container[key]
+
+#! Valid
+# Property accessors
+TestProperties():void=
+    getter := obj.Property
+    setter := obj.Property = value
+    chained := obj.SubObj.Property
+
+#! Valid
+# Async and concurrent operations
+TestAsync():void=
+    spawn:
+        AsyncOperation()
+
+    race:
+        Option1()
+        Option2()
+
+#! Valid
+# Module and namespace syntax
+TestModule():void=
+    MyModule := module:
+        ExportedFunc(): void = Print("Hello")
+        InternalVar := 42
+
+#! Valid
+# Type annotations and conversions
+TestTypes():void=
+    typed: int = 42
+    converted := value as string
+    checked := value isa int
+
+#! Valid
+# Basic if-then-else expressions (expression form)
+TestBasicIfExpressions():void=
+    result1 := if (true) then 1 else 2
+    result2 := if (x > 0) then "positive" else "not positive"
+    result3 := if (condition) then value1 else value2
+
+#! Valid
+# If-then without else (expression form)
+TestIfThenOnly():void=
+    result1 := if (true) then 42
+    result2 := if (x > 0) then DoSomething()
+    result3 := if (condition) then value
+
+#! Valid
+# If-then-else with parentheses variations
+TestIfParentheses():void=
+    result1 := if (x > 0) then (y + 1) else (y - 1)
+    result2 := if ((a and b) or c) then d else e
+    result3 := if (func(arg)) then (complex + expression) else default
+
+#! Valid
+# If-then-else statement form with blocks
+TestIfStatements():void=
+    if (condition):
+        DoSomething()
+        DoSomethingElse()
+    else:
+        DoAlternative()
+
+    if (x > 0):
+        Print("Positive")
+
+#! Valid
+# If-then-else with complex conditions
+TestComplexConditions():void=
+    result1 := if (x > 0 and y < 10) then "valid" else "invalid"
+    result2 := if (a or b or c) then 1 else 0
+    result3 := if (not condition) then alternate else primary
+    result4 := if (x = y) then equal else notEqual
+
+#! Valid
+# Nested if-then-else expressions
+TestNestedIfExpressions():void=
+    result1 := if (x > 0) then (if (y > 0) then 1 else 2) else 3
+    result2 := if (condition1) then value1 else (if (condition2) then value2 else value3)
+    result3 := if (a) then (if (b) then (if (c) then deep else mid) else shallow) else default
+
+#! Valid
+# Nested if-then-else statements
+TestNestedIfStatements():void=
+    if (level1):
+        if (level2):
+            if (level3):
+                DeepAction()
+            else:
+                MidAction()
+        else:
+            ShallowAction()
+    else:
+        DefaultAction()
+
+#! Valid
+# If-then-else ladder (else if pattern)
+TestIfElseLadder():void=
+    if (score >= 90):
+        grade := "A"
+    else if (score >= 80):
+        grade := "B"
+    else if (score >= 70):
+        grade := "C"
+    else if (score >= 60):
+        grade := "D"
+    else:
+        grade := "F"
+
+#! Valid
+# If-then-else with function calls and method chaining
+TestIfWithFunctions():void=
+    result := if (GetValue() > threshold) then ProcessHigh(data) else ProcessLow(data)
+    status := if (obj.IsValid()) then obj.GetStatus() else "invalid"
+    value := if (array.Length() > 0) then array[0] else defaultValue
+
+#! Valid
+# If-then-else with assignment operations
+TestIfWithAssignment():void=
+    if (condition):
+        x := newValue
+        y := anotherValue
+    else:
+        x := defaultValue
+        y := 0
+
+    counter := if (increment) then (counter + 1) else counter
+
+#! Valid
+# If-then-else with different return types (same base type)
+TestIfReturnTypes():void=
+    number := if (useFloat) then 3.14 else 42
+    text := if (useLong) then "This is a long string" else "Short"
+    flag := if (condition) then true else false
+
+#! Valid
+# If-then-else with block expressions
+TestIfWithBlocks():void=
+    result := if (condition) then {
+        intermediate := calculate()
+        intermediate * 2
+    } else {
+        defaultCalculation()
+    }
+
+#! Valid
+# If-then-else with multiline formatting
+TestIfMultiline():void=
+    result := if (
+        veryLongCondition and
+        anotherCondition or
+        thirdCondition
+    ) then (
+        complexCalculation() +
+        anotherCalculation()
+    ) else (
+        simpleDefault
+    )
+
+#! Valid
+# If-then-else with ranges and arrays
+TestIfWithCollections():void=
+    range := if (ascending) then 1..10 else 10..1
+    array := if (empty) then array{} else array{1, 2, 3}
+    element := if (index < array.Length()) then array[index] else defaultElement
+
+
+#! Valid
+# If-then-else with lambda expressions
+TestIfWithLambda():void=
+    func := if (useSimple) then (x => x + 1) else (x => x * 2)
+    result := if (condition) then applyFunc(lambda) else directValue
+
+#! Valid
+# If-then-else with case expressions
+TestIfWithCase():void=
+    result := if (useCase) then (
+        case (value):
+            1 => "one"
+            2 => "two"
+            _ => "other"
+    ) else (
+        defaultString
+    )
+
+#! Valid
+# Deeply nested complex if-then-else
+TestDeeplyNested():void=
+    result := if (level1) then (
+        if (level2a) then (
+            if (level3a) then (
+                if (level4) then deepValue1 else deepValue2
+            ) else (
+                midValue1
+            )
+        ) else if (level2b) then (
+            if (level3b) then midValue2 else midValue3
+        ) else (
+            shallowValue
+        )
+    ) else (
+        if (altCondition) then altValue else defaultValue
+    )
+
+#! Valid
+# If-then-else with loop control
+TestIfWithLoops():void=
+    for (item : collection):
+        if (item.IsValid()):
+            ProcessItem(item)
+        else:
+            SkipItem(item)
+
+    while (condition):
+        if (shouldBreak):
+            break
+        else if (shouldContinue):
+            continue
+        else:
+            ProcessNormally()
+
+#! Valid
+# If-then-else with error handling
+TestIfWithErrorHandling():void=
+    result := if (canProcess) then (
+        try:
+            ProcessData()
+        catch:
+            HandleError()
+    ) else (
+        SkipProcessing()
+    )
+
+#! Valid
+# If-then-else with assignment in condition (properly parenthesized)
+TestProperAssignmentInCondition():void=
+    result := if (x := getValue(); x > 0) then x else 0
+
+#! Valid
+# If-then-else with curly brace blocks (statement form)
+TestIfCurlyBraces():void=
+    if (condition) then {
+        DoSomething()
+        x := 42
+    } else {
+        DoSomethingElse()
+        x := 0
+    }
+
+#! Valid
+# If-then with single curly brace block
+TestIfThenCurlyBrace():void=
+    if (x > 0) then {
+        Print("Positive")
+        counter := counter + 1
+    }
+
+#! Valid
+# Nested if-then-else with curly braces
+TestNestedIfCurlyBraces():void=
+    if (level1) then {
+        if (level2) then {
+            DeepAction()
+            value := 1
+        } else {
+            ShallowAction()
+            value := 2
+        }
+    } else {
+        DefaultAction()
+        value := 0
+    }
+
+#! Valid
+# If-then-else ladder with curly braces
+TestIfElseLadderCurlyBraces():void=
+    if (score >= 90) then {
+        Print("Excellent")
+        grade := "A"
+    } else if (score >= 80) then {
+        Print("Good")
+        grade := "B"
+    } else if (score >= 70) then {
+        Print("Average")
+        grade := "C"
+    } else {
+        Print("Needs improvement")
+        grade := "F"
+    }
+
+#! Valid
+# Mixed colon and curly brace syntax
+TestMixedColonCurlyBrace():void=
+    if (useNewStyle):
+        if (detailedLogging) then {
+            Log("Starting detailed process")
+            ProcessWithDetails()
+            Log("Completed detailed process")
+        } else {
+            QuickProcess()
+        }
+    else:
+        LegacyProcess()
+
+#! Valid
+# If-then-else with curly braces and complex expressions
+TestComplexCurlyBraces():void=
+    if (player.IsValid() and player.Health > 0) then {
+        currentHealth := player.GetHealth()
+        maxHealth := player.GetMaxHealth()
+        healthPercent := currentHealth / maxHealth
+        if (healthPercent < 0.2) then {
+            PlayLowHealthWarning()
+        }
+    } else {
+        RespawnPlayer()
+        ResetPlayerStats()
+    }
+
+#! Valid
+# If-then-else with curly braces containing loops
+TestCurlyBracesWithLoops():void=
+    if (processAllItems) then {
+        for (item : itemList):
+            if (item.IsValid()) then {
+                ProcessItem(item)
+            }
+    } else {
+        ProcessSingleItem(defaultItem)
+    }
+
+#! Valid
+# If-then-else with curly braces and function calls
+TestCurlyBracesWithFunctions():void=
+    if (ShouldInitialize()) then {
+        result := Initialize()
+        if (result.IsSuccess()) then {
+            Print("Initialization successful")
+        } else {
+            Print("Initialization failed")
+            Cleanup()
+        }
+    } else {
+        Print("Skipping initialization")
+    }
+
+#! Valid
+# If-then-else with empty curly brace blocks
+TestEmptyCurlyBraces():void=
+    if (condition) then {        
+    } else {
+        # Another empty block
+    }
+
+#! Valid
+# If-then-else with curly braces and variable declarations
+TestCurlyBracesVariableDecl():void=
+    if (createNewScope) then {
+        var localVar : int = 42
+        var anotherVar :string= "local"
+        ProcessWithLocalVars(localVar, anotherVar)
+    } else {
+        ProcessWithGlobalVars()
+    }
+
+#! Valid
+# Deeply nested if-then-else with curly braces
+TestDeeplyNestedCurlyBraces():void=
+    if (level1) then {
+        if (level2) then {
+            if (level3) then {
+                if (level4) then {
+                    DeepestAction()
+                } else {
+                    Level4Alternative()
+                }
+            } else {
+                Level3Alternative()
+            }
+        } else {
+            Level2Alternative()
+        }
+    } else {
+        Level1Alternative()
+    }
+
+#! Valid
+# If-then-else with curly braces and return statements
+TestCurlyBracesWithReturn():void=
+    if (shouldReturnEarly) then {
+        CleanupResources()
+        return false
+    } else {
+        ContinueProcessing()
+        return true
+    }
+
+#! Valid
+# If-then-else with curly braces and error handling
+TestCurlyBracesErrorHandling():void=
+    if (riskyOperation) then {
+        try:
+            result := PerformRiskyOperation()
+            if (result.IsSuccess()) then {
+                HandleSuccess(result)
+            } else {
+                HandleFailure(result)
+            }
+        catch:
+            HandleException()
+    } else {
+        SafeOperation()
+    }
+
+#! Valid
+# Basic class declarations
+TestBasicClasses():void=
+    SimpleClass := class:
+        Value : int = 0
+
+    EmptyClass := class{}
+
+    ClassWithMethod := class:
+        Method():void = Print("Hello")
+
+#! Valid
+# Class inheritance and specifiers
+TestClassInheritance():void=
+    BaseClass := class:
+        BaseValue : int = 100
+
+    DerivedClass := class(BaseClass):
+        DerivedValue : string = "derived"
+
+    PublicClass<public> := class:
+        PublicField : int = 42
+
+#! Valid
+# Classes with creative device inheritance
+TestCreativeDeviceClasses():void=
+    MyDevice := class(creative_device):
+        DeviceId : int = 1
+        IsActive : logic = false
+
+    AdvancedDevice<public> := class(creative_device):
+        @editable
+        MaxPlayers : int = 10
+
+        Initialize():void = set IsActive = true
+
+#! Valid
+# Classes with multiple inheritance
+TestMultipleInheritance():void=
+    MultiBase := class(creative_device, creative_object):
+        CommonField : float = 1.0
+
+    ComplexClass := class(base_class, interface_type, mixin_class):
+        Implementation():void = DoSomething()
+
+#! Valid
+# Complex interface with multiple methods
+TestComplexInterface():void=
+    GameInterface := interface:
+        Initialize():logic
+        Update(deltaTime:float):void
+        Cleanup():void
+        GetHealth():int
+        SetHealth(newHealth:int):void
+
+    EventInterface := interface:
+        OnPlayerJoin(player:agent):void
+        OnPlayerLeave(player:agent):void
+        OnGameStart():void
+        OnGameEnd():void
+
+#! Valid
+# Struct declarations
+TestBasicStructs():void=
+    Position := struct:
+        X : float = 0.0
+        Y : float = 0.0
+        Z : float = 0.0
+
+    PlayerData := struct:
+        Name : string = ""
+        Score : int = 0
+        IsActive : logic = true
+
+#! Valid
+# Nested struct definitions
+TestNestedStructs():void=
+    Vector3 := struct:
+        X : float = 0.0
+        Y : float = 0.0
+        Z : float = 0.0
+
+    Transform := struct:
+        Position : Vector3 = Vector3{}
+        Rotation : Vector3 = Vector3{}
+        Scale : Vector3 = Vector3{X := 1.0, Y := 1.0, Z := 1.0}
+
+#! Valid
+# Classes with properties and methods
+TestClassesWithMethods():void=
+    Counter := class:
+        var Value : int = 0
+
+        Increment():void =
+            set Value = Value + 1
+
+        GetValue():int = Value
+
+        Reset():void = set Value = 0
+
+    Calculator := class:
+        Add(a:int, b:int):int = a + b
+        Subtract(a:int, b:int):int = a - b
+        Multiply(a:int, b:int):int = a * b
+
+#! Valid
+# Classes with constructors and destructors
+TestClassLifecycle():void=
+    ManagedResource := class:
+        ResourceId : int = -1
+
+        Initialize(id:int):void =
+            set ResourceId = id
+            Print("Resource {ResourceId} initialized")
+
+        Cleanup():void =
+            Print("Resource {ResourceId} cleaned up")
+            set ResourceId = -1
+
+#! Valid
+# Classes with static and instance members
+TestClassMembers():void=
+    GameManager := class:
+        var InstanceCount : int = 0
+        PlayerId : string = ""
+
+        GetInstanceCount():int = InstanceCount
+        SetPlayerId(id:string):void = set PlayerId = id
+        GetFullInfo():string = "Player {PlayerId}, Instance {InstanceCount}"
+
+
+
+#! Valid
+# Classes with attributes and specifiers
+TestClassAttributes():void=
+    @editable
+    ConfigurableClass := class:
+        @editable{Category := "Settings"}
+        MaxValue : int = 100
+
+        @editable{DisplayName := "Player Name"}
+        PlayerName : string = "Default"
+
+    PublicUtility<public> := class:
+       UtilityMethod <public>():void = Print("Utility")
+
+
+#! Valid
+# Interface implementation and composition
+TestInterfaceImplementation():void=
+    Drawable := interface:
+        Draw():void
+        GetBounds():vector3
+
+    Updatable := interface:
+        Update(deltaTime:float):void
+
+    GameObject := class(Drawable, Updatable):
+        Position : vector3 = vector3{}
+
+        Draw():void = Print("Drawing at {Position}")
+        Update(deltaTime:float):void = Print("Updating")
+        GetBounds():vector3 = Position
+
+#! Valid
+# Struct with methods and computed properties
+TestStructMethods():void=
+    Rectangle := struct:
+        Width : float = 1.0
+        Height : float = 1.0
+
+        GetArea():float = Width * Height
+        GetPerimeter():float = 2.0 * (Width + Height)
+        IsSquare():logic = Width = Height
+
+#! Valid
+# Complex class hierarchy
+TestClassHierarchy():void=
+    Entity := class:
+        Id : int = 0
+        Active : logic = true
+
+        Initialize(id:int):void = set Id = id
+        Activate():void = set Active = true
+        Deactivate():void = set Active = false
+
+    GameObject := class(Entity):
+        Transform : transform = transform{}
+
+        SetPosition(pos:vector3):void =
+            set Transform = transform{Translation := pos}
+
+    Player := class(GameObject):
+        Health : int = 100
+        Name : string = ""
+
+        TakeDamage(damage:int):void =
+            set Health = Health - damage
+            if (Health <= 0):
+                OnDeath()
+
+        OnDeath():void = Print("Player {Name} died")
+
+#! Valid
+# Abstract classes and virtual methods
+TestAbstractClasses():void=
+    Animal := class:
+        Name : string = ""
+
+       MakeSound <virtual>():void = Print("Generic animal sound")
+       GetSpecies <abstract>():string
+
+    Dog := class(Animal):
+        MakeSound<overrides>():void = Print("Woof!")
+
+
+#! Valid
+# Enum classes and specialized types
+TestSpecializedClasses():void=
+    Color := enum:
+        Red
+        Green
+        Blue
+
+    StateEnum := enum<public>:
+        Idle
+        Running
+        Jumping
+
+    StatusClass := class:
+        CurrentColor : Color = Color.Red
+        State : StateEnum = StateEnum.Idle
+
+#! Valid
+# Classes with events and delegates
+TestClassEvents():void=
+    EventPublisher := class:
+        PlayerJoined : event(agent) = event(agent){}
+        ScoreChanged : event(int) = event(int){}
+
+        AddPlayer(player:agent):void =
+            PlayerJoined.Signal(player)
+
+        UpdateScore(newScore:int):void =
+            ScoreChanged.Signal(newScore)
+
+#! Valid
+# Mixin and trait-like patterns
+TestMixinPatterns():void=
+    Loggable := class:
+        LogLevel : int = 1
+
+        Log(message:string):void =
+            if (LogLevel > 0):
+                Print("[LOG] {message}")
+
+    Configurable := class:
+        Settings : map(string, string) = map{}
+
+        GetSetting(key:string):?string =
+            if (Value := Settings[key]):
+                Value
+            else:
+                false
+
+    Component := class(Loggable, Configurable):
+        ComponentName : string = "Default"
+
+        Initialize():void =
+            Log("Initializing component {ComponentName}")
+
+#! Valid
+# Classes with operator overloading
+TestOperatorOverloading():void=
+    Vector := class:
+        X : float = 0.0
+        Y : float = 0.0
+
+        operator+(other:Vector):Vector =
+            Vector{X := X + other.X, Y := Y + other.Y}
+
+        operator*(scalar:float):Vector =
+            Vector{X := X * scalar, Y := Y * scalar}
+
+#! Valid
+# Class templates and specialization
+TestClassTemplates():void=
+    Stack<T> := class:
+        Items : []T = array{}
+
+        Push(item:T):void =
+            set Items = Items + array{item}
+
+        Pop():?T =
+            if (Items.Length > 0):
+                Result := Items[Items.Length - 1]
+                set Items = Items.RemoveLast()
+                Result
+            else:
+                false
+
+#! Valid
+# Function declarations with various specifiers
+TestFunctionSpecifiers():void=
+    DecideFunction()<decides>:logic = true
+    SucceedFunction()<succeeds>:void = Print("Success")
+    FailFunction()<fails>:void = Print("Fail")
+    TransactFunction()<transacts>:void = DoTransaction()
+    ComputeFunction()<computes>:int = 42
+    AmbiguateFunction()<ambiguates>:int = RandomValue()
+    ReadFunction()<reads>:string = GetStoredValue()
+    WriteFunction()<writes>:void = SaveValue("data")
+    AllocateFunction()<allocates>:object = CreateNewObject()
+    SuspendFunction()<suspends>:void = WaitForEvent()
+    ClosedFunction()<closed>:void = FinalizeOperation()
+
+#! Valid
+# Functions with multiple specifiers
+TestMultipleSpecifiers():void=
+    ComplexFunction()<suspends><transacts>:void =
+        PerformAsyncTransaction()
+
+    ReadWriteFunction()<reads><writes>:void =
+        ProcessDataInPlace()
+
+    DecideComputeFunction()<decides><computes>:int =
+        CalculateDecision()
+
+#! Valid
+# Functions with specifiers and parameters
+TestSpecifiersWithParameters():void=
+    ProcessPlayer(player:agent)<suspends><writes>:void =
+        UpdatePlayerData(player)
+
+    CalculateScore(base:int, multiplier:float)<computes><reads>:int =
+        GetStoredBonus() * base * multiplier
+
+    ValidateInput(input:string)<decides><reads>:logic =
+        IsValidAgainstRules(input)
+
+#! Valid
+# Functions with specifiers and return types
+TestSpecifiersWithReturnTypes():void=
+    GetRandomValue()<ambiguates><computes>:int =
+        GenerateRandomNumber()
+
+    AllocateMemory(size:int)<allocates><transacts>:memory_block =
+        RequestMemoryBlock(size)
+
+    CheckPermission(user:agent)<decides><reads>:logic =
+        HasUserPermission(user)
+
+#! Valid
+# Class methods with specifiers
+TestClassMethodSpecifiers():void=
+    PlayerManager := class:
+        GetPlayer(id:int)<reads>:?agent =
+            FindPlayerById(id)
+
+        UpdatePlayer(player:agent)<writes><suspends>:void =
+            SavePlayerToDatabase(player)
+
+        ValidatePlayer(player:agent)<decides><reads>:logic =
+            IsPlayerValid(player)
+
+        CreateNewPlayer()<allocates><transacts>:agent =
+            AllocateNewPlayerObject()
+
+#! Valid
+# Interface methods with specifiers
+TestInterfaceMethodSpecifiers():void=
+    GameService := interface:
+        Initialize()<suspends><writes>:logic
+        GetState()<reads>:game_state
+        UpdateState(newState:game_state)<writes><transacts>:void
+        ValidateState(state:game_state)<decides><reads>:logic
+        CleanupResources()<closed><writes>:void
+
+#! Valid
+# Functions with specifiers in different contexts
+TestSpecifierContexts():void=
+    # Event handlers with specifiers
+    OnPlayerJoin(player:agent)<suspends><writes>:void =
+        RegisterPlayerInSystem(player)
+
+    # Async operations with specifiers
+    LoadGameData()<suspends><reads><allocates>:game_data =
+        LoadFromPersistentStorage()
+
+    # Validation functions with specifiers
+    IsValidMove(move:game_move)<decides><reads>:logic =
+        CheckMoveAgainstRules(move)
+
+#! Valid
+# Lambda expressions with specifiers (if supported)
+TestLambdaSpecifiers():void=
+    validator := (input:string)<decides> => IsValidInput(input)
+    processor := (data:[]string)<writes><computes> => ProcessDataArray(data)
+    allocator := (size:int)<allocates> => CreateBuffer(size)
+
+#! Valid
+# Complex specifier combinations
+TestComplexSpecifierCombinations():void=
+    DatabaseOperation(query:string)<suspends><reads><writes><transacts>:result =
+        ExecuteComplexQuery(query)
+
+    AIDecision(context:game_context)<decides><computes><ambiguates><reads>:action =
+        CalculateOptimalAction(context)
+
+    SystemShutdown()<closed><writes><suspends>:void =
+        PerformGracefulShutdown()
+ 
+
+#! Valid
+# Specifiers in function overloads and variants
+TestSpecifierOverloads():void=
+    ProcessAsync(data:string)<suspends><writes>:void =
+        AsyncProcessString(data)
+
+    ProcessSync(data:string)<computes><reads>:void =
+        SyncProcessString(data)
+
+    ProcessDecide(data:string)<decides><reads>:logic =
+        ShouldProcessString(data)
+
+#! Valid
+# Specifiers with default parameters
+TestSpecifiersWithDefaults():void=
+    ConfigureSystem(timeout:int = 30)<writes><suspends>:void =
+        SetSystemTimeout(timeout)
+
+    AllocateWithSize(size:int = 1024)<allocates><transacts>:buffer =
+        CreateBuffer(size)
+
+    ValidateWithMode(data:string, strict:logic = true)<decides><reads>:logic =
+        if (strict) then StrictValidate(data) else LooseValidate(data)
+
+#! Valid
+# Nested function calls with specifiers
+TestNestedSpecifierCalls():void=
+    result := ProcessData(
+        TransformInput("raw_data")<computes>,
+        ValidateFormat("format")<decides><reads>
+    )<writes><suspends>
+
+    finalValue := CalculateResult(
+        GetBaseValue()<reads>,
+        GetMultiplier()<computes><ambiguates>
+    )<decides><computes>
+
+#! Valid
+# Specifiers with error handling
+TestSpecifiersWithErrorHandling():void=
+    SafeOperation()<suspends><transacts><fails>:?result =
+        try:
+            PerformRiskyOperation()<suspends><transacts>
+        catch:
+            false
+
+    ValidatedProcess(input:string)<decides><reads><fails>:?output =
+        if (IsValid(input)<decides><reads>) then:
+            ProcessValid(input)<computes><writes>
+        else:
+            false
+
+#! Valid
+# Class inheritance with specifier preservation
+TestSpecifierInheritance():void=
+    BaseProcessor := class:
+        Process(data:string)<computes><writes>:string =
+            TransformData(data)
+
+        Validate(input:string)<decides><reads>:logic =
+            CheckInput(input)
+
+    ExtendedProcessor := class(BaseProcessor):
+        <override>Process(data:string)<computes><writes>:string =
+            EnhancedTransform(data)
+
+        BatchProcess(items:[]string)<suspends><writes><computes>:[]string =
+            ProcessMultiple(items)
+
+#! Valid
+# Module-level functions with specifiers
+TestModuleLevelSpecifiers():void=
+    GameModule := module:
+        InitializeGame()<suspends><writes><allocates>:void =
+            SetupGameWorld()
+
+        GetGameState()<reads>:game_state =
+            RetrieveCurrentState()
+
+        UpdateGameLogic(deltaTime:float)<computes><writes>:void =
+            AdvanceGameSimulation(deltaTime)
+
+        ShutdownGame()<closed><writes>:void =
+            CleanupGameResources()
+
+#! Valid
+# Event system with specifiers
+TestEventSpecifiers():void=
+    PlayerJoinedEvent : event(agent) = event(agent){}
+
+    OnPlayerJoined(player:agent)<suspends><writes>:void =
+        PlayerJoinedEvent.Signal(player)
+        UpdatePlayerDatabase(player)
+
+    ProcessPlayerEvents()<reads><computes>:void =
+        for (player : GetAllPlayers()):
+            if (ShouldProcessPlayer(player)<decides><reads>):
+                ProcessPlayerUpdate(player)<writes><computes>
+
+#! Valid
+# Concurrent operations with specifiers
+TestConcurrentSpecifiers():void=
+    ParallelProcess(items:[]string)<suspends><writes><computes>:[]result =
+        race:
+            ProcessBatch1(items[0..items.Length()/2])<suspends><computes>
+            ProcessBatch2(items[items.Length()/2..items.Length()])<suspends><computes>
+
+    ConcurrentValidation(inputs:[]string)<decides><reads><suspends>:logic =
+        spawn:
+            for (input : inputs):
+                if (not ValidateInput(input)<decides><reads>):
+                    return false
+        return true
+
+#! Valid
+# Basic class declarations with curly braces
+TestCurlyBraceClasses():void=
+    SimpleClass := class {
+        Value : int = 0
+    }
+
+    EmptyClass := class {}
+
+    ClassWithInitializer := class {
+        Name : string = "Default"
+        Count : int = 1
+    }
+
+#! Valid
+# Classes with curly brace methods
+TestCurlyBraceClassMethods():void=
+    Calculator := class {
+        Result : int = 0
+
+        Add(a : int, b : int) : int = {
+            set Result = a + b
+            Result
+        }
+
+        Multiply(x : int, y : int) : int = {
+            temp := x * y
+            set Result = temp
+            temp
+        }
+    }
+
+#! Valid
+# Classes with curly brace constructors and destructors
+TestCurlyBraceLifecycle():void=
+    ManagedClass := class {
+        Id : int = 0
+        Active : logic = false
+
+        Initialize(newId : int) : void = {
+            set Id = newId
+            set Active = true
+            Print("Initialized with ID: {Id}")
+        }
+
+        Cleanup() : void = {
+            Print("Cleaning up ID: {Id}")
+            set Active = false
+            set Id = 0
+        }
+    }
+
+#! Valid
+# Inherited classes with curly braces
+TestCurlyBraceInheritance():void=
+    BaseClass := class {
+        BaseValue : int = 100
+
+        GetBaseValue() : int = {
+            BaseValue
+        }
+    }
+
+    DerivedClass := class(BaseClass) {
+        DerivedValue : string = "derived"
+
+        GetCombinedInfo() : string = {
+            "Base: {BaseValue}, Derived: {DerivedValue}"
+        }
+    }
+
+#! Valid
+# Creative device classes with curly braces
+TestCurlyBraceCreativeDevice():void=
+    GameDevice := class(creative_device) {
+        PlayersConnected : int = 0
+        GameActive : logic = false
+
+        StartGame() : void = {
+            set GameActive = true
+            Print("Game started with {PlayersConnected} players")
+        }
+
+        AddPlayer() : void = {
+            set PlayersConnected = PlayersConnected + 1
+            if (PlayersConnected >= 2) {
+                StartGame()
+            }
+        }
+
+        EndGame() : void = {
+            set GameActive = false
+            set PlayersConnected = 0
+            Print("Game ended")
+        }
+    }
+
+#! Valid
+# Classes with curly brace event handlers
+TestCurlyBraceEvents():void=
+    EventHandler := class {
+        EventCount : int = 0
+        PlayerJoined : event(agent) = event(agent){}
+
+        OnPlayerConnect(player : agent) : void = {
+            set EventCount = EventCount + 1
+            Print("Player connected: {EventCount} total events")
+            PlayerJoined.Signal(player)
+        }
+
+        ProcessEvents() : void = {
+            if (EventCount > 0) {
+                Print("Processing {EventCount} events")
+                set EventCount = 0
+            }
+        }
+    }
+
+#! Valid
+# Classes with nested curly brace blocks
+TestNestedCurlyBraceBlocks():void=
+    GameManager := class {
+        Score : int = 0
+        Lives : int = 3
+
+        ProcessTurn(playerAction : string) : logic = {
+            if (playerAction = "attack") {
+                enemyHealth := 10
+                damage := 5
+                set enemyHealth = enemyHealth - damage
+
+                if (enemyHealth <= 0) {
+                    set Score = Score + 100
+                    Print("Enemy defeated! Score: {Score}")
+                    true
+                } else {
+                    Print("Enemy health: {enemyHealth}")
+                    false
+                }
+            } else if (playerAction = "defend") {
+                Print("Player defending")
+                true
+            } else {
+                set Lives = Lives - 1
+                if (Lives <= 0) {
+                    Print("Game Over!")
+                    false
+                } else {
+                    Print("Invalid action! Lives remaining: {Lives}")
+                    true
+                }
+            }
+        }
+    }
+
+#! Valid
+# Classes with curly brace property accessors
+TestCurlyBraceProperties():void=
+    PlayerStats := class {
+        var Health : int = 100
+        var Mana : int = 50
+
+        GetHealthPercent() : float = {
+            Health / 100.0
+        }
+
+        SetHealth(newHealth : int) : void = {
+            if (newHealth >= 0 and newHealth <= 100) {
+                set Health = newHealth
+            }
+        }
+
+        RestoreMana(amount : int) : void = {
+            newMana := Mana + amount
+            if (newMana > 100) {
+                set Mana = 100
+            } else {
+                set Mana = newMana
+            }
+        }
+    }
+
+#! Valid
+# Generic classes with curly braces
+TestCurlyBraceGenerics():void=
+    Container<T> := class {
+        Items : []T = array{}
+        Count : int = 0
+
+        Add(item : T) : void = {
+            set Items = Items + array{item}
+            set Count = Count + 1
+        }
+
+        Get(index : int) : ?T = {
+            if (index >= 0 and index < Count) {
+                Items[index]
+            } else {
+                false
+            }
+        }
+
+        Clear() : void = {
+            set Items = array{}
+            set Count = 0
+        }
+    }
+
+#! Valid
+# Classes with curly brace error handling
+TestCurlyBraceErrorHandling():void=
+    SafeCalculator := class {
+        LastResult : ?float = false
+        ErrorMessage : string = ""
+
+        Divide(a : float, b : float) : ?float = {
+            if (b = 0.0) {
+                set ErrorMessage = "Division by zero"
+                set LastResult = false
+                false
+            } else {
+                result := a / b
+                set LastResult = result
+                set ErrorMessage = ""
+                result
+            }
+        }
+
+        SafeOperation(operation : string, x : float, y : float) : ?float = {
+            try {
+                if (operation = "divide") {
+                    Divide(x, y)
+                } else if (operation = "sqrt") {
+                    if (x >= 0.0) {
+                        result := x ^ 0.5
+                        set LastResult = result
+                        result
+                    } else {
+                        set ErrorMessage = "Negative square root"
+                        false
+                    }
+                } else {
+                    set ErrorMessage = "Unknown operation"
+                    false
+                }
+            } catch {
+                set ErrorMessage = "Operation failed"
+                set LastResult = false
+                false
+            }
+        }
+    }
+
+#! Valid
+# Mixed colon and curly brace syntax in classes
+TestMixedClassSyntax():void=
+    HybridClass := class(creative_device): {
+        # Colon for inheritance, curly brace for body
+        PublicValue : int = 42
+
+        Initialize() : void = {
+            Print("Hybrid class initialized")
+        }
+    }
+
+    AnotherHybrid := class {
+        # Curly brace for main body
+        Settings : map(string, int) = map{}
+
+        ConfigureSettings() : void = {
+            if (Settings.Length = 0): {
+                # Colon for if condition, curly for body
+                set Settings = map{"default" -> 1, "advanced" -> 2}
+            }
+        }
+
+        ProcessConfig(mode : string) : void = {
+            for (key : Settings.Keys) {
+                if (key = mode) {
+                    value := Settings[key]
+                    Print("Processing {key} with value {value}")
+                } else {
+                    Print("Skipping {key}")
+                }
+            }
+        }
+    }
+
+#! Valid
+# Classes with curly brace loops and control flow
+TestCurlyBraceControlFlow():void=
+    LoopProcessor := class {
+        Data : []int = array{1, 2, 3, 4, 5}
+        var ProcessedCount : int = 0
+
+        ProcessAllData() : void = {
+            for (item : Data) {
+                if (item > 2) {
+                    Print("Processing item: {item}")
+                    set ProcessedCount = ProcessedCount + 1
+                } else {
+                    Print("Skipping item: {item}")
+                }
+            }
+        }
+
+        ProcessWithWhile() : void = {
+            var index :int= 0
+            while (index < Data.Length) {
+                current := Data[index]
+                if (current % 2 = 0) {
+                    Print("Even number: {current}")
+                } else {
+                    Print("Odd number: {current}")
+                }
+                set index = index + 1
+            }
+        }
+    }
+
+#! Valid
+# Interface implementations with curly braces
+TestCurlyBraceInterfaces():void=
+    Drawable := interface {
+        Draw() : void
+        GetBounds() : vector3
+    }
+
+    Sprite := class(Drawable) {
+        Position : vector3 = vector3{}
+        Size : vector3 = vector3{X := 1.0, Y := 1.0, Z := 1.0}
+
+        Draw() : void = {
+            Print("Drawing sprite at {Position}")
+        }
+
+        GetBounds() : vector3 = {
+            vector3{
+                X := Position.X + Size.X,
+                Y := Position.Y + Size.Y,
+                Z := Position.Z + Size.Z
+            }
+        }
+    }
+
+#! Valid
+# Struct definitions with curly braces
+TestCurlyBraceStructs():void=
+    Point := struct {
+        X : float = 0.0
+        Y : float = 0.0
+
+        DistanceFromOrigin() : float = {
+            (X * X + Y * Y) ^ 0.5
+        }
+    }
+
+    GameState := struct {
+        CurrentLevel : int = 1
+        Score : int = 0
+        Lives : int = 3
+
+        IsGameOver() : logic = {
+            Lives <= 0
+        }
+
+        AdvanceLevel() : void = {
+            set CurrentLevel = CurrentLevel + 1
+            Print("Advanced to level {CurrentLevel}")
+        }
+    }
+
+
+#! Valid
+# String interpolation - empty and edge cases
+F():= 
+    ""
+    "{}"
+    "No interpolation here"
+    "Just {var}"
+    "{a}{b}{c}"
+
+#! Valid
+# String interpolation in different contexts
+TestStringInterpolation():void=
+    name := "World"
+    count := 42
+    Print("Hello {name}!")
+    Print("Count: {count} items")
+
+    message := "User {userId} has {score} points"
+    log := "Error: {errorCode} - {errorMessage}"
+
+    # In function calls
+    SetTitle("Game Level {currentLevel}")
+    DisplayMessage("Player {player.Name} joined")
+
+    # In variable assignments
+    statusText := "Health: {health}/{maxHealth}"
+    debugInfo := "Position ({x}, {y}) at time {timestamp}"
+
+#! Valid
+# String interpolation with method calls
+TestInterpolationWithMethods():void=
+    player := GetCurrentPlayer()
+    weapon := player.GetCurrentWeapon()
+    stats := player.GetStats()
+
+    Print("Player {player.GetName()} using {weapon.GetType()}")
+    Print("Stats: Level {stats.GetLevel()}, XP {stats.GetExperience()}")
+    Print("Inventory: {player.GetInventory().Count()} items")
+
+#! Valid
+# String interpolation with complex expressions
+TestComplexInterpolation():void=
+    players := GetAllPlayers()
+    teamA := GetTeam("A")
+    teamB := GetTeam("B")
+
+    scoreboard := "Team A: {teamA.Score} vs Team B: {teamB.Score}"
+    summary := "Game {gameId}: {players.Length} players, duration {GetGameDuration()}s"
+    analysis := "Winner: {if (teamA.Score > teamB.Score) then "Team A" else "Team B"}"
+
+#! Valid
+# String interpolation in class methods
+TestClassInterpolation():void=
+    Logger := class:
+        LogLevel : string = "INFO"
+        Timestamp : float = 0.0
+
+        Log(message : string) : void =
+            Print("[{LogLevel}] {GetCurrentTime()}: {message}")
+
+        LogError(error : string, code : int) : void =
+            Print("[ERROR] Code {code}: {error} at {Timestamp}")
+
+#! Valid
+# String interpolation with operators and arithmetic
+TestInterpolationArithmetic():void=
+    x := 10
+    y := 20
+    multiplier := 1.5
+
+    result1 := "Sum: {x + y}"
+    result2 := "Product: {x * y * multiplier}"
+    result3 := "Comparison: {x} < {y} is {x < y}"
+    result4 := "Modulo: {y % x} remainder"
+
+#! Valid
+# String interpolation with conditionals
+TestInterpolationConditionals():void=
+    health := 75
+    mana := 30
+    level := 5
+
+    status := "Health: {if (health > 50) then "Good" else "Low"}"
+    magic := "Mana: {if (mana > 0) then mana else "Empty"}"
+    progress := "Level {level}: {if (level >= 10) then "Max" else "Growing"}"
+
+#! Valid
+# String interpolation with array and map access
+TestInterpolationCollections():void=
+    scores := array{100, 85, 92, 78}
+    playerNames := map{"p1" -> "Alice", "p2" -> "Bob"}
+
+    topScore := "Highest: {scores[0]}"
+    player1 := "Player 1: {playerNames["p1"]}"
+    summary := "Scores: [{scores[0]}, {scores[1]}, {scores[2]}, {scores[3]}]"
+

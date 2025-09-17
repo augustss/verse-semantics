@@ -12,6 +12,8 @@ export interface Loc {
 export interface L<T> {
   loc: Loc;
   value: T;
+  leadingTrivia?: import('./trivia').TriviaList;
+  trailingTrivia?: import('./trivia').TriviaList;
 }
 
 // For backwards compatibility, we'll alias Position to Pos
@@ -25,7 +27,22 @@ export function createLoc(start: Pos, end: Pos): Loc {
   return { start, end };
 }
 
-export function withLoc<T>(loc: Loc, value: T): L<T> {
+export function withLoc<T>(loc: Loc, value: T): L<T>;
+export function withLoc<T>(
+  loc: Loc,
+  value: T,
+  leadingTrivia: import('./trivia').TriviaList,
+  trailingTrivia: import('./trivia').TriviaList
+): L<T>;
+export function withLoc<T>(
+  loc: Loc,
+  value: T,
+  leadingTrivia?: import('./trivia').TriviaList,
+  trailingTrivia?: import('./trivia').TriviaList
+): L<T> {
+  if (leadingTrivia !== undefined || trailingTrivia !== undefined) {
+    return { loc, value, leadingTrivia, trailingTrivia };
+  }
   return { loc, value };
 }
 

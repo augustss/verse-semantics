@@ -1,12 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseVersee } from '../src/parser/parser';
+import { extractSourceContext } from '../src/error-reporting';
 
 interface ParseTest {
   expectSuccess: boolean;
   code: string;
   lineNumber: number;
   description?: string;
+}
+
+interface ParseFailure {
+  test: ParseTest;
+  error?: string;
+  errorPosition?: { line: number; column: number; offset: number };
 }
 
 /**
@@ -78,7 +85,7 @@ function runTestFile(filepath: string): void {
   const tests = parseTestFile(filepath);
   let passed = 0;
   let failed = 0;
-  const failures: Array<{test: ParseTest, error?: string}> = [];
+  const failures: ParseFailure[] = [];
 
   tests.forEach((test, index) => {
     const result = parseVersee(test.code);
@@ -97,10 +104,21 @@ function runTestFile(filepath: string): void {
         console.log(`  ${test.description}`);
       }
 
-      failures.push({
+      const failure: ParseFailure = {
         test,
         error: result.success ? undefined : result.error.message
-      });
+      };
+
+      // Extract error position if available
+      if (!result.success && result.error.position) {
+        failure.errorPosition = {
+          line: result.error.position.line,
+          column: result.error.position.column,
+          offset: result.error.position.offset
+        };
+      }
+
+      failures.push(failure);
     }
   });
 
@@ -115,15 +133,45 @@ function runTestFile(filepath: string): void {
     console.log('Failed Tests:');
     console.log('='.repeat(60));
 
-    failures.forEach(({ test, error }, index) => {
+    failures.forEach((failure, index) => {
+      const { test, error, errorPosition } = failure;
       console.log(`\n${index + 1}. Line ${test.lineNumber} - Expected ${test.expectSuccess ? 'success' : 'error'} but got ${test.expectSuccess ? 'error' : 'success'}`);
+
       if (test.description) {
         console.log(`   Description: ${test.description}`);
       }
+
       console.log('   Code:');
-      test.code.split('\n').forEach(line => console.log(`     ${line}`));
+      test.code.split('\n').forEach((line, lineIndex) => {
+        const lineNum = lineIndex + 1;
+        console.log(`     ${lineNum.toString().padStart(2, ' ')} | ${line}`);
+      });
+
       if (error) {
         console.log(`   Error: ${error}`);
+
+        // Show error position and context if available
+        if (errorPosition) {
+          console.log(`   Error Position: Line ${errorPosition.line}, Column ${errorPosition.column}`);
+
+          // Extract and show source context around the error
+          const sourceContext = extractSourceContext(test.code, errorPosition.line, 1);
+          if (sourceContext) {
+            console.log('   Context:');
+            sourceContext.split('\n').forEach(contextLine => {
+              console.log(`   ${contextLine}`);
+            });
+          }
+
+          // Show pointer to exact error location if within reasonable bounds
+          if (errorPosition.line <= test.code.split('\n').length && errorPosition.column > 0) {
+            const errorLine = test.code.split('\n')[errorPosition.line - 1];
+            if (errorLine && errorPosition.column <= errorLine.length + 5) { // +5 for some tolerance
+              const pointer = ' '.repeat(errorPosition.column - 1) + '^';
+              console.log(`   ${' '.repeat(7)}${pointer} Error here`);
+            }
+          }
+        }
       }
     });
   }

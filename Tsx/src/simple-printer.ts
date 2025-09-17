@@ -36,6 +36,8 @@ export function printExp(exp: L<Exp>): string {
             return `${printExp(inner.left)} * ${printExp(inner.right)}`;
         case 'Divide':
             return `${printExp(inner.left)} / ${printExp(inner.right)}`;
+        case 'Exponent':
+            return `${printExp(inner.left)} ^ ${printExp(inner.right)}`;
         case 'And':
             return `${printExp(inner.left)} and ${printExp(inner.right)}`;
         case 'Or':
@@ -44,8 +46,7 @@ export function printExp(exp: L<Exp>): string {
             return `${printExp(inner.left)} < ${printExp(inner.right)}`;
         case 'Greater':
             return `${printExp(inner.left)} > ${printExp(inner.right)}`;
-        case 'Equal':
-            return `${printExp(inner.left)} = ${printExp(inner.right)}`;
+        // case 'Equal': // This node type no longer exists
 
         // Variable declarations
         case 'ExpVar':
@@ -54,24 +55,13 @@ export function printExp(exp: L<Exp>): string {
             return `${printExp(inner.left)} := ${printExp(inner.right)}`;
 
         // Function calls
-        case 'Apply':
-            if (inner.args && inner.args.length > 0) {
-                const args = inner.args.map(arg => printExp(arg)).join(', ');
-                return `${printExp(inner.func)}(${args})`;
-            }
-            return `${printExp(inner.func)}()`;
+        case 'ParenInvoke':
+            return `${printExp(inner.func)}(${printExp(inner.arg)})`;
 
         // Control flow
         case 'If':
-            const condition = printExp(inner.condition);
-            const thenExpr = printExp(inner.then);
-            const elseExpr = inner.else ? printExp(inner.else) : null;
-
-            if (elseExpr) {
-                return `if (${condition}) then ${thenExpr} else ${elseExpr}`;
-            } else {
-                return `if (${condition}) then ${thenExpr}`;
-            }
+            const condition = printExp(inner.cond);
+            return `if (${condition})`;
 
         // Array/List
         case 'Array':
@@ -84,6 +74,15 @@ export function printExp(exp: L<Exp>): string {
         // Parentheses
         case 'Paren':
             return `(${printExp(inner.expr)})`;
+
+        // Tuples
+        case 'Tuple':
+            if (inner.elements.length === 1) {
+                return `(${printExp(inner.elements[0])}, )`;
+            } else {
+                const elements = inner.elements.map(elem => printExp(elem)).join(', ');
+                return `(${elements})`;
+            }
 
         // For unimplemented constructs, show kind
         default:

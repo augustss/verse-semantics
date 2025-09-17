@@ -30,7 +30,8 @@ export type FuncDecl = {
   name: SimpleName;
   params: FuncParam[];
   returnType?: L<Exp>;
-  specifiers: Specifier[];
+  preSpecifiers: Specifier[]; // Specifiers before parameters
+  postSpecifiers: Specifier[]; // Specifiers after parameters
   body?: L<Exp>; // Optional for function signatures
   isDefinition: boolean; // true for :=, false for =
 };
@@ -38,6 +39,16 @@ export type FuncDecl = {
 export type Exp =
   // Function declarations
   | { kind: 'FuncDecl'; decl: FuncDecl }
+
+  // Advanced language constructs
+  | { kind: 'Ident'; name: string }
+  | { kind: 'GenericType'; base: L<Exp>; typeArgs: L<Exp>[] }
+  | { kind: 'Attribute'; name: string; args?: L<Exp>[] }
+  | { kind: 'ClassDecl'; name: L<Exp>; typeParams?: L<Exp>[]; baseClass?: L<Exp>; attributes?: L<Exp>[]; body?: L<Exp> }
+  | { kind: 'InterfaceDecl'; name: L<Exp>; typeParams?: L<Exp>[]; body: L<Exp> }
+  | { kind: 'ModuleDecl'; name: L<Exp>; typeParams?: L<Exp>[]; body: L<Exp> }
+  | { kind: 'PropertyDecl'; name: L<Exp>; type?: L<Exp>; attributes?: L<Exp>[]; value?: L<Exp> }
+  | { kind: 'MethodDecl'; name: L<Exp>; typeParams?: L<Exp>[]; params?: L<Exp>[]; returnType?: L<Exp>; attributes?: L<Exp>[]; body?: L<Exp> }
 
   // Binary operators
   | { kind: 'Assign'; left: L<Exp>; right: L<Exp> }
@@ -50,7 +61,10 @@ export type Exp =
   | { kind: 'Greater'; left: L<Exp>; right: L<Exp> }
   | { kind: 'GreaterEqual'; left: L<Exp>; right: L<Exp> }
   | { kind: 'Choice'; left: L<Exp>; right: L<Exp> }
+  | { kind: 'As'; left: L<Exp>; right: L<Exp> }
+  | { kind: 'Isa'; left: L<Exp>; right: L<Exp> }
   | { kind: 'Multiply'; left: L<Exp>; right: L<Exp> }
+  | { kind: 'Exponent'; left: L<Exp>; right: L<Exp> }
   | { kind: 'Add'; left: L<Exp>; right: L<Exp> }
   | { kind: 'Subtract'; left: L<Exp>; right: L<Exp> }
   | { kind: 'Arrow'; left: L<Exp>; right: L<Exp> }
@@ -83,7 +97,7 @@ export type Exp =
   | { kind: 'Units'; expr: L<Exp>; unit: L<SimpleName> }
   | { kind: 'For'; expr: L<Exp> }
   | { kind: 'ForDo'; expr: L<Exp>; body: L<Exp> }
-  | { kind: 'ForEach'; expr: L<Exp>; body: L<Exp> }
+  | { kind: 'ForEach'; loopVar: L<SimpleName>; expr: L<Exp>; body: L<Exp> }
   | { kind: 'ForEachIndexed'; indexVar: L<SimpleName>; itemVar: L<SimpleName>; expr: L<Exp>; body: L<Exp> }
   | { kind: 'ForRange'; loopVar: L<SimpleName>; rangeExpr: L<Exp>; body: L<Exp> }
   | { kind: 'Forall'; name: L<SimpleName> }
@@ -107,6 +121,7 @@ export type Exp =
   | { kind: 'Option'; expr: L<Exp> }
   | { kind: 'Paren'; expr: L<Exp> }
   | { kind: 'ParenInvoke'; func: L<Exp>; arg: L<Exp> }
+  | { kind: 'BraceInvoke'; func: L<Exp>; arg: L<Exp> }
   | { kind: 'Pat'; pattern: Pat }
   | { kind: 'PostfixCaret'; expr: L<Exp> }
   | { kind: 'PostfixQuery'; expr: L<Exp> }
@@ -122,7 +137,7 @@ export type Exp =
   | { kind: 'PrefixAmpersand'; expr: L<Exp> }
   | { kind: 'PrefixDotDot'; expr: L<Exp> }
   | { kind: 'Return'; value: L<Exp> | null }
-  | { kind: 'ExpVar'; expr: L<Exp>; pattern?: L<Exp> }
+  | { kind: 'ExpVar'; expr: L<Exp>; pattern?: L<Exp>; type?: L<Exp> }
   | { kind: 'ExpSet'; expr: L<Exp> }
   | { kind: 'ExpRef'; expr: L<Exp> }
   | { kind: 'ExpAlias'; expr: L<Exp> }
@@ -138,8 +153,8 @@ export type Exp =
   | { kind: 'Struct'; body: L<Exp> }
   | { kind: 'Interface'; body: L<Exp> }
   | { kind: 'Enum'; body: L<Exp> }
-  | { kind: 'EnumDecl'; name: L<Exp>; values: L<IdentExp>[] }
-  | { kind: 'Class'; body: L<Exp> }
+  | { kind: 'EnumDecl'; name: L<Exp>; values: L<IdentExp>[]; specifiers?: Specifier[] }
+  | { kind: 'Class'; body: L<Exp>; specifiers?: Specifier[]; parents?: L<SimpleName>[] }
   | { kind: 'True' }
   | { kind: 'Truth'; expr: L<Exp> }
   | { kind: 'Tuple'; elements: L<Exp>[] }
@@ -191,12 +206,73 @@ export function createFuncDecl(
   name: SimpleName,
   params: FuncParam[],
   returnType: L<Exp> | undefined,
-  specifiers: Specifier[],
+  preSpecifiers: Specifier[],
+  postSpecifiers: Specifier[],
   body: L<Exp> | undefined,
   isDefinition: boolean
 ): Exp {
   return {
     kind: 'FuncDecl',
-    decl: { name, params, returnType, specifiers, body, isDefinition }
+    decl: { name, params, returnType, preSpecifiers, postSpecifiers, body, isDefinition }
   };
+}
+
+// Factory functions for new AST nodes
+
+export function createIdent(name: string): Exp {
+  return { kind: 'Ident', name };
+}
+
+export function createGenericType(base: L<Exp>, typeArgs: L<Exp>[]): Exp {
+  return { kind: 'GenericType', base, typeArgs };
+}
+
+export function createAttribute(name: string, args?: L<Exp>[]): Exp {
+  return { kind: 'Attribute', name, args };
+}
+
+export function createClassDecl(
+  name: L<Exp>,
+  typeParams?: L<Exp>[],
+  baseClass?: L<Exp>,
+  attributes?: L<Exp>[],
+  body?: L<Exp>
+): Exp {
+  return { kind: 'ClassDecl', name, typeParams, baseClass, attributes, body };
+}
+
+export function createInterfaceDecl(
+  name: L<Exp>,
+  body: L<Exp>,
+  typeParams?: L<Exp>[]
+): Exp {
+  return { kind: 'InterfaceDecl', name, typeParams, body };
+}
+
+export function createModuleDecl(
+  name: L<Exp>,
+  body: L<Exp>,
+  typeParams?: L<Exp>[]
+): Exp {
+  return { kind: 'ModuleDecl', name, typeParams, body };
+}
+
+export function createPropertyDecl(
+  name: L<Exp>,
+  type?: L<Exp>,
+  attributes?: L<Exp>[],
+  value?: L<Exp>
+): Exp {
+  return { kind: 'PropertyDecl', name, type, attributes, value };
+}
+
+export function createMethodDecl(
+  name: L<Exp>,
+  typeParams?: L<Exp>[],
+  params?: L<Exp>[],
+  returnType?: L<Exp>,
+  attributes?: L<Exp>[],
+  body?: L<Exp>
+): Exp {
+  return { kind: 'MethodDecl', name, typeParams, params, returnType, attributes, body };
 }
