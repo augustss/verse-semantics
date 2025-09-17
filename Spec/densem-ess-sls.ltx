@@ -170,7 +170,7 @@ $$
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %       B, C, and F
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
 & \semess{B}{u}{v}{|t|} & : & \SL{ \ENV } \\
 & \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
 & \semapp{C}{|t|} & : & \SL{ \ENV } \\
@@ -194,7 +194,8 @@ $$
 
  & \pomFOR{\_}{xs}{u}{v}{t_2} & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
  & \pomFOR{\pomempty}{xs}{u}{v}{t_2} & = & \pomempty \\
-  & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} \\
+ & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} & \text{Simon's version} \\
+ & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2} \pomunion \pomFOR{T \pomcat S}{xs}{u}{v}{t_2} & \text{Tim's version} \\
  & \pomFOR{\pomunit{\EV}}{xs}{u}{v}{t_2}
        &  = & \begin{array}[t]{@@{}l}
                 (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}

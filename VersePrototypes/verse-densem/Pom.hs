@@ -40,17 +40,19 @@ none = Empty
 
 infixl 8 +++
 (+++) :: P a -> P a -> P a
-(+++) = (:++)
+Empty +++ y = y
+x +++ Empty = x
+x +++     y = x :++ y
 
 infixl 8 ***
 (***) :: P ENV -> P ENV -> P ENV
 (***) = liftA2 (/\)
---  \ s t -> uncanon $ lift2 (/\) (canon s) (canon t)
---    \ s t -> liftA2 (/\) (uncanon $ canon s) (uncanon $ canon t)
 
 infixl 6 `union`
 union :: P a -> P a -> P a
-union = (:\/)
+union Empty y = y
+union x Empty = x
+union x     y = x :\/ y
 
 instance Functor P where
   fmap f s = s >>= pure . f
@@ -63,8 +65,8 @@ instance Monad P where
   return          = pure
   Empty     >>= _ = Empty
   Unit x    >>= k = k x
-  (s :++ t) >>= k = (s >>= k) :++ (t >>= k)
-  (s :\/ t) >>= k = (s >>= k) :\/ (t >>= k)
+  (s :++ t) >>= k = (s >>= k) +++ (t >>= k)
+  (s :\/ t) >>= k = (s >>= k) `union` (t >>= k)
 
 pfilter :: (a -> Bool) -> P a -> P a
 pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
@@ -98,25 +100,21 @@ absorbEmpty (x :\/ y) =
 
 uncanon :: Ord a => Set [a] -> P a
 uncanon s | Set.isEmpty s = Empty
-uncanon s = Set.foldSet (:\/) [ foldr (:++) Empty (map unit xs) | xs <- s ]
+uncanon s = Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
 
 oNE :: [Ident] -> P ENV -> P ENV
 oNE _ Empty = Empty
 oNE _ (Unit d) = Unit d
-oNE xs (s :\/ t) = oNE xs s :\/ oNE xs t
-oNE xs (s :++ t) = s1 :\/ (nOT xs s1 *** oNE xs t)
+oNE xs (s :\/ t) = oNE xs s `union` oNE xs t
+oNE xs (s :++ t) = s1 `union` (
+    (fmap compl s1 >>> xs) -- nOT xs s1
+    *** oNE xs t)
   where s1 = oNE xs s
 
 nOT :: [Ident] -> P ENV -> P ENV
 nOT xs s =
   fmap compl (s >>> xs)
   -- fmap compl s >>> xs
-
-{-
-uNION :: Set (P a) -> P a
-uNION s | Set.isEmpty s = Empty
-uNION s = Set.foldSet (:\/) s
--}
 
 nil :: Value
 nil = Tuple []
@@ -126,15 +124,18 @@ sing x = Tuple [x]
 fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
 fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
 fOR xs d@Unit{}  t i x =
-  (d *** unit sings *** dE t p q) >>> (p:q:xs)
-  :\/ 
+  d *** unit sings *** dE t p q >>> (p:q:xs)
+  `union` 
   nOT xs d *** unit (i .= nil /\ x .= nil)
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
         sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
                          | ip <- allInts
                          , iq <- allInts
                          ]
-fOR xs (a :\/ b) t i x = fOR xs a t i x :\/ fOR xs b t i x
+fOR xs (a :\/ b) t i x = --fOR xs a t i x `union` fOR xs b t i x
+  fOR xs (a :++ b) t i x
+  `union`
+  fOR xs (b :++ a) t i x
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
@@ -171,14 +172,14 @@ dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
   dE t0 i x `union` dE t1 i x
 dE (If3 t0 t1 t2)                   i x =
   s0 *** dB t1 i x >>> xs
-  :\/
+  `union`
   nOT xs s0 *** dB t2 i x
   where xs = bvs t0
         s0 = oNE xs (dC t0)
 dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
 dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
   dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
-  foldr (:\/) Empty
+  foldr union Empty
     [ unit $ bigUnion [ x .= Int v /\ l .= Int start /\ h .= Int end | v <- [ start .. end ] ]
     | start <- allInts'
     , len   <- allInts'
@@ -201,30 +202,30 @@ dE t@(Array ts)                     i x =
                           bigIntersect (zipWith (.=) xs xvals)
                         | ivals <- tupvals, xvals <- tupvals
                         ]
-{-
 -- A speedup for x:int
-dE (Range (EPrim IsInt))            i x = singleton [ bigUnion [ i .= v /\ x .= v | v <- allInts ] ]
+dE (Range (EPrim IsInt))            i x = unit (bigUnion [ i .= v /\ x .= v | v <- allInts ])
 dE (Range t)                        i x =
-  (dE t j y *** dF y i x) `remv` [j,y]
+  dE t j y *** dF y i x >>> [j,y]
     where (j, y) = fresh2 ("j", "y") [i, x] t
 dE t@(ApplyD t0 t1)                 i x =
-  (dE t0 h f *** dE t1 j y *** dF f y x *** unit (i .=. x)) `remv` [h,f,j,y]
+  dE t0 h f *** dE t1 j y *** dF f y x *** unit (i .=. x) >>> [h,f,j,y]
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
--}
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
-{-
+
 dF :: Ident -> Ident -> Ident -> P ENV
-dF f a r = [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
-                                       | u <- allValues  -- list
-                                       , Just v <- [applyPF h u]
-                                       ]
-             | h <- hs -- list
-             ]
-           | hs <- mkSetUnsafe allFUNs -- set
-           ]
--}
+dF f a r =
+  uncanon
+  [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
+                              | u <- allValues  -- list
+                              , Just v <- [applyPF h u]
+                              ]
+    | h <- hs -- list
+    ]
+  | hs <- Set.mkSetUnsafe allFUNs -- set
+  ]
+
 {-
 -- A hack to avoid iterating over so many values
 valsOf :: [Ident] -> ENV -> [Value]
@@ -258,8 +259,8 @@ t1=Variable a
 -}
 u=Ident noLoc "u"
 v=Ident noLoc "v"
-t0=If3 (Variable x `Unify` k0) k2 k3
-t1=DefineIE x (k0 `Choice` k1)
+t0=DefineIE x (k1 `Choice` k2)
+t1=If3 t0 (Variable x) k3
 
 {-
 ix :: [ ENV ] -> Int -> ENV

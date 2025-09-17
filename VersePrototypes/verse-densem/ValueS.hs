@@ -69,7 +69,7 @@ applyPF (PF _ m) a = M.lookup a m
 -----------------------------
 
 numInt :: Z
-numInt = 4
+numInt = 2
 
 allInts' :: [Int]
 allInts' = [0 .. fromIntegral numInt - 1 ]
@@ -142,6 +142,6 @@ allTuplesLen' els n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ s
                     | otherwise = replicateM n els
 
 allTupleElems :: [Value]
-allTupleElems = [Int 0, Int 1]
-                -- allInts
+allTupleElems = --[Int 0, Int 1]
+                allInts
 -- TOO SLOW                ++ map Tuple (allTuplesLen' allInts 2)   -- all pairs on ints

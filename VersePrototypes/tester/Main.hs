@@ -39,7 +39,8 @@ import PlanCC(edenSem, edenSemDS)
 import SExpC(srcExprToExp)
 
 -- Tim densem
-import TimE (den)
+import qualified TimE (den)
+import qualified Pom (den)
 import ENVDesugar (envDesugar)
 
 import Epic.Print hiding ( (<>) )
@@ -202,7 +203,7 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     }
     deriving (Show)
 
-data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS   -- denotational semantic functions
+data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS   -- denotational semantic functions
 
 instance Show TestRunner where
   -- INFO: Ideally these should correspond to their respective commands in the
@@ -214,6 +215,7 @@ instance Show TestRunner where
   show DLS_DS = "dls"
   show SLS_DS = "sls"
   show ELS_DS = "els"
+  show POM_DS = "pom"
 
 
 data TestType =
@@ -442,7 +444,8 @@ evalDenSem _flags test e = do
     f :: SrcExpr -> IO String
     f = case testRunner $ testInfo test of
           Nothing     -> error $ "evalExpr: Expected densem type, got Nothing with test: " ++ show test
-          Just Tim_DS -> fmap (showASCII . den . envDesugar) . go
+          Just Tim_DS -> fmap (showASCII . TimE.den . envDesugar) . go
+          Just POM_DS -> fmap (showASCII . Pom.den . envDesugar) . go
           Just DLS_DS -> go >=> fmap showASCII . edenSem . edenSemDS . srcExprToExp
           Just SLS_DS -> error "SLS densem not implemented yet. Sorry!"
           Just ELS_DS -> go >=> denSemDesugar >=> fmap showASCII . denSem
@@ -796,6 +799,7 @@ pTestRunner = choice
     , string "sls" *> pure SLS_DS
     , string "dls" *> pure DLS_DS
     , string "els" *> pure ELS_DS
+    , string "pom" *> pure POM_DS
     ] <* pOp ","
 
 pTestStatus :: P TestStatus
