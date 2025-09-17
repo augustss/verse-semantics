@@ -8,9 +8,13 @@ import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
 import qualified Set
---import Debug.Trace
+import Set(Set)
+import Debug.Trace
 
 default ()
+
+infixl 6 :\/
+infixl 8 :++
 
 data P a
   = Empty
@@ -69,7 +73,7 @@ infixl 7 >>>
 (>>>) :: P ENV -> [Ident] -> P ENV
 s >>> xs = fmap (hides xs) s
 
-canon :: P a -> Set.Set [a]
+canon :: P a -> Set [a]
 canon Empty = Set.empty
 canon (Unit a) = Set.singleton [a]
 canon (s :\/ t) = canon s `Set.union` canon t
@@ -92,7 +96,7 @@ absorbEmpty (x :\/ y) =
     (x', Empty) -> x'
     (x', y') -> x' :\/ y'
 
-uncanon :: Ord a => Set.Set [a] -> P a
+uncanon :: Ord a => Set [a] -> P a
 uncanon s | Set.isEmpty s = Empty
 uncanon s = Set.foldSet (:\/) [ foldr (:++) Empty (map unit xs) | xs <- s ]
 
@@ -104,24 +108,49 @@ oNE xs (s :++ t) = s1 :\/ (nOT xs s1 *** oNE xs t)
   where s1 = oNE xs s
 
 nOT :: [Ident] -> P ENV -> P ENV
-nOT xs s = fmap compl s >>> xs
+nOT xs s =
+  fmap compl (s >>> xs)
+  -- fmap compl s >>> xs
+
+{-
+uNION :: Set (P a) -> P a
+uNION s | Set.isEmpty s = Empty
+uNION s = Set.foldSet (:\/) s
+-}
 
 nil :: Value
 nil = Tuple []
+sing :: Value -> Value
+sing x = Tuple [x]
 
 fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
-fOR _  Empty     _ _ _ = unit (u .= nil /\ v .= nil)
-fOR xs d@Unit{}  t _ _ =
-  ((d *** unit (u .=% sing p /\ v .=% sing q) *** dE t p q) >>> (p:q:xs))
-  :\/
-  (nOT xs d *** unit (u .=% nil /\ v .=% nil))
+fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
+fOR xs d@Unit{}  t i x =
+  (d *** unit sings *** dE t p q) >>> (p:q:xs)
+  :\/ 
+  nOT xs d *** unit (i .= nil /\ x .= nil)
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
+        sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
+                         | ip <- allInts
+                         , iq <- allInts
+                         ]
 fOR xs (a :\/ b) t i x = fOR xs a t i x :\/ fOR xs b t i x
 fOR xs (a :++ b) t i x =
-  unit (u .=% u1 `app` u2 /\ v .=% v1 `app` v2) ***
-  fOR xs a t u1 v1 *** fOR xs b t u2 v2
-  where (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
+--  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
+  (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
+  where fora = fOR xs a t u1 v1
+        forb = fOR xs b t u2 v2
+        (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
         (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
+        sings = bigUnion [ i .= tu1 `app` tu2 /\ x .= tv1 `app` tv2 /\
+                           u1 .= tu1 /\ u2 .= tu2 /\ v1 .= tv1 /\ v2 .= tv2
+                         | tu1 <- allTuples
+                         , tu2 <- allTuples
+                         , tv1 <- allTuplesLenV (tupleLen tu1)
+                         , tv2 <- allTuplesLenV (tupleLen tu2)
+                         ]
+        app (Tuple xs) (Tuple ys) = Tuple (xs ++ ys)
+        app _ _ = undefined
 
 dE :: SrcEssential -> Ident -> Ident -> P ENV
 dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
@@ -142,14 +171,24 @@ dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
   dE t0 i x `union` dE t1 i x
 dE (If3 t0 t1 t2)                   i x =
   s0 *** dB t1 i x >>> xs
-  `union`
+  :\/
   nOT xs s0 *** dB t2 i x
   where xs = bvs t0
         s0 = oNE xs (dC t0)
 dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
-{-
+dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
+  dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
+  foldr (:\/) Empty
+    [ unit $ bigUnion [ x .= Int v /\ l .= Int start /\ h .= Int end | v <- [ start .. end ] ]
+    | start <- allInts'
+    , len   <- allInts'
+    , let end = start + len - 1
+    , end < numInt
+    ] >>> [a,l,b,h]
+    where (a, l) = fresh2 ("a", "l") [i, x] t
+          (b, h) = fresh2 ("b", "h") [i, x] t
 dE t@(Array ts)                     i x =
-  foldl1 (***) (et : es) `remv` (is ++ xs)
+  foldl1 (***) (et : es) >>> (is ++ xs)
   where n = length ts
         used = i:x:getFree t
         is = take n $ freshList "i" used
@@ -162,77 +201,17 @@ dE t@(Array ts)                     i x =
                           bigIntersect (zipWith (.=) xs xvals)
                         | ivals <- tupvals, xvals <- tupvals
                         ]
+{-
 -- A speedup for x:int
 dE (Range (EPrim IsInt))            i x = singleton [ bigUnion [ i .= v /\ x .= v | v <- allInts ] ]
 dE (Range t)                        i x =
   (dE t j y *** dF y i x) `remv` [j,y]
     where (j, y) = fresh2 ("j", "y") [i, x] t
-dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
-  (dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
-  [ [ x .= Int v /\ l .= Int start /\ h .= Int end | v <- [ start .. end ] ]
-  | start <- mkSetUnsafe allInts'
-  , len   <- mkSetUnsafe allInts'
-  , let end = start + len - 1
-  , end < numInt
-  ]) `remv` [a,l,b,h]
-    where (a, l) = fresh2 ("a", "l") [i, x] t
-          (b, h) = fresh2 ("b", "h") [i, x] t
 dE t@(ApplyD t0 t1)                 i x =
   (dE t0 h f *** dE t1 j y *** dF f y x *** unit (i .=. x)) `remv` [h,f,j,y]
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
-dE (If3 t0 t1 t2)                   i x = join
- [ let a0' :: [ENV]
-       a0' = a0 `remvL` bvs t0
-       Snoc bs b = go ENVS.empty a0 a0'
-       go :: ENV -> [ENV] -> [ENV] -> [ENV]
-       go s [] [] = [univ \\\ s]
-       go s (a:as) (a':as') = (a \\\ s) : go (s \/ a') as as'
-       go _ _ _ = undefined
-   in  ((singleton bs *** dB t1 i x) `remv` bvs t0) `outerUnion`
-       ((unit b       *** dB t2 i x) `remv` bvs t0)
- | a0 :: [ENV] <- dC t0
- ]
-
--- For2
-dE t@(For2 t0 t1) i x = join
-  [ let rhoss  = foldr1 (***) [ c n | n <- [0..nAlts-1] ]
-        is     = take nAlts $ freshList "i_" (i : x : getAllBinders t)
-        xs     = take nAlts $ freshList "x_" (i : x : getAllBinders t)
-        a' :: [ENV]
-        a' = a `remvL` bvs t0 `remvL` [j, y]
-        nAlts = length a
-        c :: Int -> P ENV
-        c n = ((unit (a `ix` n) *** [ [ bigUnion [rhos /\ k .= ki /\ z .= zi /\
-                                                (is!!n) .= Tuple [ki] /\ (xs!!n) .= Tuple [zi]
-                                               | ki <- allValues, zi <- allValues]
-                                      | rhos <- s1
-                                      ]
-                                    | s1 <- dE t1 k z
-                                    ])
-               `remv` bvs t0 `remv` bvs t1 `remv` [j, k, y, z])
-          `outerUnion`
-              ((unit (univ \\\ (a' `ix` n)) *** unit ( (is!!n) .= empTup /\ (xs!!n) .= empTup )))
-    in
-      [
-        [ bigUnion [ rhos /\ i .= conc ss /\ x .= conc ts /\
-                     bigIntersect (zipWith (.=) is ss) /\
-                     bigIntersect (zipWith (.=) xs ts)
-                   | ss <- replicateM nAlts tups
-                   , ts <- replicateM nAlts tups
-                   ]
-        | rhos <- s1
-        ]
-      | s1 <- rhoss
-      ] `remv` is `remv` xs
-  | a <- dE t0 j y
-  ]
-  where
-    (j, y) = fresh2 ("j", "y") [i, x] t
-    (k, z) = fresh2 ("k", "z") [i, x] t
-    tups   = map Tuple (allTuplesLen 0 ++ allTuplesLen 1)
-    empTup = Tuple []
 -}
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 {-
@@ -357,17 +336,17 @@ bvs = getVisibleBinders
 
 -------
 
-canonAll :: P ENV -> Set.Set [ENV]
+canonAll :: P ENV -> Set [ENV]
 canonAll = canon . absorbEmpty . pfilter (/= ENVS.empty)
 
-den :: SrcEssential -> Set.Set [ENV]
+den :: SrcEssential -> Set [ENV]
 den t = canonAll $
         dE (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"
 
 {-
-denU :: SrcEssential -> Set.Set [ENV]
+denU :: SrcEssential -> Set [ENV]
 denU t = canon $
          dE (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("u", "v") [] t

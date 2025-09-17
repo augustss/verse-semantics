@@ -9,7 +9,8 @@ module ValueS(
   funNegate, funInt, funGt, funLt,
   funAdd, funSub, funMul, funDiv,
   funXF,
-  allTuples, allTuplesLen,
+  allTuples, allTuplesLen, allTuplesLenV,
+  tupleLen,
   ) where
 import Control.Monad
 import Data.List((\\), intercalate)
@@ -121,18 +122,26 @@ allValues = allInts ++ map Tuple (allTuplesLen 2)
 maxTuples :: Int
 maxTuples = 2
 
+tupleLen :: Value -> Int
+tupleLen (Tuple xs) = length xs
+tupleLen _ = error "not a Tuple"
+
 -- Just tuples of ints for now,
 -- and just 0,1,2-tuples
 allTuples :: [Value]
-allTuples = concatMap (map Tuple . allTuplesLen) [0..maxTuples]
+allTuples = concatMap allTuplesLenV [0..maxTuples]
 
 allTuplesLen :: Int -> [[Value]]
 allTuplesLen = allTuplesLen' allTupleElems
+
+allTuplesLenV :: Int -> [Value]
+allTuplesLenV = map Tuple . allTuplesLen' allTupleElems
 
 allTuplesLen' :: [Value] -> Int -> [[Value]]
 allTuplesLen' els n | n < 0 || n > maxTuples = error $ "allTuplesLen: bad " ++ show n
                     | otherwise = replicateM n els
 
 allTupleElems :: [Value]
-allTupleElems = allInts
+allTupleElems = [Int 0, Int 1]
+                -- allInts
 -- TOO SLOW                ++ map Tuple (allTuplesLen' allInts 2)   -- all pairs on ints
