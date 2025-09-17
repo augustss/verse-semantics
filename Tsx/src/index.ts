@@ -15,6 +15,39 @@ function astToJSON(obj: any): any {
   return obj;
 }
 
+// Helper to format error with source context
+function formatErrorWithContext(error: any, source: string): string {
+  const lines = source.split('\n');
+  const errorLine = error.position.line;
+  const errorColumn = error.position.column;
+
+  let output = `Error: ${error.message}\n`;
+  output += `Position: line ${errorLine}, column ${errorColumn}\n\n`;
+
+  // Show context: 2 lines before, error line, 2 lines after
+  const startLine = Math.max(1, errorLine - 2);
+  const endLine = Math.min(lines.length, errorLine + 2);
+
+  for (let i = startLine; i <= endLine; i++) {
+    const lineContent = lines[i - 1] || '';
+    const lineNumber = i.toString().padStart(3, ' ');
+    const isErrorLine = i === errorLine;
+
+    if (isErrorLine) {
+      output += `${lineNumber}→ ${lineContent}\n`;
+
+      // Add pointer to exact position
+      const spaces = ' '.repeat(lineNumber.length + 1); // Account for line number and arrow
+      const pointer = ' '.repeat(Math.max(0, errorColumn - 1)) + '^';
+      output += `${spaces} ${pointer}\n`;
+    } else {
+      output += `${lineNumber}  ${lineContent}\n`;
+    }
+  }
+
+  return output;
+}
+
 export function testParser() {
   console.log('Testing Versee parser...\n');
 
@@ -50,7 +83,8 @@ export function testParser() {
       const jsonSafe = astToJSON(result.value);
       console.log('  AST:', JSON.stringify(jsonSafe, null, 2).split('\n').slice(0, 5).join('\n'));
     } else {
-      console.log('  ✗ Failed:', result.error.message);
+      console.log('  ✗ Failed:');
+      console.log(formatErrorWithContext(result.error, test).split('\n').map(line => '    ' + line).join('\n'));
     }
     console.log();
   }
@@ -79,8 +113,7 @@ if (require.main === module) {
         console.log('AST:', JSON.stringify(jsonSafe, null, 2));
       } else {
         console.log('✗ PARSING FAILED');
-        console.log('Error:', result.error.message);
-        console.log('Position:', result.error.position);
+        console.log(formatErrorWithContext(result.error, fileContent));
       }
     } catch (error: any) {
       console.log('Error reading file:', error.message);

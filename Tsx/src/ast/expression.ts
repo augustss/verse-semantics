@@ -31,7 +31,7 @@ export type FuncDecl = {
   params: FuncParam[];
   returnType?: L<Exp>;
   specifiers: Specifier[];
-  body: L<Exp>;
+  body?: L<Exp>; // Optional for function signatures
   isDefinition: boolean; // true for :=, false for =
 };
 
@@ -68,9 +68,11 @@ export type Exp =
   | { kind: 'Catch'; try: L<Exp>; handler: L<Exp> }
   | { kind: 'Char'; value: string }
   | { kind: 'Char32'; value: string }
+  | { kind: 'Case'; expr: L<Exp>; arms: Array<{pattern: L<Exp>, result: L<Exp>}> }
   | { kind: 'Class'; parent: L<Exp> | null; body: L<Exp> }
   | { kind: 'Continue' }
   | { kind: 'Do'; expr: L<Exp>; body: L<Exp> }
+  | { kind: 'Decorator'; name: string }
   | { kind: 'Enum'; specs: L<Exp>[]; names: [L<Exp>[], L<SimpleName>][] }
   | { kind: 'Exists'; name: L<SimpleName> }
   | { kind: 'ExpInfixColon'; left: L<Exp>; right: L<Exp> }
@@ -81,6 +83,9 @@ export type Exp =
   | { kind: 'Units'; expr: L<Exp>; unit: L<SimpleName> }
   | { kind: 'For'; expr: L<Exp> }
   | { kind: 'ForDo'; expr: L<Exp>; body: L<Exp> }
+  | { kind: 'ForEach'; expr: L<Exp>; body: L<Exp> }
+  | { kind: 'ForEachIndexed'; indexVar: L<SimpleName>; itemVar: L<SimpleName>; expr: L<Exp>; body: L<Exp> }
+  | { kind: 'ForRange'; loopVar: L<SimpleName>; rangeExpr: L<Exp>; body: L<Exp> }
   | { kind: 'Forall'; name: L<SimpleName> }
   | { kind: 'Lam'; param: L<Exp>; body: L<Exp> }
   | { kind: 'If'; cond: L<Exp> }
@@ -96,6 +101,7 @@ export type Exp =
   | { kind: 'Int'; value: bigint }
   | { kind: 'List'; elements: L<Exp>[] }
   | { kind: 'Module'; body: L<Exp> }
+  | { kind: 'Import'; path: L<Exp> }
   | { kind: 'Not'; expr: L<Exp> }
   | { kind: 'One'; expr: L<Exp> }
   | { kind: 'Option'; expr: L<Exp> }
@@ -106,6 +112,7 @@ export type Exp =
   | { kind: 'PostfixQuery'; expr: L<Exp> }
   | { kind: 'PostfixIncrement'; expr: L<Exp> }
   | { kind: 'PostfixDecrement'; expr: L<Exp> }
+  | { kind: 'Optional'; expr: L<Exp> }
   | { kind: 'PrefixBracket'; specs: L<Exp>[]; expr: L<Exp> }
   | { kind: 'PrefixCaret'; expr: L<Exp> }
   | { kind: 'PrefixMinus'; expr: L<Exp> }
@@ -115,7 +122,7 @@ export type Exp =
   | { kind: 'PrefixAmpersand'; expr: L<Exp> }
   | { kind: 'PrefixDotDot'; expr: L<Exp> }
   | { kind: 'Return'; value: L<Exp> | null }
-  | { kind: 'ExpVar'; expr: L<Exp> }
+  | { kind: 'ExpVar'; expr: L<Exp>; pattern?: L<Exp> }
   | { kind: 'ExpSet'; expr: L<Exp> }
   | { kind: 'ExpRef'; expr: L<Exp> }
   | { kind: 'ExpAlias'; expr: L<Exp> }
@@ -131,6 +138,7 @@ export type Exp =
   | { kind: 'Struct'; body: L<Exp> }
   | { kind: 'Interface'; body: L<Exp> }
   | { kind: 'Enum'; body: L<Exp> }
+  | { kind: 'EnumDecl'; name: L<Exp>; values: L<IdentExp>[] }
   | { kind: 'Class'; body: L<Exp> }
   | { kind: 'True' }
   | { kind: 'Truth'; expr: L<Exp> }
@@ -184,7 +192,7 @@ export function createFuncDecl(
   params: FuncParam[],
   returnType: L<Exp> | undefined,
   specifiers: Specifier[],
-  body: L<Exp>,
+  body: L<Exp> | undefined,
   isDefinition: boolean
 ): Exp {
   return {

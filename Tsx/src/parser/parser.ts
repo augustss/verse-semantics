@@ -49,7 +49,12 @@ function lexeme<T>(parser: Parser<T>): Parser<T> {
 // Specifiers
 const specifiers = new Set([
   'decides', 'succeeds', 'fails', 'transacts', 'computes', 'ambiguates',
-  'reads', 'writes', 'allocates', 'suspends', 'closed'
+  'reads', 'writes', 'allocates', 'suspends', 'closed', 'localizes',
+  'public', 'private', 'override', 'editable', 'concrete',
+  // Epic Games platform specifiers
+  'epic_internal', 'native', 'native_callable', 'abstract', 'protected',
+  // Class and object specifiers
+  'final', 'persistable', 'constructor', 'final_super'
 ]);
 
 // Keywords
@@ -89,6 +94,23 @@ const pIdentifier: Parser<SimpleName> = flatMap(
 );
 
 const pIdent: Parser<L<SimpleName>> = withLocation(lexeme(pIdentifier));
+
+// Special identifier parser for decorators that allows specifier names
+const pDecoratorIdentifier: Parser<SimpleName> = flatMap(
+  flatMap(pAlpha, first =>
+    map(many(pAlnum), rest => [first, ...rest])
+  ),
+  chars => {
+    const name = String.fromCharCode(...chars);
+    // Allow specifier names in decorators (but still reject other reserved words)
+    if (reserved.has(name) && !specifiers.has(name)) {
+      return fail(`Reserved word: ${name}`);
+    }
+    return succeed(name);
+  }
+);
+
+const pDecoratorIdent: Parser<L<SimpleName>> = withLocation(lexeme(pDecoratorIdentifier));
 
 // Number parsers
 const pInt: Parser<bigint> = map(
@@ -195,7 +217,7 @@ const pChar: Parser<L<Exp>> = withLocation(
 // Extended specifiers including visibility modifiers
 const allSpecifiers = new Set([
   ...specifiers,
-  'public', 'private', 'protected', 'internal', 'override', 'concrete', 'native'
+  'public', 'private', 'protected', 'internal', 'override', 'concrete', 'native', 'final'
 ]);
 
 // Specifier parser
@@ -205,9 +227,9 @@ const pSpecifier: Parser<L<Exp>> = withLocation(
       char('<'),
       char('>'),
       flatMap(
-        flatMap(pAlpha, first =>
+        lexeme(flatMap(pAlpha, first =>
           map(many(pAlnum), rest => [first, ...rest])
-        ),
+        )),
         chars => {
           const specName = String.fromCharCode(...chars).toLowerCase();
           if (specifiers.has(specName)) {
@@ -238,14 +260,14 @@ const pRBrace = lexeme(char('}'));
 
 // Forward declarations (using lazy)
 const pList: Parser<L<Exp>[]> = lazy(() =>
-  sepBy(lazy(() => pArrow), choice([pComma, pSemi]))
+  sepBy(lazy(() => pLambda), choice([pComma, pSemi]))
 );
 
 const pExp: Parser<L<Exp>> = lazy(() =>
   flatMap(pList, list => {
     if (list.length === 0) {
-      // Empty list should not happen with sepBy, but handle gracefully
-      return fail('Empty expression list');
+      // Provide more helpful error message for empty expressions
+      return fail('Expected expression (identifier, number, string, function call, etc.)');
     } else if (list.length === 1) {
       return succeed(list[0]);
     } else {
@@ -287,16 +309,36 @@ const pBrace: Parser<L<Exp>> = withLocation(
   )
 );
 
-// Array literal parser: array{1, 2, 3}
+// Array literal parser: array{1, 2, 3} and array:
 const pArray: Parser<L<Exp>> = withLocation(
   flatMap(
     keyword('array'),
-    () => flatMap(
-      between(pLBrace, pRBrace, pList),
-      elements => succeed({ kind: 'Array', elements } as Exp)
-    )
+    () => choice([
+      // Array with braces: array{...}
+      flatMap(
+        between(pLBrace, pRBrace, pList),
+        elements => succeed({ kind: 'Array', elements } as Exp)
+      ),
+      // Array with colon: array:
+      flatMap(
+        lexeme(char(':')),
+        () => map(
+          parseOptionalIndentedBlock,
+          body => {
+            // Convert block to array elements
+            if (body.value.kind === 'Block' && body.value.expr.value.kind === 'List') {
+              return { kind: 'Array', elements: body.value.expr.value.elements } as Exp;
+            } else {
+              // Single element array
+              return { kind: 'Array', elements: [body] } as Exp;
+            }
+          }
+        )
+      )
+    ])
   )
 );
+
 
 // Comment parser for #, //, and <# #> style comments
 const pComment: Parser<L<Exp>> = withLocation(
@@ -347,6 +389,74 @@ const pComment: Parser<L<Exp>> = withLocation(
   ])
 );
 
+// Helper function to skip content until matching closing brace
+function skipToMatchingBrace(state: ParseState): ParseResult<null> {
+  let braceCount = 1;
+  let pos = state.position;
+
+  while (pos < state.input.length && braceCount > 0) {
+    const char = state.input[pos];
+    if (char === 123) { // '{'
+      braceCount++;
+    } else if (char === 125) { // '}'
+      braceCount--;
+    }
+    pos++;
+  }
+
+  if (braceCount === 0) {
+    // Found matching brace, return new state
+    return {
+      success: true,
+      value: null,
+      state: { ...state, position: pos - 1 } // Position before the closing brace
+    };
+  } else {
+    return {
+      success: false,
+      error: { position: createPos(state.line, state.column, state.position), message: 'Unmatched brace in decorator' }
+    };
+  }
+}
+
+// Parse decorators like @editable or @editable{param}
+const pDecorator: Parser<string> = flatMap(
+  char('@'),
+  () => flatMap(
+    pDecoratorIdent,
+    name => choice([
+      // Complex decorator with braces: @editable{ToolTip := Value}
+      flatMap(
+        optional(pWhitespace),
+        () => flatMap(
+          pLBrace,
+          () => flatMap(
+            // Skip the content inside braces for now - just find the matching brace
+            skipToMatchingBrace,
+            () => flatMap(
+              pRBrace,
+              () => succeed(`@${name.value}{...}`)
+            )
+          )
+        )
+      ),
+      // Simple decorator: @editable
+      succeed(`@${name.value}`)
+    ])
+  )
+);
+
+// Parse optional decorators (can have multiple)
+const pDecorators: Parser<string[]> = many(
+  flatMap(
+    pDecorator,
+    decorator => map(
+      optional(pWhitespace), // Optional whitespace after decorator
+      () => decorator
+    )
+  )
+);
+
 const pBase: Parser<L<Exp>> = choice([
   // Comments
   pComment,
@@ -357,7 +467,7 @@ const pBase: Parser<L<Exp>> = choice([
       () => flatMap(
         lexeme(char(':')),
         () => flatMap(
-          parseIndentedBlock,
+          parseOptionalIndentedBlock,
           ifBlock => choice([
             // With then clause: if: ... then: ...
             flatMap(
@@ -365,7 +475,7 @@ const pBase: Parser<L<Exp>> = choice([
               () => flatMap(
                 lexeme(char(':')),
                 () => map(
-                  parseIndentedBlock,
+                  parseOptionalIndentedBlock,
                   thenBlock => ({ kind: 'IfThen', cond: ifBlock, then: thenBlock } as Exp)
                 )
               )
@@ -387,7 +497,7 @@ const pBase: Parser<L<Exp>> = choice([
         cond => flatMap(
           lexeme(char(':')),
           () => flatMap(
-            parseIndentedBlock,
+            parseOptionalIndentedBlock,
             thenBlock => choice([
               // With else clause
               flatMap(
@@ -402,7 +512,7 @@ const pBase: Parser<L<Exp>> = choice([
                   flatMap(
                     lexeme(char(':')),
                     () => map(
-                      parseIndentedBlock,
+                      parseOptionalIndentedBlock,
                       elseBlock => ({ kind: 'IfThenElse', cond, then: thenBlock, else: elseBlock } as Exp)
                     )
                   )
@@ -515,14 +625,14 @@ const pBase: Parser<L<Exp>> = choice([
       ])
     )
   ),
-  // Variable declarations: var name : type = value OR var name := value
+  // Variable declarations with specifiers: var name<specifier> : type = value
   withLocation(
     flatMap(
       keyword('var'),
       () => flatMap(
-        pIdent,
-        _name => choice([
-          // Explicit type: var name : type = value
+        pIdentWithSpecifier,
+        namePattern => choice([
+          // Explicit type: var name<specifier> : type = value
           flatMap(
             lexeme(char(':')),
             () => flatMap(
@@ -555,16 +665,46 @@ const pBase: Parser<L<Exp>> = choice([
                     )
                   )
                 ),
-                // Array type: []type_name
+                // Array type: []type_name, [][]type_name, etc.
                 flatMap(
-                  lexeme(char('[')),
-                  () => flatMap(
-                    lexeme(char(']')),
-                    () => map(
+                  parseArrayDimensions,
+                  dimensions => {
+                    // Only proceed if we found at least one dimension
+                    if (dimensions === '') {
+                      return fail('No array dimensions found');
+                    }
+                    return map(
                       pIdent,
                       typeName => withLoc(
                         createLoc(typeName.loc.start, typeName.loc.end),
-                        `[]${typeName.value}` as SimpleName
+                        `${dimensions}${typeName.value}` as SimpleName
+                      )
+                    );
+                  }
+                ),
+                // Generic/parameterized type: type_name(param1, param2, ...)
+                flatMap(
+                  pIdent,
+                  typeName => flatMap(
+                    lexeme(char('(')),
+                    () => flatMap(
+                      sepBy(lazy(() => pType), pComma),
+                      params => flatMap(
+                        lexeme(char(')')),
+                        () => {
+                          // Build the generic type string representation
+                          const paramStr = params.map(p => {
+                            // Extract the string representation from the type expression
+                            if (p && p.value && p.value.kind === 'Pat' && p.value.pattern && p.value.pattern.kind === 'Name' && p.value.pattern.ident) {
+                              return (p.value.pattern.ident as any).qualName || (p.value.pattern.ident as any).name || 'unknown';
+                            }
+                            return 'unknown';
+                          }).join(', ');
+                          return succeed(withLoc(
+                            createLoc(typeName.loc.start, typeName.loc.end),
+                            `${typeName.value}(${paramStr})` as SimpleName
+                          ));
+                        }
                       )
                     )
                   )
@@ -573,26 +713,36 @@ const pBase: Parser<L<Exp>> = choice([
                 pIdent
               ]), // Parse type name (regular, array, map, or optional)
               _type => flatMap(
-                lexeme(char('=')),
+                lexeme(char('=')), // Explicit type MUST use = only, not :=
                 () => map(
                   lazy(() => pOr), // Parse the value
-                  value => ({ kind: 'ExpVar', expr: value } as Exp) // Store the actual value
+                  value => ({ kind: 'ExpVar', expr: value, pattern: namePattern } as Exp) // Store the actual value with pattern
                 )
               )
             )
           ),
-          // Type inference: var name := value
+          // Type inference: var name<specifier> := value
           flatMap(
             pColonAssign,
             () => map(
               lazy(() => pOr), // Parse the value
-              value => ({ kind: 'ExpVar', expr: value } as Exp) // Store the actual value
+              value => ({ kind: 'ExpVar', expr: value, pattern: namePattern } as Exp) // Store the actual value with pattern
+            )
+          ),
+          // Simple type inference: var name<specifier> = value
+          flatMap(
+            lexeme(char('=')),
+            () => map(
+              lazy(() => pOr), // Parse the value
+              value => ({ kind: 'ExpVar', expr: value, pattern: namePattern } as Exp) // Store the actual value with pattern
             )
           )
         ])
       )
     )
   ),
+  // Enum declarations with specifiers: name<specifier> := enum{...}
+  lazy(() => pEnumDecl),
   // Field declarations with optional visibility: name<visibility>:type = value OR name:type (no value)
   withLocation(
     flatMap(
@@ -603,19 +753,22 @@ const pBase: Parser<L<Exp>> = choice([
           pColon,
           () => flatMap(
             choice([
-              // Array type: []type_name
+              // Array type: []type_name, [][]type_name, etc.
               flatMap(
-                lexeme(char('[')),
-                () => flatMap(
-                  lexeme(char(']')),
-                  () => map(
+                parseArrayDimensions,
+                dimensions => {
+                  // Only proceed if we found at least one dimension
+                  if (dimensions === '') {
+                    return fail('No array dimensions found');
+                  }
+                  return map(
                     pIdent,
                     typeName => withLoc(
                       createLoc(typeName.loc.start, typeName.loc.end),
-                      `[]${typeName.value}` as SimpleName
+                      `${dimensions}${typeName.value}` as SimpleName
                     )
-                  )
-                )
+                  );
+                }
               ),
               // Optional type: ?type_name
               flatMap(
@@ -628,13 +781,40 @@ const pBase: Parser<L<Exp>> = choice([
                   )
                 )
               ),
+              // Generic/parameterized type: type_name(param1, param2, ...) or type_name (param1, param2, ...)
+              flatMap(
+                pIdent,
+                typeName => flatMap(
+                  flatMap(optional(pWhitespace), () => lexeme(char('('))),
+                  () => flatMap(
+                    sepBy(lazy(() => pType), pComma),
+                    params => flatMap(
+                      lexeme(char(')')),
+                      () => {
+                        // Build the generic type string representation
+                        const paramStr = params.map(p => {
+                          // Extract the string representation from the type expression
+                          if (p && p.value && p.value.kind === 'Pat' && p.value.pattern && p.value.pattern.kind === 'Name' && p.value.pattern.ident) {
+                            return (p.value.pattern.ident as any).qualName || (p.value.pattern.ident as any).name || 'unknown';
+                          }
+                          return 'unknown';
+                        }).join(', ');
+                        return succeed(withLoc(
+                          createLoc(typeName.loc.start, typeName.loc.end),
+                          `${typeName.value}(${paramStr})` as SimpleName
+                        ));
+                      }
+                    )
+                  )
+                )
+              ),
               // Regular type: type_name
               pIdent
             ]), // Parse type name (regular, array, or optional)
             type => choice([
-              // With assignment: name<visibility>:type = value OR name<visibility>:type := value
+              // With assignment: name<visibility>:type = value (explicit type requires =)
               flatMap(
-                choice([pEqual, pColonAssign]),
+                pEqual,
                 op => map(
                   lazy(() => pOr), // Parse the value
                   value => {
@@ -683,22 +863,19 @@ const pBase: Parser<L<Exp>> = choice([
       )
     )
   ),
-  // Interface definitions: interface():
+  // Interface definitions: interface: or interface():
   withLocation(
     flatMap(
       keyword('interface'),
       () => flatMap(
         optional(pSpecifierList), // Parse optional specifiers after interface
         _specifiers => flatMap(
-          pLParen,
+          optional(flatMap(pLParen, () => pRParen)), // Optional parentheses
           () => flatMap(
-            pRParen,
-            () => flatMap(
-              lexeme(char(':')),
-              () => map(
-                parseIndentedBlock,
-                body => ({ kind: 'Interface', body } as Exp)
-              )
+            lexeme(char(':')),
+            () => map(
+              parseOptionalIndentedBlock,
+              body => ({ kind: 'Interface', body } as Exp)
             )
           )
         )
@@ -730,72 +907,109 @@ const pBase: Parser<L<Exp>> = choice([
         _specifiers => flatMap(
           lexeme(char(':')),
           () => map(
-            parseIndentedBlock, // Parse indented module body
+            parseOptionalIndentedBlock, // Parse indented module body
             body => ({ kind: 'Module', body } as Exp)
           )
         )
       )
     )
   ),
-  // Class literals: class<specs>: or class(parent)<specs>: or class(parent){}
+  // Class literals: class<specs>: or class<specs>(parent): or class<specs>(): or class(parent){}
   withLocation(
     flatMap(
       keyword('class'),
       () => flatMap(
-        optional(
-          // Parse optional parent class: (parent_name)
+        optional(pSpecifierList), // Parse optional specifiers after class keyword
+        _classSpecifiers => choice([
+          // Case 1: class<specs>(parent1, parent2, ...): or class<specs>():
           flatMap(
             lexeme(char('(')),
             () => flatMap(
-              pIdent, // Parse parent class name
-              _parent => map(
+              optional(sepBy(pIdent, pComma)), // Parse optional comma-separated parent class names
+              _parents => flatMap(
                 lexeme(char(')')),
-                () => _parent // Return parent for potential future use
+                () => flatMap(
+                  lexeme(char(':')),
+                  () => map(
+                    parseOptionalIndentedBlock,
+                    body => ({ kind: 'Class', body } as Exp)
+                  )
+                )
               )
+            )
+          ),
+          // Case 2: class<specs>(parent1, parent2, ...){} - empty inline body
+          flatMap(
+            lexeme(char('(')),
+            () => flatMap(
+              optional(sepBy(pIdent, pComma)), // Parse optional comma-separated parent class names
+              _parents => flatMap(
+                lexeme(char(')')),
+                () => flatMap(
+                  pLBrace,
+                  () => flatMap(
+                    pRBrace,
+                    () => {
+                      const emptyBody = withLoc(
+                        createLoc(createPos(0, 0, 0), createPos(0, 0, 0)),
+                        { kind: 'List', elements: [] } as Exp
+                      );
+                      return succeed({ kind: 'Class', body: emptyBody } as Exp);
+                    }
+                  )
+                )
+              )
+            )
+          ),
+          // Case 3: class<specs>: - no parentheses
+          flatMap(
+            lexeme(char(':')),
+            () => map(
+              parseOptionalIndentedBlock,
+              body => ({ kind: 'Class', body } as Exp)
             )
           )
-        ),
-        _parent => flatMap(
-          optional(pSpecifierList), // Parse optional specifiers after class
-          _specifiers => choice([
-            // Case 1: class(...): with indented block
-            flatMap(
-              lexeme(char(':')),
-              () => map(
-                parseIndentedBlock,
-                body => ({ kind: 'Class', body } as Exp)
-              )
-            ),
-            // Case 2: class(...){} with inline empty body
-            flatMap(
-              pLBrace,
-              () => flatMap(
-                pRBrace,
-                () => {
-                  const emptyBody = withLoc(
-                    createLoc(createPos(0, 0, 0), createPos(0, 0, 0)),
-                    { kind: 'List', elements: [] } as Exp
-                  );
-                  return succeed({ kind: 'Class', body: emptyBody } as Exp);
-                }
-              )
-            )
-          ])
-        )
+        ])
       )
     )
   ),
-  // Constructor calls with braces: type_name{...}
+  // Constructor calls with braces: type_name{...} or property.access{...}
   withLocation(
     flatMap(
-      pIdent,
-      typeName => flatMap(
+      // Parse a property access chain (ident.ident.ident) or simple identifier
+      flatMap(
+        pIdent,
+        firstIdent => map(
+          many(flatMap(
+            lexeme(char('.')),
+            () => pIdent
+          )),
+          dotParts => {
+            // Build property access chain
+            if (dotParts.length === 0) {
+              // Simple identifier
+              return withLoc(firstIdent.loc, { kind: 'Pat', pattern: createNamePattern(createIdentName(firstIdent.value)) } as Exp);
+            } else {
+              // Property access chain: build Dot expressions
+              let result: L<Exp> = withLoc(firstIdent.loc, { kind: 'Pat', pattern: createNamePattern(createIdentName(firstIdent.value)) } as Exp);
+              for (const part of dotParts) {
+                result = withLoc(
+                  createLoc(result.loc.start, part.loc.end),
+                  { kind: 'Dot', left: result, right: withLoc(part.loc, createIdentName(part.value)) } as Exp
+                );
+              }
+              return result;
+            }
+          }
+        )
+      ),
+      typeExpr => flatMap(
         pLBrace,
         () => flatMap(
           parseNamedParameters, // Use optimized parser for named parameters
           properties => flatMap(
             pRBrace,
-            () => succeed({ kind: 'ParenInvoke', func: withLoc(typeName.loc, { kind: 'Pat', pattern: createNamePattern(createIdentName(typeName.value)) } as Exp), arg: withLoc(createLoc(createPos(0, 0, 0), createPos(0, 0, 0)), { kind: 'List', elements: properties } as Exp) } as Exp)
+            () => succeed({ kind: 'ParenInvoke', func: typeExpr, arg: withLoc(createLoc(createPos(0, 0, 0), createPos(0, 0, 0)), { kind: 'List', elements: properties } as Exp) } as Exp)
           )
         )
       )
@@ -826,7 +1040,7 @@ const pBase: Parser<L<Exp>> = choice([
       () => flatMap(
         lexeme(char(':')),
         () => map(
-          parseIndentedBlock,
+          parseOptionalIndentedBlock,
           body => ({ kind: 'While', expr: withLoc(createLoc(createPos(0, 0, 0), createPos(0, 0, 0)), { kind: 'True' } as Exp), body } as Exp)
         )
       )
@@ -921,6 +1135,81 @@ const pBase: Parser<L<Exp>> = choice([
     flatMap(
       keyword('for'),
       () => choice([
+        // For-each with pattern matching: for (index -> item : collection):
+        flatMap(
+          lexeme(char('(')),
+          () => flatMap(
+            pIdent,
+            indexVar => flatMap(
+              lexeme(string('->')),
+              () => flatMap(
+                pIdent,
+                itemVar => flatMap(
+                  pColon,
+                  () => flatMap(
+                    lazy(() => pExp), // collection expression
+                    expr => flatMap(
+                      lexeme(char(')')),
+                      () => flatMap(
+                        lexeme(char(':')),
+                        () => map(
+                          parseOptionalIndentedBlock,
+                          body => ({ kind: 'ForEachIndexed', indexVar, itemVar, expr, body } as Exp)
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        // For-each style: for (var : collection):
+        flatMap(
+          lexeme(char('(')),
+          () => flatMap(
+            pIdent,
+            _var => flatMap(
+              pColon,
+              () => flatMap(
+                lazy(() => pExp), // collection expression
+                expr => flatMap(
+                  lexeme(char(')')),
+                  () => flatMap(
+                    lexeme(char(':')),
+                    () => map(
+                      parseOptionalIndentedBlock,
+                      body => ({ kind: 'ForEach', expr, body } as Exp)
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        // Range iteration: for (var := range):
+        flatMap(
+          lexeme(char('(')),
+          () => flatMap(
+            pIdent,
+            loopVar => flatMap(
+              pColonAssign,
+              () => flatMap(
+                lazy(() => pExp), // range expression like 0..10
+                rangeExpr => flatMap(
+                  lexeme(char(')')),
+                  () => flatMap(
+                    lexeme(char(':')),
+                    () => map(
+                      parseOptionalIndentedBlock,
+                      body => ({ kind: 'ForRange', loopVar, rangeExpr, body } as Exp)
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
         // Verse-style: for (var : type = expr):
         flatMap(
           lexeme(char('(')),
@@ -939,7 +1228,7 @@ const pBase: Parser<L<Exp>> = choice([
                       () => flatMap(
                         lexeme(char(':')),
                         () => map(
-                          parseIndentedBlock,
+                          parseOptionalIndentedBlock,
                           body => ({ kind: 'ForDo', expr, body } as Exp)
                         )
                       )
@@ -1021,24 +1310,24 @@ const pBase: Parser<L<Exp>> = choice([
       )
     )
   ),
-  // Class inheritance: class(parent_class):
+  // Class inheritance: class(parent_class1, parent_class2, ...):
   withLocation(
     flatMap(
       keyword('class'),
       () => flatMap(
         pLParen,
         () => flatMap(
-          pIdent, // Parse parent class name
-          parent => flatMap(
+          sepBy(pIdent, pComma), // Parse comma-separated parent class names
+          parents => flatMap(
             pRParen,
             () => flatMap(
               lexeme(char(':')),
               () => {
-                // Create parent expression
-                const parentExp = withLoc(
-                  parent.loc,
-                  { kind: 'Pat', pattern: createNamePattern(createIdentName(parent.value)) } as Exp
-                );
+                // Create parent expressions (using first parent for now, as AST may need updating for multiple)
+                const parentExp = parents.length > 0 ? withLoc(
+                  parents[0].loc,
+                  { kind: 'Pat', pattern: createNamePattern(createIdentName(parents[0].value)) } as Exp
+                ) : null;
 
                 // Create empty body for now
                 const emptyBody = withLoc(
@@ -1134,6 +1423,28 @@ const pBase: Parser<L<Exp>> = choice([
   pChar,
   pParen,
   pBrace,
+  // Case statements: case (expr): pattern => result ...
+  withLocation(
+    flatMap(
+      keyword('case'),
+      () => flatMap(
+        char('('),
+        () => flatMap(
+          lazy(() => pExp), // case expression
+          expr => flatMap(
+            lexeme(char(')')),
+            () => flatMap(
+              lexeme(char(':')),
+              () => map(
+                parseCaseArms,
+                arms => ({ kind: 'Case', expr, arms } as Exp)
+              )
+            )
+          )
+        )
+      )
+    )
+  ),
   // Identifier with access specifier: name<public>, name<internal>, etc.
   withLocation(
     flatMap(
@@ -1158,7 +1469,19 @@ const pBase: Parser<L<Exp>> = choice([
         }
       )
     )
-  )
+  ),
+  // Decorator expressions: @editable or @editable{param}
+  withLocation(
+    map(
+      pDecorator,
+      decoratorString => ({
+        kind: 'Decorator',
+        name: decoratorString
+      } as Exp)
+    )
+  ),
+  // Import statements
+  lazy(() => pImport)
 ]);
 
 // Postfix operators (function calls, array access)
@@ -1168,7 +1491,8 @@ type PostfixOp =
   | { type: 'emptyBracketCall' }
   | { type: 'dot'; ident: L<IdentExp> }
   | { type: 'increment' }
-  | { type: 'decrement' };
+  | { type: 'decrement' }
+  | { type: 'optional' };
 
 const pPostfix: Parser<L<Exp>> = flatMap(
   pBase,
@@ -1238,6 +1562,11 @@ const pPostfix: Parser<L<Exp>> = flatMap(
         string('--'),
         () => succeed({ type: 'decrement' } as PostfixOp)
       ),
+      // Optional operator: x?
+      flatMap(
+        char('?'),
+        () => succeed({ type: 'optional' } as PostfixOp)
+      ),
     ])),
     postfixOps => postfixOps.reduce((acc, op) => {
       if (op.type === 'call') {
@@ -1274,6 +1603,11 @@ const pPostfix: Parser<L<Exp>> = flatMap(
         return withLoc(
           createLoc(acc.loc.start, acc.loc.end),
           { kind: 'PostfixDecrement', expr: acc } as Exp
+        );
+      } else if (op.type === 'optional') {
+        return withLoc(
+          createLoc(acc.loc.start, acc.loc.end),
+          { kind: 'Optional', expr: acc } as Exp
         );
       }
       return acc;
@@ -1312,19 +1646,22 @@ const pColon = lexeme(char(':'));
 // Type parser for function parameters and variable types
 const pType: Parser<L<Exp>> = withLocation(
   choice([
-    // Array type: []type_name
+    // Array type: []type_name, [][]type_name, etc.
     flatMap(
-      lexeme(char('[')),
-      () => flatMap(
-        lexeme(char(']')),
-        () => map(
+      parseArrayDimensions,
+      dimensions => {
+        // Only proceed if we found at least one dimension
+        if (dimensions === '') {
+          return fail('No array dimensions found');
+        }
+        return map(
           pIdent,
           typeName => ({
             kind: 'Pat',
-            pattern: createNamePattern(createIdentName(`[]${typeName.value}`))
+            pattern: createNamePattern(createIdentName(`${dimensions}${typeName.value}`))
           } as Exp)
-        )
-      )
+        );
+      }
     ),
     // Optional type: ?type_name
     flatMap(
@@ -1335,6 +1672,33 @@ const pType: Parser<L<Exp>> = withLocation(
           kind: 'Pat',
           pattern: createNamePattern(createIdentName(`?${typeName.value}`))
         } as Exp)
+      )
+    ),
+    // Generic/parameterized type: type_name(param1, param2, ...) or type_name (param1, param2, ...)
+    flatMap(
+      pIdent,
+      typeName => flatMap(
+        flatMap(optional(pWhitespace), () => lexeme(char('('))),
+        () => flatMap(
+          sepBy(lazy(() => pType), pComma),
+          params => flatMap(
+            lexeme(char(')')),
+            () => {
+              // Build the generic type string representation
+              const paramStr = params.map(p => {
+                // Extract the string representation from the type expression
+                if (p && p.value && p.value.kind === 'Pat' && p.value.pattern && p.value.pattern.kind === 'Name' && p.value.pattern.ident) {
+                  return (p.value.pattern.ident as any).qualName || (p.value.pattern.ident as any).name || 'unknown';
+                }
+                return 'unknown';
+              }).join(', ');
+              return succeed({
+                kind: 'Pat',
+                pattern: createNamePattern(createIdentName(`${typeName.value}(${paramStr})`))
+              } as Exp);
+            }
+          )
+        )
       )
     ),
     // Regular type: type_name
@@ -1421,7 +1785,7 @@ const pFuncDeclWithReturnType: Parser<L<Exp>> = withLocation(
                   ),
                   // If inline fails, try indented block
                   map(
-                    parseIndentedBlock,
+                    parseOptionalIndentedBlock,
                     body => createFuncDecl(
                       name.value,
                       params,
@@ -1451,7 +1815,7 @@ const pFuncDeclWithReturnType: Parser<L<Exp>> = withLocation(
                   ),
                   // If inline fails, try indented block
                   map(
-                    parseIndentedBlock,
+                    parseOptionalIndentedBlock,
                     body => createFuncDecl(
                       name.value,
                       params,
@@ -1462,57 +1826,48 @@ const pFuncDeclWithReturnType: Parser<L<Exp>> = withLocation(
                     )
                   )
                 ])
-              )
+              ),
+              // Case 3: name(params)<specs>:type (function signature without body)
+              succeed(createFuncDecl(
+                name.value,
+                params,
+                returnType,
+                finalSpecifiers,
+                undefined, // No body for signatures
+                false // Not a definition, just a signature
+              ))
             ]);
           } else {
-            // If no return type, both := and = are allowed
-            return choice([
-              // Case 1: name(params) := body (inline or indented)
-              flatMap(
-                pColonAssign,
-                () => choice([
-                  // Try inline expression first
-                  flatMap(
-                    lazy(() => pExp),
-                    body => succeed(createFuncDecl(
-                      name.value,
-                      params,
-                      undefined,
-                      finalSpecifiers,
-                      body,
-                      true // isDefinition
-                    ))
-                  ),
-                  // If inline fails, try indented block
-                  map(
-                    parseIndentedBlock,
-                    body => createFuncDecl(
-                      name.value,
-                      params,
-                      undefined,
-                      finalSpecifiers,
-                      body,
-                      true // isDefinition
-                    )
-                  )
-                ])
-              ),
-              // Case 2: name(params) = (indented body on next lines)
-              flatMap(
-                pEqual,
-                () => map(
-                  parseIndentedBlock,
+            // If no return type, only := is allowed (= should be parsed as assignment)
+            return flatMap(
+              pColonAssign,
+              () => choice([
+                // Try inline expression first
+                flatMap(
+                  lazy(() => pExp),
+                  body => succeed(createFuncDecl(
+                    name.value,
+                    params,
+                    undefined,
+                    finalSpecifiers,
+                    body,
+                    true // isDefinition
+                  ))
+                ),
+                // If inline fails, try indented block
+                map(
+                  parseOptionalIndentedBlock,
                   body => createFuncDecl(
                     name.value,
                     params,
                     undefined,
                     finalSpecifiers,
                     body,
-                    false // isDefinition
+                    true // isDefinition
                   )
                 )
-              )
-            ]);
+              ])
+            );
           }
             })
           )
@@ -1623,9 +1978,19 @@ const pLess: Parser<L<Exp>> = rightAssocBinary(
   )
 );
 
+// Not equal operator
+const pNotEqual: Parser<L<Exp>> = binary(
+  pLess,
+  lexeme(string('<>')),
+  (left, _op, right) => withLoc(
+    createLoc(left.loc.start, right.loc.end),
+    { kind: 'NotEqual', left, right } as Exp
+  )
+);
+
 // Equality and struct/module definitions
 const pEq: Parser<L<Exp>> = binary(
-  pLess,
+  pNotEqual,
   pEqual,
   (left, _op, right) => withLoc(
     createLoc(left.loc.start, right.loc.end),
@@ -1691,6 +2056,16 @@ const pArrow: Parser<L<Exp>> = rightAssocBinary(
   (left, _op, right) => withLoc(
     createLoc(left.loc.start, right.loc.end),
     { kind: 'Arrow', left, right } as Exp
+  )
+);
+
+// Lambda expressions: X => Y (lower precedence than ->)
+const pLambda: Parser<L<Exp>> = rightAssocBinary(
+  pArrow,
+  lexeme(string('=>')),
+  (left, _op, right) => withLoc(
+    createLoc(left.loc.start, right.loc.end),
+    { kind: 'Lam', param: left, body: right } as Exp
   )
 );
 
@@ -1934,29 +2309,37 @@ function parseNamedParameters(state: ParseState): ParseResult<L<Exp>[]> {
   }
 
   while (currentState.position < currentState.input.length) {
-    // Parse parameter: Name := value
-    const nameResult = pIdent(currentState);
-    if (!nameResult.success) {
-      // If we can't parse as name := value, fall back to general expression parsing
-      const exprResult = pExp(currentState);
-      if (!exprResult.success) {
-        break;
-      }
-      parameters.push(exprResult.value);
-      currentState = exprResult.state;
+    // Try to parse key = value or key := value where key can be identifier or string
+    let keyResult;
+
+    // First try identifier
+    const identResult = pIdent(currentState);
+    if (identResult.success) {
+      keyResult = {
+        success: true,
+        value: withLoc(identResult.value.loc, { kind: 'Pat', pattern: createNamePattern(createIdentName(identResult.value.value)) } as Exp),
+        state: identResult.state
+      };
     } else {
-      // Try to parse := or :
-      const colonAssignResult = pColonAssign(nameResult.state);
-      if (colonAssignResult.success) {
+      // Try string literal as key
+      const stringResult = pString(currentState);
+      if (stringResult.success) {
+        keyResult = stringResult;
+      }
+    }
+
+    if (keyResult && keyResult.success) {
+      // Try to parse := or =
+      const assignResult = choice([pColonAssign, pEqual])(keyResult.state);
+      if (assignResult.success) {
         // Parse the value
-        const valueResult = pExp(colonAssignResult.state);
+        const valueResult = pExp(assignResult.state);
         if (valueResult.success) {
           // Create assignment expression
+          const assignKind = assignResult.value === ':=' ? 'InfixColonEqual' : 'Assign';
           const assignment = withLoc(
-            createLoc(nameResult.value.loc.start, valueResult.value.loc.end),
-            { kind: 'InfixColonEqual',
-              left: withLoc(nameResult.value.loc, { kind: 'Pat', pattern: createNamePattern(createIdentName(nameResult.value.value)) } as Exp),
-              right: valueResult.value } as Exp
+            createLoc(keyResult.value.loc.start, valueResult.value.loc.end),
+            { kind: assignKind, left: keyResult.value, right: valueResult.value } as Exp
           );
           parameters.push(assignment);
           currentState = valueResult.state;
@@ -1964,7 +2347,7 @@ function parseNamedParameters(state: ParseState): ParseResult<L<Exp>[]> {
           break;
         }
       } else {
-        // Fall back to treating the name as an expression
+        // No assignment operator, treat as standalone expression
         const exprResult = pExp(currentState);
         if (!exprResult.success) {
           break;
@@ -1972,6 +2355,14 @@ function parseNamedParameters(state: ParseState): ParseResult<L<Exp>[]> {
         parameters.push(exprResult.value);
         currentState = exprResult.state;
       }
+    } else {
+      // Neither identifier nor string, fall back to general expression parsing
+      const exprResult = pExp(currentState);
+      if (!exprResult.success) {
+        break;
+      }
+      parameters.push(exprResult.value);
+      currentState = exprResult.state;
     }
 
     // Skip whitespace
@@ -2005,6 +2396,7 @@ function parseNamedParameters(state: ParseState): ParseResult<L<Exp>[]> {
 
   return { success: true, value: parameters, state: currentState };
 }
+
 
 // Fast property assignment parser for constructor contexts
 function parsePropertyAssignment(state: ParseState): ParseResult<L<Exp>> {
@@ -2041,6 +2433,130 @@ function parsePropertyAssignment(state: ParseState): ParseResult<L<Exp>> {
 }
 
 // Indentation parsing utilities
+// Parse case arms: pattern => result
+function parseCaseArms(state: ParseState): ParseResult<Array<{pattern: L<Exp>, result: L<Exp>}>> {
+  // Similar to parseIndentedBlock but parses case arms specifically
+  // Skip any immediate newlines
+  let pos = state.position;
+  while (pos < state.input.length && (state.input[pos] === 10 || state.input[pos] === 13)) { // \n or \r
+    pos++;
+  }
+
+  if (pos >= state.input.length) {
+    return { success: false, error: { position: createPos(state.line, state.column, state.position), message: 'Expected case arms' } };
+  }
+
+  // Measure the indentation of the first case arm
+  let indent = '';
+  while (pos < state.input.length && (state.input[pos] === 32 || state.input[pos] === 9)) { // space or tab
+    indent += String.fromCharCode(state.input[pos]);
+    pos++;
+  }
+
+  if (indent === '') {
+    return { success: false, error: { position: createPos(state.line, state.column, state.position), message: 'Expected indented case arms' } };
+  }
+
+  // Parse case arms with this indentation level
+  const arms: Array<{pattern: L<Exp>, result: L<Exp>}> = [];
+  let currentState = { ...state, position: pos };
+
+  while (currentState.position < currentState.input.length) {
+    // Skip whitespace
+    while (currentState.position < currentState.input.length &&
+           (isSpace(currentState.input[currentState.position]) ||
+            currentState.input[currentState.position] === 10 ||
+            currentState.input[currentState.position] === 13)) {
+      if (currentState.input[currentState.position] === 10) {
+        currentState.line++;
+        currentState.column = 1;
+      } else {
+        currentState.column++;
+      }
+      currentState.position++;
+    }
+
+    // Check if we've reached end of input
+    if (currentState.position >= currentState.input.length) {
+      break;
+    }
+
+    // Find the start of the current line to measure indentation
+    let lineStart = currentState.position;
+    while (lineStart > 0 &&
+           currentState.input[lineStart - 1] !== 10 &&
+           currentState.input[lineStart - 1] !== 13) {
+      lineStart--;
+    }
+
+    // Measure indentation from start of line
+    let currentIndent = '';
+    let checkPos = lineStart;
+    while (checkPos < currentState.input.length &&
+           (currentState.input[checkPos] === 32 || currentState.input[checkPos] === 9)) {
+      currentIndent += String.fromCharCode(currentState.input[checkPos]);
+      checkPos++;
+    }
+
+    // If the indentation doesn't match our expected case indentation, we're done
+    if (currentIndent !== indent) {
+      break;
+    }
+
+    // Parse one case arm: pattern => result
+    const patternResult = lazy(() => pOr)(currentState);
+    if (!patternResult.success) {
+      break;
+    }
+
+    currentState = patternResult.state;
+
+    // Skip whitespace and parse '=>'
+    while (currentState.position < currentState.input.length &&
+           isSpace(currentState.input[currentState.position])) {
+      currentState.position++;
+      currentState.column++;
+    }
+
+    const arrowResult = string('=>')(currentState);
+    if (!arrowResult.success) {
+      break;
+    }
+
+    currentState = arrowResult.state;
+
+    // Skip whitespace after '=>'
+    while (currentState.position < currentState.input.length &&
+           isSpace(currentState.input[currentState.position])) {
+      currentState.position++;
+      currentState.column++;
+    }
+
+    // Parse the result expression
+    const resultResult = lazy(() => pOr)(currentState);
+    if (!resultResult.success) {
+      break;
+    }
+
+    arms.push({
+      pattern: patternResult.value,
+      result: resultResult.value
+    });
+
+    currentState = resultResult.state;
+  }
+
+  if (arms.length === 0) {
+    return { success: false, error: { position: createPos(state.line, state.column, state.position), message: 'Expected at least one case arm' } };
+  }
+
+  return {
+    success: true,
+    value: arms,
+    state: currentState
+  };
+}
+
 function parseIndentedBlock(state: ParseState): ParseResult<L<Exp>> {
   // Parse a block of statements with consistent indentation
   // Returns a Block expression containing the statements
@@ -2071,7 +2587,7 @@ function parseIndentedBlock(state: ParseState): ParseResult<L<Exp>> {
   let currentState = { ...state, position: pos };
 
   while (currentState.position < currentState.input.length) {
-    // Skip whitespace and empty lines to find the start of the next statement
+    // Skip whitespace (but track line/column correctly)
     while (currentState.position < currentState.input.length &&
            (isSpace(currentState.input[currentState.position]) ||
             currentState.input[currentState.position] === 10 ||
@@ -2090,14 +2606,17 @@ function parseIndentedBlock(state: ParseState): ParseResult<L<Exp>> {
       break;
     }
 
-    // Check indentation of the current line
-    let currentIndent = '';
-    let checkPos = currentState.position;
-    // Go back to find the start of this line to measure indentation
-    while (checkPos > 0 && currentState.input[checkPos - 1] !== 10 && currentState.input[checkPos - 1] !== 13) {
-      checkPos--;
+    // Find the start of the current line to measure indentation
+    let lineStart = currentState.position;
+    while (lineStart > 0 &&
+           currentState.input[lineStart - 1] !== 10 &&
+           currentState.input[lineStart - 1] !== 13) {
+      lineStart--;
     }
+
     // Measure indentation from start of line
+    let currentIndent = '';
+    let checkPos = lineStart;
     while (checkPos < currentState.input.length &&
            (currentState.input[checkPos] === 32 || currentState.input[checkPos] === 9)) {
       currentIndent += String.fromCharCode(currentState.input[checkPos]);
@@ -2112,6 +2631,7 @@ function parseIndentedBlock(state: ParseState): ParseResult<L<Exp>> {
     // Parse one statement as expression or declaration with decorators
     const stmtResult = pDeclWithDecorators(currentState);
     if (!stmtResult.success) {
+      // If parsing fails, stop processing the block instead of continuing
       break;
     }
 
@@ -2136,6 +2656,157 @@ function parseIndentedBlock(state: ParseState): ParseResult<L<Exp>> {
     ),
     state: currentState
   };
+}
+
+// Parse multi-dimensional array prefix: [], [][], [][][], etc.
+function parseArrayDimensions(state: ParseState): ParseResult<string> {
+  let dimensions = '';
+  let currentState = state;
+
+  while (true) {
+    // Try to parse '[]'
+    const openResult = lexeme(char('['))(currentState);
+    if (!openResult.success) break;
+
+    const closeResult = lexeme(char(']'))(openResult.state);
+    if (!closeResult.success) break;
+
+    dimensions += '[]';
+    currentState = closeResult.state;
+  }
+
+  return {
+    success: true,
+    value: dimensions,
+    state: currentState
+  };
+}
+
+// Parse identifier with optional specifier (for variable declarations)
+const pIdentWithSpecifier: Parser<L<Exp>> = withLocation(
+  flatMap(
+    pIdent,
+    name => flatMap(
+      optional(pSpecifier),
+      specifier => {
+        if (specifier) {
+          // Create a pattern with specifier information
+          return succeed({
+            kind: 'Pat',
+            pattern: createNamePattern(createIdentName(name.value)),
+            specifier: specifier.value
+          } as Exp);
+        } else {
+          // Regular identifier without specifier
+          return succeed({
+            kind: 'Pat',
+            pattern: createNamePattern(createIdentName(name.value))
+          } as Exp);
+        }
+      }
+    )
+  )
+);
+
+// Enum declarations with specifiers: name<specifier> := enum{...} OR name := enum<specifier>{...}
+const pEnumDecl: Parser<L<Exp>> = withLocation(
+  choice([
+    // Pattern 1: name<specifier> := enum{...}
+    flatMap(
+      pIdentWithSpecifier,
+      namePattern => flatMap(
+        pColonAssign,
+        () => flatMap(
+          keyword('enum'),
+          () => map(
+            between(
+              pLBrace,
+              pRBrace,
+              sepBy(pIdent, pComma)
+            ),
+            enumValues => ({ kind: 'EnumDecl', name: namePattern, values: enumValues.map(v => withLoc(v.loc, createIdentName(v.value))) } as Exp)
+          )
+        )
+      )
+    ),
+    // Pattern 2: name := enum<specifier>{...}
+    flatMap(
+      pIdent,
+      name => flatMap(
+        pColonAssign,
+        () => flatMap(
+          keyword('enum'),
+          () => flatMap(
+            optional(pSpecifier),
+            _enumSpecifier => map(
+              between(
+                pLBrace,
+                pRBrace,
+                sepBy(pIdent, pComma)
+              ),
+              enumValues => {
+                const namePattern = withLoc(name.loc, {
+                  kind: 'Pat',
+                  pattern: createNamePattern(createIdentName(name.value))
+                } as Exp);
+                return { kind: 'EnumDecl', name: namePattern, values: enumValues.map(v => withLoc(v.loc, createIdentName(v.value))) } as Exp;
+              }
+            )
+          )
+        )
+      )
+    )
+  ])
+);
+
+// Parse an optional indented block - allows empty blocks for class definitions
+function parseOptionalIndentedBlock(state: ParseState): ParseResult<L<Exp>> {
+  // Skip any immediate newlines
+  let pos = state.position;
+  while (pos < state.input.length && (state.input[pos] === 10 || state.input[pos] === 13)) { // \n or \r
+    pos++;
+  }
+
+  // If we're at end of file or no indentation, return empty block
+  if (pos >= state.input.length) {
+    // Return empty block at current position
+    return {
+      success: true,
+      value: withLoc(
+        createLoc(createPos(state.line, state.column, state.position), createPos(state.line, state.column, state.position)),
+        { kind: 'Block', expr: withLoc(
+          createLoc(createPos(state.line, state.column, state.position), createPos(state.line, state.column, state.position)),
+          { kind: 'List', elements: [] } as Exp
+        )}
+      ),
+      state: { ...state, position: pos }
+    };
+  }
+
+  // Measure the indentation of the first line
+  let indent = '';
+  while (pos < state.input.length && (state.input[pos] === 32 || state.input[pos] === 9)) { // space or tab
+    indent += String.fromCharCode(state.input[pos]);
+    pos++;
+  }
+
+  // If no indentation, return empty block
+  if (indent === '') {
+    return {
+      success: true,
+      value: withLoc(
+        createLoc(createPos(state.line, state.column, state.position), createPos(state.line, state.column, state.position)),
+        { kind: 'Block', expr: withLoc(
+          createLoc(createPos(state.line, state.column, state.position), createPos(state.line, state.column, state.position)),
+          { kind: 'List', elements: [] } as Exp
+        )}
+      ),
+      state: { ...state, position: pos }
+    };
+  }
+
+  // If we have indentation, parse normally using the existing parseIndentedBlock logic
+  return parseIndentedBlock(state);
 }
 
 // Helper to detect function declaration patterns
@@ -2240,7 +2911,14 @@ const pDeclWithDecorators: Parser<L<Exp>> = (state: ParseState) => {
         state: declResult.state
       };
     } else {
-      return declResult;
+      // If parsing after decorators fails, try to give a better error
+      return {
+        success: false,
+        error: {
+          position: createPos(decoratorResult.state.line, decoratorResult.state.column, decoratorResult.state.position),
+          message: 'Expected declaration after decorator'
+        }
+      };
     }
   } else {
     // No decorators, parse normally
@@ -2260,26 +2938,6 @@ const pDeclWithDecorators: Parser<L<Exp>> = (state: ParseState) => {
 
 // Declaration parser (functions or expressions)
 const pDecl: Parser<L<Exp>> = pDeclWithDecorators;
-
-// Parse decorators like @editable
-const pDecorator: Parser<string> = flatMap(
-  char('@'),
-  () => map(
-    pIdent,
-    name => `@${name}`
-  )
-);
-
-// Parse optional decorators (can have multiple)
-const pDecorators: Parser<string[]> = many(
-  flatMap(
-    pDecorator,
-    decorator => flatMap(
-      pWhitespace,
-      () => succeed(decorator)
-    )
-  )
-);
 
 // Parse using statement separately (not as part of expressions)
 const pUsing: Parser<L<Exp>> = withLocation(
@@ -2303,6 +2961,35 @@ const pUsing: Parser<L<Exp>> = withLocation(
                 }
               )
             )
+          )
+        )
+      )
+    )
+  )
+);
+
+// Parse import statement: import(/path/to/module) or import(/path)
+const pImport: Parser<L<Exp>> = withLocation(
+  flatMap(
+    string('import'),
+    () => flatMap(
+      char('('),
+      () => flatMap(
+        char('/'),
+        () => flatMap(
+          many(satisfy(c => c !== 41)), // Parse until ')' (charCode 41)
+          pathChars => flatMap(
+            char(')'),
+            () => {
+              const pathStr = '/' + String.fromCharCode(...pathChars);
+              return succeed({
+                kind: 'Import',
+                path: withLoc(
+                  createLoc(createPos(0, 0, 0), createPos(0, 0, 0)),
+                  { kind: 'String', text: pathStr, interpolations: [] } as Exp
+                )
+              } as Exp);
+            }
           )
         )
       )
@@ -2359,24 +3046,31 @@ const pVerseFile: Parser<L<Exp>> = (state: ParseState): ParseResult<L<Exp>> => {
   }
 
   while (currentState.position < currentState.input.length) {
-    // Parse one top-level statement - try using first, then declaration, then expression
+    // Parse one top-level statement - try using first, then comments, then declaration, then expression
     const usingResult = pUsing(currentState);
     if (usingResult.success) {
       statements.push(usingResult.value);
       currentState = usingResult.state;
     } else {
-      const stmtResult = pDecl(currentState);
-      if (!stmtResult.success) {
-        // If we can't parse as declaration, try as expression
-        const exprResult = pExp(currentState);
-        if (!exprResult.success) {
-          return exprResult;
-        }
-        statements.push(exprResult.value);
-        currentState = exprResult.state;
+      // Try parsing comments first before declarations
+      const commentResult = pComment(currentState);
+      if (commentResult.success) {
+        statements.push(commentResult.value);
+        currentState = commentResult.state;
       } else {
-        statements.push(stmtResult.value);
-        currentState = stmtResult.state;
+        const stmtResult = pDecl(currentState);
+        if (!stmtResult.success) {
+          // If we can't parse as declaration, try as expression
+          const exprResult = pExp(currentState);
+          if (!exprResult.success) {
+            return exprResult;
+          }
+          statements.push(exprResult.value);
+          currentState = exprResult.state;
+        } else {
+          statements.push(stmtResult.value);
+          currentState = stmtResult.state;
+        }
       }
     }
 
@@ -2430,9 +3124,19 @@ const pVerseFile: Parser<L<Exp>> = (state: ParseState): ParseResult<L<Exp>> => {
 const pFile: Parser<L<Exp>> = pVerseFile;
 
 // Export main parse function
+// Normalize line endings to be consistent throughout the file
+function normalizeLineEndings(input: string): string {
+  // Convert all line ending styles (\r\n, \r, \n) to Unix style (\n)
+  // This ensures consistent parsing behavior across different platforms
+  return input.replace(/\r\n|\r/g, '\n');
+}
+
 export function parseVersee(input: string | Uint8Array): ParseResult<L<Exp>> {
+  // Normalize line endings if input is a string
+  const normalizedInput = typeof input === 'string' ? normalizeLineEndings(input) : input;
+
   const state: ParseState = {
-    input: typeof input === 'string' ? new TextEncoder().encode(input) : input,
+    input: typeof normalizedInput === 'string' ? new TextEncoder().encode(normalizedInput) : normalizedInput,
     position: 0,
     line: 1,
     column: 1,
