@@ -80,7 +80,7 @@ S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
   \multicolumn{3}{l}{\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms}} \\
   (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom{B} \\
   \pomempty \pombind h		& = & \pomempty \\
-  \pomunit{a} \pombind h  	& = & h(x) \\
+  \pomunit{a} \pombind h  	& = & h(a) \\
   (S \pomcat T) \pombind h      & = & (S \pombind h) \pomcat (T \pombind h) \\
   (S \pomunion T) \pombind h    & = & (S \pombind h) \pomunion (T \pombind h) \\
   \\
