@@ -2,6 +2,7 @@
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Pom where
+import Control.Applicative
 import Control.Monad
 import Epic.List
 import FrontEnd.Expr hiding(Tuple)
@@ -38,16 +39,14 @@ unit a = Unit a
 none :: P a
 none = Empty
 
+-- Smart constructor for :++
 infixl 8 +++
 (+++) :: P a -> P a -> P a
 Empty +++ y = y
 x +++ Empty = x
 x +++     y = x :++ y
 
-infixl 8 ***
-(***) :: P ENV -> P ENV -> P ENV
-(***) = liftA2 (/\)
-
+-- Smart constructor for :\/
 infixl 6 `union`
 union :: P a -> P a -> P a
 union Empty y = y
@@ -68,50 +67,63 @@ instance Monad P where
   (s :++ t) >>= k = (s >>= k) +++ (t >>= k)
   (s :\/ t) >>= k = (s >>= k) `union` (t >>= k)
 
-pfilter :: (a -> Bool) -> P a -> P a
-pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
+instance Alternative P where
+  empty = Empty
+  (<|>) = union
+
+--pfilter :: (a -> Bool) -> P a -> P a
+--pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
+
+-- Sequencing
+infixl 8 ***
+(***) :: P ENV -> P ENV -> P ENV
+s1 *** s2 = [ r | d1 <- s1, d2 <- s2, let r = d1 /\ d2, r /= ENVS.empty ]
+
+-- Disjunction
+disj :: P ENV -> P ENV -> P ENV
+disj s1 s2 = [ d1 \/ d2 | d1 <- s1, d2 <- s2 ]
 
 infixl 7 >>>
 (>>>) :: P ENV -> [Ident] -> P ENV
 s >>> xs = fmap (hides xs) s
 
+{-
+This is hard to implement
+uNION :: Set (P a) -> P a
+-}
+
+cONC :: [P a] -> P a
+cONC = foldr (+++) Empty
+
 canon :: P a -> Set [a]
 canon Empty = Set.empty
-canon (Unit a) = Set.singleton [a]
-canon (s :\/ t) = canon s `Set.union` canon t
-canon (Empty :++ s) = canon s
-canon (Unit a :++ s) = [ a : as | as <- canon s ]
-canon ((s :\/ t) :++ r) = canon (s :++ r) `Set.union` canon (t :++ r)
-canon ((s :++ t) :++ r) = canon (s :++ (t :++ r))
-
-absorbEmpty :: P a -> P a
-absorbEmpty x@Empty = x
-absorbEmpty x@Unit{} = x
-absorbEmpty (x :++ y) =
-  case (absorbEmpty x, absorbEmpty y) of
-    (Empty, y') -> y'
-    (x', Empty) -> x'
-    (x', y') -> x' :++ y'
-absorbEmpty (x :\/ y) =
-  case (absorbEmpty x, absorbEmpty y) of
-    (Empty, y') -> y'
-    (x', Empty) -> x'
-    (x', y') -> x' :\/ y'
+canon p = canon' p
+  where
+    canon' Empty = error "canon' : Empty"
+    canon' (Unit a) = Set.singleton [a]
+    canon' (s :\/ t) = canon' s `Set.union` canon' t
+    canon' (Unit a :++ s) = [ a : as | as <- canon' s ]
+    canon' ((s :\/ t) :++ r) = canon' (s :++ r) `Set.union` canon' (t :++ r)
+    canon' ((s :++ t) :++ r) = canon' (s :++ (t :++ r))
 
 uncanon :: Ord a => Set [a] -> P a
 uncanon s | Set.isEmpty s = Empty
 uncanon s = Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
 
+------------------
+
 oNE :: [Ident] -> P ENV -> P ENV
 oNE _ Empty = Empty
 oNE _ (Unit d) = Unit d
 oNE xs (s :\/ t) = oNE xs s `union` oNE xs t
-oNE xs (s :++ t) = s1 `union` (
-    (fmap compl s1 >>> xs) -- nOT xs s1
+oNE xs (s :++ t) = s1 `disj` (
+    --(fmap compl s1 >>> xs)
+    nOT xs s1
     *** oNE xs t)
   where s1 = oNE xs s
 
 nOT :: [Ident] -> P ENV -> P ENV
+nOT _ Empty = unit univ
 nOT xs s =
   fmap compl (s >>> xs)
   -- fmap compl s >>> xs
@@ -132,10 +144,12 @@ fOR xs d@Unit{}  t i x =
                          | ip <- allInts
                          , iq <- allInts
                          ]
-fOR xs (a :\/ b) t i x = --fOR xs a t i x `union` fOR xs b t i x
+fOR xs (a :\/ b) t i x = fOR xs a t i x `union` fOR xs b t i x
+{-
   fOR xs (a :++ b) t i x
   `union`
   fOR xs (b :++ a) t i x
+-}
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
@@ -157,7 +171,7 @@ dE :: SrcEssential -> Ident -> Ident -> P ENV
 -- The denotational semantics itself (Fig 10)
 dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
 dE (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
-dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF
+dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
 dE (Variable v) i x | isSrcUnderscore v = unit $ i .=. x
                     | otherwise         = unit $ i .=. x /\ x .=. v
 dE (DefineE y t)                    i x = unit (x .=. y) *** dE t i x
@@ -168,7 +182,7 @@ dE (Choice t0 t1)                   i x = dB t0 i x +++ dB t1 i x
 dE (Seq t0 t1)                      i x = dC t0     *** dE t1 i x
 dE (Where t0 t1)                    i x = dE t0 i x *** dC t1
 dE (Block t)                        i x = dB t i x
-dE Fail                             _ _ = none
+dE Fail                             _ _ = Empty
 dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
   dE t0 i x `union` dE t1 i x
 dE (If3 t0 t1 t2)                   i x =
@@ -198,11 +212,11 @@ dE t@(Array ts)                     i x =
         es = zipWith3 dE ts is xs
         tupvals = allTuplesLen n
         et = unit $ bigUnion [ i .= Tuple ivals /\
-                          x .= Tuple xvals /\
-                          bigIntersect (zipWith (.=) is ivals) /\
-                          bigIntersect (zipWith (.=) xs xvals)
-                        | ivals <- tupvals, xvals <- tupvals
-                        ]
+                               x .= Tuple xvals /\
+                               bigIntersect (zipWith (.=) is ivals) /\
+                               bigIntersect (zipWith (.=) xs xvals)
+                             | ivals <- tupvals, xvals <- tupvals
+                             ]
 -- A speedup for x:int
 dE (Range (EPrim IsInt))            i x = unit (bigUnion [ i .= v /\ x .= v | v <- allInts ])
 dE (Range t)                        i x =
@@ -338,19 +352,8 @@ bvs = getVisibleBinders
 
 -------
 
-canonAll :: P ENV -> Set [ENV]
-canonAll = canon . absorbEmpty . pfilter (/= ENVS.empty)
-
 den :: SrcEssential -> Set [ENV]
-den t = canonAll $
+den t = canon $
         dE (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"
-
-{-
-denU :: SrcEssential -> Set [ENV]
-denU t = canon $
-         dE (Block t) i x -- `remv` [i]
-  where (i, x) = fresh2 ("u", "v") [] t
-        -- res = Ident noLoc "res"
--}

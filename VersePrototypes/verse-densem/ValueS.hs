@@ -69,7 +69,7 @@ applyPF (PF _ m) a = M.lookup a m
 -----------------------------
 
 numInt :: Z
-numInt = 2
+numInt = 4
 
 allInts' :: [Int]
 allInts' = [0 .. fromIntegral numInt - 1 ]
