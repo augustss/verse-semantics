@@ -71,17 +71,44 @@ instance Alternative P where
   empty = Empty
   (<|>) = union
 
+cONC :: [P a] -> P a
+cONC = foldr (+++) Empty
+
 --pfilter :: (a -> Bool) -> P a -> P a
 --pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
+
+----------------------------------------------------
+--
+--            Functions over PENV = P ENV
+--
+----------------------------------------------------
+
+type PENV = P ENV
+     -- Invariants of PENV
+     --     (I1) Empty only at the root
+     --     (I2) No (Unit ENVS.empty) anywhere
+
+mkUnit :: ENV -> PENV
+-- Establish (I2)
+mkUnit d | d == ENVS.empty = Empty
+         | otherwise       = Unit d
 
 -- Sequencing
 infixl 8 ***
 (***) :: P ENV -> P ENV -> P ENV
-s1 *** s2 = [ r | d1 <- s1, d2 <- s2, let r = d1 /\ d2, r /= ENVS.empty ]
+s1 *** s2 = do { d1 <- s1
+               ; d2 <- s2
+               ; mkUnit (d1 /\ d2) }
 
 -- Disjunction
 disj :: P ENV -> P ENV -> P ENV
+disj Empty s = s
+disj s Empty = s
 disj s1 s2 = [ d1 \/ d2 | d1 <- s1, d2 <- s2 ]
+
+nOT :: PENV -> PENV
+nOT Empty = unit univ
+nOT s     =  do { d <-s; mkUnit (compl d) }
 
 infixl 7 >>>
 (>>>) :: P ENV -> [Ident] -> P ENV
@@ -91,9 +118,6 @@ s >>> xs = fmap (hides xs) s
 This is hard to implement
 uNION :: Set (P a) -> P a
 -}
-
-cONC :: [P a] -> P a
-cONC = foldr (+++) Empty
 
 canon :: P a -> Set [a]
 canon Empty = Set.empty
@@ -112,21 +136,15 @@ uncanon s = Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
 
 ------------------
 
-oNE :: [Ident] -> P ENV -> P ENV
+oNE :: [Ident] -> PENV -> PENV
 oNE _ Empty = Empty
 oNE _ (Unit d) = Unit d
 oNE xs (s :\/ t) = oNE xs s `union` oNE xs t
 oNE xs (s :++ t) = s1 `disj` (
     --(fmap compl s1 >>> xs)
-    nOT xs s1
+    nOT (s1 >>> xs)
     *** oNE xs t)
   where s1 = oNE xs s
-
-nOT :: [Ident] -> P ENV -> P ENV
-nOT _ Empty = unit univ
-nOT xs s =
-  fmap compl (s >>> xs)
-  -- fmap compl s >>> xs
 
 nil :: Value
 nil = Tuple []
@@ -138,7 +156,7 @@ fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
 fOR xs d@Unit{}  t i x =
   d *** unit sings *** dE t p q >>> (p:q:xs)
   `union` 
-  nOT xs d *** unit (i .= nil /\ x .= nil)
+  nOT (d >>> xs) *** unit (i .= nil /\ x .= nil)
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
         sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
                          | ip <- allInts
@@ -188,7 +206,7 @@ dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
 dE (If3 t0 t1 t2)                   i x =
   s0 *** dB t1 i x >>> xs
   `union`
-  nOT xs s0 *** dB t2 i x
+  nOT (s0 >>> xs) *** dB t2 i x
   where xs = bvs t0
         s0 = oNE xs (dC t0)
 dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
