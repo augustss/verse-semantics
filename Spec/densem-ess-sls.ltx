@@ -74,6 +74,9 @@ $$
 $$
 \begin{array}{l}
 
+  \mathbf{type}\; \pomENV = \pom{\ENV} \hspace{5mm}
+  \text{{\bf Invariant:} $S:\pomENV$ has no nested $\pomempty$ and no $\pomunit{\{\}}$ anywhere}
+\\ \\
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
 
 \multicolumn{3}{l}{\mathbf{Canonicalisation.}
@@ -81,7 +84,7 @@ $$
     \text{Theorem: $\pomcanon$ satisfies axioms.} \\
     \text{Theorem: $\forall s \in \pomcanon(S).\; s \not=[] \text{and}\; \forall \EV \in s. \; \EV \not= \{\}$}
       \end{array}} \\
-\pomcanon & : & \pom{\ENV} \rightarrow \powerset{\seq{\ENV}} \\
+\pomcanon & : & \pomENV \rightarrow \powerset{\seq{\ENV}} \\
 \pomcanon( \pomempty ) & = & \{ \} \\
 \pomcanon( \pomunit{\EV} ) & = & \left\{\begin{array}{ll}
 \{ \} & \text{if $\EV = \{\}$} \\
@@ -101,7 +104,7 @@ $$
 \\
 \\
 \multicolumn{3}{l}{\text{\textbf{Conjunction (sequencing, intersection).}  Theorem: $\pomseq$ satisfies axioms.}} \\
-(\pomseq) & : & \pom{\ENV} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
+(\pomseq) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
   \pomempty \pomseq S                     & = & \pomempty \\
   S \pomseq \pomempty                     & = & \pomempty \\
   (S \pomunion T) \pomseq R               & = & (S \pomseq R) \pomunion (T \pomseq R) \\
@@ -120,7 +123,7 @@ $$
         & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T, \EV_1 \cap \EV_2 \not= \{\} \pomcompR \\[1mm]
 
  \multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
-(\pomor) & : & \pom{\ENV} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
+(\pomor) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
 S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T \pomcompR
 \end{array} \\
 \end{array}
@@ -140,8 +143,7 @@ $$
 $$
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
-  & \semess{E}{u}{v}{|t|} & : & \pom{\ENV}  \hspace{5mm}
-  \text{{\bf Invariant:} returned $\ENV$ has no nested $\pomempty$ and no $\pomunit{\{\}}$}\\
+  & \semess{E}{u}{v}{|t|} & : & \pomENV  \\
 
 % Wildcards and atoms
 \rulename{swild}  &  \semess{E}{u}{v}{|_|} & = & \pomunit{ \conBrack{u =v} } \\
@@ -206,9 +208,9 @@ $$
 %       B, C, and F
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
-& \semess{B}{u}{v}{|t|} & : & \pom{ \ENV } \\
+& \semess{B}{u}{v}{|t|} & : & \pomENV \\
 & \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
-& \semapp{C}{|t|} & : & \pom{ \ENV } \\
+& \semapp{C}{|t|} & : & \pomENV \\
 & \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N a_1 a_2|}r & : & \pom{\ENV} \\
 & \semap{F}{|apply1N a_1 a_2|}r  & = &
@@ -216,7 +218,7 @@ $$
       \; \}
  \\[1.5ex]
 
- & \pomONE & : & \powerset{\Ident} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV}
+ & \pomONE & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV
        \hspace{5mm} \text{Result has no $(\pomcat)$}\\
 
  & \pomONE( xs, \pomempty )  & = & \pomempty \\
@@ -224,13 +226,16 @@ $$
  & \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
  & \pomONE( xs, S \pomcat T )  & = & S1 \pomor (\pomNOT(xs,S1) \pomseq \pomONE(xs, T)) \\
  &                             & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
- & NOT & : & \powerset{\Ident} \rightarrow \pom{\ENV} \rightarrow \pom{\ENV} \\
+ & NOT & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
+ & NOT(xs,\pomempty) & = & \pomunit{ \conUniv } \\
  & NOT(xs,S) & = & \pommap( \conCompl, S \pomHIDE xs) \hspace{5mm} \text{Hide $xs$, and complement each ENV} \\[1mm]
 
- & \pomFOR{\_}{xs}{u}{v}{t_2} & : & \pom{\ENV} \rightarrow \pom{\ENV} \\
+ & \pomFOR{\_}{xs}{u}{v}{t_2} & : & \pomENV \rightarrow \pomENV \\
  & \pomFOR{\pomempty}{xs}{u}{v}{t_2} & = & \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}} \hspace{5mm} \text{|for(fail)| returns empty tuple}\\
- & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} & \text{Simon's version} \\
- & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2} \pomunion \pomFOR{T \pomcat S}{xs}{u}{v}{t_2} & \text{Tim's version} \\
+ & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} \\
+% Tim's version, maybe
+       % & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2} \pomunion
+       % \pomFOR{T \pomcat S}{xs}{u}{v}{t_2} & \text{Tim's version} \\
  & \pomFOR{\pomunit{\EV}}{xs}{u}{v}{t_2}
        &  = & \begin{array}[t]{@@{}l}
                 (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
