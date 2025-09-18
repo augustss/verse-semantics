@@ -164,7 +164,7 @@ $$
          \pomseq \semess{E}{u_1}{v_1}{t_1}
          \pomseq \mydots
          \pomseq \semess{E}{u_n}{v_n}{t_n} \\
-         \HIDESkw { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \pomHIDE { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
          \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
       \end{array} \\
 
@@ -179,14 +179,18 @@ $$
 % Sequencing
 \rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \pomseq \semess{E}{u}{v}{t_2} \\
 % Dot-dot
-\rulename{sdotdot} &  \semess{E}{u}{v}{|a_1 ..  a_2|}
-& = & \pomunions \{\;  \pomcats [ \conBrack{u=v=a_1+i, i \leq a_2 - a_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
+\rulename{sdotdot} &  \semess{E}{u}{v}{|t_1 ..  t_2|}
+  & = & \pomunit{\conBrack{u=v}} \pomseq \semess{E}{p_1}{q_1}{t_1} \pomseq \semess{E}{p_2}{q_2}{t_2} \pomseq \\
+  & & & \pomunions \{\;  \pomcats [ \conBrack{v=q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
+  & & & \pomHIDE \{p_1,q_1,p_2,q_2\} \hspace{5mm}  \{p_1,q_1,p_2,q_2\} \not\in \freevars(t_1,t_2,u,v) \\
 
 % Application and type
-\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
- & = &  \pomunit{\conBrack{u=v}} \pomseq \semap{F}{|apply1N a_1 a_2|}v \\
-\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
-\\
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N t_1 t_2|}
+& = &  \pomunit{\conBrack{u=v}} \pomseq \semess{E}{f}{g}{t_1} \pomseq \semess{E}{p}{q}{t_1}
+\pomseq \semap{F}{|apply1N g q|}v  \\
+& & & \pomHIDE \{f,g,p,q\} \hspace{5mm} \{f,g,p,q\} \not\in \freevars{t_1,t_2,u,v} \\
+\rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \pomseq \semap{F}{|apply1N q u|}v
+  \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t,u,v} \\[1mm]
 
 % IF
 \multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
@@ -197,7 +201,7 @@ $$
           (\pomNOT(xs,S0) \pomseq \semess{B}{u}{v}{t_3}) \\
         \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
       \end{array}
-\\ \\
+\\[5mm]
 \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_1 t_2|}}
 & = &  \pomFOR{\semapp{C}{t_1}}{\semap{I}{t_1}}{u}{v}{t_2} \\
 \end{array}
@@ -212,9 +216,9 @@ $$
 & \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
 & \semapp{C}{|t|} & : & \pomENV \\
 & \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
-& \semap{F}{|apply1N a_1 a_2|}r & : & \pom{\ENV} \\
-& \semap{F}{|apply1N a_1 a_2|}r  & = &
-    \pomunions \{ \ \pomcats [ \; \conBrack{\conFun{a_2}{r}{a_1}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
+& \semap{F}{|apply1N f x|}r & : & \pom{\ENV} \\
+& \semap{F}{|apply1N f x|}r  & = &
+    \pomunions \{ \ \pomcats [ \; \conBrack{\conFun{x}{r}{f}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
       \; \}
  \\[1.5ex]
 
