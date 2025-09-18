@@ -82,26 +82,16 @@ $$
 \multicolumn{3}{l}{\mathbf{Canonicalisation.}
   \begin{array}[t]{l}
     \text{Theorem: $\pomcanon$ satisfies axioms.} \\
-    \text{Theorem: $\forall s \in \pomcanon(S).\; s \not=[] \text{and}\; \forall \EV \in s. \; \EV \not= \{\}$}
+    \text{Theorem: $\forall s \in \pomcanon(S).\; s \not=[] \; \text{and}\; \forall \EV \in s. \; \EV \not= \{\}$}
       \end{array}} \\
 \pomcanon & : & \pomENV \rightarrow \powerset{\seq{\ENV}} \\
 \pomcanon( \pomempty ) & = & \{ \} \\
-\pomcanon( \pomunit{\EV} ) & = & \left\{\begin{array}{ll}
-\{ \} & \text{if $\EV = \{\}$} \\
-\{ [ \EV ] \} & \text{otherwise}
-\end{array}
-\right. \\
+\pomcanon( \pomunit{\EV} ) & = & \{ [ \EV ] \} \\
 \pomcanon( S \pomunion T ) & = & \pomcanon(S) \cup \pomcanon(T) \\
 \pomcanon( \pomempty \pomcat S ) & = & \pomcanon(S) \\
 \pomcanon( (S \pomunion T) \pomcat R ) & = & \pomcanon(S \pomcat R) \cup \pomcanon(S \pomcat R) \\
 \pomcanon( (S \pomcat T) \pomcat R ) & = & \pomcanon(S \pomcat (T \pomcat R)) \\
-\pomcanon( \pomunit{\EV} \pomcat S ) & = &
-\left\{ \begin{array}{ll}
-    \pomcanon(S) & \text{if $\EV = \{\}$} \\
-    \pomunit{\EV} & \text{if $S = \{\}$} \\
-    \{ a:as \vb as \in \pomcanon(S) \} & \text{otherwise}
- \end{array} \right.
-\\
+\pomcanon( \pomunit{\EV} \pomcat S ) & = & \{ a:as \vb as \in \pomcanon(S) \} \\
 \\
 \multicolumn{3}{l}{\text{\textbf{Conjunction (sequencing, intersection).}  Theorem: $\pomseq$ satisfies axioms.}} \\
 (\pomseq) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
@@ -122,15 +112,16 @@ $$
         \text{if}\,\EV_1 \cap \EV_2 = \{\} \, \text{then}\,  \pomempty \, \text{else} \, \pomunit{\EV_1 \cap \EV_2})) \\
         & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T, \EV_1 \cap \EV_2 \not= \{\} \pomcompR \\[1mm]
 
- \multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
+\multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
 (\pomor) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
  \pomempty \pomor S & = & S \\
  S \pomor \pomempty & = & S \\
  S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T \pomcompR \\[1mm]
 
+\multicolumn{3}{l}{\text{\textbf{Negation (or, complement)}}} \\
 \pomNOT & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
 \pomNOT(\pomempty) & = & \pomunit{ \conUniv } \hfill \text{(|if3 fail t_1 t_2| = |t_2|)} \\
-\pomNOT(S) & = & \pommap( \conCompl, S) 
+\pomNOT(S) & = & \pomcompL \conCompl(\EV) \vb \EV \in S, \conCompl(\EV) \not= \{\} \pomcompR
 \end{array} \\
 \end{array}
 $$
