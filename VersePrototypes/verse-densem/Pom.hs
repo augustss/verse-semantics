@@ -154,6 +154,7 @@ fOR xs (a :++ b) t i x =
         app _ _ = undefined
 
 dE :: SrcEssential -> Ident -> Ident -> P ENV
+-- The denotational semantics itself (Fig 10)
 dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
 dE (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
 dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF

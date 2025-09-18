@@ -304,13 +304,17 @@
 \newcommand{\pomcats}{\mathit{CONC}}
 \newcommand{\pomunit}[1]{\lfloor #1 \rfloor}
 \newcommand{\pomcanon}{\mathbf{canon}}
-\newcommand{\pomseq}{\,\bigstar\,}
+% \newcommand{\pomseq}{\,\bigstar\,}
+\newcommand{\pomseq}{\,\Cap\,}
+\newcommand{\pomor}{\,\Cup\,}
 \newcommand{\pombind}{\gg \! =_{p}}
 \newcommand{\pommap}{\mathbf{map}_{p}}
 \newcommand{\pomONE}{\mathit{ONE}}
 \newcommand{\pomNOT}{\mathit{NOT}}
 \newcommand{\pomHIDE}{\HIDEkw}
 \newcommand{\pomFOR}[5]{\mathit{FOR}(#2,\,#1)\llbracket #5 \rrbracket #3 #4}
+\newcommand{\pomcompL}{\{\!\mid}   % left bracket for pom comprehensions
+\newcommand{\pomcompR}{\mid\!\}}   % right bracket for pom comprehensions
 
 %% Semantic function calls, e.g E[e]rho
 \newcommand{\semfun}[1]{\mathcal{#1}}
@@ -381,7 +385,7 @@
 
 % Notation for ENV
 \newcommand{\sembrack}[1]{\llbracket #1 \rrbracket}
-\newcommand{\conBrack}[1]{\{\!\{\, #1 \, \}\!\} }
+\newcommand{\conBrack}[1]{\{\!\!\{\, #1 \, \}\!\!\} }
 \newcommand{\conFun}[5]{(\fpr{#1}{#2}) \in \mathit{#3}[#4/#5]}
 \newcommand{\conCompl}{\mathbf{compl}}
 \newcommand{\conEmpty}{\mathbf{empty}}
