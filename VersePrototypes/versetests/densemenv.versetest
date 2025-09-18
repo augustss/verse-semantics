@@ -15,6 +15,7 @@ testds("choice2",tim, pass) {(1=2)|2}                             {"[{{u=v=2}}]"
 testds("exi1",   tim, pass) {x:any; x>0; x<3}                     {"[{{u=v=1}} U {{u=v=2}}]"}
 testds("if1",    tim, pass) {if(0){1}else{2}}                     {"[{{u=v=1}}]"}
 testds("if2",    tim, pass) {if(0=1){1}else{2}}                   {"[{{u=v=2}}]"}
+testds("if2b",   pom, pass) {if(fail){1}else{2}}                  {"{[{{u=v=2}}]}"}
 testds("if3",    tim, pass) {if(x:=1|2){x}else{3}}                {"[{{u=v=1}}]"}
 testds("if4",    tim, pass) {if(x:=1|2){x=2}else{3}}              {"[]"}
 testds("if5",    tim, pass) {if(0){1|2}else{3}}                   {"[{{u=v=1}},{{u=v=2}}]"}
