@@ -224,6 +224,7 @@
 %format dollar = "\$"
 %format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\{" b "\}"
 %format forb (a) b = "\textbf{for}(" a ")\{" b "\}"
+%format for1 (a) = "\textbf{for}(" a ")"
 
 %format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
 
@@ -257,7 +258,7 @@
 %format choice = "\rule[-0.1em]{0.15em}{0.75em}"
 %% 1mm is about 0.3em with the current font
 %format `choice` = "\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}"
-%format `uchoice` = "||"
+%format `uchoice` = "|\!|\!|"
 
 %% New version: tall | for BNF, fat | for choice
 %%format vbar = "\mathop{\bigm|}"

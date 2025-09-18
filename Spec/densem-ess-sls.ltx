@@ -124,7 +124,13 @@ $$
 
  \multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
 (\pomor) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
-S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T \pomcompR
+ \pomempty \pomor S & = & S \\
+ S \pomor \pomempty & = & S \\
+ S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T \pomcompR \\[1mm]
+
+\pomNOT & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
+\pomNOT(\pomempty) & = & \pomunit{ \conUniv } \hfill \text{(|if3 fail t_1 t_2| = |t_2|)} \\
+\pomNOT(S) & = & \pommap( \conCompl, S) 
 \end{array} \\
 \end{array}
 $$
@@ -158,20 +164,21 @@ $$
 
 % Tuples
 \multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}}
-& = & \begin{array}[t]{@@{}l}
+& = & 
          \pomunit{\conBrack{ u=|arr (u_1, xdots, u_n)|,
                             v=|arr (v_1, xdots, v_n)|}}
          \pomseq \semess{E}{u_1}{v_1}{t_1}
          \pomseq \mydots
          \pomseq \semess{E}{u_n}{v_n}{t_n} \\
-         \pomHIDE { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
-         \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
-      \end{array} \\
+&&&         \pomHIDE { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \hfill u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v} \\
 
 % Choice and failure
 \rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \pomempty \\
 \rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
   & = & \semess{B}{u}{v}{t_1} \pomcat \semess{B}{u}{v}{t_2} \\
+\rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
+  & = & \semess{B}{u}{v}{t_1} \pomunion \semess{B}{u}{v}{t_2} \\
 
 % Unification
 \rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \pomseq \semess{E}{u}{v}{t_2} \\
@@ -182,15 +189,15 @@ $$
 \rulename{sdotdot} &  \semess{E}{u}{v}{|t_1 ..  t_2|}
   & = & \pomunit{\conBrack{u=v}} \pomseq \semess{E}{p_1}{q_1}{t_1} \pomseq \semess{E}{p_2}{q_2}{t_2} \pomseq \\
   & & & \pomunions \{\;  \pomcats [ \conBrack{v=q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
-  & & & \pomHIDE \{p_1,q_1,p_2,q_2\} \hspace{5mm}  \{p_1,q_1,p_2,q_2\} \not\in \freevars(t_1,t_2,u,v) \\
+  & & & \pomHIDE \{p_1,q_1,p_2,q_2\} \hfill  p_1,q_1,p_2,q_2 \not\in \freevars{t_1,t_2,u,v} \\[1mm]
 
 % Application and type
 \rulename{sapp} & \semess{E}{u}{v}{|apply1N t_1 t_2|}
 & = &  \pomunit{\conBrack{u=v}} \pomseq \semess{E}{f}{g}{t_1} \pomseq \semess{E}{p}{q}{t_1}
 \pomseq \semap{F}{|apply1N g q|}v  \\
-& & & \pomHIDE \{f,g,p,q\} \hspace{5mm} \{f,g,p,q\} \not\in \freevars{t_1,t_2,u,v} \\
+& & & \pomHIDE \{f,g,p,q\} \hfill f,g,p,q \not\in \freevars{t_1,t_2,u,v} \\[1mm]
 \rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \pomseq \semap{F}{|apply1N q u|}v
-  \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t,u,v} \\[1mm]
+  \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t,u,v} \\[1mm]
 
 % IF
 \multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
@@ -215,7 +222,7 @@ $$
 & \semess{B}{u}{v}{|t|} & : & \pomENV \\
 & \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
 & \semapp{C}{|t|} & : & \pomENV \\
-& \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+& \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N f x|}r & : & \pom{\ENV} \\
 & \semap{F}{|apply1N f x|}r  & = &
     \pomunions \{ \ \pomcats [ \; \conBrack{\conFun{x}{r}{f}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
@@ -228,14 +235,12 @@ $$
  & \pomONE( xs, \pomempty )  & = & \pomempty \\
  & \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
  & \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
- & \pomONE( xs, S \pomcat T )  & = & S1 \pomor (\pomNOT(xs,S1) \pomseq \pomONE(xs, T)) \\
+ & \pomONE( xs, S \pomcat T )  & = & S1 \pomor ( \pomNOT(S1 \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
  &                             & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
- & NOT & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
- & NOT(xs,\pomempty) & = & \pomunit{ \conUniv } \\
- & NOT(xs,S) & = & \pommap( \conCompl, S \pomHIDE xs) \hspace{5mm} \text{Hide $xs$, and complement each ENV} \\[1mm]
 
  & \pomFOR{\_}{xs}{u}{v}{t_2} & : & \pomENV \rightarrow \pomENV \\
- & \pomFOR{\pomempty}{xs}{u}{v}{t_2} & = & \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}} \hspace{5mm} \text{|for(fail)| returns empty tuple}\\
+       & \pomFOR{\pomempty}{xs}{u}{v}{t_2} & = & \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}
+                   \hfill \text{(|for1 fail| returns empty tuple)}\\
  & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} \\
 % Tim's version, maybe
        % & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2} \pomunion
@@ -244,7 +249,7 @@ $$
        &  = & \begin{array}[t]{@@{}l}
                 (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
                   \pomseq \semess{E}{p}{q}{t_2}) \pomHIDE \{p,q,xs\}   \\
-                \pomunion \; \pomNOT(xs, \pomunit{\EV}) \pomseq \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}
+                \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}
               \end{array} \\
  & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2}
          & = & \begin{array}[t]{@@{}l}
