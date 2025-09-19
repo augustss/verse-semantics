@@ -17,6 +17,9 @@ testds("if1",    pom, pass) {if(0){1}else{2}}                     {"{[{{u=v=1}}]
 testds("if2",    pom, pass) {if(0=1){1}else{2}}                   {"{[{{u=v=2}}]}"}
 testds("if2b",   pom, pass) {if(fail){1}else{2}}                  {"{[{{u=v=2}}]}"}
 testds("if3",    pom, pass) {if(x:=1|2){x}else{3}}                {"{[{{u=v=1}}]}"}
+testds("if5",    pom, pass) {if(0){1|2}else{3}}                   {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("if6",    pom, pass) {x:any; if(x=0){1}else{2}}            {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+testds("if7",    pom, pass) {x:any; if(x=0|3){1}else{2}}          {"{[{{u=v=1}}],[{{u=v=2}}]}"}
 
 # From https://docs.google.com/document/d/1C6d_02AgRjoiUsaLUm4mGaEdwEPnN8ucK3vsGeInJrs/
 # I prefix names in the doc with 'T'
@@ -32,12 +35,9 @@ testds("Tif2-4",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=1; r}   {"{}"}
 testds("Tif2-5",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=2; r}   {"{[{{u=v=2}}]}"}
 testds("Tif2-5",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=3; r}   {"{[{{u=v=3}}]}"}
 
-testds("Tif4",   pom, pass) {if(x:=1|2){x | x}else{fail}}          {"{[{{u=v=1}}, {{u=v=1}}]}"}
+testds("Tif4",   pom, pass) {if(x:=1|2){x | x}else{fail}}          {"{[{{u=v=1}},{{u=v=1}}]}"}
 
 <#
-testds("if5",    pom, pass) {if(0){1|2}else{3}}                   {"[{{u=v=1}},{{u=v=2}}]"}
-testds("if6",    pom, pass) {x:any; if(x=0){1}else{2}}            {"[{{u=v=1}},{{u=v=2}}]"}  # weird, but what Pom wants
-testds("if7",    pom, pass) {x:any; if(x=0|3){1}else{2}}          {"[{{u=v=1}},{{u=v=1}},{{u=v=2}}]"}  # weird
 testds("apptup1",pom, pass) {a:=(1,2); a[0]}                      {"[{{u=v=1}}]"}
 testds("apptup2",pom, pass) {a:=(1,2); a[1]}                      {"[{{u=v=2}}]"}
 testds("apptup3",pom, pass) {a:=(1,2); a[3]}                      {"[]"}
