@@ -94,7 +94,6 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \section{Source Verse, Essential Verse, and superficial desugaring}
 \fi % \ifeverything
 \input{verse-source}
-\ifeverything
 
 
 % -------------------------------------------------------------
@@ -104,8 +103,15 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 \section{Denotational semantics: Essential Verse, using SLS}
 \input{densem-notation}
 \input{densem-ess-sls}
-\input{densem-ess-ls}
 
+% -----------> LS: commented out for now <------------
+% \input{densem-ess-ls}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%     Rest of doc is commented out for now
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{comment}
 
 % -------------------------------------------------------------
 %               Mini to Essential: wrapping
@@ -137,7 +143,6 @@ semantics'' for Essential Verse  (\Crefrange{fig:den-sem1}{fig:den-sem-dest1}).
 
 \clearpage \newpage
 \section{Denotational semantics: overview}
-\fi % \ifeverything
 
 Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and \Cref{fig:densem-notation}):
 \begin{itemize}
@@ -195,11 +200,9 @@ Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and
 % -------------------------------------------------------------
 %               Denotational semantics: destination style
 % -------------------------------------------------------------
-\begin{comment}
 \clearpage \newpage
 \section{Denotational semantics: DPS (Jan style)}
 \input{densem-dps-style}
-\end{comment}
 
 % -------------------------------------------------------------
 %               Denotational semantics: plan A
@@ -209,5 +212,10 @@ Design variants (all of them use notation in \Cref{fig:densem-sets-and-seqs} and
 \section{Denotational semantics: Plan A}
 \input{verse-densem-planA}
 \fi % \ifeverything
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%     End of commented out for now
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{comment}
 
 \end{document}

@@ -17,7 +17,23 @@ testds("if1",    pom, pass) {if(0){1}else{2}}                     {"{[{{u=v=1}}]
 testds("if2",    pom, pass) {if(0=1){1}else{2}}                   {"{[{{u=v=2}}]}"}
 testds("if2b",   pom, pass) {if(fail){1}else{2}}                  {"{[{{u=v=2}}]}"}
 testds("if3",    pom, pass) {if(x:=1|2){x}else{3}}                {"{[{{u=v=1}}]}"}
-testds("if4",    pom, pass) {if(x:=1|2){x=2}else{3}}              {"{}"}
+
+# From https://docs.google.com/document/d/1C6d_02AgRjoiUsaLUm4mGaEdwEPnN8ucK3vsGeInJrs/
+# I prefix names in the doc with 'T'
+testds("Tif1a",    pom, pass) {if(x:=1|2){x=2}else{3}}              {"{}"}
+testds("Tif1b",    pom, pass) {if(x:=1|2){x=1}else{3}}              {"{[{{u=v=1}}]}"}
+
+testds("Tif2-1",   pom, pass) {x:nat; x=1; if(x=1|2){x=2}else{3}}   {"{}"}
+testds("Tif2-2",   pom, pass) {x:nat; x=2; if(x=1|2){x=2}else{3}}   {"{[{{u=v=2}}]}"}
+testds("Tif2-3",   pom, pass) {x:nat; x=3; if(x=1|2){x=2}else{3}}   {"{[{{u=v=3}}]}"}
+
+# Tests -4 to -6 are same as -1 to -3, but with the unification of x later
+testds("Tif2-4",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=1; r}   {"{}"}
+testds("Tif2-5",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=2; r}   {"{[{{u=v=2}}]}"}
+testds("Tif2-5",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=3; r}   {"{[{{u=v=3}}]}"}
+
+testds("Tif4",   pom, pass) {if(x:=1|2){x | x}else{fail}}          {"{[{{u=v=1}}, {{u=v=1}}]}"}
+
 <#
 testds("if5",    pom, pass) {if(0){1|2}else{3}}                   {"[{{u=v=1}},{{u=v=2}}]"}
 testds("if6",    pom, pass) {x:any; if(x=0){1}else{2}}            {"[{{u=v=1}},{{u=v=2}}]"}  # weird, but what Pom wants
