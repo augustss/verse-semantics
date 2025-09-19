@@ -315,9 +315,12 @@
 \newcommand{\pomNOT}{\mathit{NOT}}
 \newcommand{\pomHIDE}{\HIDEkw}
 \newcommand{\pomFOR}[5]{\mathit{FOR}(#2,\,#1)\llbracket #5 \rrbracket #3 #4}
+\newcommand{\pomFUN}[5]{\mathit{FUN}(#2,\,#1)\llbracket #5 \rrbracket #3 #4}
 \newcommand{\pomcompL}{\{\!\mid}   % left bracket for pom comprehensions
 \newcommand{\pomcompR}{\mid\!\}}   % right bracket for pom comprehensions
 
+\newcommand{\funplus}{\boxplus}    % Fun fs `plus` Fun gs  = Fun (fs++gs)
+  
 %% Semantic function calls, e.g E[e]rho
 \newcommand{\semfun}[1]{\mathcal{#1}}
 \newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket}

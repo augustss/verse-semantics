@@ -119,7 +119,7 @@ $$
  S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T \pomcompR \\[1mm]
 
 \multicolumn{3}{l}{\text{\textbf{Negation (or, complement)}}} \\
-\pomNOT & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
+\pomNOT & : & \pomENV \rightarrow \pomENV \\
 \pomNOT(\pomempty) & = & \pomunit{ \conUniv } \hfill \text{(|if3 fail t_1 t_2| = |t_2|)} \\
 \pomNOT(S) & = & \pomcompL \conCompl(\EV) \vb \EV \in S, \conCompl(\EV) \not= \{\} \pomcompR
 \end{array} \\
@@ -200,8 +200,8 @@ $$
         \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
       \end{array}
 \\[5mm]
-\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_1 t_2|}}
-& = &  \pomFOR{\semapp{C}{t_1}}{\semap{I}{t_1}}{u}{v}{t_2} \\[2mm]
+\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
+& = &  \pomFOR{\semapp{C}{t_0}}{\semap{I}{t_1}}{u}{v}{t_1} \\[2mm]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %       B, C, and F
@@ -227,28 +227,60 @@ $$
   \pomONE( xs, S \pomcat T )  & = & S1 \pomor ( \pomNOT(S1 \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
                               & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
 
-  \pomFOR{\_}{xs}{u}{v}{t_2} & : & \pomENV \rightarrow \pomENV \\
-  \pomFOR{\pomempty}{xs}{u}{v}{t_2} & = & \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}
+  \pomFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
+  \pomFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}
                    \hfill \text{(|for1 fail| returns empty tuple)}\\
-  \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S}{xs}{u}{v}{t_2} \pomunion \pomFOR{T}{xs}{u}{v}{t_2} \\
-% Tim's version, maybe
-       % & \pomFOR{S \pomunion T}{xs}{u}{v}{t_2 } & = & \pomFOR{S \pomcat T}{xs}{u}{v}{t_2} \pomunion
-       % \pomFOR{T \pomcat S}{xs}{u}{v}{t_2} & \text{Tim's version} \\
-  \pomFOR{\pomunit{\EV}}{xs}{u}{v}{t_2}
+  \pomFOR{S \pomunion T}{xs}{u}{v}{t_1 } & = & \pomFOR{S}{xs}{u}{v}{t_1} \pomunion \pomFOR{T}{xs}{u}{v}{t_1} \\
+  \pomFOR{S \pomcat T}{xs}{u}{v}{t_1}
+                   & = & \pomunit{\conBrack{u=u_1 \oplus u_2, v=v_1 \oplus v_2}}
+                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
+&&  \pomseq \pomFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \pomFOR{T}{xs}{u_2}{v_2}{t_1} \\
+  \pomFOR{\pomunit{\EV}}{xs}{u}{v}{t_1}
        &  = &
                 (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
-                  \pomseq \semess{E}{p}{q}{t_2}) \pomHIDE \{p,q,xs\}   \\
- &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}  \hspace{6mm}  p,q \not\in \freevars{t_2,u,v,xs} \\
-  \pomFOR{S \pomcat T}{xs}{u}{v}{t_2}
-                   & = & \pomunit{\conBrack{u=u_1 \oplus u_2, v=v_1 \oplus v_2}}
-                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_2,u,v,xs} \\
-&&  \pomseq \pomFOR{S}{xs}{u_1}{v_1}{t_2} \pomseq \pomFOR{T}{xs}{u_2}{v_2}{t_2}
+                  \pomseq \semess{E}{p}{q}{t_1}) \pomHIDE \{p,q,xs\}   \\
+ &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=|emptytup|,v=|emptytup|}}  \hspace{6mm}  p,q \not\in \freevars{t_1,u,v,xs} \\
 \end{array}
 \end{array}
 $$
 \caption{E-POM: denotational semantics of Essential Verse, using pomsets}
 \label{fig:E-sls1}
 \end{figure}
+
+
+% --------------------------------------------
+%                Functions
+% --------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+  & \semess{E}{u}{v}{|t|} & : & \pomENV  \\
+
+\multicolumn{2}{@@{}l}{\rulename{sfun} \; \hfill \semess{E}{u}{v}{|function t_0 t_1|}}
+& = &  \pomFUN{\semess{E}{p}{q}{t_0}}{\semap{I}{t_1}}{pq}{uv}{t_1} \\[2mm]
+
+&  \pomFUN{\_}{xs}{pq}{uv}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\[1mm]
+&  \pomFUN{\pomempty}{xs}{pq}{uv}{t_1} & = & \pomunit{\conBrack{u=v=Fun[]}} \\[1mm]
+&  \pomFUN{S \pomunion T}{xs}{pq}{uv}{t_1 } & = & \pomFUN{S}{xs}{pq}{uv}{t_1} \pomunion \pomFUN{T}{xs}{pq}{uv}{t_1} \\[1mm]
+&  \pomFUN{S \pomcat T}{xs}{pq}{uv}{t_1}
+                   & = & \pomunit{\conBrack{u=u_1 \funplus u_2, v=v_1 \funplus v_2}}
+                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_2,u,v,xs} \\
+&&&  \pomseq \pomFUN{S}{xs}{pq}{u_1v_1}{t_1} \pomseq \pomFUN{T}{xs}{pq}{u_2v_2}{t_1} \\[1mm]
+&  \pomFUN{\pomunit{\EV}}{xs}{u}{v}{t_1}
+       &  = & \text{Not done yet}
+\end{array}
+\\
+\\
+\text{where $\funplus$ is ``function range concatenation'':} \\
+\hspace{5mm} Fun(fs) \funplus Fun(gs) = Fun( fs \append gs )
+\end{array}
+$$
+\caption{E-POM: denotational semantics of Essential Verse: functions}
+\label{fig:E-sls-funs}
+\end{figure}
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
