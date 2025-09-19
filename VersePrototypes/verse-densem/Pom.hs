@@ -108,7 +108,7 @@ disj s1 s2 = [ d1 \/ d2 | d1 <- s1, d2 <- s2 ]
 
 nOT :: PENV -> PENV
 nOT Empty = unit univ
-nOT s     =  do { d <-s; mkUnit (compl d) }
+nOT s     = do { d <-s; mkUnit (compl d) }
 
 infixl 7 >>>
 (>>>) :: P ENV -> [Ident] -> P ENV
@@ -292,7 +292,7 @@ t1=Variable a
 -}
 u=Ident noLoc "u"
 v=Ident noLoc "v"
-t0=DefineIE x (k1 `Choice` k2)
+t0=DefineIE x (k0 `Choice` k1)
 t1=If3 t0 (Variable x) k3
 
 {-
