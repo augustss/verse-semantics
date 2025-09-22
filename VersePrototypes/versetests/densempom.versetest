@@ -45,7 +45,7 @@ testds("Tif5-1", pom, pass) {if( (x:=2)|(y:=1) ){x}else{fail}}       {"{[{{v=u,x
 testds("Tif5-2", pom, pass)         {x:nat; y:nat; if(x=7|y=3){x}else{fail}} {"{[{{u=v=3}}]}"}
 
 testds("Tif6-1", pom, pass) {x:int; if(x=1){1}else{0}; x=(2|1)}    {"{[{{u=v=1}}],[{{u=v=2}}]}"}
-testds("Tif6-2", pom, pass, broken) {x:int; if(x=2){1}else{0}; x=(2|1)}    {"{[{{u=v=2}}],[{{u=v=1}}]}"}
+testds("Tif6-2", pom, pass) {x:int; if(x=2){1}else{0}; x=(2|1)}    {"{[{{u=v=1}}],[{{u=v=2}}]}"}
 
 # The crucial thing here is that Tim1a and Tim1b have the same RHS.
 # Ditto Tim2a and Tim2b
@@ -56,10 +56,11 @@ testds("Tim2b", pom, pass) {x:=1|||2; x=1|2} {"{[{{u=v=1}}],[{{u=v=2}}]}"}
 
 ############### all
 ###### these are skipped because pom densem does not implement all yet
-testds("all1", pom, pass, skip)  {all {(x:=1|2)}}           {"{[{{u=v=<1,2>}}]}"}
-testds("all2a", pom, pass, skip) {all {(x:=1|2|3; x>0)}}    {"{[{{u=v=<1,2,3>}}]}"}
-testds("all2b", pom, pass, skip) {all {(x:=1|2|3; x>1)}}    {"{[{{u=v=<2,3>}}]}"}
-testds("all3",  pom, pass, skip) {all {exists x w { (x=1;w=1) | (x=2;w=2) }}}  {"[ {{u=v=<1>,w=1}} u {{u=v=<2>,w=2}} u {{u=v=<>, w∉{1,2}}} ]"}
+testds("all1", pom, pass)  {for {(x:=1|2)}}           {"{[{{u=v=<1,2>}}]}"}
+testds("all2a", pom, pass) {for {(x:=1|2|3; x>0)}}    {"{[{{u=v=<1,2,3>}}]}"}
+testds("all2b", pom, pass) {for {(x:=1|2|3; x>1)}}    {"{[{{u=v=<2,3>}}]}"}
+testds("all3",  pom, pass) {for {(x=1;w=1) | (x=2;w=2)} }  {"{[{{u=v=<>,w/=1,w/=2}} U {{u=v=<>,w/=1,x/=2}} U {{u=v=<>,w/=2,x/=1}} U {{u=v=<>,x/=1,x/=2}}],[{{w=x=1,u=v=<1>}}],[{{w=x=2,u=v=<2>}}]}"}
+
 testds("all4", pom, pass, skip) {x:int; all {x=1 | x=2}; x=(1|2)}    {"{[{{u=v=<1,2>}}]}"} # jeff: I think this is right?
 testds("all5a", pom, pass, skip) {x:int; all {x=1|2}}    {"[{{u=v=<1>,x=1}} U {{u=v=<2>,x=2}} U {{u=v=<>,x∉{1,2}}}]"}
 testds("all5b", pom, pass, skip) {x:int; all {x=1 | x=2}}    {"[{{u=v=<1>}} U {{u=v=<2>}} U {{u=v=<>}}]"}

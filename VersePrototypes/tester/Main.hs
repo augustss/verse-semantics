@@ -459,6 +459,7 @@ showASCII :: Show a => a -> String
 showASCII = concatMap ascii . show
   where ascii '\8746' = "U"
         ascii '\8800' = "/="
+        ascii '\n' = ""
         ascii c = [c]
 
 type TimTag = Src.Ident
