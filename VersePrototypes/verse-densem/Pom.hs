@@ -212,13 +212,16 @@ dE (If3 t0 t1 t2)                   i x =
 dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
 dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
   dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
-  foldr union Empty
-    [ unit $ bigUnion [ x .= Int v /\ l .= Int start /\ h .= Int end | v <- [ start .. end ] ]
-    | start <- allInts'
-    , len   <- allInts'
-    , let end = start + len - 1
-    , end < numInt
-    ] >>> [a,l,b,h]
+  (let
+    mkSeq :: Int -> Int -> [ENV]
+    mkSeq lo hi = [ x .= Int v /\ l .= Int lo /\ h .= Int hi | v <- [ lo .. hi ] ]
+    allSeqs :: Set [ENV]
+    allSeqs = [ mkSeq start end
+              | start <- Set.mkSetUnsafe allInts'
+              , end   <- Set.mkSetUnsafe [ start .. numInt-1 ]
+              ]
+   in uncanon allSeqs
+  ) >>> [a,l,b,h]
     where (a, l) = fresh2 ("a", "l") [i, x] t
           (b, h) = fresh2 ("b", "h") [i, x] t
 dE t@(Array ts)                     i x =
@@ -257,15 +260,12 @@ dF f a r =
     | h <- hs -- list
     ]
   | hs <- Set.mkSetUnsafe allFUNs -- set
-  ] {- `Set.union`
-  [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
-                              | u <- allValues  -- list
-                              , Just v <- [applyPF h u]
-                              ]
-    | h <- hs -- list
-    ] 
-  | tt <- Set.mkSetUnsafe allTuples
-  ] XXX finish this -}
+  ] `Set.union`
+  [ [ f .= tt /\ a .= Int u /\ r .= (vs !! u)
+    | u <- [0 .. length vs - 1] -- list
+    ]
+  | tt@(Tuple vs) <- Set.mkSetUnsafe allTuples -- set
+  ]
 
 {-
 -- A hack to avoid iterating over so many values
