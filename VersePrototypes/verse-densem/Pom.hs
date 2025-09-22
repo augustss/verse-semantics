@@ -5,6 +5,7 @@ module Pom where
 import Control.Applicative
 import Control.Monad
 import Epic.List
+import qualified Data.List as L
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
@@ -163,11 +164,6 @@ fOR xs d@Unit{}  t i x =
                          , iq <- allInts
                          ]
 fOR xs (a :\/ b) t i x = fOR xs a t i x `union` fOR xs b t i x
-{-
-  fOR xs (a :++ b) t i x
-  `union`
-  fOR xs (b :++ a) t i x
--}
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
@@ -177,13 +173,19 @@ fOR xs (a :++ b) t i x =
         (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
         sings = bigUnion [ i .= tu1 `app` tu2 /\ x .= tv1 `app` tv2 /\
                            u1 .= tu1 /\ u2 .= tu2 /\ v1 .= tv1 /\ v2 .= tv2
-                         | tu1 <- allTuples
-                         , tu2 <- allTuples
-                         , tv1 <- allTuplesLenV (tupleLen tu1)
-                         , tv2 <- allTuplesLenV (tupleLen tu2)
+                         | tu1 <- allValuesOf u1 fora
+                         , tu2 <- allValuesOf u2 forb
+                         , tv1 <- allValuesOf v1 fora
+                         , tv2 <- allValuesOf v2 forb
                          ]
         app (Tuple xs) (Tuple ys) = Tuple (xs ++ ys)
         app _ _ = undefined
+
+allValuesOf :: Ident -> P ENV -> [Value]
+allValuesOf _ Empty = []
+allValuesOf x (a :++ b) = allValuesOf x a `L.union` allValuesOf x b
+allValuesOf x (a :\/ b) = allValuesOf x a `L.union` allValuesOf x b
+allValuesOf x (Unit d) = extractVar d x
 
 dE :: SrcEssential -> Ident -> Ident -> P ENV
 -- The denotational semantics itself (Fig 10)
@@ -301,7 +303,7 @@ t1=Variable a
 u=Ident noLoc "u"
 v=Ident noLoc "v"
 t0=DefineIE x (k0 `Choice` k1)
-t1=If3 t0 (Variable x) k3
+t1=For2 t0 (Variable x)
 
 {-
 ix :: [ ENV ] -> Int -> ENV
