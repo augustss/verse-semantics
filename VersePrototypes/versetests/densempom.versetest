@@ -47,6 +47,13 @@ testds("Tif5-2", pom, pass)         {x:nat; y:nat; if(x=7|y=3){x}else{fail}} {"{
 testds("Tif6-1", pom, pass) {x:int; if(x=1){1}else{0}; x=(2|1)}    {"{[{{u=v=1}}],[{{u=v=2}}]}"}
 testds("Tif6-2", pom, pass, broken) {x:int; if(x=2){1}else{0}; x=(2|1)}    {"{[{{u=v=2}}],[{{u=v=1}}]}"}
 
+# The crucial thing here is that Tim1a and Tim1b have the same RHS.
+# Ditto Tim2a and Tim2b
+testds("Tim1a", pom, pass) {x:=1|2}          {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("Tim1b", pom, pass) {x:=1|2; x=1|||2} {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("Tim2a", pom, pass) {x:=1|||2}        {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+testds("Tim2b", pom, pass) {x:=1|||2; x=1|2} {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+
 ############### all
 ###### these are skipped because pom densem does not implement all yet
 testds("all1", pom, pass, skip)  {all {(x:=1|2)}}           {"{[{{u=v=<1,2>}}]}"}
