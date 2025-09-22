@@ -872,11 +872,33 @@ const parseTypeDeclaration = (declarationType: 'class' | 'interface' | 'struct')
     }
   }
 
-  // Old syntax: Name := type...
+  // Old syntax: Name := type... or Name<specifier> := type...
   const nameResult = variable(currentState);
   if (!nameResult.success) return { success: false, error: `Expected ${declarationType} declaration`, state };
 
-  const assignResult = assignOp(nameResult.state);
+  let nameWithSpecifier = nameResult.value.token;
+  let afterName = nameResult.state;
+
+  // Check for specifier after the name (e.g., advanced_device<public>)
+  const leftAngleAfterNameResult = PC.char('<')(afterName);
+  if (leftAngleAfterNameResult.success) {
+    // Parse the specifier content until >
+    const specifierContentResult = PC.regex(/^[^>]+/)(leftAngleAfterNameResult.state);
+    if (specifierContentResult.success) {
+      const rightAngleAfterNameResult = PC.char('>')(specifierContentResult.state);
+      if (rightAngleAfterNameResult.success) {
+        // Include the specifier in the name token's text
+        nameWithSpecifier = {
+          ...nameResult.value.token,
+          text: nameResult.value.token.text + '<' + specifierContentResult.value + '>',
+          value: nameResult.value.token.value + '<' + specifierContentResult.value + '>'
+        };
+        afterName = rightAngleAfterNameResult.state;
+      }
+    }
+  }
+
+  const assignResult = assignOp(afterName);
   if (!assignResult.success) return { success: false, error: `Expected := after ${declarationType} name`, state };
 
   // Parse keyword with optional annotation (e.g., interface<abstract>)
@@ -945,7 +967,7 @@ const parseTypeDeclaration = (declarationType: 'class' | 'interface' | 'struct')
       success: true,
       value: AST.topLevelDeclaration(
         declarationType,
-        nameResult.value.token,
+        nameWithSpecifier,
         assignResult.value as AST.Token<':='>,
         keywordWithAnnotation as AST.Token<string>,
         colonResult.value,
@@ -973,7 +995,7 @@ const parseTypeDeclaration = (declarationType: 'class' | 'interface' | 'struct')
         success: true,
         value: AST.topLevelDeclaration(
           declarationType,
-          nameResult.value.token,
+          nameWithSpecifier,
           assignResult.value as AST.Token<':='>,
           keywordWithAnnotation as AST.Token<string>,
           undefined,
@@ -998,7 +1020,7 @@ const parseTypeDeclaration = (declarationType: 'class' | 'interface' | 'struct')
       success: true,
       value: AST.topLevelDeclaration(
         declarationType,
-        nameResult.value.token,
+        nameWithSpecifier,
         assignResult.value as AST.Token<':='>,
         keywordWithAnnotation as AST.Token<string>,
         undefined, // colon

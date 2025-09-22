@@ -171,3 +171,67 @@ export const memberName = (state: PC.ParserState): PC.ParserResult<string> => {
     state: { ...state, position: currentPos }
   };
 };
+
+// Field name parser - like identifier but allows keywords for object field names
+export const fieldName = (state: PC.ParserState): PC.ParserResult<string> => {
+  const startPos = state.position;
+  let currentPos = startPos;
+
+  if (currentPos >= state.input.length) {
+    return { success: false, error: 'Expected field name', state };
+  }
+
+  // First character must be letter or underscore
+  const firstChar = state.input[currentPos];
+  if (!/[a-zA-Z_]/.test(firstChar)) {
+    return { success: false, error: 'Expected field name', state };
+  }
+
+  currentPos++;
+
+  // Rest can be alphanumeric or underscore
+  while (currentPos < state.input.length && /[a-zA-Z0-9_]/.test(state.input[currentPos])) {
+    currentPos++;
+  }
+
+  const id = state.input.slice(startPos, currentPos);
+
+  // Don't reject keywords for field names - allow {continue := 1}, {class := foo}, etc.
+  return {
+    success: true,
+    value: id,
+    state: { ...state, position: currentPos }
+  };
+};
+
+// Field variable parser - like variable but allows keywords for object field names
+export const fieldVariable: PC.Parser<AST.Variable> = (state) => {
+  const startPos = state.position;
+
+  // Parse leading trivia
+  const leadingTriviaResult = trivia(state);
+  const afterTrivia = leadingTriviaResult.success ? leadingTriviaResult.state : state;
+  const leadingTrivia = leadingTriviaResult.success ? leadingTriviaResult.value : '';
+
+  // Parse field name (allows keywords)
+  const nameResult = fieldName(afterTrivia);
+  if (!nameResult.success) return nameResult;
+
+  // Parse trailing trivia
+  const trailingTriviaResult = trivia(nameResult.state);
+  const trailingTrivia = trailingTriviaResult.success ? trailingTriviaResult.value : '';
+  const finalState = trailingTriviaResult.success ? trailingTriviaResult.state : nameResult.state;
+
+  const nameToken = AST.token(
+    nameResult.value,
+    nameResult.value,
+    { leading: leadingTrivia, trailing: trailingTrivia },
+    { start: startPos, end: finalState.position }
+  );
+
+  return {
+    success: true,
+    value: AST.variable(nameToken, { start: startPos, end: finalState.position }),
+    state: finalState
+  };
+};

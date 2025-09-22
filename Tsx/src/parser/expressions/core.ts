@@ -9,7 +9,7 @@ import * as AST from '../../ast';
 import { integer, floatLiteral } from '../literals/numbers';
 import { booleanLiteral } from '../literals/booleans';
 import { stringLiteral } from '../literals/strings';
-import { variable, memberName } from '../literals/identifiers';
+import { variable, memberName, fieldVariable } from '../literals/identifiers';
 import { withTriviaLiteral } from '../foundation/tokens';
 import { addOp, mulOp, unaryMinusOp } from '../operators/arithmetic';
 import { compareOp } from '../operators/comparison';
@@ -296,7 +296,7 @@ callExpr = (state) => {
       let hasValidFields = false;
       while (true) {
         // Parse field name
-        const nameResult = variable(fieldState);
+        const nameResult = fieldVariable(fieldState);
         if (!nameResult.success) {
           // If we haven't parsed any valid fields and can't parse a field name,
           // this might be malformed object construction
@@ -403,7 +403,7 @@ callExpr = (state) => {
           let nextState = triviaResult.success ? triviaResult.state : fieldState;
 
           // Try to parse another field name to see if we should continue
-          const nextNameResult = variable(nextState);
+          const nextNameResult = fieldVariable(nextState);
           if (nextNameResult.success) {
             // There's another field after trivia, continue parsing
             fieldState = nextState;
@@ -641,7 +641,7 @@ callExpr = (state) => {
       // Parse field assignments on indented lines
       while (true) {
         // Parse field name
-        const nameResult = variable(fieldState);
+        const nameResult = fieldVariable(fieldState);
         if (!nameResult.success) break;
 
         // Expect := operator for field assignment
@@ -1229,6 +1229,7 @@ assignmentExpr = (state) => {
     if (leftResult.value.type === 'Variable') {
       const bodyResult = assignmentExpr(arrowResult.state);
       if (bodyResult.success) {
+        // Note: () is a valid unit expression, not an empty expression, so we allow all parsed expressions
         return {
           success: true,
           value: AST.lambdaExpression(
@@ -1298,6 +1299,9 @@ setLoopExprParser(() => expr);
 
 // Export the modular expression parser
 export const modularExpr = expr;
+
+// Export a parser that stops before lambda/assignment expressions (for case patterns)
+export const modularExprNoLambda = () => logicalExpr;
 
 /**
  * Parse an expression using modular components

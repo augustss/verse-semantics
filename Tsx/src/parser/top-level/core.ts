@@ -241,7 +241,8 @@ const programParser: PC.Parser<AST.Program> = (state) => {
           break;
         }
 
-        // For now, just consume the expression
+        // Add the successfully parsed expression to declarations
+        declarations.push(exprResult.value);
         currentState = exprResult.state;
 
         // If we consumed the entire input, we're done

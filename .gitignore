@@ -78,3 +78,8 @@ Spec/verse-densem-planA.tex
 /VerseRocq/verse/.lia.cache
 Spec/densem-ess-sls.tex
 Spec/densem-ess-ls.tex
+Tsx/extract_failing_tests.js
+Tsx/tests/failing-tests.parseset
+Tsx/analyze_all_verse.js
+Tsx/analyze_specific_patterns.js
+Tsx/analyze_verse_files.js

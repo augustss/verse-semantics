@@ -5,11 +5,20 @@
 import * as PC from '../../parser-combinators';
 import { isNewline, isWhitespace } from './helpers';
 
-// Parse line comment starting with #
+// Parse line comment starting with # or ## (doc comments)
 export const lineComment: PC.Parser<string> = (state) => {
   if (state.position < state.input.length && state.input[state.position] === '#') {
-    // Find the end of the line or end of input
+    // Check if it's a doc comment (##) or regular comment (#)
+    // Both are handled the same way for parsing purposes
+    let startIndex = state.position;
     let endIndex = state.position + 1;
+
+    // If it's a doc comment, include the second #
+    if (endIndex < state.input.length && state.input[endIndex] === '#') {
+      endIndex++;
+    }
+
+    // Find the end of the line or end of input
     while (endIndex < state.input.length && !isNewline(state.input[endIndex])) {
       endIndex++;
     }
@@ -17,7 +26,7 @@ export const lineComment: PC.Parser<string> = (state) => {
     if (endIndex < state.input.length && isNewline(state.input[endIndex])) {
       endIndex++;
     }
-    const comment = state.input.slice(state.position, endIndex);
+    const comment = state.input.slice(startIndex, endIndex);
     return {
       success: true,
       value: comment,

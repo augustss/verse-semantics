@@ -6,6 +6,8 @@ import * as PC from '../../parser-combinators';
 import * as AST from '../../ast';
 import { leftParen, rightParen, leftBrace, rightBrace, colon, comma, arrowOp } from '../operators/punctuation';
 import { withTriviaLiteral } from '../foundation/tokens';
+import { parseIndentedStatements } from './shared-indented';
+import { modularExprNoLambda } from '../expressions/core';
 
 // We'll get the expression parser passed in via a getter to avoid circular dependencies
 let getExpr: () => PC.Parser<AST.Expr>;
@@ -43,36 +45,16 @@ const parseCaseBranch: PC.Parser<AST.CaseBranch> = (state) => {
       );
       afterPattern = identifierResult.state;
     } else {
-      // Fall back to full expression parsing for more complex patterns
-      if (!getExpr) {
-        return { success: false, error: 'Expression parser not initialized', state };
-      }
+      // Fall back to expression parsing for more complex patterns
+      // Use the no-lambda parser to avoid consuming => as part of a lambda
+      const exprResult = modularExprNoLambda()(state);
 
-      // Use a limited expression parser that stops at arrows
-      // We'll use peek to check if there's an arrow nearby
-      const peekAhead = state.input.slice(state.position, state.position + 50);
-      const arrowIndex = peekAhead.indexOf('=>');
-
-      if (arrowIndex === -1) {
-        return { success: false, error: 'Expected => in case branch', state };
-      }
-
-      // Parse only up to the arrow
-      const beforeArrowText = peekAhead.slice(0, arrowIndex).trim();
-      const patternResult = getExpr()({ input: beforeArrowText, position: 0 });
-
-      if (!patternResult.success) {
+      if (!exprResult.success) {
         return { success: false, error: 'Expected pattern in case branch', state };
       }
 
-      pattern = patternResult.value;
-      afterPattern = { ...state, position: state.position + beforeArrowText.length };
-
-      // Skip any whitespace before the arrow
-      while (afterPattern.position < state.input.length &&
-             /\s/.test(state.input[afterPattern.position])) {
-        afterPattern = { ...afterPattern, position: afterPattern.position + 1 };
-      }
+      pattern = exprResult.value;
+      afterPattern = exprResult.state;
     }
   }
 
@@ -255,51 +237,84 @@ export const caseExpression: PC.Parser<AST.Expr> = (state) => {
     style = 'indentation';
     bodyState = colonResult.state;
 
-    // Use simpler parsing approach - just parse branches sequentially
-    // Skip whitespace and newlines to get to first branch
+    // Skip to next line and get base indentation
+    while (bodyState.position < bodyState.input.length &&
+           bodyState.input[bodyState.position] !== '\n') {
+      bodyState = { ...bodyState, position: bodyState.position + 1 };
+    }
+    if (bodyState.position < bodyState.input.length) {
+      bodyState = { ...bodyState, position: bodyState.position + 1 }; // Skip newline
+    }
+
+    let baseIndent: number | undefined = undefined;
+
+    // Parse indented branches
     while (bodyState.position < bodyState.input.length) {
-      const char = bodyState.input[bodyState.position];
-      if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
-        bodyState = { ...bodyState, position: bodyState.position + 1 };
-      } else {
-        break;
-      }
-    }
+      const lineStart = bodyState.position;
 
-    // Parse first branch (required)
-    const firstBranchResult = parseCaseBranch(bodyState);
-    if (!firstBranchResult.success) {
-      return { success: false, error: 'Expected case branch after :', state };
-    }
-
-    branches.push(firstBranchResult.value);
-    bodyState = firstBranchResult.state;
-
-    // Parse additional branches
-    while (true) {
-      // Skip whitespace and newlines
+      // Count indentation
+      let indentLevel = 0;
       while (bodyState.position < bodyState.input.length) {
         const char = bodyState.input[bodyState.position];
-        if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+        if (char === ' ') {
+          indentLevel++;
+          bodyState = { ...bodyState, position: bodyState.position + 1 };
+        } else if (char === '\t') {
+          indentLevel += 4;
           bodyState = { ...bodyState, position: bodyState.position + 1 };
         } else {
           break;
         }
       }
 
-      // Check if we're at the end of input
-      if (bodyState.position >= bodyState.input.length) {
+      // Check for empty line
+      if (bodyState.position >= bodyState.input.length ||
+          bodyState.input[bodyState.position] === '\n' ||
+          bodyState.input[bodyState.position] === '\r') {
+        if (bodyState.position < bodyState.input.length) {
+          bodyState = { ...bodyState, position: bodyState.position + 1 };
+        }
+        continue;
+      }
+
+      // Check indentation level
+      if (baseIndent === undefined) {
+        if (indentLevel === 0) {
+          // No indentation means we're done
+          bodyState = { ...bodyState, position: lineStart };
+          break;
+        }
+        baseIndent = indentLevel;
+      } else if (indentLevel < baseIndent) {
+        // Dedented - we're done
+        bodyState = { ...bodyState, position: lineStart };
         break;
       }
 
-      // Try to parse another branch
-      const nextBranchResult = parseCaseBranch(bodyState);
-      if (!nextBranchResult.success) {
+      // Parse branch starting from line start to include indentation as trivia
+      const branchStateWithIndent = { ...bodyState, position: lineStart };
+      const branchResult = parseCaseBranch(branchStateWithIndent);
+
+      if (!branchResult.success) {
         break;
       }
 
-      branches.push(nextBranchResult.value);
-      bodyState = nextBranchResult.state;
+      branches.push(branchResult.value);
+      bodyState = branchResult.state;
+
+      // Move to next line
+      while (bodyState.position < bodyState.input.length &&
+             bodyState.input[bodyState.position] !== '\n' &&
+             bodyState.input[bodyState.position] !== '\r') {
+        bodyState = { ...bodyState, position: bodyState.position + 1 };
+      }
+      if (bodyState.position < bodyState.input.length) {
+        bodyState = { ...bodyState, position: bodyState.position + 1 };
+      }
+    }
+
+    if (branches.length === 0) {
+      return { success: false, error: 'Expected case branches after :', state };
     }
 
     return {

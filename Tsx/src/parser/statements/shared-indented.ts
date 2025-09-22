@@ -185,12 +185,16 @@ export const parseIndentedStatements = (
     const startsWithBrace = firstNonWhitespace < currentState.input.length &&
                            currentState.input[firstNonWhitespace] === '{';
 
-    // Check if this is an if expression that might have multi-line structure
-    const isIfExpression = exprResult.value.type === 'IfExpression';
+    // Check if this is an expression that might have multi-line structure
+    const isMultiLineExpression = exprResult.value.type === 'IfExpression' ||
+                                 exprResult.value.type === 'CaseExpression' ||
+                                 exprResult.value.type === 'ForExpression' ||
+                                 exprResult.value.type === 'ObjectConstruction' ||
+                                 exprResult.value.type === 'Block';
 
     // Make sure the expression didn't consume beyond the current line
-    // UNLESS it's a braced block OR an if expression (which can have else clauses on subsequent lines)
-    if (!startsWithBrace && !isIfExpression && exprResult.state.position > lineEnd) {
+    // UNLESS it's a braced block OR a multi-line expression (which can span multiple lines)
+    if (!startsWithBrace && !isMultiLineExpression && exprResult.state.position > lineEnd) {
       // Limit the expression's extent to the current line
       exprResult.state = { ...exprResult.state, position: lineEnd };
     }
@@ -198,9 +202,9 @@ export const parseIndentedStatements = (
     statements.push(exprResult.value);
 
     // Move to the next position after the expression
-    // For braced blocks and if expressions, use the expression's end position
+    // For braced blocks and multi-line expressions, use the expression's end position
     // For single-line expressions, move to the end of the current line
-    if (startsWithBrace || isIfExpression) {
+    if (startsWithBrace || isMultiLineExpression) {
       // The expression consumed multiple lines, continue from where it ended
       currentState = exprResult.state;
     } else {
