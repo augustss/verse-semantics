@@ -1,0 +1,527 @@
+#! Valid Expression
+# 1. Empty object constructor
+Point{}
+
+#! Valid Expression
+# 2. Single field object without spaces
+Point{x:=1}
+
+#! Valid Expression
+# 3. Single field object with spaces
+Point{ x := 1 }
+
+#! Valid Expression
+# 4. Two field object without spaces
+Point{x:=1, y:=2}
+
+#! Valid Expression
+# 5. Two field object with spaces
+Point{ x := 1, y := 2 }
+
+#! Valid Expression
+# 6. Three field object without spaces
+Point{x:=1,y:=2,z:=3}
+
+#! Valid Expression
+# 7. Three field object with spaces
+Point{ x := 1 , y := 2 , z := 3 }
+
+#! Valid Expression
+# 8. Object fields with arithmetic expressions
+vec3{x:=a+b, y:=f(c), z:=d-e}
+
+#! Valid Expression
+# 9. Object fields with spaced arithmetic expressions
+vec3{ x := a + b, y := f(c), z := d - e }
+
+#! Valid Expression
+# 10. Nested object construction
+Player{name:=playerName, pos:=Point{x:=0, y:=0}}
+
+#! Valid Expression
+# 11. Object with indentation style syntax
+Point:
+  x := 1
+  y := 2
+
+#! Valid Expression
+# 12. Three field indentation style object
+Point:
+  x := 1
+  y := 2
+  z := 3
+
+#! Valid Expression
+# 13. Indentation style with variable assignments
+Player:
+  name := playerName
+  x := 10
+  y := 20
+
+#! Valid Expression
+# 14. Multiline object with arithmetic in fields
+Config{
+  width := 800,
+  height := 600,
+  ratio := width + height
+}
+
+#! Valid Expression
+# 15. Object as left operand in binary expression
+Point{x:=1, y:=2} + offset
+
+#! Valid Expression
+# 16. Object as right operand in binary expression
+offset + Point{x:=1, y:=2}
+
+#! Valid Expression
+# 17. Objects on both sides of binary operator
+Point{x:=1, y:=2} + Vector{dx:=3, dy:=4}
+
+#! Valid Expression
+# 18. Object wrapped in parentheses
+(Point{x:=1, y:=2})
+
+#! Valid Expression
+# 19. Parenthesized object in binary expression
+(Point{x:=1, y:=2}) + offset
+
+#! Valid Expression
+# 20. Object as function argument
+moveTo(Point{x:=100, y:=200})
+
+#! Valid Expression
+# 21. Multiple objects as function arguments
+drawLine(Point{x:=0, y:=0}, Point{x:=100, y:=100})
+
+#! Valid Expression
+# 22. Object with function calls in fields
+Config{handler:=getHandler(), timeout:=getTimeout()}
+
+#! Valid Expression
+# 23. Object field with binary expression
+Rectangle{area:=width + height}
+
+#! Valid Expression
+# 24. Object field with complex parenthesized expression
+Stats{total:=(base + bonus) - penalty}
+
+#! Valid Expression
+# 25. Object with nested object in field
+Game{player:=Character{name:=hero}}
+
+#! Valid Expression
+# 26. Object with mixed function call styles
+Settings{
+  items:=getItems[0],
+  handler:=getHandler(),
+  filters:=getFilters[all]
+}
+
+#! Valid Expression
+# 27. Indentation style object in binary expression
+a + Point:
+  x := 1
+  y := 2
+
+#! Valid Expression
+# 28. Object with trailing spaces and line comment
+Point{  x:=1  ,  y:=2  }  # end comment
+
+#! Valid Expression
+# 29. Object with object-typed fields
+Matrix{
+  row1:=Vector{x:=1, y:=0, z:=0},
+  row2:=Vector{x:=0, y:=1, z:=0},
+  row3:=Vector{x:=0, y:=0, z:=1}
+}
+
+#! Valid Expression
+# 30. Object fields with complex arithmetic
+Values{
+  sum:=a + b + c,
+  difference:=a - b,
+  product:=a + b - c + d
+}
+
+#! Valid Expression
+# 31. Empty object in binary expression
+Container{} + data
+
+#! Valid Expression
+# 32. Object with single character field names
+P{x:=1, y:=2, z:=3}
+
+#! Valid Expression
+# 33. Object with underscore field names
+My_Class{field_one:=1, field_two:=2}
+
+#! Valid Expression
+# 34. Complex nested expression with objects
+result + Game{
+  state:=Running{time:=100},
+  score:=(points + bonus) - penalty
+}
+
+#! Valid Expression
+# 35. Object with trailing comma
+Point{x:=1,}
+
+#! Valid Expression
+# 36. Object fields with arithmetic expressions
+Rectangle{width:=100+50, height:=200-50}
+
+#! Valid Expression
+# 37. Object fields with function calls
+Config{debug:=isDebug(), port:=getPort()}
+
+#! Valid Expression
+# 38. Object with bracket-style function calls in fields
+Settings{items:=getItems[0], count:=len[items]}
+
+#! Valid Expression
+# 39. Multiline nested object construction
+Player{
+  pos:=Point{x:=0, y:=0},
+  velocity:=Vector{x:=1, y:=0, z:=0}
+}
+
+#! Valid Expression
+# 40. Deeply nested object hierarchy
+Game{
+  player:=Player{
+    pos:=Point{x:=10, y:=20},
+    inventory:=Items{count:=5}
+  }
+}
+
+#! Valid Expression
+# 41. Object with self-referencing field expressions
+Stats{
+  health:=100,
+  damage:=health - 20,
+  total:=damage + 10
+}
+
+#! Valid Expression
+# 42. Object with inline comments
+Person{ # creating person
+  name := userName, # user's name
+  age := 25 # default age
+}
+
+#! Valid Expression
+# 43. Multiline object with line breaks
+Person{
+  name := userName,
+  age := 25,
+  city := userCity
+}
+
+#! Valid Expression
+# 44. Complex transform object with nested constructors
+Transform{
+  position:=vec3{x:=a + b, y:=c + d, z:=0},
+  rotation:=quaternion{w:=1, x:=0, y:=0, z:=0},
+  scale:=vec3{x:=1, y:=1, z:=1}
+}
+
+#! Valid Expression
+# 45. Empty indentation style object
+MyClass:
+
+#! Valid Expression
+# 46. Single field indentation style
+Point:
+  x := 42
+
+#! Valid Expression
+# 47. Multiple field indentation style
+Vector:
+  x := 1
+  y := 2
+  z := 3
+
+#! Valid Expression
+# 48. Indentation style with arithmetic
+Rectangle:
+  width := 100 + 50
+  height := 200 - 50
+
+#! Valid Expression
+# 49. Indentation style with function calls
+Config:
+  debug := isDebug()
+  port := getPort()
+
+#! Valid Expression
+# 50. Mixed indentation and brace styles
+Player:
+  pos := Point{x:=0, y:=0}
+  velocity := Vector{x:=1, y:=0, z:=0}
+
+#! Valid Expression
+# 51. Indentation style with comments
+Person: # creating person
+  name := userName # user's name
+  age := 25 # default age
+
+#! Valid Expression
+# 52. Object with nested arithmetic and objects
+result{value:=Point{x:=1, y:=2} + Vector{dx:=3, dy:=4}}
+
+#! Valid Expression
+# 53. Object as function argument
+draw(Point{x:=100, y:=200})
+
+#! Valid Expression
+# 54. Object in bracket-style function call
+process[Config{debug:=true, verbose:=false}]
+
+#! Valid Expression
+# 55. Multiple objects in function call
+connect(Server{host:=localhost, port:=8080}, Client{id:=123})
+
+#! Valid Expression
+# 56. Object with parenthesized field expression
+Shape{area:=(width + 10) - (height - 5)}
+
+#! Valid Expression
+# 57. Compact object without spaces
+Compact{a:=1,b:=2,c:=3}
+
+#! Valid Expression
+# 58. Object with excessive spacing
+Spaced  {  a  :=  1  ,  b  :=  2  ,  c  :=  3  }
+
+#! Valid Expression
+# 59. Object with multiline comment
+Point{<# coordinates #>x:=1, y:=2}
+
+#! Valid Expression
+# 60. Complex indentation style with mixed constructs
+GameState:
+  player := Player{name:=hero, level:=10}
+  enemies := count[hostiles]
+  score := points + bonus
+  time := getCurrentTime()
+
+#! Valid Expression
+# 61. Object field containing another object
+Container{item:=Box{size:=10}}
+
+#! Valid Expression
+# 62. Object with long descriptive field names
+DatabaseConfiguration{
+  connectionString := getConnectionString(),
+  maxConnections := 100,
+  timeoutInMilliseconds := 30000
+}
+
+#! Valid Expression
+# 63. Simple nested object
+Player{pos:=Point{x:=0, y:=0}}
+
+#! Valid Expression
+# 64. Double nested object
+Game{player:=Player{pos:=Point{x:=10, y:=20}}}
+
+#! Valid Expression
+# 65. Triple nested object hierarchy
+World{
+  game:=Game{
+    player:=Player{
+      pos:=Point{x:=10, y:=20}
+    }
+  }
+}
+
+#! Valid Expression
+# 66. Multiple nested objects at same level
+Character{
+  position:=Point{x:=100, y:=200},
+  velocity:=Vector{x:=1, y:=0, z:=0},
+  stats:=Stats{health:=100, mana:=50}
+}
+
+#! Valid Expression
+# 67. Entity with transform component
+Entity{
+  transform:=Transform{
+    pos:=Vec3{x:=px + 10, y:=py - 5, z:=0},
+    rot:=Quat{w:=1, x:=0, y:=0, z:=0}
+  }
+}
+
+#! Valid Expression
+# 68. Deeply nested configuration object
+App{
+  config:=Config{
+    server:=Server{
+      host:=localhost,
+      port:=8080,
+      ssl:=SSL{
+        cert:=getCert(),
+        key:=getKey()
+      }
+    },
+    client:=Client{
+      timeout:=30000,
+      retry:=RetryPolicy{
+        maxAttempts:=3,
+        backoff:=exponential
+      }
+    }
+  }
+}
+
+#! Valid Expression
+# 69. Mixed indentation and brace styles in nesting
+GameState:
+  player := Player{
+    name := heroName,
+    inventory := Inventory{
+      items := getItems(),
+      capacity := 20
+    }
+  }
+  world := World{
+    size := worldSize
+  }
+
+#! Valid Expression
+# 70. Array-like function with object arguments
+makeList[
+  Item{id:=1, name:=sword},
+  Item{id:=2, name:=shield},
+  Item{id:=3, name:=potion}
+]
+
+#! Valid Expression
+# 71. Nested object in arithmetic expression
+Point{x:=10, y:=20} + Offset{dx:=Vector{x:=1, y:=0}, scale:=2}
+
+#! Valid Expression
+# 72. Nested objects with extensive comments
+Player{ # main player
+  pos:=Point{ # position
+    x:=0, # x coordinate
+    y:=0  # y coordinate
+  },
+  stats:=Stats{ # player stats
+    health:=100
+  }
+}
+
+#! Valid Expression
+# 73. Complex scene object with multiple components
+Scene{
+  camera:=Camera{
+    position:=getPosition(),
+    target:=Point{x:=0, y:=0, z:=0},
+    fov:=calculateFOV[aspect]
+  },
+  lights:=Lights{
+    ambient:=Color{r:=20, g:=20, b:=20},
+    directional:=Light{
+      direction:=normalize[Vector{x:=1, y:=1, z:=1}],
+      color:=Color{r:=255, g:=255, b:=255}
+    }
+  }
+}
+
+#! Valid Expression
+# 74. Configuration with handler array
+Config{
+  handlers:=getHandlers[
+    Handler{
+      fn:=onCreate(),
+      priority:=1
+    }
+  ]
+}
+
+#! Valid Expression
+# 75. Quadruple nested object chain
+A{b:=B{c:=C{d:=D{e:=1}}}}
+
+#! Valid Expression
+# 76. Object containing empty nested object
+Container{empty:=Empty{}}
+
+#! Valid Expression
+# 77. Complex UI object with calculations
+UI{
+  window:=Window{
+    pos:=Point{x:=(screenWidth - width) + 2, y:=(screenHeight - height) + 2},
+    size:=Size{width:=800, height:=600},
+    content:=Panel{
+      layout:=Grid{rows:=3, cols:=4},
+      children:=getChildren()
+    }
+  }
+}
+
+#! Valid Expression
+# 78. Recursive same-type nesting
+Box{
+  inner:=Box{
+    inner:=Box{
+      value:=42
+    }
+  }
+}
+
+#! Valid Expression
+# 79. Pure indentation style nesting
+World:
+  terrain := Terrain:
+    height := 100
+    width := 100
+  player := Player:
+    x := 50
+    y := 50
+
+#! Valid Expression
+# 80. Mixed indentation and brace style deep nesting
+Game:
+  state := Running{
+    time := 0,
+    score := Score{
+      current := 0,
+      high := getHighScore()
+    }
+  }
+
+#! Valid Expression
+# 81. Complex nested object as function argument
+process(Request{
+  header:=Header{
+    auth:=Auth{token:=getToken()},
+    contentType:=json
+  },
+  body:=Body{
+    data:=getData()
+  }
+})
+
+#! Valid Expression
+# 82. Multi-level object with varying field counts
+Root{
+  a:=Level1{
+    b:=Level2{
+      c:=1,
+      d:=2,
+      e:=Level3{
+        f:=3,
+        g:=4,
+        h:=5,
+        i:=6
+      }
+    },
+    j:=Level2{
+      k:=7
+    }
+  },
+  l:=8
+}

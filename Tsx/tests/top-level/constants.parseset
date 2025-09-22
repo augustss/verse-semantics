@@ -1,0 +1,99 @@
+#! Valid expression
+# 1. Simple const declaration without type
+x := 42
+
+#! Valid expression
+# 2. Const with expression value
+y := x + 10
+
+#! Valid expression
+# 3. Const with type annotation
+x : int = 42
+
+#! Valid expression
+# 4. Const with type and complex value
+sum : int = a + b
+
+#! Valid expression
+# 5. Const with function call
+result := f(x, y)
+
+#! Valid expression
+# 6. Const with type and function call
+data : string = getName()
+
+#! Valid expression
+# 7. Const with object value
+point := Point{x:=10, y:=20}
+
+#! Valid expression
+# 8. Const with type and object
+player : Player = Player{name:=playerName}
+
+#! Valid expression
+# 9. Const with parenthesized expression
+value := (a + b) - c
+
+#! Valid expression
+# 10. Const with block value
+result := { x + y; z }
+
+#! Valid expression
+# 11. Const with whitespace preservation
+x  :=  42
+
+#! Valid expression
+# 12. Const with type and spaces
+x   :   int   =   42
+
+#! Valid expression
+# 13. Const with comments
+x # name
+  := # assignment
+  42 # value
+
+#! Valid expression
+# 14. Const with type and comments
+x # name
+  : int # type
+  = 42 # value
+
+#! Valid expression
+# 15. Multiple const declarations in block
+{
+  x := 10;
+  y := 20;
+  x + y
+}
+
+#! Valid expression
+# 16. Mixed const and var declarations
+{
+  var a : int = 5;
+  b := 10;
+  c : int = 15;
+  a + b + c
+}
+
+#! Valid expression
+# 17. Const with nested indented object
+config := Player:
+  name := playerName
+  x := 10
+  y := 20
+
+#! Error expression
+# 18. Invalid syntax - random symbols
+$$$invalid$$$
+
+#! Valid expression
+# 19. Const with square bracket function call
+items := getData[1, 2, 3]
+
+#! Valid expression
+# 20. Const with multiline comment
+x <# const declaration #> := 42
+
+#! Valid expression
+# 21. Const with line comment
+y := 10 # initial value

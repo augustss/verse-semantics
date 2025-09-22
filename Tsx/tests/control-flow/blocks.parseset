@@ -1,0 +1,163 @@
+#! Valid expression
+# 1. Simple block with braces
+{ x + y }
+
+#! Valid expression
+# 2. Block with single statement and semicolon
+{ x + y; }
+
+#! Valid expression
+# 3. Block with multiple statements
+{ x + 1; y - 2; z + 3 }
+
+#! Valid expression
+# 4. Block with multiple statements and trailing semicolon
+{ a; b; c; }
+
+#! Valid expression
+# 5. Empty block
+{ }
+
+#! Valid expression
+# 6. Block with complex expressions
+{
+  f(x);
+  Point{x:=10, y:=20};
+  a + b
+}
+
+#! Valid expression
+# 7. Nested blocks
+{
+  x + 1;
+  {
+    y + 2;
+    z + 3
+  };
+  w + 4
+}
+
+#! Valid expression
+# 8. Block with comments
+{
+  # first statement
+  x + 1;
+  # second statement
+  y + 2  # inline comment
+}
+
+#! Valid expression
+# 9. Block with various expressions
+{
+  42;
+  variable;
+  f(a, b);
+  obj{field:=value};
+  (x + y) - z
+}
+
+#! Valid expression
+# 10. Indented block style
+block:
+  x + 1
+  y + 2
+  z + 3
+
+#! Valid expression
+# 11. Indented block with semicolons
+block:
+  x + 1;
+  y + 2;
+  z + 3
+
+#! Valid expression
+# 12. Indented block with mixed content
+block:
+  f(x)
+  Point{x:=10, y:=20}
+  a + b
+
+#! Valid expression
+# 13. Nested indented blocks
+block:
+  x + 1
+  block:
+    y + 2
+    z + 3
+  w + 4
+
+#! Valid expression
+# 14. Block in expression
+x + { a; b; c } + y
+
+#! Valid expression
+# 15. Block as function argument
+f({ x; y; z })
+
+#! Valid expression
+{
+  Point{x:=10, y:=20};
+  { a + b; c + d };
+  result
+}
+
+#! Valid expression
+# 16. Statements with all expression types
+{
+  123;
+  variable;
+  x + y;
+  f(a);
+  g[b];
+  Obj{x:=1};
+  (expression)
+}
+
+#! Valid expression
+# 17. Block with whitespace preservation
+{  x  ;  y  ;  z  }
+
+#! Valid expression
+# 18. Indented block with comments
+block: # block start
+  x + 1  # first
+  y + 2  # second
+  z + 3  # third
+
+#! Valid expression
+# 19. Mixed semicolons
+{
+  a;
+  b + c;
+  d
+}
+
+#! Valid expression
+# 20. Indented block with optional semicolons preserved
+block:
+  x + 1;
+  y + 2
+  z + 3;
+
+#! Valid expression
+# 21. All semicolons in indented block
+block:
+  a;
+  b;
+  c;
+
+#! Valid expression
+# 22. No semicolons in indented block
+block:
+  a
+  b
+  c
+
+#! Valid expression
+# 23. Mixed semicolons preserved in nested indented blocks
+block:
+  outer1;
+  block:
+    inner1
+    inner2;
+  outer2

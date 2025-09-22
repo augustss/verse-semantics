@@ -1,0 +1,97 @@
+#! Valid TopLevel
+# 1. Using statement with simple path
+using { std }
+
+#! Valid TopLevel
+# 2. Using statement with absolute path
+using { /std/io }
+
+#! Valid TopLevel
+# 3. Using statement with nested path
+using { /std/collections/map }
+
+#! Valid TopLevel
+# 4. Multiple using statements in program
+using { std }
+using { /io }
+using { math/complex }
+
+#! Valid TopLevel
+# 5. Simple const declaration
+myValue := 42
+
+#! Valid TopLevel
+# 6. String const declaration
+name := "Alice"
+
+#! Valid TopLevel
+# 7. Expression const declaration
+result := x + y
+
+#! Valid TopLevel
+# 8. Function declaration
+add(x, y) := x + y
+
+#! Valid TopLevel
+# 9. Function with single parameter
+square(x) := x * x
+
+#! Valid TopLevel
+# 10. Const declaration with function call
+value := f(42)
+
+#! Valid TopLevel
+# 11. Const declaration with object construction
+point := Point{x:=10, y:=20}
+
+#! Valid TopLevel
+# 12. Const declaration with expression
+PI := 3.14159
+
+#! Valid TopLevel
+# 13. Function declaration with string concatenation
+greet(name) := "Hello, " + name
+
+#! Valid TopLevel
+# 14. Function declaration returning zero
+area() := 0
+
+#! Valid TopLevel
+# 15. Multiple const declarations with zero values
+x := 0
+
+#! Valid TopLevel
+# 16. Const declaration with integer
+Red := 0
+
+#! Valid TopLevel
+# 17. Function declaration with simple return
+println(x) := x
+
+#! Valid TopLevel
+# 18. Complex program with using statements and declarations
+using { std }
+using { /io }
+
+main() := "Hello World"
+
+#! Valid TopLevel
+# 19. Function with comments throughout
+# Mathematical function
+add(x, y) := x + y # Add two numbers
+
+#! Valid TopLevel
+# 20. Multiple const declarations
+firstName := "John"
+
+#! Valid TopLevel
+# 21. Function declarations
+format(s) := s
+
+#! Valid TopLevel
+# 22. Multiple top-level declarations in one program
+y := 0
+
+z := 0
+
+calculate(p1, p2) := 0

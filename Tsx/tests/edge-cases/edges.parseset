@@ -1,0 +1,116 @@
+#! Valid expression
+# 1. Empty block
+{}
+
+#! Valid expression
+# 2. Block with only semicolon
+{;}
+
+#! Valid expression
+# 3. Single character variable
+x
+
+#! Valid expression
+# 4. Very long identifier
+thisIsAVeryLongIdentifierNameThatTestsTheParserWithReallyLongNames
+
+#! Valid expression
+# 5. Number with leading zeros
+007
+
+#! Valid expression
+# 6. Decimal number with trailing zeros
+123.000
+
+#! Valid expression
+# 7. Very small decimal
+0.001
+
+#! Valid expression
+# 8. Function with no arguments
+f()
+
+#! Valid expression
+# 9. Empty string
+""
+
+#! Valid expression
+# 10. String with only spaces
+"   "
+
+#! Valid expression
+# 11. String with escape characters
+"hello\nworld\ttab"
+
+#! Error expression
+# 12. Object with empty field value
+Point{x := , y := 1}
+
+#! Error expression
+# 13. Whitespace only expression
+
+
+#! Error expression
+# 14. Expression with only comments
+<# this is just a comment #>
+
+#! Valid expression
+# 15. Multiple empty lines with expression
+
+
+42
+
+
+#! Error expression
+# 16. Function call with trailing comma
+f(1, 2, 3,)
+
+#! Error expression
+# 17. Function call with square brackets and trailing comma
+f[1, 2, 3,]
+
+#! Valid expression
+# 18. Object construction with trailing comma
+Point{x := 1, y := 2,}
+
+#! Valid expression
+# 19. Nested empty blocks
+{{}}
+
+#! Error expression
+# 20. Expression with unicode characters
+变量名
+
+#! Valid expression
+# 21. Very deeply nested parentheses
+((((((((((x))))))))))
+
+#! Valid expression
+# 22. Range with same start and end
+5..5
+
+#! Valid expression
+# 23. Negative numbers in range
+-10..-5
+
+#! Valid expression
+# 24. Range with expressions
+(a + 1)..(b - 1)
+
+#! Valid expression
+# 25. Empty for loop body
+for(x : items) {}
+
+#! Valid expression
+# 26. If expression with empty then block
+if(condition) then: {}
+
+#! Valid expression
+# 27. Complex whitespace preservation
+x    +    y    *    z
+
+#! Valid expression
+# 28. Mixed line ending styles
+x +
+y
+ 

@@ -1,0 +1,84 @@
+#! Valid expression
+f (   
+
+)
+
+#! Valid expression
+f(    x )
+
+#! Valid expression
+f(1, 2)
+
+#! Valid expression
+f(1, 2, 3)
+
+#! Valid expression
+add(x, y)
+
+#! Valid expression
+f(x + y)
+
+#! Valid expression
+f(g(x))
+
+#! Valid expression
+f(1 + 2, 3 - 4)
+
+#! Valid expression
+f(g(x, y), h(z))
+
+#! Valid expression
+a + f(b)
+
+#! Valid expression
+a + f(b + c)
+
+#! Valid expression
+f(a) + g(b)
+
+#! Valid expression
+# 1. Square bracket function calls
+f[]
+
+#! Valid expression
+f[x]
+
+#! Valid expression
+f[1, 2]
+
+#! Valid expression
+f[1, 2, 3]
+
+#! Valid expression
+add[x, y]
+
+#! Valid expression
+f[x + y]
+
+#! Valid expression
+f[g[x]]
+
+#! Valid expression
+f[1 + 2, 3 - 4]
+
+#! Valid expression
+f[g(x, y), h[z]]
+
+#! Valid expression
+a + f[b]
+
+#! Valid expression
+a + f[b + c]
+
+#! Valid expression
+f[a] + g(b)
+
+#! Valid expression
+# 2. Mixed brackets
+f(g[x])
+
+#! Valid expression
+f[g(x)]
+
+#! Valid expression
+add(x, y) + sum[1, 2, 3]

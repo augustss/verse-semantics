@@ -1,0 +1,49 @@
+# Tests for identifiers that start with keywords
+
+#! Valid Expression
+# 1. Method call on continue-like name
+continueHandler.execute()
+
+#! Valid Expression
+# 2. Method call on break-like name
+breakpoint.set()
+
+#! Valid Expression
+# 3. Variable starting with continue
+continueSomething
+
+#! Valid Expression
+# 4. Variable starting with break
+breakSomething
+
+#! Valid Expression
+# 5. Variable starting with for
+forEach
+
+#! Valid Expression
+# 6. Variable starting with if
+ifStatement
+
+#! Valid Expression
+# 7. Assignment with keyword-like identifier
+continueFlag := true
+
+#! Valid Expression
+# 8. Function call with keyword-like name
+breakpoint(123)
+
+#! Valid Expression
+# 9. Object construction with keyword-like name
+breakpointConfig{line := 42, enabled := true}
+
+#! Valid Expression
+# 10. Member access chain with keyword-like names
+continueHandler.breakManager.forEach()
+
+#! Valid Expression
+# 11. Actual break keyword
+break
+
+#! Valid Expression
+# 12. Actual continue keyword
+continue

@@ -1,0 +1,21 @@
+# Boolean If Expression Tests
+
+#! Valid Expression
+# 1. Boolean in if condition - compact
+if(true) then { 42 }
+
+#! Valid Expression
+# 2. Boolean in if condition - spaced parentheses
+if ( true ) then { 32 }
+
+#! Valid Expression
+# 3. Boolean in if condition - no parentheses
+if true then { 23 }
+
+#! Valid Expression
+# 4. Boolean false conditions
+if(false) then { 0 } else { 1 }
+
+#! Valid Expression
+# 5. Boolean false without parens
+if false then { no } else { yes }

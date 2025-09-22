@@ -1,0 +1,23 @@
+#! Valid Expression
+Point{x := 1, y := 2}
+
+#! Valid Expression
+Point{x := 1}
+
+#! Valid Expression
+Point{}
+
+#! Error Expression
+Point{x := , y := 1}
+
+#! Error Expression
+Point{x := 1, y := }
+
+#! Error Expression
+Point{x := 1, , y := 2}
+
+#! Error Expression
+Point{, x := 1}
+
+#! Valid Expression
+Point{x := 1,}

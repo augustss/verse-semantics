@@ -1,0 +1,115 @@
+#! Valid expression
+# 1. Complex mathematical expression
+((a + b) * c - (d / e)) + f(g(h(x)))
+
+#! Valid expression
+# 2. Mixed function call styles with operations
+square[x] + cube(y) - abs[z]
+
+#! Valid expression
+# 3. Complex object with function calls
+Entity{
+  name := getName(),
+  position := Point{x := getX(), y := getY()},
+  health := calculateHealth(level, stats)
+}
+
+#! Valid expression
+# 4. Nested conditional with complex expressions
+if((x + y) > (a * b)) then:
+  calculate(x, y)
+else:
+  if((x - y) < (a / b)) then:
+    fallback(x)
+  else:
+    default()
+
+#! Valid expression
+# 5. Complex for loop with range and operations
+for(i : (start + 1)..(end - 1)):
+  process(items[i] + offset)
+
+#! Valid expression
+# 6. Chained function calls with mixed bracket styles
+getData()[0].process(x, y).getValue()
+
+#! Valid expression
+# 7. Complex block with multiple statements
+{
+  x := f(a, b);
+  y := g(x + c);
+  z := h(y * d);
+  if(z > threshold) then:
+    result := process(z)
+  else:
+    result := defaultValue;
+  result
+}
+
+#! Valid expression
+# 8. Nested loops with complex bodies
+for(group : groups):
+  for(item : group.items):
+    if(item.isValid):
+      item.process()
+    else:
+      item.skip()
+
+#! Valid expression
+# 9. Complex range expression with operations
+for(x : (min + offset)..(max - padding)):
+  calculate(x * multiplier + base)
+
+#! Valid expression
+# 10. Mixed operators with function calls
+(add(x, y) * 2) + (subtract(a, b) / 3) - multiply(c, d)
+
+#! Valid expression
+# 11. Complex nested object construction
+GameState{
+  player := Player{
+    name := "Hero",
+    stats := Stats{
+      health := 100,
+      mana := 50
+    },
+    inventory := items.filter(isUsable)
+  },
+  world := World{
+    level := currentLevel,
+    entities := spawnEntities()
+  }
+}
+
+#! Valid expression
+# 12. Function with complex argument expressions
+transform(
+  source.map(x => x + 1),
+  target.filter(y => y > 0),
+  combine(a, b, c)
+)
+
+#! Valid expression
+# 13. Complex conditional with nested operations
+if(((player.health + bonus) * modifier) > ((enemy.damage - armor) * threat)):
+  player.attack(enemy)
+else:
+  player.defend()
+
+#! Valid expression
+# 14. Mixed comment styles with complex expression
+<# Block comment #>
+calculate( # inline comment
+  x + y, # argument 1
+  a * b  # argument 2
+) # end comment
+
+#! Valid expression
+# 15. Complex assignment chain with operations
+{
+  a := source.getValue();
+  b := transform(a + offset);
+  c := process(b * scale, a / divisor);
+  d := combine(c, getValue(index + 1));
+  finalResult := optimize(d)
+}

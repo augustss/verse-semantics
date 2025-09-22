@@ -1,0 +1,219 @@
+# Comprehensive tests for keyword restrictions
+# =============================================
+
+# ========================================
+# Block Keyword Restrictions
+# ========================================
+
+#! Error Expression
+# 1. Block with braces
+block { x := 1; y := 2 }
+
+#! Valid Expression
+# 2. Block with colon and indentation
+block:
+  x := 1
+  y := 2
+
+#! Error Expression
+# 3. Block cannot be assigned to
+block := 5
+ 
+# Variable name starting with 'block'
+#! Valid Expression
+blockSize := 100
+
+#! Valid Expression
+# 4. Variable name ending with 'block'
+dataBlock := { 1, 2, 3 }
+
+#! Valid Expression
+# 5. Method named blockSomething
+obj.blockUser()
+
+# ========================================
+# Continue Keyword Restrictions
+# ========================================
+
+#! Valid Expression
+# 6. Continue as variable reference
+continue
+
+#! Valid Expression
+# 7. Continue as function call
+continue()
+
+#! Valid Expression
+# 8. Continue with parameters
+continue(x, y, z)
+
+#! Error Expression
+# 9. Continue in array
+array{continue, break, return}
+
+#! Error Expression
+# 10. Continue cannot be assigned to
+continue := 5
+
+#! Error Expression
+# 11. Continue cannot be declaration target
+continue: int = 5
+
+#! Valid Expression
+# 12. Variable name starting with 'continue'
+continueProcessing := true
+
+#! Valid Expression
+# 13. Variable name containing 'continue'
+shouldContinue := false
+
+#! Valid Expression
+# 14. Method call on continue-like name
+continueHandler.execute()
+
+# ========================================
+# Boolean Literal Restrictions
+# ========================================
+
+#! Error Expression
+# 15. Cannot assign to true
+true := 5
+
+#! Error Expression
+# 16. Cannot assign to false
+false := 10
+
+#! Valid Expression
+# 17. true as expression
+true
+
+#! Valid Expression
+# 18. false as expression
+false
+
+#! Valid Expression
+# 19. Boolean in operations
+true and false or not true
+
+#! Valid Expression
+# 20. Boolean in comparisons
+x == true
+
+#! Valid Expression
+# 21. Variable names similar to booleans
+truely := 1
+falsey := 0
+
+# ========================================
+# Other Reserved Keywords
+# ========================================
+
+#! Error Expression
+# 22. Cannot assign to var
+var := 5
+
+#! Error Expression
+# 23. Cannot assign to if
+if := 10
+
+#! Error Expression
+# 24. Cannot assign to then
+then := 15
+
+#! Error Expression
+# 25. Cannot assign to else
+else := 20
+
+#! Error Expression
+# 26. Cannot assign to for
+for := 25
+
+#! Error Expression
+# 27. Cannot assign to case
+case := 30
+
+#! Error Expression
+# 28. Cannot assign to using
+using := 35
+
+#! Error Expression
+# 29. Cannot assign to module
+module := 40
+
+#! Error Expression
+# 30. Cannot assign to class
+class := 45
+
+#! Error Expression
+# 31. Cannot assign to interface
+interface := 50
+
+#! Error Expression
+# 32. Cannot assign to enum
+enum := 55
+
+#! Error Expression
+# 33. Cannot assign to struct
+struct := 60
+
+#! Error Expression
+# 34. Cannot assign to function
+function := 65
+
+#! Error Expression
+# 35. Cannot assign to return
+return := 70
+
+#! Error Expression
+# 36. Cannot assign to break
+break := 75
+
+#! Error Expression
+# 37. Cannot assign to not
+not := 80
+
+#! Error Expression
+# 38. Cannot assign to and
+and := 85
+
+#! Error Expression
+# 39. Cannot assign to or
+or := 90
+
+#! Error Expression
+# 40. Cannot assign to array
+array := 95
+
+# ========================================
+# Valid Uses of Keywords in Other Contexts
+# ========================================
+
+#! Valid Expression
+# 41. Keywords can appear in strings
+"block and continue are keywords"
+
+#! Valid Expression
+# 42. Keywords can be parts of larger identifiers
+forEach := 10
+notEqual := false
+orElse := true
+arraySize := 100
+
+#! Error Expression
+# 43. Keywords in member access
+obj.class
+data.array
+result.block
+
+#! Valid Expression
+# 44. Keywords in comments
+# This is a comment about block and continue
+x := 1 # using var or not
+
+#! Valid Expression
+# 45. Complex expression with keyword-like names
+blockManager := class {
+  continueOperation():= true
+  varStorage: int = 0
+  ifCondition():= false
+}

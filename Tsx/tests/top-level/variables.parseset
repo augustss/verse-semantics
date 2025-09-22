@@ -1,0 +1,86 @@
+#! Valid expression
+# 1. Simple variable declaration
+var x : int = 42
+
+#! Valid expression
+# 2. Variable with type and expression
+var y : string = name
+
+#! Valid expression
+# 3. Variable with complex expression
+var sum : int = x + y
+
+#! Valid expression
+# 4. Variable with function call
+var result : int = f(x, y)
+
+#! Valid expression
+# 5. Variable with object construction
+var point : Point = Point{x:=10, y:=20}
+
+#! Valid expression
+# 6. Variable with parenthesized expression
+var value : int = (a + b) - c
+
+#! Valid expression
+# 7. Variable declaration with specifier
+var x <public> : int = 42
+
+#! Valid expression
+# 8. Variable with path specifier
+var config <path(config.json)> : Config = loadConfig()
+
+#! Valid expression
+# 9. Variable with specifier and simple value
+var data <mut> : int = 42
+
+#! Valid expression
+# 10. Variable with whitespace preservation
+var   x   :   int   =   42
+
+#! Valid expression
+# 11. Variable with comments
+var x # name
+  : int # type
+  = 42 # value
+
+#! Valid expression
+# 12. Variable with multiline comment
+var x <# variable #> : int = 42
+
+#! Valid expression
+# 13. Variable with block value
+var result : int = { x + y; z }
+
+#! Valid expression
+# 14. Variable with nested objects
+var player : Player = Player{
+  name := playerName,
+  position := Point{x:=0, y:=0}
+}
+
+#! Valid expression
+# 15. Variable with indented object
+var point : Point = Point:
+  x := 10
+  y := 20
+
+#! Valid expression
+# 16. Variable with specifier and complex type
+var data <export> : Array = f[1, 2, 3]
+
+#! Valid expression
+# 17. Multiple variable declarations in block
+{
+  var x : int = 10;
+  var y : int = 20;
+  x + y
+}
+
+#! Valid expression
+# 18. Variable with specifier and spaces
+var x<public>:int= 42
+
+#! Valid expression
+# 19. Variable with numeric specifier
+var index <index(5)> : int = getValue(5)

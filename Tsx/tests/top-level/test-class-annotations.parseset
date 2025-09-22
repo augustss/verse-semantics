@@ -1,0 +1,45 @@
+# Test cases for class-level annotations
+
+#! Valid Expression
+# Class with computes annotation
+class_1 := class<computes>:
+    InstanceData1 : string
+
+#! Valid Expression
+# Class with native annotation
+MyClass := class<native>:
+    field1 : int
+
+#! Valid Expression
+# Class with multiple annotations
+MyClass := class<abstract><public>:
+    field1 : int
+
+#! Valid Expression
+# Class with annotation and inheritance
+MyClass := class<computes>(BaseClass):
+    field1 : int
+
+#! Valid Expression
+# Class with annotation and empty inheritance
+MyClass := class<computes>():
+    field1 : int
+ 
+#! Valid Expression
+# Interface with annotation (if supported)
+MyInterface := interface<abstract>:
+    Method() : void
+
+#! Valid Expression
+# Struct with annotation
+MyStruct := struct<native>:
+    field1 : int
+
+#! Valid Expression
+# Empty class with annotation
+EmptyClass := class<computes>()
+
+#! Valid Expression
+# Class with computes annotation and method with override
+MyClass := class<computes>:
+    Method1<override>() : string = "test"

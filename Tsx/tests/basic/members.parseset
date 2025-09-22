@@ -1,0 +1,81 @@
+#! Valid Expression
+# 1. Simple member access
+x.y
+
+#! Valid Expression
+# 2. Chained member access
+x.y.z
+
+#! Valid Expression
+# 3. Member access on function result
+f().x
+
+#! Valid Expression
+# 4. Method call on member
+x.f()
+
+#! Valid Expression
+# 5. Chained method calls
+x.f().g()
+
+#! Valid Expression
+# 6. Complex chaining
+x.f().y.g().z
+
+#! Valid Expression
+# 7. Member access with square bracket call
+x.f[1, 2].y
+
+#! Valid Expression
+# 8. Member access in arithmetic
+x.value + y.value
+
+#! Valid Expression
+# 9. Member access in comparison
+item.price > 100
+
+#! Valid Expression
+# 10. Member access in logical expression
+obj.isValid and obj.data.exists
+
+#! Valid Expression
+# 11. Member access in function argument
+process(item.data)
+
+#! Valid Expression
+# 12. Member access on parenthesized expression
+(x + y).toString()
+
+#! Valid Expression
+# 13. Member access on object construction
+Point{x:=1, y:=2}.x
+
+#! Valid Expression
+# 14. Whitespace preservation
+x . y . z
+
+#! Valid Expression
+# 15. Comments with member access
+x. # member
+y. # another
+z
+
+#! Valid Expression
+# 16. Multiline comments
+x.<# member #>y
+
+#! Valid Expression
+# 17. Method call with arguments
+x.f(a, b, c)
+
+#! Valid Expression
+# 18. Method call with square brackets
+x.f[a, b, c]
+
+#! Valid Expression
+# 19. Nested method calls
+x.f(y.g(z))
+
+#! Error Expression
+# 20. Missing member name
+x.

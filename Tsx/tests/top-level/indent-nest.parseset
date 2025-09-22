@@ -1,0 +1,159 @@
+#! Valid expression
+Player:
+  position := Point:
+    x := 10
+    y := 20
+
+#! Valid expression
+Game:
+  player := Character:
+    name := hero
+    level := 1
+
+#! Valid expression
+World:
+  terrain := Terrain:
+    width := 100
+    height := 100
+    type := grass
+
+#! Valid expression
+Config:
+  server := Server:
+    host := localhost
+    port := 8080
+  client := Client:
+    timeout := 30000
+
+#! Valid expression
+App:
+  ui := UI:
+    window := Window:
+      width := 800
+      height := 600
+
+#! Valid expression
+Tree:
+  root := Node:
+    value := 1
+    left := Node:
+      value := 2
+    right := Node:
+      value := 3
+
+#! Valid expression
+Database:
+  connection := Connection:
+    pool := Pool:
+      min := 5
+      max := 20
+    timeout := 30000
+
+#! Valid expression
+Scene:
+  camera := Camera:
+    position := Vec3:
+      x := 0
+      y := 0
+      z := 10
+    target := Vec3:
+      x := 0
+      y := 0
+      z := 0
+
+#! Valid expression
+Layout:
+  header := Section:
+    height := 60
+  body := Section:
+    content := Content:
+      padding := 20
+  footer := Section:
+    height := 40
+
+#! Valid expression
+Settings:
+  graphics := Graphics:
+    resolution := Resolution:
+      width := 1920
+      height := 1080
+    quality := high
+
+#! Valid expression
+Entity:
+  transform := Transform:
+    position := Vec3:
+      x := 0
+      y := 0
+      z := 0
+    rotation := Quaternion:
+      w := 1
+      x := 0
+      y := 0
+      z := 0
+    scale := Vec3:
+      x := 1
+      y := 1
+      z := 1
+
+#! Valid expression
+Menu:
+  items := Items:
+    file := MenuItem:
+      label := File
+      shortcut := CtrlF
+    edit := MenuItem:
+      label := Edit
+      shortcut := CtrlE
+
+#! Valid expression
+Network:
+  protocol := TCP:
+    keepAlive := true
+    noDelay := true
+
+#! Valid expression
+State:
+  current := Running:
+    time := 0
+    score := 0
+
+#! Valid expression
+Component:
+  props := Props:
+    style := Style:
+      color := blue
+      size := large
+
+#! Valid expression
+Package:
+  dependencies := Deps:
+    runtime := Runtime:
+      version := 1
+
+#! Valid expression
+Board:
+  pieces := Pieces:
+    white := Set:
+      king := King:
+        position := e1
+    black := Set:
+      king := King:
+        position := e8
+
+#! Valid expression
+Document:
+  metadata := Meta:
+    author := Author:
+      name := John
+      email := john
+
+#! Valid expression
+Pipeline:
+  stages := Stages:
+    build := Stage:
+      timeout := 600
+    test := Stage:
+      parallel := true
+    deploy := Stage:
+      environment := prod

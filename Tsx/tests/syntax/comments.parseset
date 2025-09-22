@@ -1,0 +1,74 @@
+#! Valid expression
+<# comment #>42
+
+#! Valid expression
+42<# comment #>
+
+#! Valid expression
+<# comment #>42<# another #>
+
+#! Valid expression
+x <# inline #> + <# another #> y
+
+#! Valid expression
+<# multi
+line
+comment #>x + y
+
+#! Valid expression
+f(<# before arg #>x<# after arg #>)
+
+#! Valid expression
+f(<# c1 #>x<# c2 #>, <# c3 #>y<# c4 #>)
+
+#! Valid expression
+<# start #>(<# before expr #>x + y<# after expr #>)<# end #>
+
+#! Valid expression
+a <# comment #> + b
+
+#! Valid expression
+<#comment#>1<#c#>+<#c#>2<#c#>
+
+#! Valid expression
+# 1. Line comment tests
+# this is a comment
+42
+
+#! Valid expression
+42 # end of line comment
+
+#! Valid expression
+# 2. comment 1
+x + y # comment 2
+
+#! Valid expression
+x + # inline comment
+y
+
+#! Valid expression
+# 3. start comment
+f(x) # middle
++ g(y) # end
+
+#! Valid expression
+Point{ # comment after brace
+  x := 1, # after field
+  y := 2
+}
+
+#! Valid expression
+# 4. Multiple comments
+# in a row
+42
+
+#! Valid expression
+x + y # line comment
+<# also multiline #> + z
+
+#! Valid expression
+# 5. Comment before object
+Point{
+  x := 1, # comment after field
+  y := 2  # another comment
+} # end comment

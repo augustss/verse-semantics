@@ -1,0 +1,220 @@
+#! Valid expression
+# 1. For loop with empty line in indented body
+for(x : items):
+  result := process(x)
+
+  output(result)
+
+#! Valid expression
+# 2. If expression with empty line in then block
+if(condition) then:
+  first := getValue()
+
+  second := transform(first)
+  second
+
+#! Valid expression
+# 3. If-else with empty lines in both blocks
+if(x > 0) then:
+  positive := true
+
+  result := x
+else:
+  negative := true
+
+  result := -x
+
+#! Valid expression
+# 4. Nested if with empty lines
+if(outer) then:
+  setup()
+
+  if(inner) then:
+    process()
+
+    cleanup()
+  else:
+    skip()
+
+  finalize()
+
+#! Valid expression
+# 5. Block expression with empty lines
+{
+  x := 10;
+
+  y := 20;
+
+  x + y
+}
+
+#! Valid expression
+# 6. For loop with multiple empty lines
+for(item : collection):
+  start := initialize()
+
+
+  middle := process(item)
+
+
+  end := finalize(middle)
+  end
+
+#! Valid expression
+# 7. Object construction with empty lines in indented style
+Player:
+  name := "Hero"
+
+  health := 100
+
+  position := Point:
+    x := 0
+
+    y := 0
+
+#! Valid expression
+# 8. Complex nested structure with empty lines
+for(group : groups):
+  total := 0
+
+  for(item : group.items):
+    value := item.getValue()
+
+    if(value > 0):
+      total := total + value
+
+      log(value)
+
+  output(total)
+
+#! Valid expression
+# 9. If expression with comments and empty lines
+if(isReady) then:
+  # Initialize
+  data := fetchData()
+
+  # Process the data
+  result := process(data)
+
+  # Return result
+  result
+else:
+  # Use default
+  defaultValue
+
+#! Valid expression
+# 10. Multiple empty lines with varying indentation
+for(x : items):
+  a := x + 1
+
+
+
+  b := a * 2
+
+
+
+  c := b - 1
+  c
+
+#! Valid expression
+# 11. Empty lines at start of indented block
+if(condition) then:
+
+  result := getValue()
+  result
+
+#! Valid expression
+# 12. Empty lines at end of indented block
+if(condition) then:
+  result := getValue()
+
+else:
+  defaultValue
+
+#! Valid expression
+# 13. Mixed empty lines and comments
+for(item : items):
+  # Start processing
+
+  temp := process(item)
+  # Middle comment
+
+  result := finalize(temp)
+  # End comment
+
+  result
+
+#! Valid expression
+# 14. Deeply nested with empty lines at each level
+if(level1) then:
+  setup1()
+
+  if(level2) then:
+    setup2()
+
+    if(level3) then:
+      result := process()
+
+      cleanup3()
+      result
+    else:
+      default3()
+
+    cleanup2()
+  else:
+    default2()
+
+  cleanup1()
+
+#! Valid expression
+# 15. Case expression with empty lines (if supported)
+case(x):
+  0 =>
+    first()
+
+    result1
+
+  1 =>
+    second()
+
+    result2
+
+  _ =>
+    default()
+
+    defaultResult
+
+#! Valid expression
+# 16. For loop with empty line before nested expression
+for(x : items):
+  value := x.getValue()
+
+  if(value > threshold):
+    process(value)
+  else:
+    skip(value)
+
+#! Valid expression
+# 17. Complex block with mixed empty lines and statements
+{
+  # Setup phase
+  config := loadConfig();
+
+  data := fetchData(config);
+
+  # Processing phase
+
+  results := array{};
+
+  for(item : data):
+    processed := process(item)
+
+    if(processed.isValid):
+      results.add(processed)
+
+  # Cleanup phase
+
+  cleanup(config);
+
+  results
+}

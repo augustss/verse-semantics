@@ -1,0 +1,79 @@
+#! Error expression
+# 1. Mismatched parentheses - too many open
+((x + y)
+
+#! Error expression
+# 2. Mismatched parentheses - too many close
+(x + y))
+
+#! Error expression
+# 3. Missing function argument
+f(,)
+
+#! Error expression
+# 4. Invalid operator sequence
+x ++ y
+
+#! Error expression
+# 5. Missing closing brace in object
+Point{x := 1, y := 2
+
+#! Error expression
+# 6. Invalid identifier starting with number
+123abc
+
+#! Error expression
+# 7. Missing operator between expressions
+x y
+
+#! Error expression
+# 8. Invalid nested structure
+f(g(h())
+
+#! Error expression
+# 9. Incomplete if expression
+if(x > 0)
+
+#! Error expression
+# 10. Missing colon in for loop
+for(x  items) { x }
+
+#! Error expression
+# 11. Invalid range operator
+x ... y
+
+#! Error expression
+# 12. Empty function call with comma
+f(,)
+
+#! Error expression
+# 13. Invalid character sequence
+x @@ y
+
+#! Error expression
+# 14. Unterminated string
+"hello world
+
+#! Error expression
+# 15. Invalid block structure
+{ x + y;
+
+#! Error expression
+# 16. Mixed bracket types
+f[x, y)
+
+#! Error expression
+# 17. Invalid assignment target
+42 := x
+
+#! Error expression
+# 18. Missing expression after operator
+x +
+
+#! Error expression
+# 19. Invalid comment structure
+<# unclosed comment
+
+#! Error expression
+# 20. Double operators
+x ** y

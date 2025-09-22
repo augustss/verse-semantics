@@ -1,0 +1,223 @@
+# Verse Parser Fixes Test Suite
+# ==== Empty Parentheses Class Tests ====
+
+#! Valid TopLevel
+# 1. Class with empty parentheses (no inheritance, no body)
+MyDevice := class()
+
+#! Valid TopLevel
+# 2. Class with empty parentheses (no inheritance, no body) with spaces
+MyDevice2 := class( )
+
+# ==== Identifier with Specifiers Tests ====
+
+#! Valid TopLevel
+# 3. Identifier with public specifier in const declaration
+MyClass<public> := class{}
+
+#! Valid TopLevel
+# 4. Identifier with private specifier
+MyClass<private> := class{}
+
+#! Valid TopLevel
+# 5. Identifier with override specifier
+MyFunction<override> := class{}
+
+#! Valid TopLevel
+# 6. Class with public specifier and inheritance
+DominationSpawnTags<public> := class(tag){}
+
+#! Valid TopLevel
+# 7. Module with public specifier
+MyModule<public> := module:
+
+# ==== Multi-line Field Preservation Tests ====
+
+#! Valid TopLevel
+# 8. Class with multiple fields on separate lines
+Player := class:
+    Name:string = "Unknown"
+    Health:int = 100
+    Position:vector3 = vector3{}
+
+#! Valid TopLevel
+# 9. Class with fields separated by blank lines
+Player := class:
+    Name:string = "Unknown"
+
+    Health:int = 100
+
+    Position:vector3 = vector3{}
+
+#! Valid TopLevel
+# 10. Class with decorated fields
+ui_device := class(creative_device):
+    @editable
+    UIText:string = "Hello"
+
+    @replicated
+    Count:int = 0
+
+# ==== Complex Class Structure Tests ====
+
+#! Valid TopLevel
+# 11. Class with fields and methods
+game_device := class:
+    Score:int = 0
+
+    GetScore():int=
+        Score
+
+    SetScore(NewScore:int):void=
+        Score = NewScore
+
+#! Valid TopLevel
+# 12. Class with decorated field and method
+teleporter := class:
+    @editable
+    Destination:vector3 = vector3{}
+
+    Teleport():void=
+        MoveTo(Destination)
+
+#! Valid TopLevel
+# 13. Class with method having specifiers
+device := class(creative_device):
+    OnBegin<override>()<suspends>:void=
+        Print("Started")
+
+#! Valid TopLevel
+# 14. Class with multiple methods with specifiers
+game := class:
+    Start<public>()<suspends>:void=
+        Initialize()
+
+    Stop<public>():void=
+        Cleanup()
+
+# ==== Method Parameter Tests ====
+
+#! Valid TopLevel
+# 15. Method with typed parameters
+Manager := class:
+    Process(Agent:agent):void=
+        HandleAgent(Agent)
+
+    Calculate(X:int, Y:int):int=
+        X + Y
+
+#! Valid TopLevel
+# 16. Method with complex parameter types
+System := class:
+    Register(Player:player, Team:team):void=
+        AddToTeam(Player, Team)
+
+# ==== Nested Structure Tests ====
+
+#! Valid TopLevel
+# 17. Class with nested object construction
+Config := class:
+    Settings:options = options{
+        Mode:string = "default"
+        Level:int = 1
+    }
+
+#! Valid TopLevel
+# 18. Class with method returning constructed object
+Factory := class:
+    Create():player=
+        player{
+            Name:string = "NewPlayer"
+            Score:int = 0
+        }
+
+# ==== Mixed Feature Tests ====
+
+#! Valid TopLevel
+# 19. Complex class with all features
+advanced_device<public> := class(creative_device):
+    @editable
+    @replicated
+    Configuration:config = config{}
+
+    Score<private>:int = 0
+
+    Initialize<override>()<suspends>:void=
+        SetupConfig()
+        LoadData()
+
+    ProcessInput(Input:string):result=
+        Parse(Input)
+
+# ==== Edge Cases ====
+
+#! Valid TopLevel
+# 20. Empty class with just colon
+EmptyClass := class:
+
+#! Valid TopLevel
+# 21. Class with single field no initializer
+Simple := class:
+    Value:int
+
+#! Valid TopLevel
+# 22. Class with const field
+Constants := class:
+    MaxValue<const>:int = 100
+    MinValue<const>:int = 0
+
+# ==== Real-world Verse Patterns ====
+
+#! Valid TopLevel
+# 23. Fortnite device pattern
+capture_point := class(creative_device):
+    @editable
+    CaptureTime:float = 10.0
+
+    @editable
+    TeamOwner:int = 0
+
+    OnBegin<override>()<suspends>:void=
+        EnableCapture()
+
+    OnCapture(Agent:agent):void=
+        AwardPoints(Agent)
+
+#! Valid TopLevel
+# 24. Event subscription pattern
+event_manager := class:
+    OnPlayerJoined:event(player) = event(player){}
+
+    Subscribe():void=
+        OnPlayerJoined.Subscribe(HandlePlayer)
+
+    HandlePlayer(Player:player):void=
+        Print("Player joined")
+
+#! Valid TopLevel
+# 25. State machine pattern
+state_machine := class:
+    CurrentState:state = state.Idle
+
+    Transition(NewState:state):void=
+        if (CanTransition(CurrentState, NewState)):
+            CurrentState = NewState
+
+# ==== Comment Preservation Tests ====
+
+#! Valid TopLevel
+# 26. Class with line comments
+MyClass := class:
+    # This is a field
+    Field1:int = 1
+
+    # This is a method
+    Method1():void=
+        Print("test")
+
+#! Valid TopLevel
+# 27. Class with multiline comments
+MyClass := class:
+    <# This is a
+       multiline comment #>
+    Field1:int = 1

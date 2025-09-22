@@ -1,116 +1,97 @@
-# CLAUDE.md
+# Verse Expression Parser
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A lossless parser for the Verse programming language (Epic Games' UEFN/Fortnite Creative language) that preserves all whitespace and comments for perfect source reconstruction.
 
-## Project Overview
+## Quick Start
 
-This is a TypeScript implementation of a lossless parser for the Verse programming language (Epic Games' functional logic language used in Unreal Engine, Fortnite Creative, and UEFN). The parser preserves all source information including comments and whitespace, generates a complete AST with source location tracking, and provides HTML syntax highlighting.
-
-## Development Commands
-
-### Build and Testing
 ```bash
-npm run build        # Compile TypeScript to JavaScript (dist/)
-npm run dev          # Run src/index.ts directly with ts-node
-npm test             # Run all tests
-npm run test:parse   # Run parse tests with ts-node
-npm run lint         # Run TypeScript type checking (tsc --noEmit)
-npm run clean        # Remove dist/ directory
+# Build the project
+npm run build
 
-# Run specific tests
-npm test -- parser.test.ts                   # Run specific test file
-npm test -- --testNamePattern="logical"      # Run tests matching pattern
-npm test -- --coverage                       # Run tests with coverage report
+# Run test suite
+node scripts/run-tests.js
+
+# Parse basic expressions (128 test cases)
+node dist/index.js
 ```
 
-### Running the Parser
-```bash
-# Parse a single file
-npx ts-node src/index.ts <file.verse>
+## API
 
-# Generate HTML with syntax highlighting
-node generate-verse-html.js "tests/Verse/**/*.verse" html-output
+```javascript
+const { parse, parseTopLevel, prettyPrint } = require('./dist/index.js');
+
+// Parse expressions
+const ast = parse('x + y * 2');
+const reconstructed = prettyPrint(ast);  // Lossless reconstruction
+
+// Parse top-level declarations
+const topLevel = parseTopLevel('MyClass := class: Field:int = 5');
 ```
 
-## Architecture
+### Core Functions
+- `parse(code, verbose?)` - Parse expressions and statements
+- `parseTopLevel(code, verbose?)` - Parse classes, modules, and other top-level constructs
+- `prettyPrint(ast)` - Losslessly reconstruct source from AST
+- `toCompactString(ast)` - Generate minified output
 
-### Core Parser System
+## Project Structure
 
-The parser uses a **combinator-based approach** with monadic parsing primitives:
+```
+src/
+├── expression-parser.ts   # Main parser implementation
+├── ast.ts                 # AST types and utilities
+└── parser-combinators.ts  # Parser combinator framework
 
-- **src/parser/combinators.ts**: Core parser combinator library implementing fundamental parsing operations (map, flatMap, choice, sequence, etc.)
-- **src/parser/parser.ts**: Main Verse language parser with grammar rules. Key exports:
-  - `parseVersee(source: string)`: Main entry point returning `ParseResult<L<Exp>>`
-  - Contains operator precedence hierarchy (assignment → logical → comparison → arithmetic)
-  - Handles both standard operators and Verse-specific constructs (specifiers, modules, etc.)
+tests/                     # Test suite
+verse-files-flat/         # 459 real Verse files for validation
+dist/                     # Compiled JavaScript output
+```
 
-- **src/parser/trivia-parser.ts**: Handles parsing of whitespace, comments, and other trivia for lossless parsing
-- **src/parser/token.ts**: Token definitions and utilities
+## Current Capabilities
 
-### AST Structure
+### ✅ Supported Features
+- Basic expressions and operators with correct precedence
+- Function calls, lambdas, and function application
+- Object construction (`array{}`, `map{}`, custom types)
+- Class and module declarations
+- Method definitions (both `=` and brace syntax)
+- Annotations (`<public>`, `<private>`)
+- Comments (line `#`, block `<# #>`, nested)
+- Array literals (both `array{1,2,3}` and `{1,2,3}`)
+- Pattern matching and conditionals
+- Assignment expressions in method bodies
 
-All AST nodes use the `L<T>` wrapper type for location tracking:
+### 🚧 Not Yet Supported
+- Variable type declarations: `var Health : int = 100`
+- Loop statements: `loop:`
+- Set statements: `set Health -= 10`
+- Logic type annotations
+- Doc comments: `##`
+- Uninitialized field declarations: `Score:int`
+- Native annotations: `<native_callable>`, `<transacts>`, `<decides>`
 
-- **src/ast/expression.ts**: Expression AST nodes (`Exp` type) including:
-  - Binary operators (Add, Multiply, And, Or, etc.)
-  - Control flow (If, For, While, Case)
-  - Literals (Int, Float, String, True, False)
-  - Special constructs (Lambda, Array, Tuple, Module)
+## Test Results
 
-- **src/ast/pattern.ts**: Pattern matching AST nodes
-- **src/ast/identifier.ts**: Identifier and name-related AST nodes
-- **src/ast/location.ts**: Source location tracking (`L<T>` type, `Pos` positions)
-- **src/ast/trivia.ts**: Trivia AST nodes (comments, whitespace)
+- **Basic Expressions**: 128/128 (100%)
+- **Advanced Features**: 25/26 (96.2%)
+- **Real Verse Files**: 107/459 (23.3%)
 
-### Parser Features
+## Development
 
-#### Recently Implemented Features
-- **Lambda expressions**: `x => x + 1` syntax with proper precedence
-- **Logical operators**: `and`/`or` keywords (units support removed to fix conflicts)
-- **For-loop ranges**: `for(x:=0..99)` with optional `.body` syntax
-- **Array/tuple literals**: Proper distinction between `(x)` (paren) and `(x,y)` (tuple)
-- **Case expressions**: Basic `case(expr): result` pattern matching
+The parser uses a combinator-based approach that preserves all source trivia (whitespace, comments) in the AST for perfect reconstruction. Each token stores its original text including surrounding whitespace.
 
-#### Known Limitations
-- Curried function declarations not supported: `F(X:int)(Y:int) := X + Y`
-- Complex case patterns with type annotations: `y:int => y + 1`
-- Some UI-related Verse constructs (struct fields, @editable attributes)
-- Generic types with brackets: `[player]widget_map`
+### Build & Test
+```bash
+npm run build        # Compile TypeScript
+npm run typecheck   # Type checking only
+npm run lint        # Run linter (if configured)
+```
 
-### Lossless Parsing & Output
+### Parser Architecture
+- Parser combinators for composable parsing logic
+- Strict operator precedence hierarchy
+- Trivia preservation in every AST node
+- Separate parsers for expressions vs top-level declarations
 
-- **src/lossless-parser.ts**: Lossless parsing implementation that preserves all source information
-- **src/printer/pretty-printer.ts**: AST pretty-printing (partially implemented, has type issues)
-- **src/simple-printer.ts**: Simple AST printer implementation
-- **src/working-printer.ts**: Working printer implementation
-- **src/error-reporting.ts**: Error reporting and diagnostic utilities
-
-## Test Organization
-
-Tests use Jest with ts-jest for TypeScript support:
-
-- **tests/parser.test.ts**: Core parser functionality tests
-- **tests/golden.test.ts**: Golden reference tests comparing against expected outputs
-- **tests/parsetest-runner.ts**: Parse test runner for bulk Verse file testing
-
-Test coverage: 100% (181/181 tests passing)
-
-## Working with Verse Files
-
-The `tests/Verse/` directory contains real Verse code samples from Epic Games:
-- Successfully parses ~80% of real Verse files
-- Common failure: "Empty expression list" for complex UI/module files
-- Test files included from: SolarisTestbed, Samples, various game templates
-
-### HTML Generation
-
-Two scripts are available for generating HTML with syntax highlighting:
-- `generate-verse-html.js`: Production script with light-mode GitHub-inspired theme
-- `simple-html-gen.js`: Simplified version without AST dependencies
-
-## Key Design Decisions
-
-1. **Combinator-Based Parser**: Chosen over traditional lexer/parser split for composability and type safety
-2. **Immutable AST**: All AST nodes created through factory functions (createInt, createString, etc.)
-3. **Location Tracking**: Every AST node includes precise source location for error reporting
-4. **Reserved Words**: Maintained in a Set for efficient keyword checking (includes 'and', 'or' after units removal)
+---
+*Last updated: September 2024*

@@ -1,0 +1,81 @@
+# ClassDeclaration Tests
+# Testing class declarations as top-level declarations with syntax: MyClass := class { ... }
+
+# Basic empty class
+MyClass := class { }
+->
+type: TopLevelDeclaration
+kind: "class"
+name: { type: "identifier", value: "MyClass", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+assignOp: { type: ":=", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+keyword: { type: "class", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+style: "braces"
+leftBrace: { type: "{", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+body: []
+rightBrace: { type: "}", leadingTrivia: [], trailingTrivia: [] }
+span: { start: 0, end: 18 }
+
+# Class with single field
+Point := class { x := 1 }
+->
+type: TopLevelDeclaration
+kind: "class"
+name: { type: "identifier", value: "Point", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+assignOp: { type: ":=", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+keyword: { type: "class", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+style: "braces"
+leftBrace: { type: "{", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+body: [
+  {
+    expr: {
+      type: ConstDeclaration
+      name: { type: "identifier", value: "x", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+      assignOp: { type: ":=", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+      value: { type: "IntegerLiteral", token: { value: 1, leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] } }
+      span: { start: 17, end: 23 }
+    }
+    span: { start: 17, end: 23 }
+  }
+]
+rightBrace: { type: "}", leadingTrivia: [], trailingTrivia: [] }
+span: { start: 0, end: 25 }
+
+# Class with multiple fields
+Rectangle := class { width := 10; height := 20 }
+->
+type: TopLevelDeclaration
+kind: "class"
+name: { type: "identifier", value: "Rectangle", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+assignOp: { type: ":=", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+keyword: { type: "class", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+style: "braces"
+leftBrace: { type: "{", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+body: [
+  {
+    expr: {
+      type: ConstDeclaration
+      name: { type: "identifier", value: "width", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+      assignOp: { type: ":=", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+      value: { type: "IntegerLiteral", token: { value: 10, leadingTrivia: [], trailingTrivia: [] } }
+      span: { start: 19, end: 29 }
+    }
+    semicolon: { type: ";", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+    span: { start: 19, end: 30 }
+  },
+  {
+    expr: {
+      type: ConstDeclaration
+      name: { type: "identifier", value: "height", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+      assignOp: { type: ":=", leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] }
+      value: { type: "IntegerLiteral", token: { value: 20, leadingTrivia: [], trailingTrivia: [{ type: "whitespace", value: " " }] } }
+      span: { start: 31, end: 42 }
+    }
+    span: { start: 31, end: 42 }
+  }
+]
+rightBrace: { type: "}", leadingTrivia: [], trailingTrivia: [] }
+span: { start: 0, end: 44 }
+
+# Note: Classes with superclasses would need parser support for inheritance syntax
+# This is not yet implemented in the top-level declaration parser
+# Example future syntax: DerivedClass := class(BaseClass) { ... }

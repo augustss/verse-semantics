@@ -1,0 +1,231 @@
+#! Valid expression
+# 1. Empty string literal
+""
+
+#! Valid expression
+# 2. Single character string
+"a"
+
+#! Valid expression
+# 3. Very long string
+"this is a very long string that tests the parser's ability to handle lengthy string literals without issues"
+
+#! Valid expression
+# 4. String with all whitespace
+"   \t\n  "
+
+#! Valid expression
+# 5. Zero integer
+0
+
+#! Valid expression
+# 6. Negative zero
+-0
+
+#! Valid expression
+# 7. Maximum small integer
+999999
+
+#! Valid expression
+# 8. Single digit
+5
+
+#! Valid expression
+# 9. Decimal zero
+0.0
+
+#! Valid expression
+# 10. Very small decimal
+0.000001
+
+#! Valid expression
+# 11. Decimal with many digits
+123.456789012345
+
+#! Valid expression
+# 12. Single character variable
+a
+
+#! Valid expression
+# 13. Very long variable name
+thisIsAnExtremelyLongVariableNameThatTestsTheParsersAbilityToHandleLengthyIdentifiersWithoutAnyIssuesOrProblems
+
+#! Valid expression
+# 14. Variable with numbers
+var123
+
+#! Valid expression
+# 15. Variable with underscores
+my_variable_name
+
+#! Valid expression
+# 16. Empty function call
+f()
+
+#! Valid expression
+# 17. Function with single argument
+f(x)
+
+#! Valid expression
+# 18. Function with many arguments
+f(a, b, c, d, e, f, g, h, i, j)
+
+#! Valid expression
+# 19. Deeply nested function calls
+f(g(h(i(j(k(l(m(n(o(p(x)))))))))))
+
+#! Valid expression
+# 20. Empty object construction
+Point{}
+
+#! Valid expression
+# 21. Object with single field
+Point{x := 1}
+
+#! Valid expression
+# 22. Object with many fields
+Entity{a := 1, b := 2, c := 3, d := 4, e := 5, f := 6, g := 7, h := 8, i := 9, j := 10}
+
+#! Valid expression
+# 23. Deeply nested objects
+A{b := B{c := C{d := D{e := E{f := 1}}}}}
+
+#! Valid expression
+# 24. Empty block
+{}
+
+#! Valid expression
+# 25. Block with single statement
+{x}
+
+#! Valid expression
+# 26. Block with many statements
+{a; b; c; d; e; f; g; h; i; j; k}
+
+#! Valid expression
+# 27. Deeply nested blocks
+{{{{{{{{{x}}}}}}}}}
+
+#! Valid expression
+# 28. Simple range
+1..2
+
+#! Valid expression
+# 29. Large range
+0..1000000
+
+#! Valid expression
+# 30. Single element range
+5..5
+
+#! Valid expression
+# 31. Negative range
+-10..-1
+
+#! Valid expression
+# 32. Decimal range
+0.1..0.9
+
+#! Valid expression
+# 33. Complex arithmetic
+((((((1 + 2) * 3) - 4) / 5) + 6) * 7) - 8
+
+#! Valid expression
+# 34. Long operator chain
+1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10
+
+#! Valid expression
+# 35. Mixed operators with precedence
+1 + 2 * 3 - 4 / 5 + 6 * 7 - 8
+
+#! Valid expression
+# 36. Many parentheses
+((((((((x))))))))
+
+#! Valid expression
+# 37. Minimal if expression
+if(x) then: y
+
+#! Valid expression
+# 38. Complex if-else chain
+if(a) then: 
+   b 
+else: 
+   if(c) then: 
+       d 
+   else: 
+       if(e) then: 
+          f 
+       else: 
+          g
+
+#! Valid expression
+# 39. Minimal for expression
+for(x : y) { x }
+
+#! Valid expression
+# 40. For with complex body
+for(item : items):
+  result := process(item)
+  if(result.isValid):
+    result.value
+  else:
+    defaultValue
+
+#! Valid expression
+# 41. Simple case expression
+case(x): 0 => y
+
+#! Valid expression
+# 42. Case with many branches
+case(x):
+  0 => a
+  1 => b
+  2 => c
+  3 => d
+  4 => e
+  _ => f
+
+#! Valid expression
+# 43. Minimal comment
+<##> x
+
+#! Valid expression
+# 44. Very long comment
+<# This is an extremely long comment that tests the parser's ability to handle lengthy comment blocks without any issues or problems whatsoever and should work correctly #>42
+
+#! Valid expression
+# 45. Comment with special characters
+<# !@#$%^&*()_+-=[]{}|;:'"<>?,./ #>x
+
+#! Valid expression
+# 46. Nested comment delimiters (but not actual nesting)
+<# comment with <# and #> inside #>x
+
+#! Valid expression
+# 47. Multiple line comments
+<# comment 1 #><# comment 2 #><# comment 3 #>x
+
+#! Valid expression
+# 48. Mixed comment styles
+# line comment
+<# block comment #>x
+
+#! Valid expression
+# 49. Expression with maximum whitespace preservation
+   x   +   y   *   z   /   w   -   q
+
+#! Valid expression
+# 50. Minimal expression
+x
+
+#! Valid expression
+# 51. Complex nested expression combining all features
+for(item : getData(config{host := "localhost", port := 8080})):
+  result := process(item.value + offset)
+  if(result > threshold) then:
+    cache[item.id] := transform(result)
+    log("Processed: " + item.name)
+  else:
+    skip(item)
+    continue

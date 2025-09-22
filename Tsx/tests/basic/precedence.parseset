@@ -1,0 +1,190 @@
+#! Valid expression
+# 1. Basic addition and multiplication precedence
+1 + 2 * 3
+
+#! Valid expression
+# 2. Basic subtraction and division precedence
+8 - 4 / 2
+
+#! Valid expression
+# 3. Multiple operations same precedence
+1 + 2 + 3
+
+#! Valid expression
+# 4. Multiple operations same precedence (multiplication)
+2 * 3 * 4
+
+#! Valid expression
+# 5. Mixed addition and subtraction
+10 + 5 - 3
+
+#! Valid expression
+# 6. Mixed multiplication and division
+20 * 2 / 4
+
+#! Valid expression
+# 7. Complex precedence test
+1 + 2 * 3 - 4 / 2
+
+#! Valid expression
+# 8. Parentheses override precedence
+(1 + 2) * 3
+
+#! Valid expression
+# 9. Nested parentheses with precedence
+((1 + 2) * 3) - 4
+
+#! Valid expression
+# 10. Complex nested precedence
+1 + (2 * 3) - (4 / 2)
+
+#! Valid expression
+# 11. Unary minus with precedence
+-1 + 2
+
+#! Valid expression
+# 12. Unary minus with multiplication
+-2 * 3
+
+#! Valid expression
+# 13. Multiple unary operators
+--x
+
+#! Valid expression
+# 14. Unary with parentheses
+-(1 + 2)
+
+#! Valid expression
+# 15. Comparison operators
+1 < 2
+
+#! Valid expression
+# 16. Comparison with arithmetic
+1 + 2 < 3 * 4
+
+#! Valid expression
+# 17. Equality comparison
+x == y
+
+#! Valid expression
+# 18. Inequality comparison
+x != y
+
+#! Valid expression
+# 19. Multiple comparisons (should be left associative)
+a < b < c
+
+#! Valid expression
+# 20. Logical operators
+true and false
+
+#! Valid expression
+# 21. Logical with comparison
+x > 0 and y < 10
+
+#! Valid expression
+# 22. Logical or
+a or b
+
+#! Valid expression
+# 23. Mixed logical operators
+a and b or c
+
+#! Valid expression
+# 24. Logical with parentheses
+(a and b) or c
+
+#! Valid expression
+# 25. Logical not
+not x
+
+#! Valid expression
+# 26. Complex logical expression
+not (x > 0 and y < 10) or z == 5
+
+#! Valid expression
+# 27. Function call in arithmetic
+f(x) + g(y)
+
+#! Valid expression
+# 28. Function call with precedence
+f(x) * 2 + g(y) / 3
+
+#! Valid expression
+# 29. Member access precedence
+obj.field + 5
+
+#! Valid expression
+# 30. Method call precedence
+obj.method() * 2
+
+#! Valid expression
+# 31. Complex member access
+obj.field.subfield + other.method().result
+
+#! Valid expression
+# 32. Array access precedence
+arr[i] + arr[j]
+
+#! Valid expression
+# 33. Complex array and function precedence
+getData()[getIndex()] * getMultiplier()
+
+#! Valid expression
+# 34. Range with arithmetic
+1 + 2..5 * 2
+
+#! Valid expression
+# 35. Range with parentheses
+(1 + 2)..(5 * 2)
+
+#! Valid expression
+# 36. Object construction in arithmetic
+Point{x := 1, y := 2}.x + Point{x := 3, y := 4}.y
+
+#! Valid expression
+# 37. Assignment precedence in object
+Point{x := 1 + 2, y := 3 * 4}
+
+#! Valid expression
+# 38. Complex precedence with all operators
+f(x + y) * g(a - b) + h(c * d) / i(e / f) - j(not k and l or m)
+
+#! Valid expression
+# 39. Precedence in if condition
+if(a + b > c * d) then: result
+
+#! Valid expression
+# 40. Precedence in for loop
+for(x : start + offset..end - padding) { x * multiplier }
+
+#! Valid expression
+# 41. Case with arithmetic expressions
+case(x + y):
+  a * b => result1
+  c - d => result2
+  _ => default
+
+#! Valid expression
+# 42. Nested expressions with precedence
+((a + b) * (c - d)) / ((e * f) + (g / h))
+
+#! Valid expression
+# 43. Chain of different operators
+a + b - c * d / e + f - g
+
+#! Valid expression
+# 44. Complex boolean expression
+(x > 0 and y > 0) or (x < 0 and y < 0) or (x == 0 or y == 0)
+
+#! Valid expression
+# 45. Function calls in logical expression
+isValid(x) and isReady(y) or hasPermission(user)
+
+#! Valid expression
+# 46. Precedence with unary operators
+not x + y == -z * w
+
+#! Valid expression
+# 47. Complex assignment with precedence
+result := calculate(base * multiplier + offset) / scale

@@ -1,0 +1,33 @@
+# Variable Declaration Tests
+
+#! Valid Expression
+# 1. Basic var declaration with int type
+var x : int = 5
+
+#! Valid Expression
+# 2. Var declaration with float type
+var ratio : float = 3.14159
+
+#! Valid Expression
+# 3. Var declaration with boolean type
+var flag : logic = true
+
+#! Valid Expression
+# 4. Var declaration with string type
+var message : string = "Hello World"
+
+#! Valid Expression
+# 5. Var declaration with expression
+var result : int = x + y * 2
+
+#! Valid Expression
+# 6. Var declaration with function call
+var value : int = calculateSum(a, b)
+
+#! Valid Expression
+# 7. Var declaration with complex type name
+var position : Vector3 = Vector3{X := 0.0, Y := 0.0, Z := 0.0}
+
+#! Valid Expression
+# 8. Var declaration with underscore in name
+var my_variable : int = 100

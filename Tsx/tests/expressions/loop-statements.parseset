@@ -1,0 +1,48 @@
+# Loop Statement Tests
+
+#! Valid Expression
+# 1. Basic loop with braces
+loop { break }
+
+#! Valid Expression
+# 2. Loop with indented style
+loop:
+  continue
+
+#! Valid Expression
+# 3. Empty loop with braces
+loop { }
+
+#! Valid Expression
+# 4. Loop with multiple statements (indented)
+loop:
+  x := 1
+  break
+
+#! Valid Expression
+# 5. Loop with break condition
+loop {
+  if(done) then { break }
+}
+
+#! Valid Expression
+# 6. Loop with continue condition
+loop {
+  if(skip) then { continue }
+  process()
+}
+
+#! Valid Expression
+# 7. Nested loops
+loop {
+  for(i : 0..10) {
+    if(i > 5) then { break }
+  }
+}
+
+#! Valid Expression
+# 8. Loop with complex body
+loop:
+  count := count + 1
+  if(count > 100) then { break }
+  result := calculate(count)

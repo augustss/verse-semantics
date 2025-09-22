@@ -1,0 +1,114 @@
+#! Valid Expression
+# 1. Empty for-loop body
+for(x : items) {}
+
+#! Valid Expression
+# 2. Single expression body
+for(x : items) { x }
+
+#! Valid Expression
+# 3. Multiple statement body
+for(x : items) { x; y; z }
+
+#! Valid Expression
+# 4. For-loop with index
+for(i -> x : items) { x + i }
+
+#! Valid Expression
+# 5. For-loop with range
+for(i : 1..10) { i * 2 }
+
+#! Valid Expression
+# 6. For-loop with variable range
+for(x : start..end) { process(x) }
+
+#! Valid Expression
+# 7. Nested for-loops
+for(x : outer) {
+  for(y : inner) {
+    x + y
+  }
+}
+
+#! Valid Expression
+# 8. For-loop with complex expression
+for(item : list) {
+  item.value * 2 + offset
+}
+
+#! Valid Expression
+# 9. For-loop with method call in iterable
+for(x : getItems()) { x }
+
+#! Valid Expression
+# 10. For-loop with member access in iterable
+for(x : object.items) { x }
+
+#! Valid Expression
+# 11. For-loop with array access body
+for(i : 0..n) { arr[i] }
+
+#! Valid Expression
+# 12. For-loop with block containing statements
+for(x : items) {
+  y := x * 2;
+  print(y);
+  y
+}
+
+#! Valid Expression
+# 13. For-loop with if expression in body
+for(x : items) {
+  if (x > 0) then { x } else { -x }
+}
+
+#! Valid Expression
+# 14. For-loop with function call body
+for(x : items) { process(x) }
+
+#! Valid Expression
+# 15. For-loop with object construction body
+for(i : 1..10) {
+  Point{x := i, y := i * 2}
+}
+
+#! Valid Expression
+# 16. For-loop with whitespace preservation
+for ( x : items ) { x }
+
+#! Valid Expression
+# 17. For-loop with comments
+for(x : items) { # Process each item
+  x * 2
+}
+
+#! Valid Expression
+# 18. Indentation style for-loop
+for(x : items):
+  x * 2
+
+#! Valid Expression
+# 19. Indentation style with index
+for(i -> x : items):
+  x + i
+
+#! Valid Expression
+# 20. Indentation style with range
+for(i : 1..10):
+  i * i
+
+#! Error Expression
+# 21. Missing iterator
+for( : items) { x }
+
+#! Error Expression
+# 22. Missing colon
+for(x items) { x }
+
+#! Error Expression
+# 23. Missing iterable
+for(x : ) { x }
+
+#! Error Expression
+# 24. Missing parentheses
+for x : items { x }

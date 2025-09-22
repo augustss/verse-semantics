@@ -1,0 +1,7 @@
+# Exact Multi-line Comment Test
+
+#! Valid Expression
+# 1. Multi-line comment with spacing (exact format)
+<# This is a
+  multi-line comment #>
+x + y

@@ -1,0 +1,58 @@
+#! Valid TopLevel
+Test := class {
+    DoSomething():void= x
+}
+
+#! Valid TopLevel
+Test := class:
+    DoSomething  ( ) :       void =
+        x := 42
+
+#! Valid TopLevel
+Test := class:
+    TestMethod():void=
+        var result:int = 10
+
+#! Valid TopLevel
+Test := class:
+    ProcessItems():void=
+        for(item : items):
+            DoSomething(item)
+
+#! Valid TopLevel
+Test := class:
+    HandleInput():void=
+        case(input):
+            0 => DoAction()
+            _ => DoDefault()
+
+#! Valid TopLevel
+# 1. Empty case branch - parser bug: currently passes when it should fail
+# The _ => branch has no body, making the structure ambiguous
+CaptureControl := class:
+    @editable
+    var CapturePoints : []capture_point = array{}
+
+    OnBegin<override>()<suspends>:void=
+        for (i -> EachCapPoint : CapturePoints):
+            case (i):
+                0 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_A)
+                1 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_B)
+                _ => 1
+
+#! Error TopLevel
+# 2. Empty case branch with wrong indentation - parser bug: currently passes when it should fail
+# Done() is at the same indentation as case, not properly indented for the _ => branch
+CaptureControl := class:
+    OnBegin<override>()<suspends>:void=
+            case (i):
+                1 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_B)
+                _ =>
+            Done()
+
+#! Valid TopLevel
+# 3. Known issue: reconstruction has spacing/newline issues with consecutive var fields
+Test := class:
+    @editable
+    var Points : []int = array{}
+    var Count : int = 0

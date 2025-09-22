@@ -1,0 +1,41 @@
+# Multi-line Comment Tests
+
+#! Valid Expression
+# 1. Simple multi-line comment
+<# comment #>
+x + y
+
+#! Valid Expression
+# 2. Multi-line comment with newlines
+<# This spans
+multiple lines #>
+x + y
+
+#! Valid Expression
+# 3. Nested multi-line comments
+<# outer <# inner #> outer #>
+x + y
+
+#! Valid Expression
+# 4. Mixed single and multi-line comments
+# Line comment
+<# Block comment #>
+x + y
+
+#! Valid Expression
+# 5. Multi-line comment at end
+x + y <# trailing comment #>
+
+#! Valid Expression
+# 6. Multi-line comment in middle
+x <# middle #> + y
+
+#! Valid Expression
+# 7. Empty multi-line comment
+<##>
+x + y
+
+#! Valid Expression
+# 8. Multi-line comment with special characters
+<# Comment with symbols: @#$%^&*()[]{}|\ #>
+x + y

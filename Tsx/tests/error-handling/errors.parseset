@@ -1,0 +1,206 @@
+#! Error expression
+# 1. Missing closing parenthesis
+f(x, y
+
+#! Error expression
+# 2. Missing opening parenthesis
+x, y)
+
+#! Error expression
+# 3. Missing closing brace in block
+{x := 1; y := 2
+
+#! Error expression
+# 4. Missing opening brace
+x := 1; y := 2}
+
+#! Error expression
+# 5. Missing closing bracket in function call
+f[x, y
+
+#! Error expression
+# 6. Missing opening bracket
+x, y]
+
+#! Error expression
+# 7. Invalid assignment to literal
+42 := x
+
+#! Error expression
+# 8. Invalid assignment to expression result
+(x + y) := z
+
+#! Error expression
+# 9. Missing expression after operator
+x +
+
+#! Error expression
+# 10. Missing expression before operator
++ y
+
+#! Error expression
+# 11. Double assignment operators
+x := := y
+
+#! Error expression
+# 12. Invalid range operator
+x ... y
+
+#! Error expression
+# 13. Incomplete range expression
+x ..
+
+#! Error expression
+# 14. Range with missing start
+.. 10
+
+#! Error expression
+# 15. Missing comma in function arguments
+f(x y z)
+
+#! Error expression
+# 16. Extra comma in function arguments
+f(x,, y)
+
+#! Error expression
+# 17. Missing colon in object field
+Point{x 1, y := 2}
+
+#! Error expression
+# 18. Missing assignment in object field
+Point{x :, y := 2}
+
+#! Error expression
+# 19. Invalid nested object syntax
+Point{x := {y := }}
+
+#! Error expression
+# 20. Missing condition in if expression
+if() then: result
+
+#! Error expression
+# 21. Missing then in if expression
+if(condition) result
+
+#! Error expression
+# 22. Missing expression in for loop
+for( : items) { x }
+
+#! Error expression
+# 23. Missing collection in for loop
+for(x : ) { x }
+
+#! Error expression
+# 24. Invalid for loop syntax
+for x in items { x }
+
+#! Error expression
+# 25. Missing case condition
+case():
+    0 => result
+
+#! Error expression
+# 26. Missing case branches
+case(x):
+
+#! Error expression
+# 27. Invalid case branch syntax
+case(x):
+    0 -> result
+
+#! Error expression
+# 28. Missing arrow in case branch
+case(x):
+    0 result
+
+#! Error expression
+# 29. Unterminated string literal
+"hello world
+
+#! Error expression
+# 30. Invalid escape sequence
+"hello\qworld"
+
+#! Error expression
+# 31. Missing variable name in declaration
+var : int = 42
+
+#! Error expression
+# 32. Missing type in variable declaration
+var x : = 42
+
+#! Error expression
+# 33. Missing value in variable declaration
+var x : int =
+
+#! Error expression
+# 34. Invalid function parameter syntax
+f(x, , z) := x + z
+
+#! Error expression
+# 35. Missing function body
+f(x, y) :=
+
+#! Error expression
+# 36. Invalid specifier syntax
+<>
+
+#! Error expression
+# 37. Incomplete specifier
+<public
+
+#! Error expression
+# 38. Invalid specifier argument
+<path()>
+
+#! Error expression
+# 39. Mixed bracket types in function call
+f(x, y]
+
+#! Error expression
+# 40. Mixed bracket types in array access
+arr[x, y)
+
+#! Valid expression
+# 41. Empty identifier
+""
+
+#! Valid expression
+# 42. arithmetic
+x-y-z
+
+#! Error expression
+# 43. Number starting identifier
+123abc
+
+#! Error expression
+# 44. Invalid operator combination
+x ++ y
+
+#! Valid expression
+# 45. valid comparison chaining
+x < y < z
+
+#! Error expression
+# 46. Missing block content
+if(condition) then:
+
+#! Error expression
+# 47. Invalid nested parentheses
+((x + y)
+
+#! Error expression
+# 48. Invalid comment nesting
+<# comment <# nested #> incomplete
+
+#! Error expression
+# 49. Missing expression in parentheses
+()
+ 
+#! Error expression
+# 50. Missing field name in object
+Point{:= 1, y := 2}
+
+#! Error expression
+# 51. Invalid field assignment
+Point{x == 1, y := 2}

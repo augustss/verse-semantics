@@ -1,0 +1,79 @@
+#! Valid Expression
+# 1. Integer literal
+42
+
+#! Valid Expression
+# 2. Integer literal with whitespace
+  42
+
+#! Valid Expression
+# 3. Variable identifier
+x
+
+#! Valid Expression
+# 4. Variable identifier with whitespace
+  x
+
+#! Valid Expression
+# 5. Simple binary addition
+x + y
+
+#! Valid Expression
+# 6. Binary addition with whitespace
+x  +  y
+
+#! Valid Expression
+# 7. Chain addition
+1 + 2 + 3
+
+#! Valid Expression
+# 8. Mixed arithmetic
+10 - 5 + 3
+
+#! Valid Expression
+# 9. Simple parentheses
+(x)
+
+#! Valid Expression
+# 10. Parentheses with whitespace
+ ( x )
+
+#! Valid Expression
+# 11. Parenthesized integer
+(42)
+
+#! Valid Expression
+# 12. Parenthesized integer with whitespace
+ ( 42 )
+
+#! Valid Expression
+# 13. Parenthesized expression
+(x + y)
+
+#! Valid Expression
+# 14. Parenthesized expression with whitespace
+ ( x  +  y )
+
+#! Valid Expression
+# 15. Nested parentheses
+((x))
+
+#! Valid Expression
+# 16. Nested parentheses with whitespace
+ ( ( x ) )
+
+#! Valid Expression
+# 17. Complex parenthesized expression
+(x + (y - z))
+
+#! Valid Expression
+# 18. Complex parenthesized expression with whitespace
+ ( x  +  ( y  -  z ) )
+
+#! Valid Expression
+# 19. Mixed operators with parentheses
+a + (b + c) - (d - e)
+
+#! Valid Expression
+# 20. Mixed operators with extensive whitespace
+ a  +  ( b  +  c )  -  ( d  -  e )
