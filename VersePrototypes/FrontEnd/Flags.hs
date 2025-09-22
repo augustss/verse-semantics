@@ -1,6 +1,7 @@
 module FrontEnd.Flags(
    Flags(..),
-   defaultFlags, showFlags
+   ReportError(..),
+   defaultFlags, showFlags,
  ) where
 
 import FrontEnd.Expr
@@ -22,7 +23,7 @@ data Flags = Flags
   , fTraceEval      :: !Bool
   , fTraceVerbosity :: !Verbosity
   , fPrelude        :: !(PreludeName, SrcExpr)
-  , fNoWarn         :: !Bool
+  , fReportError    :: !ReportError
   , fKeepIf         :: !Bool
   , fAllAsIter      :: !Bool
   , fDsUniform      :: !Bool   -- Desugar Essential->Mini in a "uniform" way
@@ -47,12 +48,15 @@ defaultFlags = Flags
   , fTraceEval      = True
   , fTraceVerbosity = 2
   , fPrelude        = either error id $ findPrelude defaultPrelude
-  , fNoWarn         = False
+  , fReportError    = ErrWarning
   , fKeepIf         = False
   , fAllAsIter      = False
   , fDsUniform      = False
   , fUseLibParser   = False
   }
+
+data ReportError = ErrError | ErrWarning | ErrNone
+  deriving (Eq, Show)
 
 showFlags :: Flags -> String
 showFlags f = unwords

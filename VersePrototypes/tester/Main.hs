@@ -189,6 +189,10 @@ testSrc (TestEvalEq _ e1 _) = e1
 testSrc (TestVerify _ e)    = e
 testSrc (TestDenSem _ e1 _) = e1
 
+isDenSemTest :: Test -> Bool
+isDenSemTest (TestDenSem _ _ _) = True
+isDenSemTest _ = False
+
 data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
                  -- The stuff in the parens is the TestInfo
   TestInfo
@@ -431,7 +435,7 @@ evalDenSem _flags test e = do
   res <- LitStr <$> f e
   return (NormOK, 0, res)
   where
-    flgs = FrontEnd.defaultFlags
+    flgs = FrontEnd.defaultFlags{ fReportError = ErrNone }
     err  = error "runD: exception in evalDenSem"
     go   = runD flgs err . getEssential flgs
 
@@ -523,7 +527,8 @@ doTestCatchingExn tflg test p1 p2
 -- evaluating/verifying; each of which can throw an exception.
 doTest :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
 doTest tflg test src1 src2 = do
-  do { let flags     = mkFEFlags tflg add_verif
+  do { let flags1    = mkFEFlags tflg add_verif
+           flags     = if isDenSemTest test then flags1{ fReportError = ErrNone } else flags1
            add_verif = desugarForVerification test
 
      ; core1 <- srcToCore flags add_verif src1

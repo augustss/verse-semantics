@@ -168,13 +168,16 @@ toCoreEff (Eff { eff_card = card, eff_side = _side })
 
 errShadow :: [(Ident, Ident)] -> DsM ()
 errShadow is = do
-  no_warn <- getDFlagsX fNoWarn
-  if no_warn then
-    case is of
-      [] -> pure ()
-      (i@(Ident li _), (Ident lj _)) : _ -> errorMessage $ "shadowing: " ++ prettyShow (li, i, lj)
-   else
-    mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "warning shadowing " ++ prettyShow (li, i, lj)) is
+  report_error <- getDFlagsX fReportError
+  case report_error of
+    ErrError ->
+      case is of
+        [] -> pure ()
+        (i@(Ident li _), (Ident lj _)) : _ -> errorMessage $ "shadowing: " ++ prettyShow (li, i, lj)
+    ErrWarning ->
+      mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "warning shadowing " ++ prettyShow (li, i, lj)) is
+    ErrNone ->
+      pure ()
 
 errMultiple :: [[Ident]] -> DsM ()
 errMultiple =
@@ -183,13 +186,16 @@ errMultiple =
 
 errUndefined :: [Ident] -> DsM ()
 errUndefined is = do
-  no_warn <- getDFlagsX fNoWarn
-  if no_warn then
-    case is of
-      [] -> pure ()
-      i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
-   else
-    mapM_ reportScopeErr is
+  report_error <- getDFlagsX fReportError
+  case report_error of
+    ErrError ->
+      case is of
+        [] -> pure ()
+        i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
+    ErrWarning ->
+      mapM_ reportScopeErr is
+    ErrNone ->
+      pure ()
 
 reportScopeErr :: Ident -> DsM ()
 reportScopeErr i@(Ident _l _) = do

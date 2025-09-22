@@ -249,7 +249,7 @@ dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> P ENV
 dF f a r =
-  uncanon
+  uncanon $
   [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
                               | u <- allValues  -- list
                               , Just v <- [applyPF h u]
@@ -257,7 +257,15 @@ dF f a r =
     | h <- hs -- list
     ]
   | hs <- Set.mkSetUnsafe allFUNs -- set
-  ]
+  ] {- `Set.union`
+  [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
+                              | u <- allValues  -- list
+                              , Just v <- [applyPF h u]
+                              ]
+    | h <- hs -- list
+    ] 
+  | tt <- Set.mkSetUnsafe allTuples
+  ] XXX finish this -}
 
 {-
 -- A hack to avoid iterating over so many values
