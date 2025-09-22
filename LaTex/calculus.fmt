@@ -395,7 +395,7 @@
 %format functionKW = "\textbf{fun}"
 
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
-%format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
+%format function (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionX (x) (fx) (rhs) = functionKW "(" x ")" fx "\{" rhs "\}"
 %format funk k (e) (rhs) = functionKW "_"k"(" e ")\{" rhs "\}"
