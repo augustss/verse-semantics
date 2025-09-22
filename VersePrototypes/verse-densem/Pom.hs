@@ -286,6 +286,9 @@ a=Ident noLoc "a"
 h=Ident noLoc "h"
 f=Ident noLoc "f"
 r=Ident noLoc "r"
+n=Ident noLoc "n"
+p=Ident noLoc "p"
+q=Ident noLoc "q"
 xf=Ident noLoc "xf"
 k0=Lit (LInt 0)
 k1=Lit (LInt 1)
@@ -302,8 +305,13 @@ t1=Variable a
 -}
 u=Ident noLoc "u"
 v=Ident noLoc "v"
-t0=DefineIE x (k0 `Choice` k1)
-t1=For2 t0 (Variable x)
+--t0=DefineIE x (k0 `Choice` k1)
+--t1=For2 t0 (Variable x)
+t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
+t1=Variable x
+tfor = For2 t0 t1
+tn=Variable n `Unify` k1
+tt = tn `Seq` tfor
 
 {-
 ix :: [ ENV ] -> Int -> ENV
