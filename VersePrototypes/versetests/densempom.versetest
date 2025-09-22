@@ -40,7 +40,8 @@ testds("Tif2-5",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=2; r}   {"{[{{
 testds("Tif3",   pom, pass) {if(x:=1|2){x}else{fail}}              {"{[{{u=v=1}}]}"}
 testds("Tif4",   pom, pass) {if(x:=1|2){x | x}else{fail}}          {"{[{{u=v=1}},{{u=v=1}}]}"}
 
-testds("Tif5-1", pom, pass, skip) {if( (x:=2)|(y:=1) ){x}else{fail}}       {"{[{{u=v=2}}]}"}
+# Note that in Tif5-1 the x is free, since the bindings in the choice do not escape the choice.
+testds("Tif5-1", pom, pass) {if( (x:=2)|(y:=1) ){x}else{fail}}       {"{[{{v=u,x=u}}]}"}
 testds("Tif5-2", pom, pass)         {x:nat; y:nat; if(x=7|y=3){x}else{fail}} {"{[{{u=v=3}}]}"}
 
 testds("Tif6-1", pom, pass) {x:int; if(x=1){1}else{0}; x=(2|1)}    {"{[{{u=v=1}}],[{{u=v=2}}]}"}
