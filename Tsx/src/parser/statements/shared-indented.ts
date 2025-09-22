@@ -185,9 +185,12 @@ export const parseIndentedStatements = (
     const startsWithBrace = firstNonWhitespace < currentState.input.length &&
                            currentState.input[firstNonWhitespace] === '{';
 
+    // Check if this is an if expression that might have multi-line structure
+    const isIfExpression = exprResult.value.type === 'IfExpression';
+
     // Make sure the expression didn't consume beyond the current line
-    // UNLESS it's a braced block, which is allowed to span multiple lines
-    if (!startsWithBrace && exprResult.state.position > lineEnd) {
+    // UNLESS it's a braced block OR an if expression (which can have else clauses on subsequent lines)
+    if (!startsWithBrace && !isIfExpression && exprResult.state.position > lineEnd) {
       // Limit the expression's extent to the current line
       exprResult.state = { ...exprResult.state, position: lineEnd };
     }
@@ -195,9 +198,9 @@ export const parseIndentedStatements = (
     statements.push(exprResult.value);
 
     // Move to the next position after the expression
-    // For braced blocks, use the expression's end position
+    // For braced blocks and if expressions, use the expression's end position
     // For single-line expressions, move to the end of the current line
-    if (startsWithBrace) {
+    if (startsWithBrace || isIfExpression) {
       // The expression consumed multiple lines, continue from where it ended
       currentState = exprResult.state;
     } else {

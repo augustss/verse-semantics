@@ -163,8 +163,12 @@ export const ifExpression: PC.Parser<AST.Expr> = (state) => {
   }
 
   // Check for optional 'else' branch
-  // First check if 'else' matches at current position (for boundary checking)
-  const elseStringCheck = PC.string('else')(currentState);
+  // First skip any trivia (whitespace, comments) before looking for 'else'
+  const triviaResult = trivia(currentState);
+  const triviaSkippedState = triviaResult.success ? triviaResult.state : currentState;
+
+  // Now check if 'else' matches at the position after trivia (for boundary checking)
+  const elseStringCheck = PC.string('else')(triviaSkippedState);
   if (elseStringCheck.success) {
     // Check boundary - make sure 'else' is not part of a longer identifier
     const afterElsePos = elseStringCheck.state.position;
@@ -172,7 +176,7 @@ export const ifExpression: PC.Parser<AST.Expr> = (state) => {
         /[a-zA-Z0-9_]/.test(elseStringCheck.state.input[afterElsePos])) {
       // 'else' is part of a longer identifier, skip else parsing
     } else {
-      // 'else' is a standalone keyword, now parse it with trivia
+      // 'else' is a standalone keyword, now parse it with trivia from the original position (includes leading trivia)
       const elseResult = withTriviaLiteral('else', PC.string('else'))(currentState);
       if (elseResult.success) {
         let elseState = elseResult.state;

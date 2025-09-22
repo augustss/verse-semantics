@@ -11,6 +11,49 @@ import { stringLiteral } from '../literals/strings';
 import { leftBrace, rightBrace, leftParen, rightParen, assignOp, colon, comma, dot, semicolon } from '../operators/punctuation';
 import { modularExpr } from '../expressions/core';
 import { decorators as parseDecorators } from '../decorators/decorators';
+import { parseIndentedStatements, statementsToBody } from '../statements/shared-indented';
+
+/**
+ * Check if we have indented content after assignment operator for method bodies
+ */
+const hasIndentedContent = (state: PC.ParserState): boolean => {
+  let pos = state.position;
+
+  // Skip spaces and tabs (but not newlines)
+  while (pos < state.input.length && (state.input[pos] === ' ' || state.input[pos] === '\t')) {
+    pos++;
+  }
+
+  // Check if we hit a newline (indicating indented content follows)
+  return pos < state.input.length && (state.input[pos] === '\n' || state.input[pos] === '\r');
+};
+
+/**
+ * Parse method body, handling both single expressions and indented multi-statement bodies
+ */
+const parseMethodBody = (state: PC.ParserState): PC.ParserResult<AST.Expr> => {
+  // Check if we have indented content
+  if (hasIndentedContent(state)) {
+    // Use indented statement parsing like block: expressions
+    const indentedResult = parseIndentedStatements(state, () => modularExpr);
+    if (indentedResult.success) {
+      // Convert statements to appropriate body
+      const body = statementsToBody(
+        indentedResult.value,
+        state.position,
+        indentedResult.state.position
+      );
+      return {
+        success: true,
+        value: body,
+        state: indentedResult.state
+      };
+    }
+  }
+
+  // Fall back to single expression parsing
+  return modularExpr(state);
+};
 
 /**
  * Recursively check if an expression contains a class expression (nested class)
@@ -425,8 +468,8 @@ export const methodDeclaration: PC.Parser<AST.MethodDeclaration> = (state) => {
   const assignResult = assignOp(afterReturn);
   if (!assignResult.success) return assignResult;
 
-  // Parse method body
-  const bodyResult = modularExpr(assignResult.state);
+  // Parse method body (handles both single expressions and indented multi-statement bodies)
+  const bodyResult = parseMethodBody(assignResult.state);
   if (!bodyResult.success) return bodyResult;
 
   return {

@@ -17,7 +17,7 @@ export const setExprParser = (exprParser: () => PC.Parser<AST.Expr>) => {
 };
 
 // Parse a single statement (expression optionally followed by semicolon, or just semicolon for empty statement)
-const parseStatement: PC.Parser<AST.Statement> = (state) => {
+export const parseStatement: PC.Parser<AST.Statement> = (state) => {
   const startPos = state.position;
 
   // Check for empty statement (just semicolon)

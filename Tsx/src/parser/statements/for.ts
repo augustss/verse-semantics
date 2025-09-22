@@ -4,10 +4,12 @@
 
 import * as PC from '../../parser-combinators';
 import * as AST from '../../ast';
-import { leftParen, rightParen, leftBrace, rightBrace, colon, rightArrowOp } from '../operators/punctuation';
+import { leftParen, rightParen, leftBrace, rightBrace, colon, rightArrowOp, semicolon } from '../operators/punctuation';
 import { withTriviaLiteral } from '../foundation/tokens';
+import { trivia } from '../foundation/trivia';
 import { variable as parseVariable } from '../literals/identifiers';
 import { parseIndentedStatements, statementsToBody } from './shared-indented';
+import { parseStatement } from './block';
 
 // We'll get the expression parser passed in via a getter to avoid circular dependencies
 let getExpr: () => PC.Parser<AST.Expr>;
@@ -117,31 +119,67 @@ export const forExpression: PC.Parser<AST.Expr> = (state) => {
       };
     }
 
-    // Non-empty block
-    const bodyResult = getExpr()(lbraceResult.state);
-    if (!bodyResult.success) return { success: false, error: 'Expected loop body', state };
+    // Non-empty block - parse as statements with semicolons
+    const statements: AST.Statement[] = [];
+    let currentState = lbraceResult.state;
 
-    const rbraceResult = rightBrace(bodyResult.state);
-    if (!rbraceResult.success) return { success: false, error: 'Expected } after loop body', state };
+    // Parse statements until we hit closing brace
+    while (true) {
+      // Try to parse a statement first
+      const stmtResult = parseStatement(currentState);
+      if (stmtResult.success) {
+        statements.push(stmtResult.value);
+        currentState = stmtResult.state;
 
-    return {
-      success: true,
-      value: AST.forExpression(
-        forResult.value,
-        lpResult.value,
-        iterator,
-        colonResult.value,
-        iterableResult.value,
-        rpResult.value,
-        'braces',
-        bodyResult.value,
-        { start: startPos, end: rbraceResult.state.position },
-        lbraceResult.value,
-        undefined,
-        rbraceResult.value
-      ),
-      state: rbraceResult.state
-    };
+        // Skip trivia between statements
+        const triviaResult = trivia(currentState);
+        if (triviaResult.success) {
+          currentState = triviaResult.state;
+        }
+        continue;
+      }
+
+      // If we can't parse a statement, check for closing brace
+      const rbraceResult = rightBrace(currentState);
+      if (rbraceResult.success) {
+        // Convert statements to appropriate body expression
+        const blockBody = statements.length === 0
+          ? AST.emptyExpression({ start: lbraceResult.state.position, end: lbraceResult.state.position })
+          : statements.length === 1
+            ? statements[0].expr || AST.emptyExpression({ start: lbraceResult.state.position, end: lbraceResult.state.position })
+            : AST.block(
+                'braces',
+                statements,
+                undefined,
+                undefined, // No left brace in body (parent owns it)
+                undefined, // No right brace in body (parent owns it)
+                undefined,
+                { start: lbraceResult.state.position, end: rbraceResult.state.position }
+              );
+
+        return {
+          success: true,
+          value: AST.forExpression(
+            forResult.value,
+            lpResult.value,
+            iterator,
+            colonResult.value,
+            iterableResult.value,
+            rpResult.value,
+            'braces',
+            blockBody,
+            { start: startPos, end: rbraceResult.state.position },
+            lbraceResult.value,
+            undefined,
+            rbraceResult.value
+          ),
+          state: rbraceResult.state
+        };
+      }
+
+      // Neither statement nor closing brace found - error
+      return { success: false, error: 'Expected statement or } in for loop body', state };
+    }
   }
 
   // Try colon/indentation style

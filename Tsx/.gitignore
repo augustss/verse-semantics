@@ -1,3 +1,9 @@
+scripts/*
+debug*
+test-*
+test_*
+*.md
+
 # Dependencies
 node_modules/
 npm-debug.log*
