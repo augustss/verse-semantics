@@ -111,7 +111,9 @@ instance Show ENV where
 #endif
 
 disj :: [CASE] -> ENV
-disj as = OR (usort [ a | a@(YES _) <- as ])
+disj as = OR (absorb (usort [ a | a@(YES _) <- as ]))
+  where absorb xs | true `elem` xs = [true]
+        absorb xs = xs
 
 data CASE
   = YES [CONSTR]
