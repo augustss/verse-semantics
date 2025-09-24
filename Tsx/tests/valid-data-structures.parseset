@@ -1,0 +1,187 @@
+# Valid Data Structures
+# Classes, interfaces, structs, enums, and modules
+
+#! Valid expression
+# 70. Class name starting with keywords (but not exact match)
+blocks := class { }
+
+#! Valid expression
+# 71. Simple class with boolean field
+Config := class { enabled: bool = true }
+
+#! Valid expression
+# 72. Nested keywords in valid contexts
+MyClass := class { Check():bool= not false }
+
+#! Valid expression
+# 73. Class inheritance with method
+Player := class(Entity) { Update():= Move() }
+
+#! Valid expression
+# 74. Class with annotation and empty inheritance
+MyClass := class<computes>():
+    field1 : int
+
+#! Valid expression
+# 75. Class declaration with multiple fields
+Rectangle := class { width := 10; height := 20 }
+
+#! Valid expression
+# 76. Class with multiple annotations
+MyClass := class<abstract><public>:
+    field1 : int
+
+#! Valid expression
+# 77. Class with computes annotation
+class_1 := class<computes>:
+    InstanceData1 : string
+
+#! Valid expression
+# 78. Class with annotation and inheritance
+MyClass := class<computes>(BaseClass):
+    field1 : int
+
+#! Valid expression
+# 79. Interface with annotation (if supported)
+MyInterface := interface<abstract>:
+    Method() : void
+
+#! Valid expression
+# 80. Class declaration with mixed members
+Player := class { name := ""; score := 0; GetScore():= score }
+
+#! Valid expression
+# 81. Class with method calling other method
+Calculator := class { Add(a, b):= a + b; Double(x):= Add(x, x) }
+
+#! Valid expression
+# 83. Class with boolean field
+Test := class { var count:int= 0 }
+
+#! Valid expression
+# 85. Class with computes annotation and method with override
+MyClass := class<computes>:
+    Method1<override>() : string = "test"
+
+#! Valid expression
+# 86. Class with complex field initializers
+Config := class { host := "localhost"; port := 8080; url := host + ":" + port }
+
+#! Valid expression
+# 87. Complex object with keyword-like names
+blockManager := class {
+  continueOperation():= true
+  varStorage: int = 0
+  ifCondition():= false
+}
+
+#! Valid expression
+# 89. Class with decorators and specifiers
+@editable
+UIComponent := class {
+  @editable
+  var visible: bool = true
+
+  OnBegin<override>()<suspends>: void = {
+    Initialize();
+    Wait(1.0)
+  }
+
+  Show<public>(): void = visible := true
+  Hide<public>(): void = visible := false
+}
+
+#! Valid expression
+# 90. Complex GameManager class
+GameManager := class(BaseManager) {
+  var players: []Player = array{}
+  var isRunning: bool = false
+
+  Start(): void = {
+    isRunning := true;
+    InitializePlayers()
+  }
+
+  AddPlayer(p: Player): bool = {
+    if(not isRunning) then {
+      players := players + array{p};
+      true
+    } else {
+      false
+    }
+  }
+
+  GetPlayerCount(): int = players.length
+}
+
+#! Valid expression
+# 92. Field with braces (should work)
+Test := class { x:int= 1 }
+
+#! Valid expression
+# 93. Multiple methods with braces
+Test := class {
+  GetX():int= x
+  SetX(val:int):= x := val
+}
+
+#! Valid expression
+# 94. Simple method with braces (should work)
+Test := class { DoSomething():= x }
+
+#! Valid expression
+# 95. Method with specifiers (braces)
+Test := class { OnBegin<override>()<suspends>:void= x }
+
+#! Valid expression
+# 96. Class declaration with field
+Point := class { x := 1 }
+
+#! Valid expression
+# 97. Brace block with var declarations
+{ var x: int = 5; x * 2 }
+
+#! Valid expression
+# 98. Block with var declarations
+{ var x : int = 5; x * 2 }
+
+#! Valid expression
+# 99. Multiple variable declarations in block
+{
+  var x : int = 10;
+  var y : int = 20;
+  x + y
+}
+
+#! Valid expression
+# 100. Class with boolean field
+Config := class { enabled: bool = true }
+
+#! Valid expression
+# 101. Class with multiple methods
+Calculator := class {
+  Add(a:int, b:int): int = a + b
+  Subtract(a:int, b:int): int = a - b
+  IsPositive(x:int): bool = x > 0
+}
+
+#! Valid expression
+# 102. Class with method parameters
+Math := class { Add(a:int, b:int):int= a + b }
+
+#! Valid expression
+# 103. Class method returning boolean
+Validator := class { IsValid(x:int): bool = x > 0 }
+
+#! Valid expression
+# 104. builder pattern class
+builder := class {
+  value: string = ""
+
+  Add(s: string): x = {
+    value := value + s;
+    this
+  }
+
+  Build(): string = value
+}

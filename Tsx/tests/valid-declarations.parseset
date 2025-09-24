@@ -1,0 +1,255 @@
+# Valid Declarations
+# Variable declarations, constants, and function declarations
+
+#! Valid expression
+# 1. Simple const declaration without type
+x := 42
+
+#! Valid expression
+# 2. Const with expression value
+y := x + 10
+
+#! Valid expression
+# 3. Const with parenthesized expression
+value := (a + b) - c
+
+#! Valid expression
+# 4. Const with type and complex value
+sum : int = a + b
+
+#! Valid expression
+# 5. Const with function call
+result := f(x, y)
+
+#! Valid expression
+# 6. Const with object value
+point := Point{x:=10, y:=20}
+
+#! Valid expression
+# 7. Const with block value
+result := { x + y; z }
+
+#! Valid expression
+# 8. Const with type and function call
+data : string = getName()
+
+#! Valid expression
+# 9. Const with square bracket function call
+items := getData[1, 2, 3]
+
+#! Valid expression
+# 10. Const with type and object
+player : Player = Player{name:=playerName}
+
+#! Valid expression
+# 11. Allow var declaration
+var x:int = 5
+
+#! Valid expression
+# 12. Variable with specifier and simple value
+var data <mut> : int = 42
+
+#! Valid expression
+# 13. Var declaration with underscore in name
+var my_variable : int = 100
+
+#! Valid expression
+# 14. Variable with complex expression
+var sum : int = x + y
+
+#! Valid expression
+# 15. Var declaration with boolean type
+var flag : logic = true
+
+#! Valid expression
+# 16. Variable with parenthesized expression
+var value : int = (a + b) - c
+
+#! Valid expression
+# 17. Variable with block value
+var result : int = { x + y; z }
+
+#! Valid expression
+# 18. Var declaration with expression
+var result : int = x + y * 2
+
+#! Valid expression
+# 19. Variable with object construction
+var point : Point = Point{x:=10, y:=20}
+
+#! Valid expression
+# 20. Var declaration with string type
+var message : string = "Hello World"
+
+#! Valid expression
+# 21. Var declaration with function call
+var value : int = calculateSum(a, b)
+
+#! Valid expression
+# 22. Variable with specifier and complex type
+var data <export> : Array = f[1, 2, 3]
+
+#! Valid expression
+# 23. Variable with path specifier
+var config <scoped(config.json)> : Config = loadConfig()
+
+#! Valid expression
+# 24. Variable with nested objects
+var player : Player = Player{
+  name := playerName,
+  position := Point{x:=0, y:=0}
+}
+
+#! Valid expression
+# 25. Variable with complex type name
+var position : Vector3 = Vector3{X := 0.0, Y := 0.0, Z := 0.0}
+
+#! Valid expression
+# 26. Const with type and spaces
+x   :   int   =   42
+
+#! Valid expression
+# 27. Variable with specifier and spaces
+var x<public>:int= 42
+
+#! Valid expression
+# 28. Assignment with keyword-like identifier
+continueFlag := true
+
+#! Valid expression
+# 29. Allow camelCase identifiers
+myLongVariableName := "test"
+
+#! Valid expression
+# 30. Set statement with expression
+set result = x + y * 2
+
+#! Valid expression
+# 31. Set statement with variable containing underscore
+set my_var = 100
+
+#! Valid expression
+# 32. Set statement with boolean expression
+set flag = x > 5 and y < 10
+
+#! Valid expression
+# 33. Set statement with string literal
+set message = "Hello World"
+
+#! Valid expression
+# 34. Set statement with function call
+set value = calculateSum(a, b)
+
+#! Valid expression
+# 35. Set statement with complex expression
+set final = (x + y) * (z - w) / 2
+
+#! Valid expression
+# 36. Simple function without args or type
+f() := 42
+
+#! Valid expression
+# 37. Function with single argument
+f(x) := x + 1
+
+#! Valid expression
+# 38. Function with multiple arguments
+add(x, y) := x + y
+
+#! Valid expression
+# 39. Function with return type
+f() : int = 42
+
+#! Valid expression
+# 40. Function with args and return type
+add(x, y) : int = x + y
+
+#! Valid expression
+# 41. Function with block body
+f() := { x + 1; y + 2 }
+
+#! Valid expression
+# 42. Function with specifier
+f <public> () := 42
+
+#! Valid expression
+# 43. Function with multiple specifiers
+f <public> <inline> () := x + y
+
+#! Valid expression
+# 44. Function with whitespace preservation
+f  (  x  ,  y  )  :=  x + y
+
+#! Valid expression
+# 45. Function with complex argument expressions
+transform(
+  source.map(x => x + 1),
+  target.filter(y => y > 0),
+  combine(a, b, c)
+)
+
+#! Valid expression
+# 46. Function with decides annotation
+<decides>
+MyFunction() : logic = true
+
+#! Valid expression
+# 47. Function with transacts annotation
+<transacts>
+UpdateScore() : void = { }
+
+#! Valid expression
+# 48. Function with both decides and transacts
+<decides><transacts>
+ProcessAction() : logic = false
+
+#! Valid expression
+# 49. Brace block as function body
+f():= { x := getValue(); process(x); x }
+
+#! Valid expression
+# 50. Function with nested function call
+compose(f, g, x) := f(g(x))
+
+#! Valid expression
+# 51. Function returning another function
+makeAdder(x) := f(y) := x + y
+
+#! Valid expression
+# 52. Function with object construction body
+makePoint(x, y) := Point{x:=x, y:=y}
+
+#! Valid expression
+# 54. Const with nested indented object
+config := Player:
+  name := playerName
+  x := 10
+  y := 20
+
+#! Valid expression
+# 55. Variable with indented object
+var point : Point = Point:
+  x := 10
+  y := 20
+
+#! Valid expression
+# 56. Function with indented object body
+makePoint(x, y) := Point:
+  x := x
+  y := y
+
+#! Valid expression
+# 57. Lambda in assignment
+increment := x => x + 1
+
+#! Valid expression
+# 58. Array of booleans
+flags := array{true, false, true, true}
+
+#! Valid expression
+# 59. Complex assignment with precedence
+result := calculate(base * multiplier + offset) / scale
+
+#! Valid expression
+# 60. Logical expression with booleans
+canProceed := isReady and not isBlocked or hasOverride

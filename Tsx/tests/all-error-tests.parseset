@@ -1,0 +1,391 @@
+# All Error Tests
+# Consolidated error test cases from all parseset files
+
+#! Error expression
+# 1. Invalid escape sequence
+"invalid\x"
+
+#! Error expression
+# 2. Unterminated string
+"hello
+
+#! Error expression
+# 3. Invalid operator (&&)
+x && y
+
+#! Error expression
+# 4. Invalid operator (||)
+x || y
+
+#! Error expression
+# 5. Invalid operator (!)
+!x
+
+#! Error expression
+# 6. Missing member name
+x.
+
+#! Error expression
+# 7. Incomplete range (missing end)
+1..
+
+#! Error expression
+# 8. Incomplete range (missing start)
+..10
+
+#! Error expression
+# 9. Triple dot (invalid)
+1...10
+
+#! Error expression
+# 10. Missing delimiter
+case(x): 0 => "zero" _ => "other"
+
+#! Error expression
+# 11. Function declaration with typed parameter (not expression)
+IsValid := (x: int): bool = x > 0 and x < 100
+
+#! Error expression
+# 12. Empty case expression (colon style)
+case(x):
+
+#! Error expression
+# 13. Empty case expression (brace style)
+case(x) {}
+
+#! Error expression
+# 14. Lambda with empty body expression
+x => ()
+
+#! Error expression
+# 15. Block keyword with braces
+block {}
+
+#! Error expression
+# 16. Missing parentheses in for loop
+for x : items { x }
+
+#! Error expression
+# 17. Missing body in for loop
+for(x : items)
+
+#! Error expression
+# 18. Object with empty field value
+Point{x := , y := 1}
+
+#! Error expression
+# 19. Object with missing field value
+Point{x := 1, y := }
+
+#! Error expression
+# 20. Object with double comma
+Point{x := 1, , y := 2}
+
+#! Error expression
+# 21. Object with leading comma
+Point{, x := 1}
+
+#! Error expression
+# 22. Function call with trailing comma
+f(1, 2, 3,)
+
+#! Error expression
+# 23. Function call with square brackets and trailing comma
+f[1, 2, 3,]
+
+#! Error expression
+# 24. Expression with unicode characters
+变量名
+
+#! Error expression
+# 25. Outdented code after indented block
+for(x : items):
+  process(x)
+
+outdented := true
+
+#! Error expression
+# 26. Missing closing parenthesis
+f(x, y
+
+#! Error expression
+# 27. Missing opening parenthesis
+x, y)
+
+#! Error expression
+# 28. Missing closing brace in block
+{x := 1; y := 2
+
+#! Error expression
+# 29. Missing opening brace
+x := 1; y := 2}
+
+#! Error expression
+# 30. Missing closing bracket in function call
+f[x, y
+
+#! Error expression
+# 31. Missing opening bracket
+x, y]
+
+#! Error expression
+# 32. Invalid assignment to literal
+42 := x
+
+#! Error expression
+# 33. Invalid assignment to expression result
+(x + y) := z
+
+#! Error expression
+# 34. Missing expression after operator
+x +
+
+#! Error expression
+# 35. Double assignment operators
+x := := y
+
+#! Error expression
+# 36. Invalid range operator
+x ... y
+
+#! Error expression
+# 37. Incomplete range expression
+x ..
+
+#! Error expression
+# 38. Range with missing start
+.. 10
+
+#! Error expression
+# 39. Missing comma in function arguments
+f(x y z)
+
+#! Error expression
+# 40. Extra comma in function arguments
+f(x,, y)
+
+#! Error expression
+# 41. Missing colon in object field
+Point{x 1, y := 2}
+
+#! Error expression
+# 42. Missing assignment in object field
+Point{x :, y := 2}
+
+#! Error expression
+# 43. Invalid nested object syntax
+Point{x := {y := }}
+
+#! Error expression
+# 44. Missing case condition
+case():
+    0 => result
+
+#! Error expression
+# 45. Invalid case branch syntax
+case(x):
+    0 -> result
+
+#! Error expression
+# 46. Missing arrow in case branch
+case(x):
+    0 result
+
+#! Error expression
+# 47. Unterminated string literal
+"hello world
+
+#! Error expression
+# 48. Invalid function parameter syntax
+f(x, , z) := x + z
+
+#! Error expression
+# 49. Missing function body
+f(x, y) :=
+
+#! Error expression
+# 50. Mixed bracket types in function call
+f(x, y]
+
+#! Error expression
+# 51. Mixed bracket types in array access
+arr[x, y)
+
+#! Error expression
+# 52. Invalid operator combination
+x ++ y
+
+#! Error expression
+# 53. Mismatched parentheses - too many open
+((x + y)
+
+#! Error expression
+# 54. Missing expression in parentheses
+()
+
+#! Error expression
+# 55. Missing field name in object
+Point{:= 1, y := 2}
+
+#! Error expression
+# 56. Invalid field assignment
+Point{x == 1, y := 2}
+
+#! Error expression
+# 57. Mismatched parentheses - too many close
+(x + y))
+
+#! Error expression
+# 58. Empty function call with comma
+f(,)
+
+#! Error expression
+# 59. Missing closing brace in object
+Point{x := 1, y := 2
+
+#! Error expression
+# 60. Missing operator between expressions
+x y
+
+#! Error expression
+# 61. Invalid nested structure
+f(g(h())
+
+#! Error expression
+# 62. Invalid character sequence
+x @@ y
+
+#! Error expression
+# 63. Invalid block structure
+{ x + y;
+
+#! Error expression
+# 64. Double operators
+x ** y
+
+#! Error expression
+# 65. Block keyword with braces
+block { x := 1; y := 2 }
+
+#! Error expression
+# 66. Invalid syntax - random symbols
+$$$invalid$$$
+
+#! Error expression
+# 68. Reject malformed class
+Test := class
+
+#! Error expression
+# 69. Reject class with invalid member
+Test := class { 123 }
+
+#! Error expression
+# 70. Missing variable name in declaration
+var : int = 42
+
+#! Error expression
+# 71. Variable declaration without type
+var x = 42
+
+#! Error expression
+# 72. Reserved keyword as object type - case
+case{x := 1}
+
+#! Error expression
+# 73. Reserved keyword as class name
+if := class { }
+
+#! Error expression
+# 74. Missing expression in for loop
+for( : items) { x }
+
+#! Error expression
+# 75. Missing colon in for loop
+for(x  items) { x }
+
+#! Error expression
+# 76. Missing collection in for loop
+for(x : ) { x }
+
+#! Error expression
+# 77. Missing expression before operator
++ y
+
+#! Error expression
+# 78. Missing condition in if expression
+if() then: result
+
+#! Error expression
+# 79. Missing then in if expression
+if(condition) result
+
+#! Error expression
+# 80. Invalid for loop syntax
+for x in items { x }
+
+#! Error expression
+# 81. Missing type in variable declaration
+var x : = 42
+
+#! Error expression
+# 82. Missing value in variable declaration
+var x : int =
+
+#! Error expression
+# 83. Invalid specifier syntax
+<>
+
+#! Error expression
+# 84. Incomplete specifier
+<public
+
+#! Error expression
+# 85. Invalid identifier starting with number
+123abc
+
+#! Error expression
+# 86. Empty line with different indentation level
+for(x : items):
+  process(x)
+
+    continue()
+
+#! Error expression
+# 87. Empty case expression with spaces
+case(x) { }
+
+#! Error expression
+# 88. Expression with only comments
+<# this is just a comment #>
+
+#! Error expression
+# 89. Invalid comment nesting
+<# comment <# nested #> incomplete
+
+#! Error expression
+# 90. Invalid comment structure
+<# unclosed comment
+
+#! Error expression
+# 91. Function with trailing comma in params
+f(x, y,) := x + y
+
+#! Error expression
+# 92. Class expression without assignment
+@editable
+class { }
+
+#! Error expression
+# 98. Case without default branch
+case(x) { _ => }
+
+#! Error expression
+# 99. Case with arithmetic expressions
+case(x + y):
+  a * b => result1
+  c - d => result2
+  _ => default
+
+#! Error expression
+# 67. Block cannot be followed by :=
+block := { x }

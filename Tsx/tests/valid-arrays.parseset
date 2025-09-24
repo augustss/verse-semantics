@@ -1,0 +1,204 @@
+# Valid Arrays
+# Array construction and array access expressions
+
+#! Valid expression
+# 1. Array access
+myArray[0]
+
+#! Valid expression
+# 2. Matrix access
+matrix[i][j]
+
+#! Valid expression
+# 3. Array access precedence
+arr[i] + arr[j]
+
+#! Valid expression
+# 4. Complex array and function precedence
+getData()[getIndex()] * getMultiplier()
+
+#! Valid expression
+# 5. Chained function calls with mixed bracket styles
+getData()[0].process(x, y).getValue()
+
+#! Valid expression
+# 6. Lambda with array access
+i => arr[i]
+
+#! Valid expression
+# 7. Array construction
+array{1, 2, 3}
+
+#! Valid expression
+# 8. Array with strings
+array{"a", "b", "c"}
+
+#! Valid expression
+# 9. Boolean in array
+array{true, false, true}
+
+#! Valid expression
+# 10. Array of booleans
+flags := array{true, false, true, true}
+
+#! Valid expression
+# 11. Lambda in array
+array{x => x + 1, y => y * 2}
+
+#! Valid expression
+# 12. Array-like function with object arguments
+makeList[
+  Item{id:=1, name:=sword},
+  Item{id:=2, name:=shield},
+  Item{id:=3, name:=potion}
+]
+
+#! Valid expression
+# 13. Square bracket function calls
+f[]
+
+#! Valid expression
+# 14. Function call with arguments
+f[x]
+
+#! Valid expression
+# 15. Function call with multiple arguments
+f[1, 2]
+
+#! Valid expression
+# 16. Function call with nested square brackets
+f[g[x]]
+
+#! Valid expression
+# 17. Mixed brackets
+f(g[x])
+
+#! Valid expression
+# 18. Mixed brackets reverse
+f[g(x)]
+
+#! Valid expression
+# 19. Square bracket function call with expression
+f[x + y]
+
+#! Valid expression
+# 20. Square bracket function in expression
+a + f[b]
+
+#! Valid expression
+# 21. Square bracket function call with three arguments
+f[1, 2, 3]
+
+#! Valid expression
+# 22. Mixed function call and square bracket
+f[a] + g(b)
+
+#! Valid expression
+# 23. Square bracket function call with addition
+a + f[b + c]
+
+#! Valid expression
+# 24. Square bracket function with arithmetic arguments
+f[1 + 2, 3 - 4]
+
+#! Valid expression
+# 25. Mixed nested function calls
+f[g(x, y), h[z]]
+
+#! Valid expression
+# 26. Deeply nested mixed brackets
+f[g(h[i(j[k])])]
+
+#! Valid expression
+# 27. Function call with square brackets and spacing
+add[x, y]
+
+#! Valid expression
+# 28. Mixed function calls with operations
+square[x] + cube(y) - abs[z]
+
+#! Valid expression
+# 29. Member access with square bracket call
+x.f[1, 2].y
+
+#! Valid expression
+# 30. Method call with square brackets
+x.f[a, b, c]
+
+#! Valid expression
+# 31. Const with square bracket function call
+items := getData[1, 2, 3]
+
+#! Valid expression
+# 32. Object with bracket-style function calls in fields
+Settings{items:=getItems[0], count:=len[items]}
+
+#! Valid expression
+# 33. Object with mixed function call styles
+Settings{
+  items:=getItems[0],
+  handler:=getHandler(),
+  filters:=getFilters[all]
+}
+
+#! Valid expression
+# 34. Object in bracket-style function call
+process[Config{debug:=true, verbose:=false}]
+
+#! Valid expression
+# 35. Mixed function call styles with operations
+square[x] + cube(y) - abs[z]
+
+#! Valid expression
+# 36. Configuration with handler array
+Config{
+  handlers:=getHandlers[
+    Handler{
+      fn:=onCreate(),
+      priority:=1
+    }
+  ]
+}
+
+#! Valid expression
+# 37. Complex array and function precedence
+getData()[getIndex()] * getMultiplier()
+
+#! Valid expression
+# 38. Test case
+add(x, y) + sum[1, 2, 3]
+
+#! Valid expression
+# 39. Variable with specifier and complex type
+var data <export> : Array = f[1, 2, 3]
+
+#! Valid expression
+# 40. Multiple variable declarations with arrays
+{
+  var x : int = 10;
+  var y : int = 20;
+  x + y
+}
+
+#! Valid expression
+# 43. Complex GameManager class with arrays
+GameManager := class(BaseManager) {
+  var players: []Player = array{}
+  var isRunning: bool = false
+
+  Start(): void = {
+    isRunning := true;
+    InitializePlayers()
+  }
+
+  AddPlayer(p: Player): bool = {
+    if(not isRunning) then {
+      players := players + array{p};
+      true
+    } else {
+      false
+    }
+  }
+
+  GetPlayerCount(): int = players.length
+}

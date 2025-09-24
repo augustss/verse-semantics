@@ -1,0 +1,310 @@
+# Valid Operators
+# Arithmetic, logical, and comparison operators
+
+#! Valid expression
+# 1. Simple addition
+1 + 2
+
+#! Valid expression
+# 2. Simple subtraction
+5 - 3
+
+#! Valid expression
+# 3. Simple multiplication
+3 * 4
+
+#! Valid expression
+# 4. Simple division
+8 / 2
+
+#! Valid expression
+# 5. Unary minus with number
+-42
+
+#! Valid expression
+# 6. Multiple unary operators
+--x
+
+#! Valid expression
+# 7. Unary minus with precedence
+-1 + 2
+
+#! Valid expression
+# 8. Unary minus with multiplication
+-2 * 3
+
+#! Valid expression
+# 9. Addition without spaces
+1+2
+
+#! Valid expression
+# 10. Subtraction without spaces
+5-3
+
+#! Valid expression
+# 11. Multiplication without spaces
+3*4
+
+#! Valid expression
+# 12. Division without spaces
+8/2
+
+#! Valid expression
+# 13. Variables without spaces around operators
+x+y
+
+#! Valid expression
+# 14. Multiplication with variables without spaces
+x*y
+
+#! Valid expression
+# 15. Variables with spaces around operators
+x + y
+
+#! Valid expression
+# 16. Multiplication with variables and spaces
+x * y
+
+#! Valid expression
+# 17. Addition with extra spaces
+1  +  2
+
+#! Valid expression
+# 18. Multiplication with extra spaces
+3  *  4
+
+#! Valid expression
+# 19. Arithmetic with unary minus without spaces
+a*-b+c
+
+#! Valid expression
+# 20. Arithmetic with unary minus and spaces
+a * -b + c
+
+#! Valid expression
+# 21. Unary with parentheses
+-(1 + 2)
+
+#! Valid expression
+# 22. Complex expression without spaces
+a+b*c-d/e
+
+#! Valid expression
+# 23. Left associativity of subtraction
+10 - 5 - 2
+
+#! Valid expression
+# 24. Left associativity of division
+24 / 4 / 2
+
+#! Valid expression
+# 25. Mixed arithmetic
+10 - 5 + 3
+
+#! Valid expression
+# 26. Mixed addition and subtraction
+10 + 5 - 3
+
+#! Valid expression
+# 27. Mixed multiplication and division
+20 * 2 / 4
+
+#! Valid expression
+# 28. Multiple operations same precedence
+1 + 2 + 3
+
+#! Valid expression
+# 29. Multiple operations same precedence (multiplication)
+2 * 3 * 4
+
+#! Valid expression
+# 30. Mixed spacing - some with, some without
+1+2 * 3-4
+
+#! Valid expression
+# 31. Complex precedence test
+1 + 2 * 3 - 4 / 2
+
+#! Valid expression
+# 32. Nested parentheses with precedence
+((1 + 2) * 3) - 4
+
+#! Valid expression
+# 33. Mixed operators with precedence
+1 + (2 * 3) - (4 / 2)
+
+#! Valid expression
+# 34. Complex nested precedence
+1 + (2 * 3) - (4 / 2)
+
+#! Valid expression
+# 35. Mixed operators with extensive whitespace
+a  +  ( b  +  c )  -  ( d  -  e )
+
+#! Valid expression
+# 36. Mixed operators with precedence
+1 + 2 * 3 - 4 / 5 + 6 * 7 - 8
+
+#! Valid expression
+# 37. Complex arithmetic
+((((((1 + 2) * 3) - 4) / 5) + 6) * 7) - 8
+
+#! Valid expression
+# 38. Long operator chain
+1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10
+
+#! Valid expression
+# 39. Comparison operators
+1 < 2
+
+#! Valid expression
+# 40. Greater than without spaces
+x>0
+
+#! Valid expression
+# 41. Less than without spaces
+x<10
+
+#! Valid expression
+# 42. Greater equal without spaces
+x>=5
+
+#! Valid expression
+# 43. Less equal without spaces
+x<=20
+
+#! Valid expression
+# 44. Less than
+x < 10
+
+#! Valid expression
+# 45. Greater than or equal
+x >= 5
+
+#! Valid expression
+# 46. Less than or equal comparison
+a <= b
+
+#! Valid expression
+# 47. Greater than or equal
+x <= 20
+
+#! Valid expression
+# 48. Comparison with float literals
+x > 1.5
+
+#! Valid expression
+# 49. Variables with comparison operators without spaces
+a>b
+
+#! Valid expression
+# 50. Variables with comparison operators and spaces
+a > b
+
+#! Valid expression
+# 51. Complex comparison without spaces
+x+1>y*2
+
+#! Valid expression
+# 52. Comparison with function calls without spaces
+f(x)>g(y)
+
+#! Valid expression
+# 53. Comparison with function calls and spaces
+f(x) > g(y)
+
+#! Valid expression
+# 54. Chained comparisons
+a > b > c
+
+#! Valid expression
+# 55. Multiple comparisons (should be left associative)
+a < b < c
+
+#! Valid expression
+# 56. Comparison with arithmetic
+x + 1 > y - 1
+
+#! Valid expression
+# 57. Complex comparison with arithmetic
+x + 1 > y * 2
+
+#! Valid expression
+# 58. Comparison with arithmetic
+1 + 2 < 3 * 4
+
+#! Valid expression
+# 59. Equality check
+value = 10
+
+#! Valid expression
+# 60. Boolean with not operator
+not true
+
+#! Valid expression
+# 61. Boolean with logical operators
+true and false
+
+#! Valid expression
+# 62. Logical with parentheses
+(a and b) or c
+
+#! Valid expression
+# 63. Multiple comparisons without spaces
+x>0 and y<10
+
+#! Valid expression
+# 64. Mixed spacing in comparisons
+x>0 and y < 10
+
+#! Valid expression
+# 65. Multiple comparisons with logical
+x > 0 and x < 10
+
+#! Valid expression
+# 66. Logical with member access
+item.isValid and item.value > 0
+
+#! Valid expression
+# 67. Member access in logical expression
+obj.isValid and obj.data.exists
+
+#! Valid expression
+# 68. Logical with method calls
+isReady() or canProceed()
+
+#! Valid expression
+# 69. Boolean in operations
+true and false or not true
+
+#! Valid expression
+# 70. Nested boolean expressions
+(true or false) and not false
+
+#! Valid expression
+# 71. Not with comparison
+not (x > 0)
+
+#! Valid expression
+# 72. Complex boolean logic
+(age >= 18 and age <= 65) and (not retired or hasException)
+
+#! Valid expression
+# 73. Mathematical expressions with precedence
+result := not false or true and false or (true and not false)
+
+#! Valid expression
+# 74. Operator precedence: multiplication before addition
+2 + 3 * 4
+
+#! Valid expression
+# 75. Operator precedence: division before subtraction
+10 - 8 / 2
+
+#! Valid expression
+# 76. Complex variables with mixed spacing
+a + b*c - d / e
+
+#! Valid expression
+# 77. Chain of different operators
+a + b - c * d / e + f - g
