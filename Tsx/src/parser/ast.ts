@@ -280,6 +280,7 @@ export interface RangeExpression extends Expression {
  * Stores:
  * - arrowOffset: Position of the => token
  * - parameterSeparatorOffsets: Positions of commas between parameters
+ * - openParenOffset/closeParenOffset: Positions of ( ) if parameters are parenthesized
  */
 export interface LambdaExpression extends Expression {
   readonly type: 'LambdaExpression';
@@ -287,6 +288,8 @@ export interface LambdaExpression extends Expression {
   readonly body: Expression;
   readonly arrowOffset: number;  // Offset of the '=>' token in the token stream
   readonly parameterSeparatorOffsets: number[]; // Offsets of commas between parameters
+  readonly openParenOffset?: number; // Offset of '(' if parameters are parenthesized
+  readonly closeParenOffset?: number; // Offset of ')' if parameters are parenthesized
 }
 
 /**

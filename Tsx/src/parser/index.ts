@@ -30,7 +30,6 @@ export {
   UsingStatement,
   Program,
   parseProgram,
-  parseTopLevel,
   createTopLevelParser
 } from './top-level-parser';
 

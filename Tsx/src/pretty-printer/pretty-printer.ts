@@ -142,6 +142,28 @@ export class PrettyPrinter {
         return this.printCompoundExpression(node as AST.CompoundExpression);
       case 'IdentedCompoundExpression':
         return this.printIdentedCompoundExpression(node as AST.IdentedCompoundExpression);
+      case 'ConstantDeclaration':
+        return this.printConstantDeclaration(node as AST.ConstantDeclaration);
+      case 'IfExpression':
+        return this.printIfExpression(node as AST.IfExpression);
+      case 'ForExpression':
+        return this.printForExpression(node as AST.ForExpression);
+      case 'BlockExpression':
+        return this.printBlockExpression(node as AST.BlockExpression);
+      case 'LoopExpression':
+        return this.printLoopExpression(node as AST.LoopExpression);
+      case 'CaseExpression':
+        return this.printCaseExpression(node as AST.CaseExpression);
+      case 'SetExpression':
+        return this.printSetExpression(node as AST.SetExpression);
+      case 'ObjectConstructorExpression':
+        return this.printObjectConstructorExpression(node as AST.ObjectConstructorExpression);
+      case 'BreakExpression':
+        return this.printBreakExpression(node as AST.BreakExpression);
+      case 'ContinueExpression':
+        return this.printContinueExpression(node as AST.ContinueExpression);
+      case 'ReturnExpression':
+        return this.printReturnExpression(node as AST.ReturnExpression);
       default:
         return '';
     }
@@ -441,6 +463,218 @@ export class PrettyPrinter {
       }
     }
     return -1;
+  }
+
+  private printConstantDeclaration(node: AST.ConstantDeclaration): string {
+    let result = this.printSkippedTokens(node.nameOffset);
+    result += this.printToken(node.nameOffset); // name
+
+    if (node.specifiers) {
+      // TODO: Handle specifiers
+    }
+
+    if (node.assignOffset !== undefined) {
+      result += this.printSkippedTokens(node.assignOffset);
+      result += this.printToken(node.assignOffset); // :=
+      if (node.initializer) {
+        result += this.printExpression(node.initializer);
+      }
+    }
+
+    return result;
+  }
+
+  private printIfExpression(node: AST.IfExpression): string {
+    let result = this.printSkippedTokens(node.ifOffset);
+    result += this.printToken(node.ifOffset); // if
+    result += this.printExpression(node.condition);
+
+    if (node.thenOffset !== undefined) {
+      result += this.printSkippedTokens(node.thenOffset);
+      result += this.printToken(node.thenOffset); // then
+    }
+    if (node.thenBranch) {
+      result += this.printExpression(node.thenBranch);
+    }
+
+    if (node.elseOffset !== undefined) {
+      result += this.printSkippedTokens(node.elseOffset);
+      result += this.printToken(node.elseOffset); // else
+    }
+    if (node.elseBranch) {
+      result += this.printExpression(node.elseBranch);
+    }
+
+    return result;
+  }
+
+  private printForExpression(node: AST.ForExpression): string {
+    let result = this.printSkippedTokens(node.forOffset);
+    result += this.printToken(node.forOffset); // for
+
+    if (node.openParenOffset !== undefined) {
+      result += this.printSkippedTokens(node.openParenOffset);
+      result += this.printToken(node.openParenOffset); // (
+
+      if (node.indexVariableOffset !== undefined) {
+        result += this.printSkippedTokens(node.indexVariableOffset);
+        result += this.printToken(node.indexVariableOffset); // index var
+      }
+      if (node.arrowOffset !== undefined) {
+        result += this.printSkippedTokens(node.arrowOffset);
+        result += this.printToken(node.arrowOffset); // ->
+      }
+
+      result += this.printSkippedTokens(node.variableOffset);
+      result += this.printToken(node.variableOffset); // variable
+
+      result += this.printSkippedTokens(node.colonOffset);
+      result += this.printToken(node.colonOffset); // :
+      result += this.printExpression(node.iterable);
+
+      if (node.closeParenOffset !== undefined) {
+        result += this.printSkippedTokens(node.closeParenOffset);
+        result += this.printToken(node.closeParenOffset); // )
+      }
+    } else if (node.colonOffset !== undefined) {
+      result += this.printSkippedTokens(node.colonOffset);
+      result += this.printToken(node.colonOffset); // :
+      result += this.printExpression(node.iterable);
+    }
+
+    if (node.doOffset !== undefined) {
+      result += this.printSkippedTokens(node.doOffset);
+      result += this.printToken(node.doOffset); // do
+    }
+
+    result += this.printExpression(node.body);
+    return result;
+  }
+
+  private printBlockExpression(node: AST.BlockExpression): string {
+    let result = this.printSkippedTokens(node.blockOffset);
+    result += this.printToken(node.blockOffset); // block
+    result += this.printSkippedTokens(node.colonOffset);
+    result += this.printToken(node.colonOffset); // :
+    result += this.printExpression(node.body);
+    return result;
+  }
+
+  private printLoopExpression(node: AST.LoopExpression): string {
+    let result = this.printSkippedTokens(node.loopOffset);
+    result += this.printToken(node.loopOffset); // loop
+    if (node.colonOffset !== undefined) {
+      result += this.printSkippedTokens(node.colonOffset);
+      result += this.printToken(node.colonOffset); // :
+    }
+    result += this.printExpression(node.body);
+    return result;
+  }
+
+  private printCaseExpression(node: AST.CaseExpression): string {
+    let result = this.printSkippedTokens(node.caseOffset);
+    result += this.printToken(node.caseOffset); // case
+    result += this.printSkippedTokens(node.openParenOffset);
+    result += this.printToken(node.openParenOffset); // (
+    result += this.printExpression(node.scrutinee);
+    result += this.printSkippedTokens(node.closeParenOffset);
+    result += this.printToken(node.closeParenOffset); // )
+
+    if (node.openBraceOffset !== undefined) {
+      result += this.printSkippedTokens(node.openBraceOffset);
+      result += this.printToken(node.openBraceOffset); // {
+
+      for (const branch of node.branches) {
+        result += this.printCaseBranch(branch);
+      }
+
+      if (node.closeBraceOffset !== undefined) {
+        result += this.printSkippedTokens(node.closeBraceOffset);
+        result += this.printToken(node.closeBraceOffset); // }
+      }
+    } else if (node.colonOffset !== undefined) {
+      result += this.printSkippedTokens(node.colonOffset);
+      result += this.printToken(node.colonOffset); // :
+
+      for (const branch of node.branches) {
+        result += this.printCaseBranch(branch);
+      }
+    }
+
+    return result;
+  }
+
+  private printCaseBranch(node: AST.CaseBranch): string {
+    let result = '';
+    if (typeof node.pattern === 'string') {
+      // Wildcard pattern - need to find its token position
+      // The wildcard should be just before the arrow
+      const wildcardOffset = node.arrowOffset - 1;
+      result += this.printSkippedTokens(wildcardOffset);
+      result += this.printToken(wildcardOffset); // _
+    } else {
+      result += this.printExpression(node.pattern);
+    }
+    result += this.printSkippedTokens(node.arrowOffset);
+    result += this.printToken(node.arrowOffset); // =>
+    result += this.printExpression(node.body);
+    return result;
+  }
+
+  private printSetExpression(node: AST.SetExpression): string {
+    let result = this.printSkippedTokens(node.setOffset);
+    result += this.printToken(node.setOffset); // set
+    result += this.printExpression(node.target);
+    result += this.printSkippedTokens(node.equalsOffset);
+    result += this.printToken(node.equalsOffset); // =
+    result += this.printExpression(node.value);
+    return result;
+  }
+
+  private printObjectConstructorExpression(node: AST.ObjectConstructorExpression): string {
+    let result = this.printSkippedTokens(node.typeNameOffset);
+    result += this.printToken(node.typeNameOffset); // type name
+    result += this.printSkippedTokens(node.openBraceOffset);
+    result += this.printToken(node.openBraceOffset); // {
+
+    for (let i = 0; i < node.fields.length; i++) {
+      const field = node.fields[i];
+      result += this.printSkippedTokens(field.nameOffset);
+      result += this.printToken(field.nameOffset); // field name
+      result += this.printSkippedTokens(field.assignOffset);
+      result += this.printToken(field.assignOffset); // :=
+      result += this.printExpression(field.value);
+
+      if (i < node.fieldSeparatorOffsets.length) {
+        result += this.printSkippedTokens(node.fieldSeparatorOffsets[i]);
+        result += this.printToken(node.fieldSeparatorOffsets[i]); // ,
+      }
+    }
+
+    result += this.printSkippedTokens(node.closeBraceOffset);
+    result += this.printToken(node.closeBraceOffset); // }
+    return result;
+  }
+
+  private printBreakExpression(node: AST.BreakExpression): string {
+    let result = this.printSkippedTokens(node.tokenOffset);
+    result += this.printToken(node.tokenOffset); // break
+    return result;
+  }
+
+  private printContinueExpression(node: AST.ContinueExpression): string {
+    let result = this.printSkippedTokens(node.tokenOffset);
+    result += this.printToken(node.tokenOffset); // continue
+    return result;
+  }
+
+  private printReturnExpression(node: AST.ReturnExpression): string {
+    let result = this.printSkippedTokens(node.tokenOffset);
+    result += this.printToken(node.tokenOffset); // return
+    if (node.value) {
+      result += this.printExpression(node.value);
+    }
+    return result;
   }
 }
 

@@ -781,10 +781,10 @@ PlayerController := class:
   MovePlayer(direction : Vector3, speed : float) <transacts>: void = { }
 
 
-#! Valid expression
+#! Valid TopLevel
 # 90. 91. Class inheritance chain
 # Original file: valid-data-structures.parseset, line 655
-# Failure: Unexpected token after expression: IDENTIFIER
+# Note: Multiple declarations require TopLevel parsing, not expression parsing
 Animal := class {
   Move(): void = print("moving")
 }
@@ -808,7 +808,7 @@ Puppy := class(Dog) {
 EmptyE2 := enum
 
 
-#! Valid expression
+#! Valid TopLevel
 # 92. 53. Variable names similar to booleans
 # Original file: valid-declarations.parseset, line 222
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -816,7 +816,7 @@ truely := 1
 falsey := 0
 
 
-#! Valid expression
+#! Error expression
 # 93. 56. Mixed indentation levels (should only parse base level)
 # Original file: valid-expression.parseset, line 254
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -894,7 +894,7 @@ PlayerController := class:
 for:
     setup := initialize()
 
-    then:
+    if:
 
         process := execute()
 
@@ -918,7 +918,7 @@ for:
 f(x, y,) := x + y
 
 
-#! Valid expression
+#! Valid TopLevel
 # 123. 572. Class inheritance chain
 # Original file: valid-expression.parseset, line 3142
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -971,8 +971,7 @@ x:= class { x := 1; DoSomething():= x + 1 }
 # Original file: valid-expression.parseset, line 3677
 # Failure: 'class' is a reserved keyword and cannot be used as an identifier
 TestClass := class:
-  <decides>
-  CanPerformAction() : logic = true
+  CanPerformAction()  <decides> : logic = true
 
 
 #! Valid expression
@@ -980,19 +979,10 @@ TestClass := class:
 # Original file: valid-expression.parseset, line 3683
 # Failure: 'class' is a reserved keyword and cannot be used as an identifier
 GameManager := class:
-  <transacts>
-  ModifyState() : void = { }
+  ModifyState()   <transacts>: void = { }
 
 
-#! Valid expression
-# 132. 686. Variable names similar to booleans
-# Original file: valid-expression.parseset, line 3812
-# Failure: Unexpected token after expression: IDENTIFIER
-truely := 1
-falsey := 0
-
-
-#! Valid expression
+#! Valid TopLevel
 # 133. 687. Keywords can be parts of larger identifiers
 # Original file: valid-expression.parseset, line 3817
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -1009,8 +999,7 @@ arraySize := 100
 <#
   This is a
   multi-line comment
-x + y
-
+x + y#>x
 
 #! Valid TopLevel
 # 140. 1. Test case

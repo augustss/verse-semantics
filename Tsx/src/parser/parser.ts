@@ -499,9 +499,19 @@ export class Parser {
       }
       // Special handling for 'block'
       if (token.content === 'block') {
-        // Block is always a keyword, never an identifier
-        // Parse as block expression
-        return this.parseBlockExpression(state);
+        // Parse block: using indented compound parser which handles semicolons
+        const compoundResult = this.parseIdentedCompound(state);
+
+        // Wrap the indented compound in a BlockExpression
+        const compound = compoundResult.node;
+        const blockExpr: AST.BlockExpression = {
+          type: 'BlockExpression',
+          body: compound,
+          blockOffset: compound.keywordOffset,
+          colonOffset: compound.colonOffset
+        };
+
+        return { node: blockExpr, state: compoundResult.state };
       }
 
       // Other block-forming keywords are handled elsewhere (if, for)

@@ -6,3 +6,9 @@
  */
 
 export { PrettyPrinter, prettyPrint } from './pretty-printer';
+export {
+  ASTReconstructor,
+  reconstructFromAST,
+  reconstructProgramFromAST,
+  ReconstructionOptions
+} from './ast-reconstructor';

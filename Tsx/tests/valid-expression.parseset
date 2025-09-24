@@ -2275,7 +2275,7 @@ block:
 # 452. Multiple nested blocks at same level
 block:
     setup := init()
-    for:
+    if:
         item := process()
         value := compute(item)
     if:

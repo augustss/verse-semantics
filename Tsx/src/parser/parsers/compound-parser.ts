@@ -262,13 +262,30 @@ export class CompoundParser {
         // Skip any trailing trivia on the line
         state = state.skipTrivia();
 
-        // Check for newline
-        if (state.current()?.type === TokenType.NEWLINE) {
+        // Check for separator: semicolon or newline
+        const separator = state.current();
+        if (separator?.type === TokenType.OPERATOR && separator.content === ';') {
+          // Semicolon separator - add to offsets and continue on same line
+          separatorOffsets.push(state.currentOffset());
+          state = state.advance().skipTrivia();
+          // Continue parsing on the same line if there's more content
+          continue;
+        } else if (separator?.type === TokenType.NEWLINE) {
+          // Newline separator - add to offsets and move to next line
           separatorOffsets.push(state.currentOffset());
           state = state.advance().skipTrivia();
         } else {
-          // No newline, we're done with the compound
-          break;
+          // No explicit separator - check if we're still at the right indentation
+          // This happens after parsing a nested block that consumed its trailing newline
+          const current = state.current();
+          if (current && current.position.column === nextLineIndent) {
+            // We're at the correct indentation level, continue parsing
+            // The nested block already consumed the newline separator
+            continue;
+          } else {
+            // We're not at the right indentation, we're done with the compound
+            break;
+          }
         }
       }
 

@@ -156,10 +156,13 @@ export class LambdaParser {
 
     const params: AST.IdentifierExpression[] = [];
     const parameterSeparatorOffsets: number[] = [];
+    let openParenOffset: number | undefined;
+    let closeParenOffset: number | undefined;
 
     // Parse parameter(s)
     if (startToken.type === TokenType.OPERATOR && startToken.content === '(') {
       // Parenthesized parameter list
+      openParenOffset = state.currentOffset();
       state = state.advance();
 
       // Parse comma-separated parameters
@@ -181,6 +184,7 @@ export class LambdaParser {
       if (!(state.current()?.type === TokenType.OPERATOR && state.current()?.content === ')')) {
         throw new ParseError('Expected )', state.position, state.current() || undefined);
       }
+      closeParenOffset = state.currentOffset();
       state = state.advance();
 
       // Collect trailing tokens after closing paren
@@ -212,7 +216,9 @@ export class LambdaParser {
       parameters: params,
       body: bodyResult.node,
       arrowOffset,
-      parameterSeparatorOffsets
+      parameterSeparatorOffsets,
+      openParenOffset,
+      closeParenOffset
     };
 
     return { node, state: bodyResult.state };

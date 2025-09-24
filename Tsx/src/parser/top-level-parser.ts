@@ -297,13 +297,5 @@ export function createTopLevelParser(): TopLevelParser {
   return new TopLevelParser();
 }
 
-/**
- * Parse a single top-level declaration (for testing)
- */
-export function parseTopLevel(source: string): AST.Declaration {
-  const stream = TokenStream.fromString(source);
-  const state = createParserState(stream);
-  const parser = createParser();
-  const result = parser.parseDeclaration(state);
-  return result.node;
-}
+// parseTopLevel has been removed - use parseProgram instead.
+// For single declarations, parseProgram will return a Program with one declaration.
