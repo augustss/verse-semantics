@@ -17,7 +17,7 @@ export const setExprParser = (exprParser: () => PC.Parser<AST.Expr>) => {
 };
 
 // Parse a single case branch
-const parseCaseBranch: PC.Parser<AST.CaseBranch> = (state) => {
+const parseCaseBranch: PC.Parser<AST.CaseBranch> = (state, style?: 'braces' | 'indentation') => {
   const startPos = state.position;
 
   // Try to parse underscore for default case
@@ -62,20 +62,72 @@ const parseCaseBranch: PC.Parser<AST.CaseBranch> = (state) => {
   const arrowResult = arrowOp(afterPattern);
   if (!arrowResult.success) return { success: false, error: 'Expected => after case pattern', state };
 
-  // Parse body (optional for default case)
+  // Parse body
   let body: AST.Expr | undefined;
   let endState = arrowResult.state;
 
-  // Check if there's a body (not just immediately followed by comma or closing brace)
-  const nextCharResult = PC.peek(endState);
-  if (nextCharResult.success && nextCharResult.value !== ',' && nextCharResult.value !== '}') {
-    if (!getExpr) {
-      return { success: false, error: 'Expression parser not initialized for body', state };
+  // For indentation style, check if body is on next line and indented
+  if (style === 'indentation') {
+    // Check if we have a newline after =>
+    let checkPos = arrowResult.state.position;
+    while (checkPos < arrowResult.state.input.length &&
+           /[ \t]/.test(arrowResult.state.input[checkPos])) {
+      checkPos++;
     }
-    const bodyResult = getExpr()(arrowResult.state);
-    if (bodyResult.success) {
-      body = bodyResult.value;
-      endState = bodyResult.state;
+
+    if (checkPos < arrowResult.state.input.length &&
+        (arrowResult.state.input[checkPos] === '\n' || arrowResult.state.input[checkPos] === '\r')) {
+      // Body is on the next line(s), parse as indented block
+      const { parseIndentedStatements } = require('./shared-indented');
+
+      // Move to next line
+      let bodyState = arrowResult.state;
+      while (bodyState.position < bodyState.input.length &&
+             bodyState.input[bodyState.position] !== '\n') {
+        bodyState = { ...bodyState, position: bodyState.position + 1 };
+      }
+      if (bodyState.position < bodyState.input.length) {
+        bodyState = { ...bodyState, position: bodyState.position + 1 }; // Skip newline
+      }
+
+      // Parse indented statements
+      const indentedResult = parseIndentedStatements(bodyState, getExpr);
+      if (indentedResult.success && indentedResult.value.length > 0) {
+        // If we have multiple statements, wrap in a block
+        if (indentedResult.value.length > 1) {
+          body = AST.block(
+            indentedResult.value,
+            { start: indentedResult.value[0].span.start, end: indentedResult.state.position }
+          );
+        } else {
+          body = indentedResult.value[0];
+        }
+        endState = indentedResult.state;
+      }
+    } else {
+      // Body is on the same line, parse as single expression
+      if (!getExpr) {
+        return { success: false, error: 'Expression parser not initialized for body', state };
+      }
+      const bodyResult = getExpr()(arrowResult.state);
+      if (bodyResult.success) {
+        body = bodyResult.value;
+        endState = bodyResult.state;
+      }
+    }
+  } else {
+    // Brace style - parse single expression on same line
+    // Check if there's a body (not just immediately followed by comma or closing brace)
+    const nextCharResult = PC.peek(endState);
+    if (nextCharResult.success && nextCharResult.value !== ',' && nextCharResult.value !== '}') {
+      if (!getExpr) {
+        return { success: false, error: 'Expression parser not initialized for body', state };
+      }
+      const bodyResult = getExpr()(arrowResult.state);
+      if (bodyResult.success) {
+        body = bodyResult.value;
+        endState = bodyResult.state;
+      }
     }
   }
 
@@ -186,7 +238,7 @@ export const caseExpression: PC.Parser<AST.Expr> = (state) => {
       }
 
       // Parse a branch
-      const branchResult = parseCaseBranch(bodyState);
+      const branchResult = parseCaseBranch(bodyState, style);
       if (!branchResult.success) break;
 
       branches.push(branchResult.value);
@@ -293,7 +345,7 @@ export const caseExpression: PC.Parser<AST.Expr> = (state) => {
 
       // Parse branch starting from line start to include indentation as trivia
       const branchStateWithIndent = { ...bodyState, position: lineStart };
-      const branchResult = parseCaseBranch(branchStateWithIndent);
+      const branchResult = parseCaseBranch(branchStateWithIndent, style);
 
       if (!branchResult.success) {
         break;

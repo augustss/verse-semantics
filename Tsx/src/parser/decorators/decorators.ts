@@ -4,7 +4,7 @@
 
 import * as PC from '../../parser-combinators';
 import * as AST from '../../ast';
-import { atSymbol, leftParen, rightParen, comma } from '../operators/punctuation';
+import { atSymbol, leftParen, rightParen, comma, leftBrace, rightBrace } from '../operators/punctuation';
 import { variable } from '../literals/identifiers';
 
 // Forward declaration for expression parser to avoid circular dependencies
@@ -34,7 +34,8 @@ export const decorator: PC.Parser<AST.Decorator> = (state) => {
   let args: AST.Expr[] | undefined;
   let commas: AST.Token<','>[] | undefined;
 
-  // Check for optional arguments: @name(arg1, arg2)
+  // Check for optional arguments: @name(arg1, arg2) or @name{key := value}
+  // First try parentheses
   const leftParenResult = leftParen(currentState);
   if (leftParenResult.success) {
     leftParenToken = leftParenResult.value;
@@ -75,6 +76,35 @@ export const decorator: PC.Parser<AST.Decorator> = (state) => {
       }
       rightParenToken = rightParenResult2.value;
       currentState = rightParenResult2.state;
+    }
+  } else {
+    // Try braces for @editable {ToolTip := "text"} style
+    const leftBraceResult = leftBrace(currentState);
+    if (leftBraceResult.success) {
+      currentState = leftBraceResult.state;
+
+      // Parse the brace content as an expression
+      // This could be empty {} or contain key := value pairs
+      const rightBraceCheck = rightBrace(currentState);
+      if (rightBraceCheck.success) {
+        // Empty braces @editable {}
+        currentState = rightBraceCheck.state;
+      } else {
+        // Parse the content as an expression
+        const contentResult = getExpr()(currentState);
+        if (contentResult.success) {
+          // Store as single argument
+          args = [contentResult.value];
+          currentState = contentResult.state;
+        }
+
+        // Expect closing brace
+        const rightBraceResult = rightBrace(currentState);
+        if (!rightBraceResult.success) {
+          return { success: false, error: 'Expected } after decorator brace content', state };
+        }
+        currentState = rightBraceResult.state;
+      }
     }
   }
 

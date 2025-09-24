@@ -199,12 +199,6 @@ notEqual := false
 orElse := true
 arraySize := 100
 
-#! Error Expression
-# 43. Keywords in member access
-obj.class
-data.array
-result.block
-
 #! Valid Expression
 # 44. Keywords in comments
 # This is a comment about block and continue

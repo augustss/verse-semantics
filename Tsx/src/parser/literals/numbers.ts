@@ -26,6 +26,12 @@ export const integer: PC.Parser<AST.IntegerLiteral> = (state) => {
     }
 
     const newPos = afterTrivia.position + intRegex[0].length;
+
+    // Check if the next character is a letter (invalid - like 123abc)
+    if (newPos < afterTrivia.input.length && /[a-zA-Z_]/.test(afterTrivia.input[newPos])) {
+      return { success: false, error: 'Invalid character after number literal', state };
+    }
+
     const trailingState = { ...afterTrivia, position: newPos };
     const trailingResult = trivia(trailingState);
     const trailingTrivia = trailingResult.success ? trailingResult.value : '';
@@ -61,6 +67,11 @@ export const integer: PC.Parser<AST.IntegerLiteral> = (state) => {
   }
 
   const newPos = afterTrivia.position + match[0].length;
+
+  // Check if the next character is a letter (invalid - like 123abc)
+  if (newPos < afterTrivia.input.length && /[a-zA-Z_]/.test(afterTrivia.input[newPos])) {
+    return { success: false, error: 'Invalid character after number literal', state };
+  }
 
   // Get trailing trivia
   const trailingState = { ...afterTrivia, position: newPos };
@@ -112,6 +123,11 @@ export const floatLiteral: PC.Parser<AST.FloatLiteral> = (state) => {
   }
 
   const newPos = afterTrivia.position + match[0].length;
+
+  // Check if the next character is a letter (invalid - like 1.23abc)
+  if (newPos < afterTrivia.input.length && /[a-zA-Z_]/.test(afterTrivia.input[newPos])) {
+    return { success: false, error: 'Invalid character after number literal', state };
+  }
 
   // Get trailing trivia
   const trailingState = { ...afterTrivia, position: newPos };

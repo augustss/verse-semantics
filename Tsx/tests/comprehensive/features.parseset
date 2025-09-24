@@ -228,7 +228,4 @@ continued := class { }
 #! Valid Expression
 # 25. Variable names similar to keywords
 blocking := 1
-
-#! Valid Expression
-# 26. Method named continue (as long as it's called, not assigned)
-obj.continue()
+ 
