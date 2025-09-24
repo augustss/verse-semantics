@@ -152,18 +152,35 @@ nil = Tuple []
 sing :: Value -> Value
 sing x = Tuple [x]
 
+coll :: P ENV -> ENV
+coll Empty     = ENVS.empty
+coll (a :\/ b) = coll a \/ coll b
+coll (a :++ b) = coll a \/ coll b
+coll (Unit e)  = e
+
 fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
 fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
 fOR xs d@Unit{}  t i x =
-  d *** unit sings *** dE t p q >>> (p:q:xs)
-  `union` 
-  nOT (d >>> xs) *** unit (i .= nil /\ x .= nil)
+  (d *** unit sings *** dE t p q >>> (p:q:xs))
+  `union`
+  (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
         sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
                          | ip <- allInts
                          , iq <- allInts
                          ]
-fOR xs (a :\/ b) t i x = fOR xs a t i x `union` fOR xs b t i x
+--fOR xs (a :\/ b) t i x = fOR xs a t i x `union` fOR xs b t i x
+--fOR xs (a :\/ b) t i x = fOR xs a t i x +++ fOR xs b t i x
+--fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
+
+fOR xs ab@(a :\/ b) t i x =
+  (unit ca *** fOR xs a t i x) `union`
+  (unit cb *** fOR xs b t i x)
+  `union` (unit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
+--  `union` (nOT (ab >>> xs) *** unit (i .= nil /\ x .= nil))
+  where ca = coll (a >>> xs)
+        cb = coll (b >>> xs)
+
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
@@ -206,9 +223,10 @@ dE Fail                             _ _ = Empty
 dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
   dE t0 i x `union` dE t1 i x
 dE (If3 t0 t1 t2)                   i x =
-  s0 *** dB t1 i x >>> xs
+  (s0 *** dB t1 i x >>> xs)
   `union`
-  nOT (s0 >>> xs) *** dB t2 i x
+  -- +++
+  (nOT (s0 >>> xs) *** dB t2 i x)
   where xs = bvs t0
         s0 = oNE xs (dC t0)
 dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
@@ -307,8 +325,9 @@ u=Ident noLoc "u"
 v=Ident noLoc "v"
 --t0=DefineIE x (k0 `Choice` k1)
 --t1=For2 t0 (Variable x)
-t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
-t1=Variable x
+--t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
+t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
+t1=Variable i
 tfor = For2 t0 t1
 tn=Variable n `Unify` k1
 tt = tn `Seq` tfor
