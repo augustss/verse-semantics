@@ -55,18 +55,44 @@ testds("Tim2a", pom, pass) {x:=1|||2}        {"{[{{u=v=1}}],[{{u=v=2}}]}"}
 testds("Tim2b", pom, pass) {x:=1|||2; x=1|2} {"{[{{u=v=1}}],[{{u=v=2}}]}"}
 
 # using for{...} instead of all{...}
-testds("all1", pom, pass)  {for {(x:=1|2)}}           {"{[{{u=v=<1,2>}}]}"}
-testds("all2a", pom, pass) {for {(x:=1|2|3; x>0)}}    {"{[{{u=v=<1,2,3>}}]}"}
-testds("all2b", pom, pass) {for {(x:=1|2|3; x>1)}}    {"{[{{u=v=<2,3>}}]}"}
-testds("all3",  pom, pass) {for {(x=1;w=1) | (x=2;w=2)} }
+testds("Tall1", pom, pass)  {for {(x:=1|2)}}           {"{[{{u=v=<1,2>}}]}"}
+testds("Tall2a", pom, pass) {for {(x:=1|2|3; x>0)}}    {"{[{{u=v=<1,2,3>}}]}"}
+testds("Tall2b", pom, pass) {for {(x:=1|2|3; x>1)}}    {"{[{{u=v=<2,3>}}]}"}
+testds("Tall3",  pom, pass) {for {(x=1;w=1) | (x=2;w=2)} }
   {"{[{{u=v=<>,w/=1,w/=2}} U {{u=v=<>,w/=1,x/=2}} U {{u=v=<>,w/=2,x/=1}} U {{u=v=<>,x/=1,x/=2}}],[{{w=x=1,u=v=<1>}}],[{{w=x=2,u=v=<2>}}]}"}
-testds("all4a", pom, pass) {x:int; x=(2|1); for {(x=1) | (x=2)}}    {"{[{{u=v=<2>}},{{u=v=<1>}}]}"}
-testds("all4b", pom, pass) {x:int; a:=for {(x=1) | (x=2)}; x=(2|1); a}    {"{[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
-testds("all5a", pom, pass) {for {x=1|2}}    {"{[{{u=v=<>,x/=1,x/=2}}],[{{x=1,u=v=<1>}}],[{{x=2,u=v=<2>}}]}"}
-testds("all5b", pom, pass) {x:int; for {(x=1) | (x=2)}}    {"{[{{u=v=<>}}],[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
-testds("all6", pom, pass) {x:int; for {x=1|2}; x=2}    {"{[{{u=v=2}}]}"}
+testds("Tall4a", pom, pass) {x:int; x=(2|1); for {(x=1) | (x=2)}}    {"{[{{u=v=<2>}},{{u=v=<1>}}]}"}
+testds("Tall4b", pom, pass) {x:int; a:=for {(x=1) | (x=2)}; x=(2|1); a}    {"{[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+testds("Tall5a", pom, pass) {for {x=1|2}}    {"{[{{u=v=<>,x/=1,x/=2}}],[{{x=1,u=v=<1>}}],[{{x=2,u=v=<2>}}]}"}
+testds("Tall5b", pom, pass) {x:int; for {(x=1) | (x=2)}}    {"{[{{u=v=<>}}],[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+testds("Tall6", pom, pass) {x:int; for {x=1|2}; x=2}    {"{[{{u=v=2}}]}"}
 # all7 technically allows 'n' to be unbounded
-testds("all7", pom, pass, broken) {n:int; n=3; for {x:=1..n}}    {"{[{{u=v=<1,2,3>}}]}"}
+testds("Tall7a", pom, pass, broken) {n:int; n=3; for {x:=1..n}}    {"{[{{u=v=<1,2,3>}}]}"}
+testds("Tall7b", pom, pass) {for {x:=(1..n|1..m)}}    {"{[{{m=n=1,u=v=<1,1>}}],[{{m=1,n=2,u=v=<1,2,1>}}],[{{m=1,n=3,u=v=<1,2,3,1>}}],[{{m=1,u=v=<1>,n/=1}}],[{{m=1,u=v=<1>,n/=2}}],[{{m=1,u=v=<1>,n/=3}}],[{{n=1,m=2,u=v=<1,1,2>}}],[{{m=n=2,u=v=<1,2,1,2>}}],[{{m=2,n=3,u=v=<1,2,3,1,2>}}],[{{m=2,u=v=<1,2>,n/=1}}],[{{m=2,u=v=<1,2>,n/=2}}],[{{m=2,u=v=<1,2>,n/=3}}],[{{n=1,m=3,u=v=<1,1,2,3>}}],[{{n=2,m=3,u=v=<1,2,1,2,3>}}],[{{m=n=3,u=v=<1,2,3,1,2,3>}}],[{{m=3,u=v=<1,2,3>,n/=1}}],[{{m=3,u=v=<1,2,3>,n/=2}}],[{{m=3,u=v=<1,2,3>,n/=3}}],[{{n=1,u=v=<1>,m/=1}}],[{{n=1,u=v=<1>,m/=2}}],[{{n=1,u=v=<1>,m/=3}}],[{{n=2,u=v=<1,2>,m/=1}}],[{{n=2,u=v=<1,2>,m/=2}}],[{{n=2,u=v=<1,2>,m/=3}}],[{{n=3,u=v=<1,2,3>,m/=1}}],[{{n=3,u=v=<1,2,3>,m/=2}}],[{{n=3,u=v=<1,2,3>,m/=3}}],[{{u=v=<>,m/=1,n/=1}}],[{{u=v=<>,m/=1,n/=2}}],[{{u=v=<>,m/=1,n/=3}}],[{{u=v=<>,m/=2,n/=1}}],[{{u=v=<>,m/=2,n/=2}}],[{{u=v=<>,m/=2,n/=3}}],[{{u=v=<>,m/=3,n/=1}}],[{{u=v=<>,m/=3,n/=2}}],[{{u=v=<>,m/=3,n/=3}}]}"}
+
+## Jeff: Lennart: why is u=v=x=0 here? Shouldn't x be minbound'd by 1..? Same for n and m...
+## marking broken
+## adding n<2; m<2 to truncate results
+## Answer: because the 'x' inside the domain is only scoped for the domain, So
+## the reference to 'n' 'm' and 'x' after the ';' are different variables
+testds("Tall7c", pom, pass, broken) {for {x:=(1..n|1..m)}; n<2; m<2; x<2}    {"{[{{m=n=u=v=x=0}} U {{m=n=0,u=v=x=1}}],[{{m=n=u=v=x=0}} U {{m=n=0,u=v=x=1}} U {{m=u=v=x=0,n=1}} U {{m=0,n=u=v=x=1}}],[{{m=n=u=v=x=0}} U {{m=n=0,u=v=x=1}} U {{m=u=v=x=0,n=1}} U {{m=0,n=u=v=x=1}} U {{n=u=v=x=0,m=1}} U {{n=0,m=u=v=x=1}} U {{u=v=x=0,m=n=1}} U {{m=n=u=v=x=1}}],[{{m=n=u=v=x=0}} U {{m=n=0,u=v=x=1}} U {{n=u=v=x=0,m=1}} U {{n=0,m=u=v=x=1}}],[{{m=u=v=x=0,n=1}} U {{m=0,n=u=v=x=1}}],[{{m=u=v=x=0,n=1}} U {{m=0,n=u=v=x=1}} U {{u=v=x=0,m=n=1}} U {{m=n=u=v=x=1}}],[{{n=u=v=x=0,m=1}} U {{n=0,m=u=v=x=1}}],[{{n=u=v=x=0,m=1}} U {{n=0,m=u=v=x=1}} U {{u=v=x=0,m=n=1}} U {{m=n=u=v=x=1}}],[{{u=v=x=0,m=n=1}} U {{m=n=u=v=x=1}}]}"}
+testds("Tall8a", pom, pass)  {x:=(2|1); for {(x=1|2)}}           {"{[{{u=v=<2>}},{{u=v=<1>}}]}"}
+testds("Tall8b", pom, pass)  {r:=for{(x=1|2)}; x:=(2|1); r}      {"{[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+
+############### for
+testds("Tfor1",   pom, pass)  { for(x=(1|2)){x} }   {"{[{{u=v=<>,x/=1,x/=2}}],[{{x=1,u=v=<1>}}],[{{x=2,u=v=<2>}}]}"}
+testds("Tfor1a",   pom, pass, broken) { for(x:=1|2; y:=3|4){ (x,y) } }         {"{[{{u=v=<1,3>}}],[{{u=v=<1,4>}}],[{{u=v=<2,3>}}],[{{u=v=<2,4>}}]}"}
+testds("Tfor1b",   pom, pass, broken) { for(x:=1|y; y:=3|4){(x,y)} }           {"{[{{u=v=<1,3>}}],[{{u=v=<1,4>}}],[{{u=v=<3,3>}}],[{{u=v=<4,4>}}]}"}
+
+# skip any test with exist, not implemented yet
+testds("Tfor2", pom, pass, skip)  { exists x y { for(x=1|2; y=3|4) {(x,y)} } }    {"???"}
+testds("Tfor2a", pom, pass, skip) { exists x { x=(2|1); for(x=1|2) {x} } }              {"{[{{u=v=<2>}}],[{{u=v=<1>}}]}"}
+testds("Tfor3a",   pom, pass, skip) { exists x { for(x=1|2) {x} } }              {"{[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+
+# skip: error: Bad LHS to := 1 | 0 = 1 | x
+testds("Tfor4",   pom, pass, skip) { for(x:=1 | 0=1 | x:=2) { x | 0=1 | 3 } }    {"???"}
+testds("Tfor4a", pom, pass, broken) { for(x:=( (y=3;1) | 2) ) {x * 2} }          {"{[{{u=v=<4>,y/=3}}],[{{y=3,u=v=<2,4>}}]}"}
+testds("Tfor5",   pom, pass, broken) { for(x:=((y=(3|4); 1) | 2)) {x * 2} }               {"{[{{u=v=<2,4>,y/=3,y/=4}}],[{{y=3,u=v=<2,4>}}],[{{y=4,u=v=<2,4>}}]}"}
+
 
 testds("apptup1",pom, pass) {a:=(1,2); a[0]}                      {"{[{{u=v=1}}]}"}
 testds("apptup2",pom, pass) {a:=(1,2); a[1]}                      {"{[{{u=v=2}}]}"}
