@@ -246,34 +246,6 @@ export class TokenStream {
     return result;
   }
 
-  /**
-   * Pretty prints a range of tokens for debugging.
-   * @param start - Starting index (default: 0)
-   * @param count - Number of tokens to print (default: 10)
-   */
-  prettyPrint(start: number = 0, count: number = 10): void {
-    const end = Math.min(start + count, this.tokens.length);
-
-    console.log(`\nTokens [${start}-${end - 1}]:`);
-    console.log('─'.repeat(60));
-
-    for (let i = start; i < end; i++) {
-      const token = this.tokens[i];
-      const marker = i === this.currentIndex ? '→' : ' ';
-      const content = token.content
-        .replace(/\n/g, '\\n')
-        .replace(/\t/g, '\\t')
-        .slice(0, 30);
-
-      console.log(
-        `${marker} ${i.toString().padStart(3)}: ` +
-        `${token.type.padEnd(18)} ` +
-        `"${content}${token.content.length > 30 ? '...' : ''}" ` +
-        `(${token.position.line}:${token.position.column})`
-      );
-    }
-    console.log('─'.repeat(60));
-  }
 
   /**
    * Reconstructs the original source from tokens.

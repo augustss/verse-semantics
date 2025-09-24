@@ -678,10 +678,3 @@ export class PrettyPrinter {
   }
 }
 
-/**
- * Pretty print an AST node to source code.
- */
-export function prettyPrint(node: AST.Expression, tokenStream: TokenStream): string {
-  const printer = new PrettyPrinter(tokenStream);
-  return printer.print(node);
-}

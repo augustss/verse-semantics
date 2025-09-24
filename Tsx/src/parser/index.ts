@@ -4,34 +4,28 @@
  * Provides parsing functionality for the Verse language.
  * Main interface is through the parse() function which takes
  * source code or a TokenStream and returns an AST.
+ *
+ * Enhanced with source range tracking for perfect reconstruction.
  */
 
 // Re-export types
 export * from './ast';
 
-// Re-export from main parser
+// Re-export from main parser (traditional)
 export {
   Parser,
   ParserState,
   ParseError,
-  ParseResult,
   createParser,
   createParserState,
-  parseExpression,
-  parseExpressionFromTokens,
-  parseExpressions,
-  parseLiteral,
-  isValidExpression
+  parseExpression
 } from './parser';
+
 
 // Re-export top-level parser
 export {
-  TopLevelParser,
   UsingStatement,
   Program,
-  parseProgram,
-  createTopLevelParser
+  parseProgram
 } from './top-level-parser';
 
-// Re-export parser modules for advanced usage
-export * from './parsers';

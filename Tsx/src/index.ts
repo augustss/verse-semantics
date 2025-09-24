@@ -62,5 +62,3 @@ export * from './parser';
 // Export the pretty printer
 export * from './pretty-printer';
 
-// Version info
-export const VERSION = '1.0.0';

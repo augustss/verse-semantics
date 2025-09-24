@@ -290,12 +290,6 @@ export function parseProgram(source: string): Program {
   return result.node;
 }
 
-/**
- * Create a top-level parser instance
- */
-export function createTopLevelParser(): TopLevelParser {
-  return new TopLevelParser();
-}
 
 // parseTopLevel has been removed - use parseProgram instead.
 // For single declarations, parseProgram will return a Program with one declaration.

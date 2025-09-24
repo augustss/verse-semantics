@@ -1,8 +1,11 @@
-scripts/*
+# Archive and temporary files
+archive/*
 debug*
-test-*
-test_*
-*.md
+
+# Allow important scripts and documentation
+!scripts/
+!README.md
+!docs/
 
 # Dependencies
 node_modules/

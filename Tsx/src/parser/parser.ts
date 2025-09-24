@@ -35,7 +35,11 @@ import { TokenStream } from '../lexer/tokenstream';
 import { Token, TokenType } from '../lexer/token';
 import * as AST from './ast';
 import { ParserState, ParseResult, ParseError } from './parser-state';
-import { LiteralParser, OperatorParser, CompoundParser, LambdaParser, DeclarationParser } from './parsers';
+import { LiteralParser } from './parsers/literal-parser';
+import { OperatorParser } from './parsers/operator-parser';
+import { CompoundParser } from './parsers/compound-parser';
+import { LambdaParser } from './parsers/lambda-parser';
+import { DeclarationParser } from './parsers/declaration-parser';
 
 // Re-export parser state types for consumers
 export { ParserState, ParseResult, ParseError } from './parser-state';
@@ -2318,104 +2322,3 @@ export function parseExpression(source: string): AST.Expression {
   return result.node;
 }
 
-/**
- * Parse an expression from a pre-lexed token stream.
- *
- * Useful when you already have a token stream or need custom lexing options.
- *
- * @param tokens The token stream to parse
- * @returns The parsed expression AST
- */
-export function parseExpressionFromTokens(tokens: TokenStream): AST.Expression {
-  const parser = createParser();
-  const state = createParserState(tokens);
-  const result = parser.parseExpression(state);
-  return result.node;
-}
-
-/**
- * Parse multiple expressions from a string.
- *
- * Expressions can be separated by newlines or semicolons.
- * Useful for parsing files or multi-line input.
- *
- * @param source The source code containing multiple expressions
- * @returns Array of parsed expression ASTs
- */
-export function parseExpressions(source: string): AST.Expression[] {
-  const tokens = TokenStream.fromString(source);
-  tokens.combineTrivia();
-  const parser = createParser();
-  let state = createParserState(tokens);
-  const expressions: AST.Expression[] = [];
-
-  while (!state.isAtEnd()) {
-    state = state.skipTrivia();
-
-    // Skip leading delimiters
-    while (state.match(TokenType.NEWLINE) || (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ';')) {
-      state = state.advance();
-    }
-
-    if (state.isAtEnd()) break;
-
-    // Parse an expression
-    const result = parser.parseExpression(state);
-    expressions.push(result.node);
-    state = result.state;
-
-    // Skip trailing delimiters
-    state = state.skipTrivia();
-    while (state.match(TokenType.NEWLINE) || (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ';')) {
-      state = state.advance();
-    }
-  }
-
-  return expressions;
-}
-
-/**
- * Parse a literal expression from a string.
- *
- * Specialized function for parsing just literals.
- * Throws an error if the input is not a valid literal.
- *
- * @param source The source code containing a literal
- * @returns The parsed literal expression AST
- * @throws ParseError if the input is not a valid literal
- */
-export function parseLiteral(source: string): AST.LiteralExpression {
-  const tokens = TokenStream.fromString(source);
-  tokens.combineTrivia();
-  const parser = createParser();
-  const state = createParserState(tokens);
-  const result = parser.parseLiteral(state);
-
-  // Verify we consumed all input
-  if (!result.state.isAtEnd()) {
-    const remaining = result.state.current();
-    if (remaining && !remaining.isEOF()) {
-      throw new ParseError(`Unexpected token after literal: ${remaining.type}`, result.state.position, remaining);
-    }
-  }
-
-  return result.node;
-}
-
-/**
- * Check if a string is a valid expression.
- *
- * Utility function for validation without throwing errors.
- * Useful for syntax highlighting, validation, etc.
- *
- * @param source The source code to validate
- * @returns true if the source is a valid expression, false otherwise
- */
-export function isValidExpression(source: string): boolean {
-  try {
-    parseExpression(source);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}

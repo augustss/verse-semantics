@@ -32,13 +32,32 @@ export interface ReconstructionOptions {
 export class ASTReconstructor {
   private tokens: Token[];
   private source: string;
-  private lastOffset: number = -1;
+  private lastTokenIndex: number = -1;
   private result: string = '';
+  private offsetToTokenMap: Map<number, number> = new Map();
 
   constructor(source: string, tokenStream?: TokenStream) {
     this.source = source;
     const stream = tokenStream || TokenStream.fromString(source);
     this.tokens = stream.getAllTokens();
+    this.buildOffsetToTokenMap();
+  }
+
+  /**
+   * Build a mapping from character offsets in source to token indices
+   */
+  private buildOffsetToTokenMap(): void {
+    let sourceOffset = 0;
+
+    for (let tokenIndex = 0; tokenIndex < this.tokens.length; tokenIndex++) {
+      const token = this.tokens[tokenIndex];
+
+      // Map the start of this token
+      this.offsetToTokenMap.set(sourceOffset, tokenIndex);
+
+      // Advance the source offset by the token's content length
+      sourceOffset += token.content.length;
+    }
   }
 
   /**
@@ -46,7 +65,7 @@ export class ASTReconstructor {
    */
   reconstruct(node: AST.ASTNode, options?: ReconstructionOptions): string {
     this.result = '';
-    this.lastOffset = -1;
+    this.lastTokenIndex = -1;
     this.reconstructNode(node);
 
     if (options?.includeTrailingTrivia) {
@@ -61,7 +80,7 @@ export class ASTReconstructor {
    */
   reconstructProgram(nodes: AST.ASTNode[], options?: ReconstructionOptions): string {
     this.result = '';
-    this.lastOffset = -1;
+    this.lastTokenIndex = -1;
 
     for (const node of nodes) {
       this.reconstructNode(node);
@@ -75,14 +94,38 @@ export class ASTReconstructor {
   }
 
   /**
-   * Append a token at the given offset, including preceding trivia
+   * Append a token at the given character offset, including preceding trivia
    */
-  private appendToken(offset: number): void {
-    if (offset < 0 || offset >= this.tokens.length) return;
+  private appendToken(charOffset: number): void {
+    const tokenIndex = this.offsetToTokenMap.get(charOffset);
+    if (tokenIndex === undefined) {
+      // Try to find the closest token
+      let bestIndex = -1;
+      let bestDistance = Infinity;
+      for (const [offset, index] of this.offsetToTokenMap.entries()) {
+        const distance = Math.abs(offset - charOffset);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = index;
+        }
+      }
+      if (bestIndex === -1) return;
+      this.appendTokenByIndex(bestIndex);
+      return;
+    }
 
-    // Append all trivia between lastOffset and current offset
-    if (this.lastOffset >= 0) {
-      for (let i = this.lastOffset + 1; i < offset; i++) {
+    this.appendTokenByIndex(tokenIndex);
+  }
+
+  /**
+   * Append a token by token index, including preceding trivia
+   */
+  private appendTokenByIndex(tokenIndex: number): void {
+    if (tokenIndex < 0 || tokenIndex >= this.tokens.length) return;
+
+    // Append all trivia between lastTokenIndex and current tokenIndex
+    if (this.lastTokenIndex >= 0) {
+      for (let i = this.lastTokenIndex + 1; i < tokenIndex; i++) {
         const token = this.tokens[i];
         if (this.isTrivia(token)) {
           this.result += token.content;
@@ -90,7 +133,7 @@ export class ASTReconstructor {
       }
     } else {
       // First token - include all leading trivia
-      for (let i = 0; i < offset; i++) {
+      for (let i = 0; i < tokenIndex; i++) {
         const token = this.tokens[i];
         if (this.isTrivia(token)) {
           this.result += token.content;
@@ -99,17 +142,17 @@ export class ASTReconstructor {
     }
 
     // Append the actual token
-    const token = this.tokens[offset];
+    const token = this.tokens[tokenIndex];
     this.result += token.content;
-    this.lastOffset = offset;
+    this.lastTokenIndex = tokenIndex;
   }
 
   /**
    * Append any remaining trivia after the last token
    */
   private appendRemainingTrivia(): void {
-    if (this.lastOffset >= 0) {
-      for (let i = this.lastOffset + 1; i < this.tokens.length; i++) {
+    if (this.lastTokenIndex >= 0) {
+      for (let i = this.lastTokenIndex + 1; i < this.tokens.length; i++) {
         const token = this.tokens[i];
         if (this.isTrivia(token) || token.type === TokenType.EOF) {
           this.result += token.content;
@@ -289,12 +332,13 @@ export class ASTReconstructor {
   /**
    * Append a token with prefix and suffix (for string quotes)
    */
-  private appendTokenWithPrefix(offset: number, prefix: string, suffix: string): void {
-    if (offset < 0 || offset >= this.tokens.length) return;
+  private appendTokenWithPrefix(charOffset: number, prefix: string, suffix: string): void {
+    const tokenIndex = this.offsetToTokenMap.get(charOffset);
+    if (tokenIndex === undefined || tokenIndex < 0 || tokenIndex >= this.tokens.length) return;
 
-    // Append all trivia between lastOffset and current offset
-    if (this.lastOffset >= 0) {
-      for (let i = this.lastOffset + 1; i < offset; i++) {
+    // Append all trivia between lastTokenIndex and current tokenIndex
+    if (this.lastTokenIndex >= 0) {
+      for (let i = this.lastTokenIndex + 1; i < tokenIndex; i++) {
         const token = this.tokens[i];
         if (this.isTrivia(token)) {
           this.result += token.content;
@@ -302,7 +346,7 @@ export class ASTReconstructor {
       }
     } else {
       // First token - include all leading trivia
-      for (let i = 0; i < offset; i++) {
+      for (let i = 0; i < tokenIndex; i++) {
         const token = this.tokens[i];
         if (this.isTrivia(token)) {
           this.result += token.content;
@@ -311,9 +355,9 @@ export class ASTReconstructor {
     }
 
     // Append the token with prefix and suffix
-    const token = this.tokens[offset];
+    const token = this.tokens[tokenIndex];
     this.result += prefix + token.content + suffix;
-    this.lastOffset = offset;
+    this.lastTokenIndex = tokenIndex;
   }
 
   private reconstructIdentifier(node: AST.IdentifierExpression): void {
@@ -471,15 +515,27 @@ export class ASTReconstructor {
   }
 
   private reconstructIdentedCompound(node: AST.IdentedCompoundExpression): void {
-    // IdentedCompoundExpression is similar to indented CompoundExpression
-    // Reconstruct each statement
-    for (let i = 0; i < node.statements.length; i++) {
-      this.reconstructNode(node.statements[i]);
+    // IdentedCompoundExpression has a keyword, colon, and indented expressions
+    // First append the keyword
+    this.appendToken(node.keywordOffset);
 
-      // Add trivia between statements
-      if (i < node.statements.length - 1) {
-        const currentEnd = this.getLastTokenOffset(node.statements[i]);
-        const nextStart = this.getFirstTokenOffset(node.statements[i + 1]);
+    // Then the colon
+    this.appendToken(node.colonOffset);
+
+    // Reconstruct each expression
+    for (let i = 0; i < node.expressions.length; i++) {
+      // Add trivia before expression
+      if (i === 0 && node.expressions.length > 0) {
+        const firstExprOffset = this.getFirstTokenOffset(node.expressions[0]);
+        this.appendTokensUntil(firstExprOffset);
+      }
+
+      this.reconstructNode(node.expressions[i]);
+
+      // Add separator trivia between expressions
+      if (i < node.expressions.length - 1) {
+        const currentEnd = this.getLastTokenOffset(node.expressions[i]);
+        const nextStart = this.getFirstTokenOffset(node.expressions[i + 1]);
         this.appendTokensUntil(nextStart);
       }
     }
@@ -556,8 +612,8 @@ export class ASTReconstructor {
         return compound.closeBraceOffset;
       case 'IdentedCompoundExpression':
         const identedCompound = node as AST.IdentedCompoundExpression;
-        if (identedCompound.statements.length > 0) {
-          return this.getLastTokenOffset(identedCompound.statements[identedCompound.statements.length - 1]);
+        if (identedCompound.expressions.length > 0) {
+          return this.getLastTokenOffset(identedCompound.expressions[identedCompound.expressions.length - 1]);
         }
         return 0;
       case 'ArrayExpression':
@@ -692,10 +748,8 @@ export class ASTReconstructor {
         return dataDecl.nameOffset;
       case 'IdentedCompoundExpression':
         const identedCompound = node as AST.IdentedCompoundExpression;
-        if (identedCompound.statements.length > 0) {
-          return this.getFirstTokenOffset(identedCompound.statements[0]);
-        }
-        return 0;
+        // The first token is the keyword that starts the indented compound (e.g., 'block')
+        return identedCompound.keywordOffset;
       default:
         // Fallback - this shouldn't happen if all node types are handled
         console.warn(`Unknown node type in getFirstTokenOffset: ${node.type}`);
@@ -704,11 +758,14 @@ export class ASTReconstructor {
   }
 
   /**
-   * Append all tokens from current position until the target offset (exclusive)
+   * Append all tokens from current position until the target character offset (exclusive)
    */
-  private appendTokensUntil(targetOffset: number): void {
-    while (this.lastOffset + 1 < targetOffset && this.lastOffset + 1 < this.tokens.length) {
-      this.appendToken(this.lastOffset + 1);
+  private appendTokensUntil(targetCharOffset: number): void {
+    const targetTokenIndex = this.offsetToTokenMap.get(targetCharOffset);
+    if (targetTokenIndex === undefined) return;
+
+    while (this.lastTokenIndex + 1 < targetTokenIndex && this.lastTokenIndex + 1 < this.tokens.length) {
+      this.appendTokenByIndex(this.lastTokenIndex + 1);
     }
   }
 
@@ -719,8 +776,8 @@ export class ASTReconstructor {
     // Program type is from top-level-parser, not in main AST types
     // Structure: { type: 'Program', initialTrivia: [], usingStatements: [], declarations: [] }
 
-    // Start from the beginning if we haven't appended anything yet
-    if (this.lastOffset === -1 && program.declarations.length > 0) {
+    // Always handle initial trivia first, regardless of whether there are declarations
+    if (this.lastTokenIndex === -1) {
       // Find the first meaningful token (first declaration or using statement)
       let firstOffset = Number.MAX_SAFE_INTEGER;
 
@@ -728,12 +785,23 @@ export class ASTReconstructor {
         firstOffset = Math.min(firstOffset, program.usingStatements[0].usingOffset);
       }
 
-      if (program.declarations.length > 0) {
+      if (program.declarations && program.declarations.length > 0) {
         firstOffset = Math.min(firstOffset, this.getFirstTokenOffset(program.declarations[0]));
       }
 
+      // If we have no meaningful content, reconstruct all tokens as trivia
+      if (firstOffset === Number.MAX_SAFE_INTEGER) {
+        // File contains only initial trivia - append all tokens directly
+        for (let i = 0; i < this.tokens.length; i++) {
+          const token = this.tokens[i];
+          this.result += token.content;
+        }
+        this.lastTokenIndex = this.tokens.length - 1;
+        return; // Done - file is only trivia
+      }
+
       // Append everything before the first meaningful content (initial trivia)
-      if (firstOffset > 0 && firstOffset < Number.MAX_SAFE_INTEGER) {
+      if (firstOffset > 0) {
         for (let i = 0; i < firstOffset && i < this.tokens.length; i++) {
           if (this.isTrivia(this.tokens[i]) || this.tokens[i].type === TokenType.EOF) {
             this.appendToken(i);
@@ -1060,11 +1128,11 @@ export class ASTReconstructor {
   }
 
   private reconstructConstant(node: AST.ConstantDeclaration): void {
-    // Check for decorators
+    // Check for decorators - decorator offsets are token indices, not character offsets
     const decoratorOffsets = (node as any).decoratorOffsets;
     if (decoratorOffsets) {
-      for (const offset of decoratorOffsets) {
-        this.appendToken(offset);
+      for (const tokenIndex of decoratorOffsets) {
+        this.appendTokenByIndex(tokenIndex);
       }
     }
 
