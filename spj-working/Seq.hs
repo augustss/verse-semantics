@@ -33,30 +33,39 @@ appndP EmptyP s = s
 appndP s EmptyP = s
 appndP s t      = AppndP s t
 
--- Sequencing -----------
+consP :: a -> P a -> P a
+consP x xs = Unit x `appndP` xs
+
+-- Sequencing (*)  -----------
 seqP :: P ENV -> P ENV -> P ENV
-EmptyP         `seqP` _               = EmptyP
-_              `seqP` EmptyP          = EmptyP
-(s `UnionP` t) `seqP` r               = (s `seqP` r) `unionP` (t `seqP` r)
-(s `AppndP` t) `seqP` r               = (s `seqP` r) `appndP` (t `seqP` r)
-(Unit d)       `seqP` (s `UnionP` t) = (Unit d `seqP` s) `unionP` (Unit d `seqP` t)
-(Unit d)       `seqP` (s `AppndP` t) = (Unit d `seqP` s) `appndP` (Unit d `seqP` t)
-(Unit d1)      `seqP` (Unit d2)
-   | isEmptyENV d                     = EmptyP
-   | otherwise                        = Unit d
+seqP EmptyP         _ = EmptyP
+seqP (s `UnionP` t) r = (s `seqP` r) `unionP` (t `seqP` r)
+seqP (s `AppndP` t) r = (s `seqP` r) `appndP` (t `seqP` r)
+seqP (Unit d)       s = seq_unit d s
+
+seq_unit :: ENV -> P ENV -> P ENV
+seq_unit _  EmptyP         = EmptyP
+seq_unit d  (s `UnionP` t) = (Unit d `seqP` s) `unionP` (Unit d `seqP` t)
+seq_unit d  (s `AppndP` t) = (Unit d `seqP` s) `appndP` (Unit d `seqP` t)
+seq_unit d1 (Unit d2)
+   | isEmptyENV d          = EmptyP
+   | otherwise             = Unit d
    where
      d = d1 `intersectENV` d2
 
 -- Canonicalisation -----------
 canon :: P a -> SL a
 -- The output has all the UnionP's on top
-canon EmptyP                      = emptySL
-canon (s `UnionP` t)              = canon s `unionSL` canon t
-canon (Unit d)                    = unitSL d
-canon (EmptyP         `AppndP` s) = canon s
-canon ((s `AppndP` t) `AppndP` r) = canon (s `AppndP` (t `AppndP` r))
-canon ((s `UnionP` t) `AppndP` r) = canon (s `AppndP` r) `unionSL` canon (t `AppndP` r)
-canon ((Unit d)       `AppndP` r) = d `consSL` canon r
+canon EmptyP         = emptySL
+canon (s `UnionP` t) = canon s `unionSL` canon t
+canon (Unit d)       = unitSL d
+canon (s `AppndP` t) = canon_app s (canon t)
+
+canon_app :: P a -> SL a -> SL a
+canon_app EmptyP         sl = sl
+canon_app (Unit d)       sl = d `consSL` sl
+canon_app (s `AppndP` t) sl = canon_app s (canon_app t sl)
+canon_app (s `UnionP` t) sl = canon_app s sl `unionSL` canon_app t sl
 
 -------------------------------------------------------
 -------------  SL a: sets of lists of a ---------------
@@ -89,10 +98,54 @@ slToPom :: SL a -> P a
 -- all the unions at the top
 slToPom (MkSL xss) = foldr unionP EmptyP
                      [ foldr consP EmptyP xs | xs <- xss ]
-  where
-    consP :: a -> P a -> P a
-    consP x xs = Unit x `appndP` xs
 
+
+------------- Sequencing directly on SL ----------
+-- seqSL sl1 sl2 = canon (seqP (slToPom sl1) (slToPom sl2))
+-- Lemma: seqP (foldr unionP EmptyP ss) t  = foldr unionP EmptyP [ seqP s t | s <- ss]
+-- Lemma: seqP (foldr consP  EmptyP ds) t  = foldr appndP EmptyP [ seqP (Unit d) t | d <- ds]
+
+-- Lemma: canon (foldr unionP EmptyP ss) = foldr unionSL   emptySL (map canon ss)
+-- Lemma: canon (foldr appndP EmptyP ss) = foldr canon_app emptySL ss
+
+-- Lemma: seq_unit d (foldr unionP EmptyP ss) = 
+{-
+seqP (consP x p) t
+  = seqP (Unit x `appnd` p) t
+  = (Unit x `seqP` t) `appnd` (p `seqP` t)
+-}
+
+---------------------------------
+-- seqSL sl1 sl2
+--  = canon (seqP (slToPom sl1) (slToPom sl2))
+
+seqSL :: SL ENV -> SL ENV -> SL ENV
+-- seqSL (MkSL xss) sl2
+--  = canon (seqP (foldr unionP EmptyP [foldr consP EmptyP xs | xs <- xss])
+--                (slToPom sl2))
+--  = canon (foldr unionP EmptyP [seqP (foldr consP EmptyP xs) (slToPom sl2)
+--                               | xs <- xss ])
+--  = foldr unionSL emptySL (map canon [seqP (foldr consP EmptyP xs) (slToPom sl2)
+--                                     | xs <- xss ])
+--  = foldr unionSL emptySL [canon (seqP (foldr consP EmptyP xs) (slToPom sl2))
+--                          | xs <- xss ]
+--  = foldr unionSL emptySL
+--    [ foldr canon_app emptySL [seqP (Unit d) (slToPom sl2) | d <- xs ]
+--    | xs <- xss ]
+--  = foldr unionSL emptySL
+--    [ foldr op emptySL xs | xs <- xss ]
+--    where
+--      op :: ENV -> SL ENV -> SL ENV
+--      op d sl = canon_app (seq_unit d (slToPom sl2)) sl
+
+seqSL (MkSL xss) sl2
+  = foldr unionSL emptySL
+    [ foldr op emptySL xs | xs <- xss ]
+    where
+      op :: ENV -> SL ENV -> SL ENV
+      op d sl = canon_app (seq_unit d (foldr unionP EmptyP
+                                          [ foldr consP EmptyP ys | ys <- yss ]))
+                          sl
 
 -------------  ENV ---------------
 -- An ENV denotes a set of environments
