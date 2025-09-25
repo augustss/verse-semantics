@@ -396,12 +396,42 @@ set final = (x + y) * (z - w) / 2
 
 
 #! Valid expression
-# 71. Function with return type
+# 71. Set array element
+set arr[0] = 42
+
+
+#! Valid expression
+# 72. Set array element with expression index
+set matrix[i + 1] = value
+
+
+#! Valid expression
+# 73. Set nested array element
+set grid[x][y] = newValue
+
+
+#! Valid expression
+# 74. Set array element with spaces
+set x[ 21 ] = 123
+
+
+#! Valid expression
+# 75. Set map element
+set scores["player1"] = 100
+
+
+#! Valid expression
+# 76. Set nested member array element
+set obj.data[index] = updated
+
+
+#! Valid expression
+# 77. Function with return type
 f() : int = 42
 
 
 #! Valid expression
-# 72. Function with args and return type
+# 78. Function with args and return type
 add(x, y) : int = x + y
 
 

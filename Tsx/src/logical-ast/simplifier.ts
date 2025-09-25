@@ -50,6 +50,8 @@ class ASTSimplifier {
         return this.simplifyAssignment(node as AST.AssignmentExpression);
       case 'MemberExpression':
         return this.simplifyMember(node as AST.MemberExpression);
+      case 'QualifiedAccessExpression':
+        return this.simplifyQualifiedAccess(node as AST.QualifiedAccessExpression);
       case 'CallExpression':
         return this.simplifyCall(node as AST.CallExpression);
       case 'ArrayExpression':
@@ -74,8 +76,6 @@ class ASTSimplifier {
         return this.simplifyCase(node as AST.CaseExpression);
       case 'BreakExpression':
         return { type: 'Break' } as LAST.Break;
-      case 'ContinueExpression':
-        return { type: 'Continue' } as LAST.Continue;
       case 'ReturnExpression':
         return this.simplifyReturn(node as AST.ReturnExpression);
 
@@ -177,6 +177,14 @@ class ASTSimplifier {
       object: this.simplifyExpression(node.object),
       property: this.simplifyExpression(node.property),
       computed: node.computed
+    };
+  }
+
+  private simplifyQualifiedAccess(node: AST.QualifiedAccessExpression): LAST.QualifiedAccess {
+    return {
+      type: 'QualifiedAccess',
+      qualifier: node.qualifier,
+      member: this.simplifyExpression(node.member)
     };
   }
 
@@ -342,40 +350,86 @@ class ASTSimplifier {
   // Declarations
 
   private simplifyConstant(node: AST.ConstantDeclaration): LAST.ConstDecl {
+    // Separate visibility from other specifiers
+    const allSpecifiers = node.specifiers ? this.extractSpecifiers(node.specifiers) : [];
+    const visibilitySpecifiers = ['public', 'private', 'protected', 'internal', 'scoped'];
+    const visibility = allSpecifiers.find(s => visibilitySpecifiers.includes(s)) as
+      'public' | 'private' | 'protected' | 'internal' | 'scoped' | undefined;
+    const otherSpecifiers = allSpecifiers.filter(s => !visibilitySpecifiers.includes(s));
+
     return {
       type: 'ConstDecl',
       name: node.name,
       declaredType: node.declaredType ? this.simplifyType(node.declaredType) : undefined,
       initializer: node.initializer ? this.simplifyExpression(node.initializer) : undefined,
-      specifiers: node.specifiers ? this.extractSpecifiers(node.specifiers) : undefined
+      visibility,
+      specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined
     };
   }
 
   private simplifyVariable(node: AST.VariableDeclaration): LAST.VarDecl {
+    // Separate visibility from other specifiers
+    const allSpecifiers = node.specifiers ? this.extractSpecifiers(node.specifiers) : [];
+    const visibilitySpecifiers = ['public', 'private', 'protected', 'internal', 'scoped'];
+    const visibility = allSpecifiers.find(s => visibilitySpecifiers.includes(s)) as
+      'public' | 'private' | 'protected' | 'internal' | 'scoped' | undefined;
+    const otherSpecifiers = allSpecifiers.filter(s => !visibilitySpecifiers.includes(s));
+
     return {
       type: 'VarDecl',
       name: node.name,
       declaredType: this.simplifyType(node.declaredType),
       initializer: node.initializer ? this.simplifyExpression(node.initializer) : undefined,
-      specifiers: node.specifiers ? this.extractSpecifiers(node.specifiers) : undefined
+      visibility,
+      specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined
     };
   }
 
   private simplifyFunction(node: AST.FunctionDeclaration): LAST.FunctionDecl {
+    // Extract visibility specifier (should be exactly one)
+    let visibility: LAST.FunctionDecl['visibility'] = undefined;
+    if (node.visibilitySpecifier) {
+      const visibilitySpecs = this.extractSpecifiers(node.visibilitySpecifier);
+      if (visibilitySpecs && visibilitySpecs.length > 0) {
+        const vis = visibilitySpecs[0].toLowerCase();
+        if (vis === 'public' || vis === 'private' || vis === 'protected' || vis === 'internal' || vis === 'scoped') {
+          visibility = vis as LAST.FunctionDecl['visibility'];
+        }
+      }
+    }
+
+    // Extract other specifiers (behavioral/modifier specifiers)
+    const otherSpecifiers = node.postSpecifiers ? this.extractSpecifiers(node.postSpecifiers) : undefined;
+
     return {
       type: 'FunctionDecl',
       name: node.name,
       parameters: node.parameters.map(p => this.simplifyParameter(p)),
       returnType: node.returnType ? this.simplifyType(node.returnType) : undefined,
       body: node.body ? this.simplifyExpression(node.body) : { type: 'Identifier', name: '_empty_' } as LAST.Identifier,
-      specifiers: node.postSpecifiers ? this.extractSpecifiers(node.postSpecifiers) : undefined
+      visibility,
+      specifiers: otherSpecifiers
     };
   }
 
   private simplifyDataStructure(node: AST.DataStructureDeclaration): LAST.Declaration {
-    const specifiers = node.nameSpecifiers ? this.extractSpecifiers(node.nameSpecifiers) :
-                       node.kindSpecifiers ? this.extractSpecifiers(node.kindSpecifiers) :
-                       node.postSpecifiers ? this.extractSpecifiers(node.postSpecifiers) : undefined;
+    // Collect all specifiers from different positions
+    const allSpecifiers: string[] = [];
+    if (node.nameSpecifiers) {
+      allSpecifiers.push(...this.extractSpecifiers(node.nameSpecifiers));
+    }
+    if (node.kindSpecifiers) {
+      allSpecifiers.push(...this.extractSpecifiers(node.kindSpecifiers));
+    }
+    if (node.postSpecifiers) {
+      allSpecifiers.push(...this.extractSpecifiers(node.postSpecifiers));
+    }
+
+    // Separate visibility from other specifiers
+    const visibilitySpecifiers = ['public', 'private', 'protected', 'internal', 'scoped'];
+    const visibility = allSpecifiers.find(s => visibilitySpecifiers.includes(s)) as
+      'public' | 'private' | 'protected' | 'internal' | 'scoped' | undefined;
+    const otherSpecifiers = allSpecifiers.filter(s => !visibilitySpecifiers.includes(s));
 
     switch (node.kind) {
       case 'class':
@@ -383,7 +437,8 @@ class ASTSimplifier {
           type: 'ClassDecl',
           name: node.name,
           members: this.simplifyMembers(node.body),
-          specifiers,
+          visibility,
+          specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined,
           parents: node.argument ? this.extractParents(node.argument) : undefined
         } as LAST.ClassDecl;
 
@@ -392,7 +447,8 @@ class ASTSimplifier {
           type: 'StructDecl',
           name: node.name,
           members: this.simplifyMembers(node.body),
-          specifiers
+          visibility,
+          specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined
         } as LAST.StructDecl;
 
       case 'interface':
@@ -400,7 +456,8 @@ class ASTSimplifier {
           type: 'InterfaceDecl',
           name: node.name,
           members: this.simplifyMembers(node.body),
-          specifiers
+          visibility,
+          specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined
         } as LAST.InterfaceDecl;
 
       case 'enum':
@@ -408,7 +465,8 @@ class ASTSimplifier {
           type: 'EnumDecl',
           name: node.name,
           members: this.simplifyEnumMembers(node.body),
-          specifiers
+          visibility,
+          specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined
         } as LAST.EnumDecl;
 
       default:
@@ -417,7 +475,8 @@ class ASTSimplifier {
           type: 'ClassDecl',
           name: node.name,
           members: this.simplifyMembers(node.body),
-          specifiers
+          visibility,
+          specifiers: otherSpecifiers.length > 0 ? otherSpecifiers : undefined
         } as LAST.ClassDecl;
     }
   }

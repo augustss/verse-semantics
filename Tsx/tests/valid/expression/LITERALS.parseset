@@ -53,3 +53,48 @@ false
 "Hello"
 
 
+#! Valid expression
+# 12. Empty tuple literal
+()
+
+
+#! Valid expression
+# 13. Empty tuple in assignment
+result := ()
+
+
+#! Valid expression
+# 14. Empty tuple in conditional
+if(x) then () else ()
+
+
+#! Valid expression
+# 15. Lambda returning empty tuple
+x => ()
+
+
+#! Valid expression
+# 16. Function returning empty tuple
+f() := ()
+
+
+#! Valid expression
+# 17. Empty tuple in case expression
+case(x): 1 => doSomething(), _ => ()
+
+
+#! Valid expression
+# 18. Empty tuple as function argument
+process(())
+
+
+#! Valid expression
+# 19. Empty tuple in block expression
+{ doSomething(); () }
+
+
+#! Valid expression
+# 20. Nested empty tuples (tuple containing empty tuple)
+((), x, ())
+
+

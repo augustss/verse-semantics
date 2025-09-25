@@ -175,6 +175,28 @@ export interface MemberExpression extends Expression {
 }
 
 /**
+ * Qualified access expressions ((qualifier:)member)
+ *
+ * Used for accessing members with an explicit qualifier/namespace:
+ * - (super:)method()
+ * - (module:)function
+ * - (namespace:)variable
+ *
+ * Stores:
+ * - openParenOffset: Position of '(' token
+ * - colonOffset: Position of ':' token
+ * - closeParenOffset: Position of ')' token
+ */
+export interface QualifiedAccessExpression extends Expression {
+  readonly type: 'QualifiedAccessExpression';
+  readonly qualifier: string;  // The qualifier name (e.g., "super", "module")
+  readonly member: Expression;  // The member being accessed (can be any expression)
+  readonly openParenOffset: number;  // Offset of '(' token
+  readonly colonOffset: number;      // Offset of ':' token
+  readonly closeParenOffset: number; // Offset of ')' token
+}
+
+/**
  * Call expressions
  *
  * Stores:

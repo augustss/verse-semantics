@@ -85,6 +85,10 @@ export class TopLevelParser {
         declarations.push(declResult.node);
         state = this.skipAllTrivia(declResult.state);
       } catch (error: any) {
+        // Re-throw type{} validation errors
+        if (error instanceof ParseError && error.message && error.message.includes('type{')) {
+          throw error;
+        }
         // If we can't parse as a declaration, log details and break
         const currentToken = state.current();
         let tempState = state;

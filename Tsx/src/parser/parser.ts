@@ -555,6 +555,66 @@ export class Parser {
         return { node, state };
       }
 
+      // Check for qualified access: (qualifier:)member
+      // Look ahead to see if we have the pattern (identifier:)
+      if (nextToken && nextToken.type === TokenType.IDENTIFIER) {
+        // Look for colon immediately after (no spaces allowed inside parens for now)
+        const colonState = state.advance();
+        const colonToken = colonState.current();
+
+        if (colonToken && colonToken.type === TokenType.OPERATOR && colonToken.content === ':') {
+          // Look for closing paren
+          const closeParenState = colonState.advance();
+          const closeParenToken = closeParenState.current();
+
+          if (closeParenToken && closeParenToken.type === TokenType.OPERATOR && closeParenToken.content === ')') {
+            // This is a qualified access expression!
+            const colonOffset = colonState.currentOffset() - 1; // Get the offset of ':'
+            const closeParenOffset = closeParenState.currentOffset();
+            state = closeParenState.advance();
+
+            // Now parse the member expression that follows
+            // If there's nothing after (qualifier:), parse it as just the qualifier
+            // This allows (super:) to be a valid expression on its own
+            const afterState = state.skipTrivia();
+
+            let memberResult: ParseResult<AST.Expression>;
+
+            // Check what comes after - if it's something that can start an expression, parse it
+            const afterToken = afterState.current();
+            if (!afterToken || afterToken.type === TokenType.EOF ||
+                (afterToken.type === TokenType.OPERATOR &&
+                 (afterToken.content === ';' || afterToken.content === ',' ||
+                  afterToken.content === ')' || afterToken.content === '}' ||
+                  afterToken.content === ']'))) {
+              // No member specified, just return the qualifier as an identifier
+              memberResult = {
+                node: {
+                  type: 'Identifier',
+                  name: nextToken.content,
+                  tokenOffset: state.currentOffset() - 1
+                } as AST.IdentifierExpression,
+                state: afterState
+              };
+            } else {
+              // Parse the member expression with all its postfix operations
+              memberResult = this.parsePostfix(afterState);
+            }
+
+            const node: AST.QualifiedAccessExpression = {
+              type: 'QualifiedAccessExpression',
+              qualifier: nextToken.content,
+              member: memberResult.node,
+              openParenOffset,
+              colonOffset,
+              closeParenOffset
+            };
+            return { node, state: memberResult.state };
+          }
+        }
+      }
+
+      // Not a qualified access, parse as normal parenthesized expression or tuple
       // Parse the first expression
       const firstExprResult = this.parseExpression(state);
       state = firstExprResult.state.skipTrivia();

@@ -76,6 +76,15 @@ export interface MemberAccess extends LogicalNode {
 }
 
 /**
+ * Qualified access expression (e.g., (super:)method)
+ */
+export interface QualifiedAccess extends LogicalNode {
+  type: 'QualifiedAccess';
+  qualifier: string;
+  member: Expression;
+}
+
+/**
  * Function call
  */
 export interface Call extends LogicalNode {
@@ -201,13 +210,6 @@ export interface Break extends LogicalNode {
 }
 
 /**
- * Continue statement
- */
-export interface Continue extends LogicalNode {
-  type: 'Continue';
-}
-
-/**
  * Return statement
  */
 export interface Return extends LogicalNode {
@@ -263,7 +265,8 @@ export interface ConstDecl extends LogicalNode {
   name: string;
   declaredType?: Type;
   initializer?: Expression;
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
 }
 
 /**
@@ -274,11 +277,18 @@ export interface VarDecl extends LogicalNode {
   name: string;
   declaredType: Type;
   initializer?: Expression;
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
 }
 
 /**
  * Function declaration
+ *
+ * Separates visibility specifier (public, private, protected, internal, scoped)
+ * from other behavioral specifiers (decides, suspends, transacts, override, etc.)
+ *
+ * The visibility specifier appears after the function name: myFunc<public>()
+ * Other specifiers can appear before or after parameters.
  */
 export interface FunctionDecl extends LogicalNode {
   type: 'FunctionDecl';
@@ -286,7 +296,8 @@ export interface FunctionDecl extends LogicalNode {
   parameters: Parameter[];
   returnType?: Type;
   body: Expression;
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
 }
 
 /**
@@ -296,7 +307,8 @@ export interface ClassDecl extends LogicalNode {
   type: 'ClassDecl';
   name: string;
   members: Declaration[];
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
   parents?: Expression[];
 }
 
@@ -307,7 +319,8 @@ export interface StructDecl extends LogicalNode {
   type: 'StructDecl';
   name: string;
   members: Declaration[];
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
 }
 
 /**
@@ -317,7 +330,8 @@ export interface InterfaceDecl extends LogicalNode {
   type: 'InterfaceDecl';
   name: string;
   members: Declaration[];
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
 }
 
 /**
@@ -327,7 +341,8 @@ export interface EnumDecl extends LogicalNode {
   type: 'EnumDecl';
   name: string;
   members: EnumMember[];
-  specifiers?: string[];
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped';  // Single visibility specifier
+  specifiers?: string[];  // Other behavioral/modifier specifiers
 }
 
 export interface EnumMember {
@@ -381,6 +396,7 @@ export type Expression =
   | UnaryOp
   | Assignment
   | MemberAccess
+  | QualifiedAccess
   | Call
   | Array
   | ObjectConstruction
@@ -393,7 +409,6 @@ export type Expression =
   | Loop
   | Case
   | Break
-  | Continue
   | Return
   | Spawn
   | Race

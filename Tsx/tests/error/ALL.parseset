@@ -59,10 +59,6 @@ case(x):
 case(x) {}
 
 #! Error expression
-# 14. Lambda with empty body expression
-x => ()
-
-#! Error expression
 # 15. Block keyword with braces
 block {}
 

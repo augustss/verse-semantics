@@ -15,18 +15,6 @@ This document describes the **simplified logical AST structure** for the Verse p
 9. [Simplification Rules](#simplification-rules)
 10. [Examples](#examples)
 
-## Overview
-
-The **Logical AST** is a simplified representation of Verse programs that:
-
-- ✅ **Removes token offsets** - No position information
-- ✅ **Removes parentheses** - Tree structure preserves precedence
-- ✅ **Simplifies compounds** - Flattens redundant wrapper nodes
-- ✅ **Focuses on semantics** - Only meaningful language constructs
-- ✅ **Preserves structure** - All logical relationships maintained
-
-**Conversion:** Original AST → Logical AST via `simplify()` function
-
 ## Core Concepts
 
 ### Base Node Structure
@@ -60,6 +48,7 @@ Literal {
 ```
 
 **Examples:**
+
 ```verse
 42          → Literal { value: 42, literalType: 'integer' }
 3.14        → Literal { value: 3.14, literalType: 'float' }
@@ -77,6 +66,7 @@ Identifier {
 ```
 
 **Examples:**
+
 ```verse
 variable    → Identifier { name: 'variable' }
 @special    → Identifier { name: '@special' }
@@ -97,6 +87,7 @@ BinaryOp {
 **Operators:** `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `and`, `or`, `..`
 
 **Examples:**
+
 ```verse
 x + y       → BinaryOp { operator: '+', left: Identifier{name: 'x'}, right: Identifier{name: 'y'} }
 a and b     → BinaryOp { operator: 'and', left: Identifier{name: 'a'}, right: Identifier{name: 'b'} }
@@ -118,6 +109,7 @@ UnaryOp {
 **Operators:** `-`, `not`, `*` (tuple expansion)
 
 **Examples:**
+
 ```verse
 -x          → UnaryOp { operator: '-', operand: Identifier{name: 'x'} }
 not flag    → UnaryOp { operator: 'not', operand: Identifier{name: 'flag'} }
@@ -137,6 +129,7 @@ Assignment {
 **Operators:** `:=`, `=`, `+=`, `-=`, `*=`, `/=`
 
 **Examples:**
+
 ```verse
 x := 42     → Assignment { operator: ':=', left: Identifier{name: 'x'}, right: Literal{value: 42} }
 y += 1      → Assignment { operator: '+=', left: Identifier{name: 'y'}, right: Literal{value: 1} }
@@ -154,9 +147,31 @@ MemberAccess {
 ```
 
 **Examples:**
+
 ```verse
 obj.field   → MemberAccess { object: Identifier{name: 'obj'}, property: Identifier{name: 'field'}, computed: false }
 arr[0]      → MemberAccess { object: Identifier{name: 'arr'}, property: Literal{value: 0}, computed: true }
+```
+
+### Qualified Access
+
+```typescript
+QualifiedAccess {
+  type: 'QualifiedAccess'
+  qualifier: string
+  member: Expression
+}
+```
+
+**Examples:**
+
+```verse
+(super:)method()    → QualifiedAccess {
+                        qualifier: 'super',
+                        member: Call{callee: Identifier{name: 'method'}, arguments: []}
+                      }
+(module:)variable   → QualifiedAccess { qualifier: 'module', member: Identifier{name: 'variable'} }
+(namespace:)Type    → QualifiedAccess { qualifier: 'namespace', member: Identifier{name: 'Type'} }
 ```
 
 ### Function Calls
@@ -170,6 +185,7 @@ Call {
 ```
 
 **Examples:**
+
 ```verse
 f()         → Call { callee: Identifier{name: 'f'}, arguments: [] }
 add(x, y)   → Call { callee: Identifier{name: 'add'}, arguments: [Identifier{name: 'x'}, Identifier{name: 'y'}] }
@@ -186,6 +202,7 @@ Array {
 ```
 
 **Examples:**
+
 ```verse
 array{1, 2, 3}  → Array { elements: [Literal{value: 1}, Literal{value: 2}, Literal{value: 3}] }
 array{}         → Array { elements: [] }
@@ -207,6 +224,7 @@ ObjectField {
 ```
 
 **Examples:**
+
 ```verse
 Point{x:=1, y:=2}  → ObjectConstruction {
   typeName: 'Point',
@@ -228,6 +246,7 @@ Range {
 ```
 
 **Examples:**
+
 ```verse
 1..10       → Range { start: Literal{value: 1}, end: Literal{value: 10} }
 start..end  → Range { start: Identifier{name: 'start'}, end: Identifier{name: 'end'} }
@@ -249,6 +268,7 @@ Parameter {
 ```
 
 **Examples:**
+
 ```verse
 x => x + 1           → Lambda { parameters: [{name: 'x'}], body: BinaryOp{...} }
 (a, b) => a * b      → Lambda { parameters: [{name: 'a'}, {name: 'b'}], body: BinaryOp{...} }
@@ -265,6 +285,7 @@ Block {
 ```
 
 **Examples:**
+
 ```verse
 {           → Block {
   x := 1      expressions: [
@@ -286,6 +307,7 @@ Set {
 ```
 
 **Examples:**
+
 ```verse
 set x = 42      → Set { target: Identifier{name: 'x'}, value: Literal{value: 42} }
 set obj.prop = value → Set { target: MemberAccess{...}, value: Identifier{name: 'value'} }
@@ -305,6 +327,7 @@ If {
 ```
 
 **Examples:**
+
 ```verse
 if x > 0 then positive else negative  → If {
   condition: BinaryOp{...},
@@ -331,6 +354,7 @@ For {
 ```
 
 **Examples:**
+
 ```verse
 for(item : items) process(item)  → For {
   variable: 'item',
@@ -356,6 +380,7 @@ Loop {
 ```
 
 **Examples:**
+
 ```verse
 loop { process(); wait(); }  → Loop { body: Block{expressions: [Call{...}, Call{...}]} }
 ```
@@ -376,6 +401,7 @@ CaseBranch {
 ```
 
 **Examples:**
+
 ```verse
 case(value) {           → Case {
   0 => "zero",            scrutinee: Identifier{name: 'value'},
@@ -399,6 +425,7 @@ Return {
 ```
 
 **Examples:**
+
 ```verse
 break           → Break {}
 continue        → Continue {}
@@ -418,6 +445,7 @@ Spawn {
 ```
 
 **Examples:**
+
 ```verse
 # Basic spawn
 spawn { computation() }  → Spawn { body: Call{callee: Identifier{name: 'computation'}, arguments: []} }
@@ -462,6 +490,7 @@ Race {
 ```
 
 **Examples:**
+
 ```verse
 # Basic race (first-wins semantics)
 race:                    → Race {
@@ -507,6 +536,7 @@ Sync {
 ```
 
 **Examples:**
+
 ```verse
 # Basic sync (synchronized execution)
 sync:                    → Sync {
@@ -557,6 +587,7 @@ Branch {
 ```
 
 **Examples:**
+
 ```verse
 # Basic branch (parallel execution paths)
 branch:                  → Branch {
@@ -644,6 +675,7 @@ ConstDecl {
 ```
 
 **Examples:**
+
 ```verse
 x := 42              → ConstDecl { name: 'x', initializer: Literal{value: 42} }
 name : string = "Alice"  → ConstDecl { name: 'name', declaredType: Type{name: 'string'}, initializer: Literal{...} }
@@ -663,6 +695,7 @@ VarDecl {
 ```
 
 **Examples:**
+
 ```verse
 var x : int = 42     → VarDecl { name: 'x', declaredType: Type{name: 'int'}, initializer: Literal{value: 42} }
 var counter<public> : int  → VarDecl { name: 'counter', declaredType: Type{name: 'int'}, specifiers: ['public'] }
@@ -677,12 +710,15 @@ FunctionDecl {
   parameters: Parameter[]
   returnType?: Type
   body: Expression
-  specifiers?: string[]
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped'  // Single visibility specifier
+  specifiers?: string[]  // Other behavioral/modifier specifiers (decides, suspends, transacts, override, etc.)
 }
 ```
 
 **Examples:**
+
 ```verse
+# Basic function
 add(x: int, y: int): int = x + y  → FunctionDecl {
   name: 'add',
   parameters: [{name: 'x', paramType: Type{name: 'int'}}, {name: 'y', paramType: Type{name: 'int'}}],
@@ -690,11 +726,29 @@ add(x: int, y: int): int = x + y  → FunctionDecl {
   body: BinaryOp{...}
 }
 
+# Function with visibility only
 process<public>() := body  → FunctionDecl {
   name: 'process',
   parameters: [],
   body: Identifier{name: 'body'},
-  specifiers: ['public']
+  visibility: 'public'
+}
+
+# Function with visibility and behavioral specifiers
+validate<private>(x: int)<decides><suspends> := x > 0  → FunctionDecl {
+  name: 'validate',
+  parameters: [{name: 'x', paramType: Type{name: 'int'}}],
+  body: BinaryOp{operator: '>', left: Identifier{name: 'x'}, right: Literal{value: 0}},
+  visibility: 'private',
+  specifiers: ['decides', 'suspends']
+}
+
+# Function with behavioral specifiers only
+compute(data: string)<transacts> := process(data)  → FunctionDecl {
+  name: 'compute',
+  parameters: [{name: 'data', paramType: Type{name: 'string'}}],
+  body: Call{callee: Identifier{name: 'process'}, arguments: [Identifier{name: 'data'}]},
+  specifiers: ['transacts']
 }
 ```
 
@@ -707,12 +761,14 @@ ClassDecl {
   type: 'ClassDecl'
   name: string
   members: Declaration[]
-  specifiers?: string[]
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped'  // Single visibility specifier
+  specifiers?: string[]  // Other modifiers (abstract, final, etc.)
   parents?: Expression[]
 }
 ```
 
 **Examples:**
+
 ```verse
 MyClass := class {        → ClassDecl {
   field := 42               name: 'MyClass',
@@ -762,7 +818,7 @@ tank := class(player_character): → ClassDecl {
 # Abstract classes
 pet := class<abstract>():        → ClassDecl {
     Speak() : void                 name: 'pet',
-                                   specifiers: ['abstract'],
+                                   specifiers: ['abstract'],  // 'abstract' is not a visibility specifier
                                    members: [
                                      FunctionDecl{
                                        name: 'Speak',
@@ -780,7 +836,8 @@ StructDecl {
   type: 'StructDecl'
   name: string
   members: Declaration[]
-  specifiers?: string[]
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped'  // Single visibility specifier
+  specifiers?: string[]  // Other modifiers
 }
 ```
 
@@ -791,7 +848,8 @@ InterfaceDecl {
   type: 'InterfaceDecl'
   name: string
   members: Declaration[]
-  specifiers?: string[]
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped'  // Single visibility specifier
+  specifiers?: string[]  // Other modifiers
 }
 ```
 
@@ -802,7 +860,8 @@ EnumDecl {
   type: 'EnumDecl'
   name: string
   members: EnumMember[]
-  specifiers?: string[]
+  visibility?: 'public' | 'private' | 'protected' | 'internal' | 'scoped'  // Single visibility specifier
+  specifiers?: string[]  // Other modifiers
 }
 
 EnumMember {
@@ -812,6 +871,7 @@ EnumMember {
 ```
 
 **Examples:**
+
 ```verse
 Color := enum {           → EnumDecl {
   Red,                      name: 'Color',
@@ -836,6 +896,7 @@ Type {
 ```
 
 **Examples:**
+
 ```verse
 int             → Type { name: 'int' }
 ?string         → Type { name: 'string', isOptional: true }
@@ -855,6 +916,7 @@ Program {
 ```
 
 **Examples:**
+
 ```verse
 using { /Verse.org/Simulation, /MyLib }  → Program {
                                             usingPaths: ['/Verse.org/Simulation', '/MyLib'],
@@ -950,7 +1012,7 @@ MyClass<public> := class {
 # Logical AST
 ClassDecl {
   name: 'MyClass',
-  specifiers: ['public'],
+  visibility: 'public',
   members: [
     ConstDecl {
       name: 'field',
@@ -1078,27 +1140,33 @@ const logicalProgram = simplifyProgram(program);
 ### ✅ **Fully Supported in Logical AST**
 
 **Core Language Features:**
+
 - **All Expression Types**: Literals, identifiers, binary/unary operations, assignments
+- **Qualified Access**: `(qualifier:)member` syntax for namespace/super access
 - **Object-Oriented**: Complete class inheritance with override specifiers and abstract classes
 - **Control Flow**: If/then/else, for loops, case expressions, break/continue/return
 - **Concurrent Constructs**: Spawn, race, sync, branch (with nested combinations)
-- **Function System**: All declaration forms with parameters, return types, and specifiers
-- **Data Structures**: Classes, structs, interfaces, enums with full member support
+- **Function System**: All declaration forms with visibility separation from behavioral specifiers
+- **Data Structures**: Classes, structs, interfaces, enums with visibility and specifier separation
 - **Advanced Types**: Tuples, maps, arrays, optional types, user-defined types
 
 **Logical AST Simplifications:**
+
 - ✅ **Parentheses removed**: `(a + b) * c` → tree structure preserves precedence
 - ✅ **Token positions stripped**: Only semantic content preserved
 - ✅ **Wrapper nodes flattened**: Compound expressions simplified to Block nodes
 - ✅ **Inheritance relationships**: Parent classes stored in `parents` array
-- ✅ **Specifier extraction**: All `<specifier>` annotations converted to string arrays
+- ✅ **Visibility separation**: Visibility specifiers (public, private, etc.) separated from behavioral specifiers
+- ✅ **Specifier normalization**: `<specifier>` annotations converted to appropriate fields
 - ✅ **Concurrent construct normalization**: All forms simplified to consistent structure
+- ✅ **Qualified access support**: `(super:)method()` → QualifiedAccess node
 
 ### 🎯 **Coverage Statistics**
 
 **Parser → Logical AST Conversion Success**: 98.7% (1,793/1,816 test cases)
 
 **Perfect Categories:**
+
 - Inheritance and class systems (100%)
 - Concurrent programming constructs (100%)
 - Control flow expressions (100%)
@@ -1134,12 +1202,14 @@ village_spawner := class(creative_device):  → ClassDecl {
 ### 📊 **Transformation Benefits**
 
 **Before (Original AST)**:
+
 - 45+ node types with syntax-specific details
 - Token offsets, parentheses, formatting preserved
 - Complex nested wrapper structures
 - Syntax-dependent parsing artifacts
 
 **After (Logical AST)**:
+
 - 25 essential semantic node types
 - Clean inheritance and concurrent construct representation
 - Consistent structure across equivalent syntax forms
@@ -1163,21 +1233,3 @@ const logicalExpr = simplify(expr);
 // Result: Clean concurrent construct hierarchy
 // Spawn { body: Race { branches: [Call{...}, Call{...}] } }
 ```
-
-### ⚡ **Performance Characteristics**
-
-- **Conversion Speed**: ~0.1ms additional overhead per AST node
-- **Memory Reduction**: 40-60% smaller than original AST (no position data)
-- **Analysis Speed**: 2-3x faster traversal due to simplified structure
-- **Transformation Efficiency**: Consistent node patterns enable generic transformations
-
-### 🎯 **Best Use Cases**
-
-1. **Code Analysis Tools**: Static analysis, linting, complexity metrics
-2. **Transpilers**: Convert Verse to other languages with clean semantic mapping
-3. **Refactoring Tools**: AST transformations without syntax noise
-4. **Language Servers**: Semantic highlighting, code completion, symbol resolution
-5. **Documentation Generators**: Extract semantic structure without formatting details
-6. **Optimization Passes**: Concurrent construct analysis and transformation
-
-The logical AST provides a clean, semantic view of Verse programs optimized for analysis, transformation, and code generation tasks while preserving all essential language semantics including inheritance relationships and concurrent programming constructs.

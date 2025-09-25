@@ -349,7 +349,11 @@ export class DeclarationParser {
       if (this.looksLikeTypeAlias(state)) {
         try {
           typeAliasResult = this.parseType(state);
-        } catch {
+        } catch (error) {
+          // If it's a type{} validation error, re-throw it
+          if (error instanceof ParseError && error.message && error.message.includes('type{')) {
+            throw error;
+          }
           // Type parsing failed, try expression parsing
           initResult = this.parseExpression(stateBeforeParsing);
         }
@@ -357,7 +361,11 @@ export class DeclarationParser {
         // Parse as expression first for most cases
         try {
           initResult = this.parseExpression(state);
-        } catch {
+        } catch (error) {
+          // If it's a type{} validation error, re-throw it
+          if (error instanceof ParseError && error.message && error.message.includes('type{')) {
+            throw error;
+          }
           // Expression parsing failed, try type parsing as fallback
           typeAliasResult = this.parseType(stateBeforeParsing);
         }
@@ -1254,6 +1262,11 @@ export class DeclarationParser {
       const openBraceOffset = state.currentOffset();
       state = state.advance().skipTrivia();
 
+      // Check for empty type{} construct
+      if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '}') {
+        throw new ParseError('Empty type{} expressions are not allowed', state.position, state.current() || undefined);
+      }
+
       // Parse the function type expression inside type{...}
       // This could be a function signature like "_(:int)<transacts><decides> : void"
       const exprResult = this.parseFunctionTypeExpression(state);
@@ -1914,25 +1927,123 @@ export class DeclarationParser {
     if (firstToken && firstToken.type === TokenType.IDENTIFIER &&
         (firstToken.content === '_' || firstToken.content === '__')) {
 
-      try {
-        return this.parseFunctionTypeSignature(state);
-      } catch (error) {
-        // Fall back to regular expression parsing
-        const resetState = state;
-        try {
-          return this.parseExpression(resetState);
-        } catch {
-          // Create a placeholder if both approaches fail
-          return this.createFunctionTypePlaceholder(state);
-        }
-      }
+      return this.parseFunctionTypeSignature(state);
     }
 
     // Try parsing as a regular expression first for non-function patterns
     try {
-      return this.parseExpression(state);
+      const result = this.parseExpression(state);
+      // Validate the parsed expression is appropriate for type{} context
+      this.validateTypeExpression(result.node);
+      return result;
     } catch (error) {
-      return this.createFunctionTypePlaceholder(state);
+      // If it's any parse error in type{} context, make it clear
+      if (error instanceof ParseError) {
+        throw new ParseError(`Invalid expression in type{} construct: ${error.message}`, error.position, error.token);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that an expression is appropriate for use inside type{} constructs.
+   * Rejects certain constructs that should not appear in type expressions.
+   */
+  private validateTypeExpression(expr: AST.Expression): void {
+    switch (expr.type) {
+      case 'AssignmentExpression':
+        throw new ParseError('Assignment expressions are not allowed in type{} constructs', 0, undefined);
+      case 'ConstantDeclaration':
+        throw new ParseError('Constant declarations are not allowed in type{} constructs', 0, undefined);
+      case 'VariableDeclaration':
+        throw new ParseError('Variable declarations are not allowed in type{} constructs', 0, undefined);
+      case 'SetStatement':
+        throw new ParseError('Set statements are not allowed in type{} constructs', 0, undefined);
+      case 'SetExpression':
+        throw new ParseError('Set expressions are not allowed in type{} constructs', 0, undefined);
+      case 'ReturnStatement':
+        throw new ParseError('Return statements are not allowed in type{} constructs', 0, undefined);
+      case 'ReturnExpression':
+        throw new ParseError('Return expressions are not allowed in type{} constructs', 0, undefined);
+      case 'BreakStatement':
+        throw new ParseError('Break statements are not allowed in type{} constructs', 0, undefined);
+      case 'BreakExpression':
+        throw new ParseError('Break expressions are not allowed in type{} constructs', 0, undefined);
+      case 'YieldStatement':
+        throw new ParseError('Yield statements are not allowed in type{} constructs', 0, undefined);
+      case 'Block':
+        throw new ParseError('Block statements are not allowed in type{} constructs', 0, undefined);
+      case 'CompoundExpression':
+        throw new ParseError('Compound expressions are not allowed in type{} constructs', 0, undefined);
+
+      case 'BinaryExpression':
+        const binExpr = expr as AST.BinaryExpression;
+        // Validate both operands recursively
+        this.validateTypeExpression(binExpr.left);
+        this.validateTypeExpression(binExpr.right);
+
+        // Check for invalid operator sequences like "+ +"
+        if (binExpr.operator === '+' && binExpr.right.type === 'UnaryExpression') {
+          const rightUnary = binExpr.right as AST.UnaryExpression;
+          if (rightUnary.operator === '+') {
+            throw new ParseError('Invalid operator sequence in type{} construct', 0, undefined);
+          }
+        }
+        break;
+
+      case 'UnaryExpression':
+        const unExpr = expr as AST.UnaryExpression;
+        this.validateTypeExpression(unExpr.operand);
+        // Check for invalid operator sequences like "+++" or multiple unary operators
+        if (unExpr.operator === '+' && unExpr.operand.type === 'UnaryExpression') {
+          const operandUnary = unExpr.operand as AST.UnaryExpression;
+          if (operandUnary.operator === '+') {
+            throw new ParseError('Invalid operator sequence in type{} construct', 0, undefined);
+          }
+        }
+        // Also reject sequences of multiple unary plus operators
+        if (unExpr.operator === '+' && unExpr.operand.type === 'UnaryExpression' &&
+            (unExpr.operand as AST.UnaryExpression).operator === '+') {
+          throw new ParseError('Multiple unary operators not allowed in type{} construct', 0, undefined);
+        }
+        break;
+
+      case 'CallExpression':
+        const callExpr = expr as AST.CallExpression;
+        this.validateTypeExpression(callExpr.callee);
+        if (callExpr.arguments) {
+          callExpr.arguments.forEach(arg => this.validateTypeExpression(arg));
+        }
+        break;
+
+      case 'ObjectConstructorExpression':
+        const objExpr = expr as AST.ObjectConstructorExpression;
+        if (objExpr.fields) {
+          objExpr.fields.forEach((field: any) => {
+            if (field.value) {
+              this.validateTypeExpression(field.value);
+            }
+          });
+        }
+        break;
+
+      case 'ArrayExpression':
+        const arrExpr = expr as AST.ArrayExpression;
+        if (arrExpr.elements) {
+          arrExpr.elements.forEach((element: AST.Expression) => this.validateTypeExpression(element));
+        }
+        break;
+
+      // Allow safe expression types
+      case 'LiteralExpression':
+      case 'IdentifierExpression':
+      case 'MemberExpression':
+      case 'IndexExpression':
+        break;
+
+      default:
+        // For any other expression types, allow them for now but could be extended
+        break;
     }
   }
 

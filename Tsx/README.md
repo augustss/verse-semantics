@@ -39,14 +39,30 @@ verse-parser/
 │   │   ├── index.ts      # Public API
 │   │   ├── ast.ts        # AST node types
 │   │   ├── parser.ts     # Recursive descent parser
-│   │   └── top-level-parser.ts # Complete file parsing
+│   │   ├── parser-state.ts # Immutable parser state
+│   │   ├── top-level-parser.ts # Complete file parsing
+│   │   └── parsers/      # Specialized parser modules
+│   │       ├── compound-parser.ts    # Blocks, arrays, control flow
+│   │       ├── declaration-parser.ts # Classes, functions, variables
+│   │       ├── lambda-parser.ts      # Lambda expressions
+│   │       ├── literal-parser.ts     # Numbers, strings, booleans
+│   │       └── operator-parser.ts    # Binary/unary operators
+│   ├── logical-ast/      # Simplified logical AST
+│   │   ├── types.ts      # Logical AST type definitions
+│   │   ├── simplifier.ts # AST to logical AST converter
+│   │   └── printer.ts    # Logical AST printer
 │   ├── pretty-printer/   # AST reconstruction & syntax highlighting
 │   │   ├── ast-reconstructor.ts # Source reconstruction
 │   │   ├── color-formatter.ts   # Syntax highlighting
 │   │   └── pretty-printer.ts    # Pretty printing with colors
-│   ├── examples/         # Usage examples
+│   ├── utils/            # Utility functions
+│   │   └── ast-printer.ts # AST visualization
 │   └── tests/            # Test files
 ├── tests/                # Verse test files (.parseset)
+│   ├── valid/           # Valid syntax test cases
+│   │   ├── expression/  # Expression tests by category
+│   │   └── program/     # Top-level declaration tests
+│   └── error/           # Error test cases
 ├── verse-files-flat/     # Real-world Verse files (459 files)
 ├── scripts/              # Testing and utility scripts
 └── dist/                 # Compiled JavaScript
@@ -192,14 +208,40 @@ const colored = prettyPrintColored(code, {
 ### AST Node Types
 
 - **Expressions**: `LiteralExpression`, `IdentifierExpression`, `BinaryExpression`
-- **Assignments**: `AssignmentExpression` (`:=`, `+=`, etc.)
-- **Functions**: `CallExpression`, `LambdaExpression` (`x => expr`)
-- **Collections**: `ArrayExpression`, `MemberExpression` (`.`, `[]`)
+- **Assignments**: `AssignmentExpression` (`:=`, `+=`, etc.), `SetExpression` (`set x[i] = value`)
+- **Functions**: `CallExpression`, `LambdaExpression` (`x => expr`, `x => ()`)
+- **Collections**: `ArrayExpression`, `TupleExpression` (`()`, `(1, 2, 3)`), `MemberExpression` (`.`, `[]`)
 - **Control**: `ParenthesizedExpression`, `UnaryExpression`, `RangeExpression`
+- **Control Flow**: `IfExpression`, `ForExpression`, `LoopExpression`, `CaseExpression`
 - **Declarations**: `ConstantDeclaration`, `VariableDeclaration`, `FunctionDeclaration`
-- **Data Structures**: `DataStructureDeclaration` (classes, modules, enums)
+- **Data Structures**: `DataStructureDeclaration` (classes, modules, enums, structs, interfaces)
+- **Concurrent**: `SpawnExpression`, `RaceExpression`, `SyncExpression`, `BranchExpression`
 - **Programs**: `Program` (complete files with using statements and declarations)
 - **Using**: `UsingStatement` (imports like `using { /Fortnite.com/Devices }`)
+
+### Logical AST
+
+The parser includes a simplified logical AST representation for semantic analysis:
+
+```typescript
+import { simplifyProgram, printLogicalAST } from 'verse-parser/logical-ast';
+
+const ast = parseProgram('x:int\ny := 42');
+const logical = simplifyProgram(ast);
+console.log(printLogicalAST(logical));
+```
+
+**Features:**
+- Removes all token offset information
+- Simplifies parentheses (precedence implicit in tree)
+- Separates visibility specifiers from behavioral specifiers
+- Focuses on semantic meaning over syntax
+
+**Key Types:**
+- **Declarations**: `ConstDecl` (supports `x:int` without initializer), `VarDecl`, `FunctionDecl`
+- **Data Structures**: `ClassDecl`, `StructDecl`, `InterfaceDecl`, `EnumDecl` with separated visibility
+- **Expressions**: Simplified without formatting details
+- **Control Flow**: Preserved semantic structure
 
 ### Parser Features
 
@@ -208,6 +250,7 @@ const colored = prettyPrintColored(code, {
 - **Rich AST** with position information for every node
 - **Error handling** with detailed position and context information
 - **Support for Verse-specific features** like `:=`, `=>`, `..`, lambdas
+- **Logical AST** for semantic analysis and transformations
 
 ## Features
 
@@ -266,11 +309,11 @@ input code here
 # Description of error case
 invalid code here
 
-#! Valid TopLevel
+#! Valid Program
 # Top-level declaration test
 module or class declaration
 
-#! Error TopLevel
+#! Error Program
 # Invalid top-level construct
 invalid declaration
 ```
@@ -278,9 +321,9 @@ invalid declaration
 Test markers:
 
 - `#! Valid expression` - Expected to parse successfully as expression
-- `#! Valid TopLevel` - Expected to parse successfully as top-level declaration
+- `#! Valid Program` - Expected to parse successfully as complete program
 - `#! Error expression` - Expected to fail parsing as expression
-- `#! Error TopLevel` - Expected to fail parsing as top-level
+- `#! Error Program` - Expected to fail parsing as program
 
 ### Running Tests
 
@@ -466,19 +509,36 @@ node scripts/test-runner.js --reconstruct my-tests.parseset
 
 **Recent Improvements:**
 
-1. **Syntax Highlighting System**
+1. **Empty Tuple Support**
+   - Added support for `()` as empty tuple literal
+   - Lambda expressions can return empty tuples: `x => ()`
+   - Empty tuples in assignments: `result := ()`
+   - Empty tuples in conditionals: `if(x) then () else ()`
+
+2. **Enhanced Set Expression**
+   - Full support for bracket notation: `set x[i] = value`
+   - Nested array/map access: `set grid[x][y] = newValue`
+   - Member + array combinations: `set obj.data[index] = updated`
+
+3. **Logical AST System**
+   - Simplified AST for semantic analysis
+   - Separated visibility specifiers from behavioral specifiers
+   - Support for declarations without initializers: `x:int`
+   - Consistent specifier handling across all data structures
+
+4. **Syntax Highlighting System**
    - Terminal output with ANSI color codes
    - HTML generation with CSS styling
    - Multiple themes (dark/light)
    - Zero additional dependencies
 
-2. **Parser Enhancements**
+5. **Parser Enhancements**
    - Fixed handling of nested `if`/`else` structures
    - Improved `for:` loop parsing with indented bodies
    - Better handling of `else` at various indentation levels
    - Fixed AST duplication issues
 
-3. **Real-World Code Support**
+6. **Real-World Code Support**
    - Added comprehensive real-world test cases
    - 100% success rate on complex nested patterns
    - Proper handling of Verse-specific constructs

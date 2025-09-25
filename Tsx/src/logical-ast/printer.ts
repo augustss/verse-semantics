@@ -89,8 +89,6 @@ class LogicalASTPrinter {
         return this.printCase(node as LAST.Case);
       case 'Break':
         return this.color('break', 'red');
-      case 'Continue':
-        return this.color('continue', 'red');
       case 'Return':
         return this.printReturn(node as LAST.Return);
 
@@ -552,8 +550,14 @@ class LogicalASTPrinter {
     const ind = this.indent();
     const params = node.parameters.map(p => p.name).join(', ');
     const ret = node.returnType ? `: ${node.returnType.name}` : '';
-    const specs = node.specifiers ? ` ${this.color(`<${node.specifiers.join(',')}>`, 'dim')}` : '';
-    const header = `${ind}${this.color('func', 'blue')} ${this.color(node.name, 'cyan')}(${params})${ret}${specs}`;
+
+    // Format visibility specifier separately from other specifiers
+    const visibility = node.visibility ? ` ${this.color(`<${node.visibility}>`, 'yellow')}` : '';
+    const specs = node.specifiers && node.specifiers.length > 0
+      ? ` ${this.color(`<${node.specifiers.join(',')}>`, 'dim')}`
+      : '';
+
+    const header = `${ind}${this.color('func', 'blue')} ${this.color(node.name, 'cyan')}${visibility}(${params})${ret}${specs}`;
 
     this.indentLevel++;
     const body = this.printExpression(node.body);

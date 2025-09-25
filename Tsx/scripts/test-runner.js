@@ -502,6 +502,34 @@ function runSingleTest(testCode, expectError, expectTopLevel, lineStart, fileNam
         console.log(`❌ FAIL [${fileName}:${testId}] Expected ${expectation} ${testType} but got error:`);
         console.log(`   Code: ${truncatedCode}`);
         console.log(`   Error: ${error.message}`);
+
+        // Show error location if available
+        if (error.token && error.token.position) {
+          const lines = testCode.split('\n');
+          const lineNum = error.token.position.line;
+          const colNum = error.token.position.column;
+
+          if (lineNum > 0 && lineNum <= lines.length) {
+            console.log(`   Location: Line ${lineNum}, Column ${colNum}`);
+            console.log(`   Context: ${lines[lineNum - 1]}`);
+            console.log(`            ${' '.repeat(colNum - 1)}^ ${error.token.type}: "${error.token.content}"`);
+          }
+        } else if (error.position !== undefined && error.position >= 0) {
+          // Fallback to character offset if no token info
+          const lines = testCode.split('\n');
+          let charCount = 0;
+          for (let i = 0; i < lines.length; i++) {
+            const lineLength = lines[i].length;
+            if (charCount + lineLength >= error.position) {
+              const posInLine = error.position - charCount;
+              console.log(`   Location: Line ${i + 1}, Column ${posInLine + 1}`);
+              console.log(`   Context: ${lines[i]}`);
+              console.log(`            ${' '.repeat(posInLine)}^`);
+              break;
+            }
+            charCount += lineLength + 1; // +1 for newline
+          }
+        }
       }
       return {
         passed: false,

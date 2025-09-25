@@ -174,6 +174,41 @@ export class OperatorParser {
       const operator = token;
       state = state.advance();
 
+      // General validation: check for invalid consecutive operators BEFORE parsing
+      // This catches patterns like ++, --, //, %%, etc.
+      const nextState = state.skipTrivia();
+      const nextToken = nextState.current();
+
+      if (nextToken && nextToken.type === TokenType.OPERATOR) {
+        // Check if this is a valid consecutive operator pattern
+        // Special case: ** is always invalid
+        if (operator.content === '*' && nextToken.content === '*') {
+          throw new ParseError(
+            'Invalid operator sequence "**" - operators cannot appear consecutively without operands',
+            state.position,
+            nextToken
+          );
+        }
+
+        const isValidUnary = nextToken.content === '-' ||     // Unary minus
+                           nextToken.content === '*' ||      // Tuple expansion (but not after *)
+                           nextToken.content === '(' ||      // Parenthesis (not really an operator in this context)
+                           nextToken.content === '[' ||      // Bracket (for indexing)
+                           nextToken.content === '{';        // Brace (for object construction)
+
+        const isValidKeywordUnary = false; // 'not' is handled as IDENTIFIER, not OPERATOR
+
+        if (!isValidUnary && !isValidKeywordUnary) {
+          // Invalid consecutive operators
+          const sequence = operator.content + nextToken.content;
+          throw new ParseError(
+            `Invalid operator sequence "${sequence}" - operators cannot appear consecutively without operands`,
+            state.position,
+            nextToken
+          );
+        }
+      }
+
       const rightResult = parseRight(state);
 
       // Create binary expression node (left-associative) with token offset
