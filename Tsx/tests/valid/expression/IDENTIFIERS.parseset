@@ -1,0 +1,31 @@
+#! Valid expression
+# 1. String with escaped quote
+"He said \"hello\""
+
+
+#! Valid expression
+# 2. String with multiple escapes
+"Quote: \"\tTab\nNewline\\"
+
+
+#! Valid expression
+# 3. Loop with indented style
+loop:
+  continue
+
+
+#! Valid expression
+# 4. Continue as standalone expression (variable reference)
+continue
+
+
+#! Valid expression
+# 5. Query operator for option types
+x?
+
+
+#! Valid expression
+# 6. Chained query operators
+optional_value??
+
+

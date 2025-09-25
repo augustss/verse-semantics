@@ -1,0 +1,924 @@
+#! Valid expression
+# 1. Chained function calls with mixed bracket styles
+getData()[0].process(x, y).getValue()
+
+
+#! Valid expression
+# 2. Mixed brackets
+f(g[x])
+
+
+#! Valid expression
+# 3. Mixed brackets reverse
+f[g(x)]
+
+
+#! Valid expression
+# 4. Mixed nested function calls
+f[g(x, y), h[z]]
+
+
+#! Valid expression
+# 5. Deeply nested mixed brackets
+f[g(h[i(j[k])])]
+
+
+#! Valid expression
+# 6. Basic spawn with braces
+spawn{DoWork()}
+
+
+#! Valid expression
+# 7. Spawn with complex expression
+spawn{Player.Teleport(Location)}
+
+
+#! Valid expression
+# 8. Spawn with indented form
+spawn:
+    Task1()
+    Task2()
+    Task3()
+
+
+#! Valid expression
+# 9. Basic race with two branches
+race:
+    FastPath()
+    SlowPath()
+
+
+#! Valid expression
+# 10. Race with multiple branches
+race:
+    Option1()
+    Option2()
+    Option3()
+    TimeoutHandler()
+
+
+#! Valid expression
+# 11. Basic sync
+sync:
+    UpdateA()
+    UpdateB()
+
+
+#! Valid expression
+# 12. Sync with multiple operations
+sync:
+    Database.Write(Data1)
+    Database.Write(Data2)
+    Database.Write(Data3)
+    Database.Commit()
+
+
+#! Valid expression
+# 13. Basic branch
+branch:
+    Path1()
+    Path2()
+
+
+#! Valid expression
+# 14. Branch with indented form (braces with comma not yet supported)
+branch:
+    PathA()
+    PathB()
+    PathC()
+
+
+#! Valid expression
+# 15. Basic if expression with brace style
+if(true) then { 42 }
+
+
+#! Valid expression
+# 16. If expression with simple condition
+if(x) then { result }
+
+
+#! Valid expression
+# 17. Boolean in if condition - spaced parentheses
+if ( true ) then { 32 }
+
+
+#! Valid expression
+# 18. If with no spaces
+if(true)then{32}
+
+
+#! Valid expression
+# 19. If-else with braces
+if (x) then { a } else { b }
+
+
+#! Valid expression
+# 20. If expression with spacing
+if( condition ) then: result
+
+
+#! Valid expression
+# 21. Boolean false conditions
+if(false) then { 0 } else { 1 }
+
+
+#! Valid expression
+# 22. If expression with object field condition
+if(user.isActive) then { user.name }
+
+
+#! Valid expression
+# 23. If expression with variable conditions
+if(flag) then { onValue } else { offValue }
+
+
+#! Valid expression
+# 24. If expression with function call condition
+if(isValid(data)) then { process(data) }
+
+
+#! Valid expression
+# 25. If expression with function return conditions
+if(checkStatus()) then { proceed() } else { abort() }
+
+
+#! Valid expression
+# 26. If expression with method calls
+if(list.isEmpty()) then { createDefault() } else { list.first() }
+
+
+#! Valid expression
+# 27. If expression as argument
+process(if(condition) then { value1 } else { value2 })
+
+
+#! Valid expression
+# 28. Empty if with braces
+if(x) then {} else {}
+
+
+#! Valid expression
+# 29. If expression with empty then block
+if(condition) then: {}
+
+
+#! Valid expression
+# 30. Complex conditional with nested if
+if(condition1):
+  if(condition2):
+    if(condition3):
+      result
+    else:
+      fallback1
+  else:
+    fallback2
+else:
+  fallback3
+
+
+#! Valid expression
+# 31. If-else with indentation
+if (condition) then:
+  actionA()
+else:
+  actionB()
+
+
+#! Valid expression
+# 32. Indented if expression style
+if(condition) then:
+  result
+
+
+#! Valid expression
+# 33. Indented if expression with else
+if(condition) then:
+  primaryValue
+else:
+  fallbackValue
+
+
+#! Valid expression
+# 34. Missing block content
+if(condition) then:
+
+
+#! Valid expression
+# 35. Indented if expression with nested if
+if(outer) then:
+  if(inner) then:
+    deepValue
+  else:
+    shallowValue
+else:
+  defaultValue
+
+
+#! Valid expression
+# 36. Basic for loop with empty body
+for(x : items) {}
+
+
+#! Valid expression
+# 37. For loop with simple expression body
+for(x : items) { x }
+
+
+#! Valid expression
+# 38. For-loop with range
+for(i : 1..10) { i * 2 }
+
+
+#! Valid expression
+# 39. For-loop with array access body
+for(i : 0..n) { arr[i] }
+
+
+#! Valid expression
+# 40. For with range
+for(i : 1..10) { i * i }
+
+
+#! Valid expression
+# 41. For loop with function call as iterable
+for(x : getItems()) { x }
+
+
+#! Valid expression
+# 42. For-loop with member access in iterable
+for(x : object.items) { x }
+
+
+#! Valid expression
+# 43. For loop with spacing variations
+for( x : items ) { f( x ) }
+
+
+#! Valid expression
+# 44. For-loop with function call body
+for(x : items) { process(x) }
+
+
+#! Valid expression
+# 45. For loop with expression body
+for(item : list) { item + 1 }
+
+
+#! Valid expression
+# 46. For loop with complex expression body
+for(x : items) { f(x) + g(x) }
+
+
+#! Valid expression
+# 47. For loop with binary operations
+for(x : items) { x + y - z * w }
+
+
+#! Valid expression
+# 48. For-loop with variable range
+for(x : start..end) { process(x) }
+
+
+#! Valid expression
+# 49. For with method call result
+for(x : getItems()) { process(x) }
+
+
+#! Valid expression
+# 50. For loop in expression context
+sum + for(x : items) { x } + total
+
+
+#! Valid expression
+# 51. Nested for expressions
+for(x : xs) { for(y : ys) { x + y } }
+
+
+#! Valid expression
+# 52. Complex range in for loop
+for(i : arr.length - 1 .. 0) { arr[i] }
+
+
+#! Valid expression
+# 53. For loop as function argument
+process(for(x : items) { transform(x) })
+
+
+#! Valid expression
+# 54. For with member access in collection
+for(item : container.items) { item.value }
+
+
+#! Valid expression
+# 55. Nested for loops with ranges
+for(x : 1..3):
+  for(y : 1..3):
+    x * y
+
+
+#! Valid expression
+# 56. For loop with complex iterable expression
+for(x : items.filter(isValid)) { transform(x) }
+
+
+#! Valid expression
+# 57. Nested for expressions
+for(x : items):
+  for(y : x.children):
+    process(y)
+
+
+#! Valid expression
+# 58. For with nested block
+for(x : items) {
+  for(y : x.children) { process(y) }
+}
+
+
+#! Valid expression
+# 59. Precedence in for loop
+for(x : start + offset..end - padding) { x * multiplier }
+
+
+#! Valid expression
+# 60. Complex for loop with range and operations
+for(i : (start + 1)..(end - 1)):
+  process(items[i] + offset)
+
+
+#! Valid expression
+# 61. Nested for loops in brace style
+for(x : items) {
+  for(y : x.children) {
+    x.value + y.value
+  }
+}
+
+
+#! Valid expression
+# 62. Nested for loops with ranges
+for(x : 1..10) {
+  for(y : 1..x) {
+    x * y
+  }
+}
+
+
+#! Valid expression
+# 63. Multiple statement body
+for(x : items) { x; y; z }
+
+
+#! Valid expression
+# 64. Indented for loop style
+for(x : items):
+  x
+
+
+#! Valid expression
+# 65. For loop with range indentation style
+for(i : 1..10):
+  i * i
+
+
+#! Valid expression
+# 66. Indented for loop with nested for loops
+for(x : items):
+  for(y : x.children):
+    process(x, y)
+
+
+#! Valid expression
+# 67. Nested range expressions
+for(x : 1..(start + end)) { x }
+
+
+#! Valid expression
+# 68. Complex range in for loop
+for(i : (min + offset)..(max - padding)):
+  calculate(x * multiplier + base)
+
+
+#! Valid expression
+# 69. Continue in else block
+if(skip) then { process() } else { continue }
+
+
+#! Valid expression
+# 70. Loop with break condition
+loop {
+  if(done) then { break }
+}
+
+
+#! Valid expression
+if (IsValid). Print("Starting"); DoWork(); Print("Done")
+
+
+#! Valid expression
+if (Player.IsAlive[]). Player.Heal(10); Player.ShowMessage("Healed") else. Player.Respawn()
+
+
+#! Valid expression
+if (true). DoSomething()
+
+
+#! Valid expression
+if (false). Action1(); Action2() else. Action3()
+
+
+#! Valid expression
+if (User.HasPermission). Grant(); Log("Access granted") else. Deny(); Log("Access denied")
+
+
+#! Valid expression - with array access
+if (Items[0]). ProcessFirst()
+
+
+#! Valid expression - with member access
+if (Player.Status). CheckStatus()
+
+
+#! Valid expression - with function call condition
+if (IsReady()). Start() else. Wait()
+
+
+#! Valid expression - multiple semicolon separated actions
+if (Ready). Action1(); Action2(); Action3(); Action4()
+
+
+#! Valid expression - else with multiple actions
+if (Valid). Success() else. Error1(); Error2(); Error3()
+
+
+#! Valid expression - empty then branch (just condition)
+if (Flag). DoNothing() else. HandleFalse()
+
+
+#! Valid expression - complex nested expression
+if (Data.Items[Index].IsValid). Process(Data.Items[Index]) else. Skip()
+
+
+#! Valid expression - boolean literals
+if (true). Always() else. Never()
+
+
+#! Valid expression
+# 84. Nested parentheses with whitespace
+( ( x ) )
+
+
+#! Valid expression
+# 85. Function call with spaced arguments
+f( x , y , z )
+
+
+#! Valid expression
+# 86. For-loop with whitespace preservation
+for ( x : items ) { x }
+
+
+#! Valid expression
+# 87. Indentation style for-loop
+for(x : items):
+  x * 2
+
+
+#! Valid expression
+# 88. For loop with whitespace preservation
+for( x : items ) { x }
+
+
+#! Valid expression
+# 89. For loop with extensive whitespace
+for    (   x   :   items   )   {   x   +   1   }
+
+
+#! Valid expression
+# 90. If with indentation style
+if (x) then:
+  result
+
+
+#! Valid expression
+# 91. If expression with whitespace preservation
+if( condition ) then { value }
+
+
+#! Valid expression
+# 92. If expression with extensive whitespace
+if   (   condition   )   then   {   result   }   else   {   fallback   }
+
+
+#! Valid expression
+# 93. Nested parentheses
+((x))
+
+
+#! Valid expression
+# 94. Function call with string
+Print("Hello")
+
+
+#! Valid expression
+# 95. Member access on function result
+f().x
+
+
+#! Valid expression
+# 96. Allow method call on boolean literal
+false.method()
+
+
+#! Valid expression
+# 97. Chained method calls
+x.f().g()
+
+
+#! Valid expression
+# 98. Complex chaining
+x.f().y.g().z
+
+
+#! Valid expression
+# 99. Member access in function argument
+process(item.data)
+
+
+#! Valid expression
+# 100. Method call with arguments
+x.f(a, b, c)
+
+
+#! Valid expression
+# 101. Nested method calls
+x.f(y.g(z))
+
+
+#! Valid expression
+# 102. Function call range
+getStart()..getEnd()
+
+
+#! Valid expression
+# 103. Range in function call
+process(1..10)
+
+
+#! Valid expression
+# 104. Multiple ranges
+combine(1..5, 10..20)
+
+
+#! Valid expression
+# 105. Block as function argument
+f({ x; y; z })
+
+
+#! Valid expression
+# 106. Test case
+f (   
+
+)
+
+
+#! Valid expression
+# 107. Test case
+f(    x )
+
+
+#! Valid expression
+# 108. Test case
+f(1, 2)
+
+
+#! Valid expression
+# 109. Test case
+f(1, 2, 3)
+
+
+#! Valid expression
+# 110. Test case
+f(g(x))
+
+
+#! Valid expression
+# 111. Test case
+f(g(x, y), h(z))
+
+
+#! Valid expression
+# 112. Function with single argument
+f(x)
+
+
+#! Valid expression
+# 113. Function with many arguments
+f(a, b, c, d, e, f, g, h, i, j)
+
+
+#! Valid expression
+# 114. Deeply nested function calls
+f(g(h(i(j(k(l(m(n(o(p(x)))))))))))
+
+
+#! Valid expression
+# 115. Many parentheses
+((((((((x))))))))
+
+
+#! Valid expression
+# 116. Nested loops with complex bodies
+for(group : groups):
+  for(item : group.items):
+    if(item.isValid):
+      item.process()
+    else:
+      item.skip()
+
+
+#! Valid expression
+# 117. Complex range expression with operations
+for(x : (min + offset)..(max - padding)):
+  calculate(x * multiplier + base)
+
+
+#! Valid expression
+# 118. Very deeply nested parentheses
+((((((((((x))))))))))
+
+
+#! Valid expression
+# 119. Multiple consecutive empty lines
+if(condition) then:
+  start()
+
+
+
+  end()
+
+
+#! Valid expression
+# 120. Very deep nesting with empty lines
+if(a) then:
+  if(b) then:
+
+    if(c) then:
+
+      if(d) then:
+
+        result
+      else:
+
+        default4
+    else:
+
+      default3
+  else:
+
+    default2
+else:
+
+  default1
+
+
+#! Valid expression
+# 121. Deeply nested parentheses
+(((((x)))))
+
+
+#! Valid expression
+# 122. Nested function calls with multiple arguments
+f(g(x, y), h(a, b))
+
+
+#! Valid expression
+# 123. Function call with multiple args
+Calculate(x, y, z)
+
+
+#! Valid expression
+# 124. Function calls with no spacing
+f(x,y,z)
+
+
+#! Valid expression
+# 125. Method chaining
+object.Method1().Method2().Method3()
+
+
+#! Valid expression
+# 126. Keywords
+device.EnabledEvent.Subscribe(Handler)
+
+
+#! Valid expression
+# 127. Boolean in if condition
+block:
+  if(true) then { 42 }
+  if ( true ) then { 32 }
+  if true then { 23 }
+
+
+#! Valid expression
+# 128. If with empty then and else
+if(condition) then:
+
+
+else:
+  default
+
+
+#! Valid expression
+# 129. For-loop with complex expression
+for(item : list) {
+  item.value * 2 + offset
+}
+
+
+#! Valid expression
+# 130. If expression with nested if in body
+if(condition) then {
+  if(nestedCondition) then { innerValue } else { defaultInner }
+}
+
+
+#! Valid expression
+# 131. If expression with for loop in body
+if(hasItems) then {
+  for(item : items) { process(item) }
+} else {
+  defaultResult
+}
+
+
+#! Valid expression
+# 132. Complex nested if expression
+if(user.isLoggedIn) then:
+  if(user.hasPermission) then:
+    if(resource.isAvailable) then:
+      processResource(resource)
+    else:
+      waitForResource()
+  else:
+    requestPermission()
+else:
+  redirectToLogin()
+
+
+#! Valid expression
+# 133. Complex if-else chain
+if(a) then: 
+   b 
+else: 
+   if(c) then: 
+       d 
+   else: 
+       if(e) then: 
+          f 
+       else: 
+          g
+
+
+#! Valid expression
+# 134. Empty line in function call arguments (if multiline supported)
+calculate(
+  getValue(),
+
+  getOtherValue(),
+
+  getThirdValue()
+)
+
+
+#! Valid expression
+# 135. Nested if with empty lines
+if(outer) then:
+  setup()
+
+  if(inner) then:
+    process()
+
+    cleanup()
+  else:
+    skip()
+
+  finalize()
+
+
+#! Valid expression
+# 136. Function call with keyword-like name
+breakpoint(123)
+
+
+#! Valid expression
+# 137. Member access chain with keyword-like names
+continueHandler.breakManager.forEach()
+
+
+#! Valid expression
+# 138. Comments
+if (condition):
+    ActionA()
+else:
+    ActionB()
+
+
+#! Valid expression
+# 139. For-loop with comments
+for(x : items) { # Process each item
+  x * 2
+}
+
+
+#! Valid expression
+# 140. For with comments
+for(# comment
+  x : items) { # body
+  x # value
+}
+
+
+#! Valid expression
+# 141. For loop with line comments
+for(x : items): # iterate over items
+  x + 1  # add one to each item
+
+
+#! Valid expression
+# 142. If expression with line comments
+if(condition) then: # check the condition
+  result # return this value
+else: # otherwise
+  fallback # return fallback
+
+
+#! Valid expression
+# 143. Multiple empty lines with comments
+for(x : items):
+  process(x)
+
+  # Middle comment
+
+  finalize(x)
+
+
+#! Valid expression
+# 144. Continue as function call
+continue()
+
+
+#! Valid expression
+# 145. Continue with arguments
+continue(x, y)
+
+
+#! Valid expression
+# 146. Loop with continue condition
+loop {
+  if(skip) then { continue }
+  process()
+}
+
+
+#! Valid expression
+# 147. continue as method call
+obj.continue()
+
+
+#! Valid expression
+# 148. Nested tuples
+((1, 2), (3, 4))
+
+
+#! Valid expression
+# 149. Tuple with function calls
+(getValue(), process(data), calculate(x))
+
+
+#! Valid expression
+# 150. Tuple element access with literal index
+myTuple(0)
+
+
+#! Valid expression
+# 151. Tuple element access with different indices
+coordinates(1)
+
+
+#! Valid expression
+# 152. Chained tuple access
+nestedTuple(0)(1)
+
+
+#! Valid expression
+# 153. Tuple access with expression index
+data(getIndex())
+
+
+#! Valid expression
+# 154. Empty tuple (edge case)
+()
+
+

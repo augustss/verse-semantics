@@ -1,0 +1,12 @@
+#! Valid expression
+# 1. Empty indented block at end of input
+else:
+
+
+#! Valid expression
+# 2. Empty indented compound with comments
+else:
+    # Just a comment
+    # Another comment
+
+

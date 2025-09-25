@@ -1,0 +1,12 @@
+#! Valid expression
+# 1. Test case
+42 # end of line comment
+
+
+#! Valid expression
+# 2. Comments with member access
+x. # member
+y. # another
+z
+
+

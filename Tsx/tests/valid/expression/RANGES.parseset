@@ -1,0 +1,22 @@
+#! Valid expression
+# 1. Range with spacing
+1 .. 10
+
+
+#! Valid expression
+# 2. Range with identifiers
+start..end
+
+
+#! Valid expression
+# 3. Range with comments
+1 # start
+.. # to
+10 # end
+
+
+#! Valid expression
+# 4. Tuple with range expressions
+(0..5, 10..15)
+
+

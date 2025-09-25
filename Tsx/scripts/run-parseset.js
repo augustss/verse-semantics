@@ -56,23 +56,55 @@ for (let i = 0; i < lines.length; i++) {
           parseExpression(currentTest);
         } else if (testType === 'TopLevel') {
           parseProgram(currentTest);
+        } else if (testType === 'ErrorExpression') {
+          parseExpression(currentTest);
+        } else if (testType === 'ErrorProgram') {
+          parseProgram(currentTest);
         }
-        passCount++;
-        if (options.verbose) {
-          console.log(`✅ ${testName}: ${currentTest.substring(0, 50)}${currentTest.length > 50 ? '...' : ''}`);
+
+        // For valid tests, success means no exception
+        // For error tests, success means an exception was expected but didn't occur
+        if (testType === 'ErrorExpression' || testType === 'ErrorProgram') {
+          failCount++;
+          failures.push({
+            number: testNumber,
+            code: currentTest,
+            error: 'Expected parsing to fail but it succeeded',
+            type: testType
+          });
+          if (options.showErrors || options.verbose) {
+            console.log(`❌ ${testName}: Expected parsing to fail but it succeeded`);
+            if (options.verbose) {
+              console.log(`   Code: ${currentTest.substring(0, 60)}${currentTest.length > 60 ? '...' : ''}`);
+            }
+          }
+        } else {
+          passCount++;
+          if (options.verbose) {
+            console.log(`✅ ${testName}: ${currentTest.substring(0, 50)}${currentTest.length > 50 ? '...' : ''}`);
+          }
         }
       } catch (error) {
-        failCount++;
-        failures.push({
-          number: testNumber,
-          code: currentTest,
-          error: error.message,
-          type: testType
-        });
-        if (options.showErrors || options.verbose) {
-          console.log(`❌ ${testName}: ${error.message}`);
+        // For valid tests, exception means failure
+        // For error tests, exception means success
+        if (testType === 'ErrorExpression' || testType === 'ErrorProgram') {
+          passCount++;
           if (options.verbose) {
-            console.log(`   Code: ${currentTest.substring(0, 60)}${currentTest.length > 60 ? '...' : ''}`);
+            console.log(`✅ ${testName}: Correctly failed with: ${error.message}`);
+          }
+        } else {
+          failCount++;
+          failures.push({
+            number: testNumber,
+            code: currentTest,
+            error: error.message,
+            type: testType
+          });
+          if (options.showErrors || options.verbose) {
+            console.log(`❌ ${testName}: ${error.message}`);
+            if (options.verbose) {
+              console.log(`   Code: ${currentTest.substring(0, 60)}${currentTest.length > 60 ? '...' : ''}`);
+            }
           }
         }
       }
@@ -85,6 +117,12 @@ for (let i = 0; i < lines.length; i++) {
       currentTest = '';
     } else if (directive.match(/^Valid\s+Program/i)) {
       testType = 'TopLevel';
+      currentTest = '';
+    } else if (directive.match(/^Error\s+Expression/i)) {
+      testType = 'ErrorExpression';
+      currentTest = '';
+    } else if (directive.match(/^Error\s+Program/i)) {
+      testType = 'ErrorProgram';
       currentTest = '';
     } else {
       // Unknown directive, skip
@@ -110,23 +148,55 @@ if (currentTest !== null) {
       parseExpression(currentTest);
     } else if (testType === 'TopLevel') {
       parseProgram(currentTest);
+    } else if (testType === 'ErrorExpression') {
+      parseExpression(currentTest);
+    } else if (testType === 'ErrorProgram') {
+      parseProgram(currentTest);
     }
-    passCount++;
-    if (options.verbose) {
-      console.log(`✅ ${testName}: ${currentTest.substring(0, 50)}${currentTest.length > 50 ? '...' : ''}`);
+
+    // For valid tests, success means no exception
+    // For error tests, success means an exception was expected but didn't occur
+    if (testType === 'ErrorExpression' || testType === 'ErrorProgram') {
+      failCount++;
+      failures.push({
+        number: testNumber,
+        code: currentTest,
+        error: 'Expected parsing to fail but it succeeded',
+        type: testType
+      });
+      if (options.showErrors || options.verbose) {
+        console.log(`❌ ${testName}: Expected parsing to fail but it succeeded`);
+        if (options.verbose) {
+          console.log(`   Code: ${currentTest.substring(0, 60)}${currentTest.length > 60 ? '...' : ''}`);
+        }
+      }
+    } else {
+      passCount++;
+      if (options.verbose) {
+        console.log(`✅ ${testName}: ${currentTest.substring(0, 50)}${currentTest.length > 50 ? '...' : ''}`);
+      }
     }
   } catch (error) {
-    failCount++;
-    failures.push({
-      number: testNumber,
-      code: currentTest,
-      error: error.message,
-      type: testType
-    });
-    if (options.showErrors || options.verbose) {
-      console.log(`❌ ${testName}: ${error.message}`);
+    // For valid tests, exception means failure
+    // For error tests, exception means success
+    if (testType === 'ErrorExpression' || testType === 'ErrorProgram') {
+      passCount++;
       if (options.verbose) {
-        console.log(`   Code: ${currentTest.substring(0, 60)}${currentTest.length > 60 ? '...' : ''}`);
+        console.log(`✅ ${testName}: Correctly failed with: ${error.message}`);
+      }
+    } else {
+      failCount++;
+      failures.push({
+        number: testNumber,
+        code: currentTest,
+        error: error.message,
+        type: testType
+      });
+      if (options.showErrors || options.verbose) {
+        console.log(`❌ ${testName}: ${error.message}`);
+        if (options.verbose) {
+          console.log(`   Code: ${currentTest.substring(0, 60)}${currentTest.length > 60 ? '...' : ''}`);
+        }
       }
     }
   }

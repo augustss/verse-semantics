@@ -1,0 +1,638 @@
+#! Valid expression
+# 1. Array access precedence
+arr[i] + arr[j]
+
+
+#! Valid expression
+# 2. Complex array and function precedence
+getData()[getIndex()] * getMultiplier()
+
+
+#! Valid expression
+# 3. Square bracket function call with expression
+f[x + y]
+
+
+#! Valid expression
+# 4. Square bracket function in expression
+a + f[b]
+
+
+#! Valid expression
+# 5. Mixed function call and square bracket
+f[a] + g(b)
+
+
+#! Valid expression
+# 6. Square bracket function call with addition
+a + f[b + c]
+
+
+#! Valid expression
+# 7. Square bracket function with arithmetic arguments
+f[1 + 2, 3 - 4]
+
+
+#! Valid expression
+# 8. Mixed function calls with operations
+square[x] + cube(y) - abs[z]
+
+
+#! Valid expression
+# 9. Test case
+add(x, y) + sum[1, 2, 3]
+
+
+#! Valid expression
+# 10. If expression in arithmetic
+x + if(condition) then { bonus } else { penalty } + y
+
+
+#! Valid expression
+# 11. Addition with extra spaces
+1  +  2
+
+
+#! Valid expression
+# 12. Multiplication with extra spaces
+3  *  4
+
+
+#! Valid expression
+# 13. Addition without spaces
+1+2
+
+
+#! Valid expression
+# 14. Subtraction without spaces
+5-3
+
+
+#! Valid expression
+# 15. Multiplication without spaces
+3*4
+
+
+#! Valid expression
+# 16. Division without spaces
+8/2
+
+
+#! Valid expression
+# 17. Complex expression without spaces
+a+b*c-d/e
+
+
+#! Valid expression
+# 18. Unary minus in expression with spaces
+x + -y
+
+
+#! Valid expression
+# 19. Unary minus in expression without spaces
+x+-y
+
+
+#! Valid expression
+# 20. Arithmetic with unary minus and spaces
+a * -b + c
+
+
+#! Valid expression
+# 21. Arithmetic with unary minus without spaces
+a*-b+c
+
+
+#! Valid expression
+# 22. Parentheses without spaces
+(x+y)*(a-b)
+
+
+#! Valid expression
+# 23. Function calls in arithmetic with spaces
+f(x) + g(y)
+
+
+#! Valid expression
+# 24. Function calls in arithmetic without spaces
+f(x)+g(y)
+
+
+#! Valid expression
+# 25. Member access in arithmetic with spaces
+obj.a + obj.b
+
+
+#! Valid expression
+# 26. Member access in arithmetic without spaces
+obj.a+obj.b
+
+
+#! Valid expression
+# 27. Parenthesized expression with whitespace
+( x  +  y )
+
+
+#! Valid expression
+# 28. Complex parenthesized expression with whitespace
+( x  +  ( y  -  z ) )
+
+
+#! Valid expression
+# 29. Mixed operators with extensive whitespace
+a  +  ( b  +  c )  -  ( d  -  e )
+
+
+#! Valid expression
+# 30. Whitespace preservation with literals
+42  +  3.14  +  "test"
+
+
+#! Valid expression
+# 31. Expression with maximum whitespace preservation
+x   +   y   *   z   /   w   -   q
+
+
+#! Valid expression
+# 32. Complex whitespace preservation
+x    +    y    *    z
+
+
+#! Valid expression
+# 33. Variables with spaces around operators
+x + y
+
+
+#! Valid expression
+# 34. Variables without spaces around operators
+x+y
+
+
+#! Valid expression
+# 35. Multiplication with variables and spaces
+x * y
+
+
+#! Valid expression
+# 36. Multiplication with variables without spaces
+x*y
+
+
+#! Valid expression
+# 37. Mixed operators
+a + b * c - d / e + f % g
+
+
+#! Valid expression
+# 38. Complex arithmetic chain
+(a + b) * (c - d) / (e + f)
+
+
+#! Valid expression
+# 39. Nested arithmetic expressions
+((x + y) * z) - ((a - b) / c)
+
+
+#! Valid expression
+# 40. Simple subtraction
+5 - 3
+
+
+#! Valid expression
+# 41. Simple division
+8 / 2
+
+
+#! Valid expression
+# 42. Multiple operations same precedence
+1 + 2 + 3
+
+
+#! Valid expression
+# 43. Left associativity of subtraction
+10 - 5 - 2
+
+
+#! Valid expression
+# 44. Multiple operations same precedence (multiplication)
+2 * 3 * 4
+
+
+#! Valid expression
+# 45. Left associativity of division
+24 / 4 / 2
+
+
+#! Valid expression
+# 46. Parentheses override precedence
+(2 + 3) * 4
+
+
+#! Valid expression
+# 47. Nested arithmetic expressions
+(a + b) * (c - d)
+
+
+#! Valid expression
+# 48. Arithmetic with function calls
+f(x) + g(y) * h(z)
+
+
+#! Valid expression
+# 49. Arithmetic with object fields
+obj.x + obj.y * 2
+
+
+#! Valid expression
+# 50. Mixed spacing - some with, some without
+1+2 * 3-4
+
+
+#! Valid expression
+# 51. Unary minus with number
+-42
+
+
+#! Valid expression
+# 52. Multiple unary operators
+--x
+
+
+#! Valid expression
+# 53. Mixed arithmetic
+10 - 5 + 3
+
+
+#! Valid expression
+# 54. Parenthesized expression
+(x + y)
+
+
+#! Valid expression
+# 55. Complex parenthesized expression
+(x + (y - z))
+
+
+#! Valid expression
+# 56. Mixed operators with parentheses
+a + (b + c) - (d - e)
+
+
+#! Valid expression
+# 57. Float in arithmetic
+x + 3.14
+
+
+#! Valid expression
+# 58. Member access on parenthesized expression
+(x + y).toString()
+
+
+#! Valid expression
+# 59. Mixed addition and subtraction
+10 + 5 - 3
+
+
+#! Valid expression
+# 60. Mixed multiplication and division
+20 * 2 / 4
+
+
+#! Valid expression
+# 61. Complex precedence test
+1 + 2 * 3 - 4 / 2
+
+
+#! Valid expression
+# 62. Nested parentheses with precedence
+((1 + 2) * 3) - 4
+
+
+#! Valid expression
+# 63. Complex nested precedence
+1 + (2 * 3) - (4 / 2)
+
+
+#! Valid expression
+# 64. Unary minus with precedence
+-1 + 2
+
+
+#! Valid expression
+# 65. Unary minus with multiplication
+-2 * 3
+
+
+#! Valid expression
+# 66. Unary with parentheses
+-(1 + 2)
+
+
+#! Valid expression
+# 67. Function call with precedence
+f(x) * 2 + g(y) / 3
+
+
+#! Valid expression
+# 68. Member access precedence
+obj.field + 5
+
+
+#! Valid expression
+# 69. Method call precedence
+obj.method() * 2
+
+
+#! Valid expression
+# 70. Complex member access
+obj.field.subfield + other.method().result
+
+
+#! Valid expression
+# 71. Range with arithmetic
+1 + 2..5 * 2
+
+
+#! Valid expression
+# 72. Range with parentheses
+(1 + 2)..(5 * 2)
+
+
+#! Valid expression
+# 73. Nested expressions with precedence
+((a + b) * (c - d)) / ((e * f) + (g / h))
+
+
+#! Valid expression
+# 74. Range with expressions
+a + 1 .. b - 1
+
+
+#! Valid expression
+# 75. Range with parenthesized expressions
+(x + 1)..(y - 1)
+
+
+#! Valid expression
+# 76. Negative range
+-10..10
+
+
+#! Valid expression
+# 77. Simple block with braces
+{ x + y }
+
+
+#! Valid expression
+# 78. Block with single statement and semicolon
+{ x + y; }
+
+
+#! Valid expression
+# 79. Block with multiple statements
+{ x + 1; y - 2; z + 3 }
+
+
+#! Valid expression
+# 80. Nested blocks
+{
+  x + 1;
+  {
+    y + 2;
+    z + 3
+  };
+  w + 4
+}
+
+
+#! Valid expression
+# 81. Block in expression
+x + { a; b; c } + y
+
+
+#! Valid expression
+# 82. Mixed semicolons
+{
+  a;
+  b + c;
+  d
+}
+
+
+#! Valid expression
+# 83. Test case
+f(x + y)
+
+
+#! Valid expression
+# 84. Test case
+f(1 + 2, 3 - 4)
+
+
+#! Valid expression
+# 85. Test case
+a + f(b)
+
+
+#! Valid expression
+# 86. Test case
+a + f(b + c)
+
+
+#! Valid expression
+# 87. Empty object in binary expression
+Container{} + data
+
+
+#! Valid expression
+# 88. Negative numbers in range
+-10..-5
+
+
+#! Valid expression
+# 89. Complex arithmetic
+((((((1 + 2) * 3) - 4) / 5) + 6) * 7) - 8
+
+
+#! Valid expression
+# 90. Long operator chain
+1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10
+
+
+#! Valid expression
+# 91. Mixed operators with precedence
+1 + 2 * 3 - 4 / 5 + 6 * 7 - 8
+
+
+#! Valid expression
+# 92. Complex mathematical expression
+((a + b) * c - (d / e)) + f(g(h(x)))
+
+
+#! Valid expression
+# 93. Mixed operators with function calls
+(add(x, y) * 2) + (subtract(a, b) / 3) - multiply(c, d)
+
+
+#! Valid expression
+# 94. Nested parenthesized expressions
+((x + y) * (a - b))
+
+
+#! Valid expression
+# 95. Mixed function calls and parentheses
+f(g(h(x + y)))
+
+
+#! Valid expression
+# 96. Function call with nested expressions
+calculate(((a + b) * c), ((d - e) / f))
+
+
+#! Valid expression
+# 97. Complex arithmetic with nested function calls
+((f(x) + g(y)) * (h(a) - i(b))) / (j(c) + k(d))
+
+
+#! Valid expression
+# 98. Deeply nested block expressions
+{
+  {
+    {
+      x + y
+    }
+  }
+}
+
+
+#! Valid expression
+# 99. Arithmetic
+x-y-z
+
+
+#! Valid expression
+# 100. Test case
+x + # inline comment
+y
+
+
+#! Valid expression
+# 101. Complex spacing in nested expressions
+f(  g(  x + y  ),  h(  a - b  )  )
+
+
+#! Valid expression
+# 102. Operator precedence: multiplication before addition
+2 + 3 * 4
+
+
+#! Valid expression
+# 103. Operator precedence: division before subtraction
+10 - 8 / 2
+
+
+#! Valid expression
+# 104. Complex expression with variables
+x + y * z - w / v
+
+
+#! Valid expression
+# 105. Complex variables with mixed spacing
+a + b*c - d / e
+
+
+#! Valid expression
+# 106. Unary minus with variable
+-x
+
+
+#! Valid expression
+# 107. Parentheses with spacing variations
+( x + y ) * ( a - b )
+
+
+#! Valid expression
+# 108. Chain of different operators
+a + b - c * d / e + f - g
+
+
+#! Valid expression
+# 109. Multi-line expression with preserved spacing
+x +
+  y +
+    z
+
+
+#! Valid expression
+# 110. Comments with literals
+42 # integer
++ 3.14 # float
++ "test" # string
+
+
+#! Valid expression
+# 111. Block with comments
+{
+  # first statement
+  x + 1;
+  # second statement
+  y + 2  # inline comment
+}
+
+
+#! Valid expression
+# 112. Comment 1
+x + y # comment 2
+
+
+#! Valid expression
+# 113. Start comment
+f(x) # middle
++ g(y) # end
+
+
+#! Valid expression
+# 114. Line comments with spacing
+x + y # this is a comment
+
+
+#! Valid expression
+# 115. Simple addition
+1 + 2
+
+
+#! Valid expression
+# 116. Simple multiplication
+3 * 4
+
+
+#! Valid expression
+# 117. Tuple with expressions
+(x + 1, y * 2, z - 3)
+
+
+#! Valid expression
+# 118. Tuple expansion in function call
+processCoords(*point)
+
+
+#! Valid expression
+# 119. Multiple tuple expansions
+combine(*first, *second)
+
+
+#! Valid expression
+# 120. Tuple expansion with regular arguments
+transform(matrix, *coords, scale)
+
+
+#! Valid expression
+# 121. Nested tuple expansion
+process(*getTuple())
+
+
+#! Valid expression
+# 122. Complex nested structure
+((getValue(), process()), (calculate(*data), transform()))
+
+

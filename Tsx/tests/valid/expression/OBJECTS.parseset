@@ -1,0 +1,32 @@
+#! Valid expression
+# 1. Boolean in if condition - no parentheses
+if true then { 23 }
+
+
+#! Valid expression
+# 2. If without parentheses with identifier
+if condition then { result }
+
+
+#! Valid expression
+# 3. Boolean false without parens
+if false then { no } else { yes }
+
+
+#! Valid expression
+# 4. Basic loop with braces
+loop { break }
+
+
+#! Valid expression
+# 5. Empty object construction
+Point{}
+
+
+#! Valid expression
+# 6. 579. Empty class expression
+# Original file: valid-expression.parseset, line 3195
+# Failure: 'class' is a reserved keyword and cannot be used as an identifier
+class { }
+
+

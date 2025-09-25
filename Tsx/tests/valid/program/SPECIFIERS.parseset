@@ -1,0 +1,49 @@
+#! Valid expression
+# 1. Variable with specifier and complex type
+var data <export> : Array = f[1, 2, 3]
+
+
+#! Valid expression
+# 2. Variable with specifier and simple value
+var data <mut> : int = 42
+
+
+#! Valid expression
+# 3. Variable with specifier and spaces
+var x<public>:int= 42
+
+
+#! Valid expression
+# 4. Function with decides annotation
+<decides>
+MyFunction() : logic = true
+
+
+#! Valid expression
+# 5. Function with transacts annotation
+<transacts>
+UpdateScore() : void = { }
+
+
+#! Valid expression
+# 6. Function with both decides and transacts
+<decides><transacts>
+ProcessAction() : logic = false
+
+
+#! Valid expression
+# 7. Complex function with annotation
+<decides>
+ValidateInput(value : int) : logic = value > 0 and value < 100
+
+
+#! Valid expression
+# 8. Function with behavior specifier before name
+<decides>ValidateInput(x:int):logic = x >= 0
+
+
+#! Valid expression
+# 9. Function with multiple pre-specifiers
+<decides><suspends>ProcessAsync():void = DoWork()
+
+

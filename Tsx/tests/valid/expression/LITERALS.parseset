@@ -1,0 +1,55 @@
+#! Valid expression
+# 1. Multiple empty lines with expression
+42
+
+
+#! Valid expression
+# 2. Float literal with no integer part
+.5
+
+
+#! Valid expression
+# 3. Float literal with no decimal part
+5.
+
+
+#! Valid expression
+# 4. Float with positive exponent
+1.5e+10
+
+
+#! Valid expression
+# 5. Float with negative exponent
+1.5e-10
+
+
+#! Valid expression
+# 6. Range with same start and end
+5..5
+
+
+#! Valid expression
+# 7. Integer with scientific notation becomes float
+1e10
+
+
+#! Valid expression
+# 8. Keywords can appear in strings
+"block and continue are keywords"
+
+
+#! Valid expression
+# 9. Boolean literal true
+true
+
+
+#! Valid expression
+# 10. Boolean literal false
+false
+
+
+#! Valid expression
+# 11. Basic string literal with double quotes
+"Hello"
+
+
