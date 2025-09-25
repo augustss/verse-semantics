@@ -1,0 +1,5 @@
+# Constructor Declaration Tests
+
+#! Valid Expression
+MakeClass1<constructor>(Arg1:int) := class1:
+    Property1 := Arg1

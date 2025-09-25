@@ -1,5 +1,5 @@
-# Valid Arrays
-# Array construction and array access expressions
+# Valid Arrays Test Suite
+# Tests for array construction, array access expressions, and matrix operations
 
 #! Valid expression
 # 1. Array access

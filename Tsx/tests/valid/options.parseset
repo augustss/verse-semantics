@@ -1,0 +1,4 @@
+# Option Expression Tests
+
+#! Valid Expression
+option{ 42 }

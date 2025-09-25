@@ -10,7 +10,7 @@ This grammar specification describes the Verse programming language syntax as im
   - All identifiers (regular and @-prefixed)
   - All operators (arithmetic, comparison, logical, assignment, special)
   - All keywords (block-forming, data structure, declaration, type, reserved)
-  - All specifiers (`<public>`, `<private>`, `<scoped(...)>`, etc.)
+  - All specifiers (`<public>`, `<private>`, `<scoped{...}>`, etc.)
   - Comments (single-line `#`, nested multi-line `<# #>`)
   - Significant whitespace and indentation tracking
   - TRIVIA token optimization for efficient parsing
@@ -133,7 +133,7 @@ This grammar specification describes the Verse programming language syntax as im
                        	      'transacts' | 'internal' | 'reads' | 'writes' | 'allocates' | 'converges' |
                        	      'castable' | 'concrete' | 'unique' | 'open' | 'closed' | 'native_callable' |
                        	      'module_scoped_var_weak_map_key' | 'epic_internal'
-<scoped-specifier> 	::= 'scoped' '(' <scoped-argument> ')'
+<scoped-specifier> 	::= 'scoped' '{' <scoped-argument> '}'
 ```
 
 ### Comments and Whitespace
@@ -356,7 +356,7 @@ This is distinguished from type annotations by the presence of a newline after t
 The lexer can combine consecutive whitespace and comments into single TRIVIA tokens for efficient parsing.
 
 ### Scoped Specifiers
-The `<scoped(...)>` specifier accepts arguments that define scoping constraints.
+The `<scoped{...}>` specifier accepts arguments that define scoping constraints.
 
 ### Nested Comments
 Multi-line comments `<# ... #>` can be nested, with proper level tracking.

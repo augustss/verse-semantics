@@ -2,12 +2,14 @@
 
 /**
  * Compare original input with reconstructed output for parseset tests
+ * Optimized version that avoids double lexing
  */
 
 const fs = require('fs');
 const path = require('path');
-const { parseProgram } = require('../dist/parser/top-level-parser');
-const { parseExpression } = require('../dist/parser');
+const { Parser, createParser, createParserState } = require('../dist/parser/parser');
+const { TopLevelParser } = require('../dist/parser/top-level-parser');
+const { TokenStream } = require('../dist/lexer/tokenstream');
 const { reconstructFromAST } = require('../dist/pretty-printer/ast-reconstructor');
 
 // Colors for terminal output
@@ -19,6 +21,46 @@ const CYAN = '\x1b[36m';
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
+
+/**
+ * Parse expression and return both AST and token stream
+ */
+function parseExpressionWithTokens(source) {
+  // Lex the source into tokens
+  const tokens = TokenStream.fromString(source);
+  // Combine trivia for cleaner parsing
+  tokens.combineTrivia();
+  // Create parser and state
+  const parser = createParser();
+  const state = createParserState(tokens);
+  // Parse the expression
+  const result = parser.parseExpression(state);
+
+  if (!result.state.isAtEnd()) {
+    const unexpected = result.state.current();
+    throw new Error(`Unexpected token after expression: ${unexpected?.type} "${unexpected?.content}" at position ${result.state.position}`);
+  }
+
+  return { ast: result.node, tokenStream: tokens };
+}
+
+/**
+ * Parse program and return both AST and token stream
+ */
+function parseProgramWithTokens(source) {
+  const tokens = TokenStream.fromString(source);
+  tokens.combineTrivia();
+  const parser = new TopLevelParser();
+  const state = createParserState(tokens);
+  const result = parser.parseProgram(state);
+
+  if (!result.state.isAtEnd()) {
+    const unexpected = result.state.current();
+    throw new Error(`Unexpected token after program: ${unexpected?.type} "${unexpected?.content}" at position ${result.state.position}`);
+  }
+
+  return { ast: result.node, tokenStream: tokens };
+}
 
 /**
  * Extract tests from a parseset file
@@ -75,19 +117,26 @@ function testReconstruction(test, testNumber) {
 
   try {
     let ast;
+    let tokenStream;
     let reconstructed;
 
     if (isTopLevel) {
       // Parse as program
-      ast = parseProgram(source);
+      const parseResult = parseProgramWithTokens(source);
+      ast = parseResult.ast;
+      tokenStream = parseResult.tokenStream;
       reconstructed = reconstructFromAST(source, ast, {
-        includeTrailingTrivia: true
+        includeTrailingTrivia: true,
+        tokenStream: tokenStream
       });
     } else {
       // Parse as expression
-      ast = parseExpression(source);
+      const parseResult = parseExpressionWithTokens(source);
+      ast = parseResult.ast;
+      tokenStream = parseResult.tokenStream;
       reconstructed = reconstructFromAST(source, ast, {
-        includeTrailingTrivia: true
+        includeTrailingTrivia: true,
+        tokenStream: tokenStream
       });
     }
 
@@ -178,8 +227,8 @@ function main() {
       .sort();
   }
 
-  console.log(`\n${BOLD}RECONSTRUCTION COMPARISON${RESET}`);
-  console.log(`${BOLD}Testing ${filesToTest.length} parseset files${RESET}\n`);
+  console.log(`\n${BOLD}OPTIMIZED RECONSTRUCTION COMPARISON${RESET}`);
+  console.log(`${BOLD}Testing ${filesToTest.length} parseset files (with token stream reuse)${RESET}\n`);
   console.log('=' .repeat(80));
 
   let totalTests = 0;

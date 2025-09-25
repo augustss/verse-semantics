@@ -142,19 +142,19 @@ function runComparisonTest(filePath, options = {}) {
     const line = lines[i];
 
     // Check for test directives
-    if (line.includes('#! Error expression')) {
+    if (line.match(/#!\s+Error\s+Expression/i)) {
       expectError = true;
       expectTopLevel = false;
       continue;
-    } else if (line.includes('#! Valid expression')) {
+    } else if (line.match(/#!\s+Valid\s+Expression/i)) {
       expectError = false;
       expectTopLevel = false;
       continue;
-    } else if (line.includes('#! Error TopLevel')) {
+    } else if (line.match(/#!\s+Error\s+Program/i)) {
       expectError = true;
       expectTopLevel = true;
       continue;
-    } else if (line.includes('#! Valid TopLevel')) {
+    } else if (line.match(/#!\s+Valid\s+Program/i)) {
       expectError = false;
       expectTopLevel = true;
       continue;

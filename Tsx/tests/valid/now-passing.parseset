@@ -12,7 +12,7 @@
             Done()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 4. 41. Complex class with arrays and case
 # Original file: valid-arrays.parseset, line 183
 # Failure: parseTopLevel is not a function
@@ -28,7 +28,7 @@ CaptureControl := class:
                 _ => 1
 
 
-#! Valid TopLevel
+#! Valid Program
 # 5. 42. Class with consecutive var fields
 # Original file: valid-arrays.parseset, line 196
 # Failure: parseTopLevel is not a function
@@ -38,7 +38,7 @@ Test := class:
     var Count : int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 18. 1. Empty class with decorators
 # Original file: valid-data-structures.parseset, line 4
 # Failure: parseTopLevel is not a function
@@ -46,7 +46,7 @@ Test := class:
 MyClass := class { }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 19. 2. Class with decorator and field
 # Original file: valid-data-structures.parseset, line 9
 # Failure: parseTopLevel is not a function
@@ -55,7 +55,7 @@ MyClass := class { }
 Component := class { x := 1 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 20. 3. Class with inheritance
 # Original file: valid-data-structures.parseset, line 15
 # Failure: parseTopLevel is not a function
@@ -63,7 +63,7 @@ Component := class { x := 1 }
 DerivedClass := class(BaseClass) { }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 21. 4. Class with indented fields
 # Original file: valid-data-structures.parseset, line 20
 # Failure: parseTopLevel is not a function
@@ -73,7 +73,7 @@ MyClass := class:
   y := 2
 
 
-#! Valid TopLevel
+#! Valid Program
 # 22. 5. Class with multiple decorators and fields
 # Original file: valid-data-structures.parseset, line 27
 # Failure: parseTopLevel is not a function
@@ -87,7 +87,7 @@ Widget := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 23. 6. Class with method and decorators
 # Original file: valid-data-structures.parseset, line 38
 # Failure: parseTopLevel is not a function
@@ -101,7 +101,7 @@ Calculator := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 24. 7. Entity class with replicated field
 # Original file: valid-data-structures.parseset, line 49
 # Failure: parseTopLevel is not a function
@@ -119,7 +119,7 @@ Player := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 25. 8. Main class with complex method
 # Original file: valid-data-structures.parseset, line 64
 # Failure: parseTopLevel is not a function
@@ -135,7 +135,7 @@ Game := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 26. 9. Class with case expression method
 # Original file: valid-data-structures.parseset, line 77
 # Failure: parseTopLevel is not a function
@@ -146,14 +146,14 @@ Test := class:
             _ => 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 27. 10. Empty interface with brace syntax
 # Original file: valid-data-structures.parseset, line 85
 # Failure: parseTopLevel is not a function
 Empty1 := interface {}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 28. 11. Multiple empty interfaces
 # Original file: valid-data-structures.parseset, line 89
 # Failure: parseTopLevel is not a function
@@ -163,7 +163,7 @@ MyInterface2:=interface{
     }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 29. 12. Interface with properties (brace style)
 # Original file: valid-data-structures.parseset, line 96
 # Failure: parseTopLevel is not a function
@@ -173,7 +173,7 @@ IGameObject := interface {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 30. 13. Interface with inheritance
 # Original file: valid-data-structures.parseset, line 103
 # Failure: parseTopLevel is not a function
@@ -182,7 +182,7 @@ IAdvancedPlayer := interface(IPlayer):
     SetArmor(value:int):void
 
 
-#! Valid TopLevel
+#! Valid Program
 # 31. 14. Struct with methods
 # Original file: valid-data-structures.parseset, line 109
 # Failure: parseTopLevel is not a function
@@ -193,7 +193,7 @@ ComplexNumber := struct:
     Add(other:ComplexNumber):ComplexNumber = ComplexNumber{Real: Real + other.Real, Imaginary: Imaginary + other.Imaginary}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 32. 15. Struct with inheritance
 # Original file: valid-data-structures.parseset, line 117
 # Failure: parseTopLevel is not a function
@@ -201,7 +201,7 @@ ColoredPoint := struct(Point):
     Color: color
 
 
-#! Valid TopLevel
+#! Valid Program
 # 33. 16. Enum with explicit values (brace style)
 # Original file: valid-data-structures.parseset, line 122
 # Failure: parseTopLevel is not a function
@@ -212,7 +212,7 @@ Priority := enum {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 34. 17. Interface with nested types
 # Original file: valid-data-structures.parseset, line 130
 # Failure: parseTopLevel is not a function
@@ -225,14 +225,14 @@ IContainer := interface:
     GetItem(id:int):ItemType?
 
 
-#! Valid TopLevel
+#! Valid Program
 # 35. 18. Empty interface with colon
 # Original file: valid-data-structures.parseset, line 140
 # Failure: parseTopLevel is not a function
 Empty3 := interface():
 
 
-#! Valid TopLevel
+#! Valid Program
 # 36. 19. Class with simple method
 # Original file: valid-data-structures.parseset, line 144
 # Failure: parseTopLevel is not a function
@@ -241,7 +241,7 @@ Test := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 37. 20. Class with spaced method signature
 # Original file: valid-data-structures.parseset, line 150
 # Failure: parseTopLevel is not a function
@@ -250,7 +250,7 @@ Test := class:
         x := 42
 
 
-#! Valid TopLevel
+#! Valid Program
 # 38. 21. Class with variable assignment in method
 # Original file: valid-data-structures.parseset, line 156
 # Failure: parseTopLevel is not a function
@@ -259,7 +259,7 @@ Test := class:
         var result:int = 10
 
 
-#! Valid TopLevel
+#! Valid Program
 # 39. 22. Class with for loop in method
 # Original file: valid-data-structures.parseset, line 162
 # Failure: parseTopLevel is not a function
@@ -269,7 +269,7 @@ Test := class:
             DoSomething(item)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 40. 23. Class with case expression in method
 # Original file: valid-data-structures.parseset, line 169
 # Failure: parseTopLevel is not a function
@@ -280,7 +280,7 @@ Test := class:
             _ => DoDefault()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 41. 24. Complex class with arrays and case
 # Original file: valid-data-structures.parseset, line 177
 # Failure: parseTopLevel is not a function
@@ -296,7 +296,7 @@ CaptureControl := class:
                 _ => 1
 
 
-#! Valid TopLevel
+#! Valid Program
 # 42. 25. Class with inheritance and decorators
 # Original file: valid-data-structures.parseset, line 190
 # Failure: parseTopLevel is not a function
@@ -305,7 +305,7 @@ simple_device := class(creative_device):
     value:int = 42
 
 
-#! Valid TopLevel
+#! Valid Program
 # 43. 26. Class with method specifiers
 # Original file: valid-data-structures.parseset, line 196
 # Failure: parseTopLevel is not a function
@@ -313,7 +313,7 @@ my_device := class:
     OnBegin<override>():void = Print("Starting")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 44. 27. Class with suspends method
 # Original file: valid-data-structures.parseset, line 201
 # Failure: parseTopLevel is not a function
@@ -321,14 +321,14 @@ async_device := class:
     DoAsync<suspends>():void = Wait(1.0)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 45. 28. Class with empty parentheses (no inheritance, no body)
 # Original file: valid-data-structures.parseset, line 206
 # Failure: parseTopLevel is not a function
 MyDevice := class()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 46. 29. Module with interface, struct, and enum
 # Original file: valid-data-structures.parseset, line 210
 # Failure: parseTopLevel is not a function
@@ -349,7 +349,7 @@ GameTypes := module:
     }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 47. 30. Class implementing interface
 # Original file: valid-data-structures.parseset, line 228
 # Failure: parseTopLevel is not a function
@@ -359,14 +359,14 @@ Player := class(IPlayer):
     SetHealth(value:int):void = { Health = value }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 48. 31. Module with empty body (colon style)
 # Original file: valid-data-structures.parseset, line 235
 # Failure: parseTopLevel is not a function
 EmptyModule := module:
 
 
-#! Valid TopLevel
+#! Valid Program
 # 49. 32. Nested declarations in module
 # Original file: valid-data-structures.parseset, line 239
 # Failure: parseTopLevel is not a function
@@ -380,7 +380,7 @@ Container := module:
         Count: int
 
 
-#! Valid TopLevel
+#! Valid Program
 # 50. 33. Class with consecutive var fields
 # Original file: valid-data-structures.parseset, line 250
 # Failure: parseTopLevel is not a function
@@ -390,7 +390,7 @@ Test := class:
     var Count : int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 51. 34. Class with calculated method
 # Original file: valid-data-structures.parseset, line 257
 # Failure: parseTopLevel is not a function
@@ -399,7 +399,7 @@ MyClass := class:
         x + y * z
 
 
-#! Valid TopLevel
+#! Valid Program
 # 52. 35. Class with conditional in method
 # Original file: valid-data-structures.parseset, line 263
 # Failure: parseTopLevel is not a function
@@ -409,28 +409,28 @@ MyClass := class:
             DoWork()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 53. 36. Empty class with various syntaxes
 # Original file: valid-data-structures.parseset, line 270
 # Failure: parseTopLevel is not a function
 EmptyClass1 := class{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 54. 37. Class inheriting from tag
 # Original file: valid-data-structures.parseset, line 274
 # Failure: parseTopLevel is not a function
 Tag_Player := class(tag){}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 55. 38. Class with inheritance and colon
 # Original file: valid-data-structures.parseset, line 278
 # Failure: parseTopLevel is not a function
 MyDevice := class(creative_device):
 
 
-#! Valid TopLevel
+#! Valid Program
 # 56. 39. Class with field
 # Original file: valid-data-structures.parseset, line 282
 # Failure: parseTopLevel is not a function
@@ -438,7 +438,7 @@ Player := class:
     Name:string = "Unknown"
 
 
-#! Valid TopLevel
+#! Valid Program
 # 57. 40. Class with multiple fields on separate lines
 # Original file: valid-data-structures.parseset, line 287
 # Failure: parseTopLevel is not a function
@@ -448,7 +448,7 @@ Player := class:
     Position:vector3 = vector3{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 58. 41. Class with decorated field
 # Original file: valid-data-structures.parseset, line 294
 # Failure: parseTopLevel is not a function
@@ -457,7 +457,7 @@ teleporter_device := class(creative_device):
     TriggerDevice:trigger_device = trigger_device{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 59. 42. Class with simple method
 # Original file: valid-data-structures.parseset, line 300
 # Failure: parseTopLevel is not a function
@@ -466,7 +466,7 @@ MyClass := class:
         42
 
 
-#! Valid TopLevel
+#! Valid Program
 # 60. 43. Class with method having specifiers
 # Original file: valid-data-structures.parseset, line 306
 # Failure: parseTopLevel is not a function
@@ -475,7 +475,7 @@ teleporter_device := class(creative_device):
         Print("Started")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 61. 44. Complex class with multiple members
 # Original file: valid-data-structures.parseset, line 312
 # Failure: parseTopLevel is not a function
@@ -493,21 +493,21 @@ game_device := class(creative_device):
         Print("Device enabled")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 62. 45. Class with public specifier in const declaration
 # Original file: valid-data-structures.parseset, line 327
 # Failure: parseTopLevel is not a function
 MyClass<public> := class{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 63. 46. Class with public specifier and inheritance
 # Original file: valid-data-structures.parseset, line 331
 # Failure: parseTopLevel is not a function
 DominationSpawnTags<public> := class(tag){}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 64. 47. Nested class-like structure
 # Original file: valid-data-structures.parseset, line 335
 # Failure: parseTopLevel is not a function
@@ -516,7 +516,7 @@ Outer := class:
         Value:int = 5
 
 
-#! Valid TopLevel
+#! Valid Program
 # 65. 48. Class with const field
 # Original file: valid-data-structures.parseset, line 341
 # Failure: parseTopLevel is not a function
@@ -524,7 +524,7 @@ Settings := class:
     MaxPlayers<const>:int = 100
 
 
-#! Valid TopLevel
+#! Valid Program
 # 66. 49. Class with multiple decorators
 # Original file: valid-data-structures.parseset, line 346
 # Failure: parseTopLevel is not a function
@@ -534,7 +534,7 @@ ui_device := class(creative_device):
     UIText:string = "Hello"
 
 
-#! Valid TopLevel
+#! Valid Program
 # 67. 50. Class with constructor-like method
 # Original file: valid-data-structures.parseset, line 353
 # Failure: parseTopLevel is not a function
@@ -543,7 +543,7 @@ player_manager := class:
         SetName(Name)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 68. 51. Full Fortnite device example
 # Original file: valid-data-structures.parseset, line 359
 # Failure: parseTopLevel is not a function
@@ -562,14 +562,14 @@ teleporter_device := class(creative_device):
             TeleportDestination.Teleport(Agent)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 69. 52. Module with public specifier
 # Original file: valid-data-structures.parseset, line 375
 # Failure: parseTopLevel is not a function
 MyModule<public> := module:
 
 
-#! Valid TopLevel
+#! Valid Program
 # 70. 53. Class with decorated fields
 # Original file: valid-data-structures.parseset, line 379
 # Failure: parseTopLevel is not a function
@@ -581,7 +581,7 @@ ui_device := class(creative_device):
     Count:int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 71. 54. Class with fields and methods
 # Original file: valid-data-structures.parseset, line 388
 # Failure: parseTopLevel is not a function
@@ -595,7 +595,7 @@ game_device := class:
         Score = NewScore
 
 
-#! Valid TopLevel
+#! Valid Program
 # 72. 55. Class with decorated field and method
 # Original file: valid-data-structures.parseset, line 399
 # Failure: parseTopLevel is not a function
@@ -607,7 +607,7 @@ teleporter := class:
         MoveTo(Destination)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 73. 56. Class with multiple methods with specifiers
 # Original file: valid-data-structures.parseset, line 408
 # Failure: parseTopLevel is not a function
@@ -620,7 +620,7 @@ game := class:
 
 
 
-#! Valid TopLevel
+#! Valid Program
 # 75. 58. Class with method returning constructed object
 # Original file: valid-data-structures.parseset, line 425
 # Failure: parseTopLevel is not a function
@@ -632,7 +632,7 @@ Factory := class:
         }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 76. 59. Complex class with all features
 # Original file: valid-data-structures.parseset, line 434
 # Failure: parseTopLevel is not a function
@@ -651,7 +651,7 @@ advanced_device<public> := class(creative_device):
         Parse(Input)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 77. 60. Class with single field no initializer
 # Original file: valid-data-structures.parseset, line 450
 # Failure: parseTopLevel is not a function
@@ -659,7 +659,7 @@ Simple := class:
     Value:int
 
 
-#! Valid TopLevel
+#! Valid Program
 # 78. 61. Class with const fields
 # Original file: valid-data-structures.parseset, line 455
 # Failure: parseTopLevel is not a function
@@ -668,7 +668,7 @@ Constants := class:
     MinValue<const>:int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 79. 62. Fortnite device pattern
 # Original file: valid-data-structures.parseset, line 461
 # Failure: parseTopLevel is not a function
@@ -686,7 +686,7 @@ capture_point := class(creative_device):
         AwardPoints(Agent)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 80. 63. Class with method (indented body)
 # Original file: valid-data-structures.parseset, line 476
 # Failure: parseTopLevel is not a function
@@ -695,14 +695,14 @@ MyClass := class:
         x + y
 
 
-#! Valid TopLevel
+#! Valid Program
 # 81. 64. Class with empty parentheses (no inheritance, no body) with spaces
 # Original file: valid-data-structures.parseset, line 482
 # Failure: parseTopLevel is not a function
 MyDevice2 := class( )
 
 
-#! Valid TopLevel
+#! Valid Program
 # 82. 65. Interface with members (indentation style)
 # Original file: valid-data-structures.parseset, line 486
 # Failure: parseTopLevel is not a function
@@ -711,7 +711,7 @@ IPlayer := interface:
     SetHealth(value:int):void
 
 
-#! Valid TopLevel
+#! Valid Program
 # 83. 66. Struct with fields (indentation style)
 # Original file: valid-data-structures.parseset, line 492
 # Failure: parseTopLevel is not a function
@@ -721,7 +721,7 @@ Vector3 := struct:
     Z: float
 
 
-#! Valid TopLevel
+#! Valid Program
 # 84. 67. Enum with values (indentation style)
 # Original file: valid-data-structures.parseset, line 499
 # Failure: parseTopLevel is not a function
@@ -732,7 +732,7 @@ CardSuit := enum:
     Spades
 
 
-#! Valid TopLevel
+#! Valid Program
 # 85. 68. Class with line comments
 # Original file: valid-data-structures.parseset, line 507
 # Failure: parseTopLevel is not a function
@@ -745,7 +745,7 @@ MyClass := class:
         Print("test")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 86. 69. Class with multiline comments
 # Original file: valid-data-structures.parseset, line 517
 # Failure: parseTopLevel is not a function
@@ -781,7 +781,7 @@ PlayerController := class:
   MovePlayer(direction : Vector3, speed : float) <transacts>: void = { }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 90. 91. Class inheritance chain
 # Original file: valid-data-structures.parseset, line 655
 # Note: Multiple declarations require TopLevel parsing, not expression parsing
@@ -801,14 +801,14 @@ Puppy := class(Dog) {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 91. 105. TODO catch later
 # Original file: valid-data-structures.parseset, line 744
 # Failure: parseTopLevel is not a function
 EmptyE2 := enum
 
 
-#! Valid TopLevel
+#! Valid Program
 # 92. 53. Variable names similar to booleans
 # Original file: valid-declarations.parseset, line 222
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -918,7 +918,7 @@ for:
 f(x, y,) := x + y
 
 
-#! Valid TopLevel
+#! Valid Program
 # 123. 572. Class inheritance chain
 # Original file: valid-expression.parseset, line 3142
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -982,7 +982,7 @@ GameManager := class:
   ModifyState()   <transacts>: void = { }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 133. 687. Keywords can be parts of larger identifiers
 # Original file: valid-expression.parseset, line 3817
 # Failure: Unexpected token after expression: IDENTIFIER
@@ -1001,7 +1001,7 @@ arraySize := 100
   multi-line comment
 x + y#>x
 
-#! Valid TopLevel
+#! Valid Program
 # 140. 1. Test case
 # Original file: valid-toplevel.parseset, line 6
 # Failure: parseTopLevel is not a function
@@ -1009,7 +1009,7 @@ x + y#>x
 MyClass := class { }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 141. 2. Test case
 # Original file: valid-toplevel.parseset, line 11
 # Failure: parseTopLevel is not a function
@@ -1018,7 +1018,7 @@ MyClass := class { }
 Component := class { x := 1 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 142. 3. Test case
 # Original file: valid-toplevel.parseset, line 17
 # Failure: parseTopLevel is not a function
@@ -1026,7 +1026,7 @@ Component := class { x := 1 }
 DerivedClass := class(BaseClass) { }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 143. 4. Test case
 # Original file: valid-toplevel.parseset, line 22
 # Failure: parseTopLevel is not a function
@@ -1036,7 +1036,7 @@ MyClass := class:
   y := 2
 
 
-#! Valid TopLevel
+#! Valid Program
 # 144. 5. Test case
 # Original file: valid-toplevel.parseset, line 29
 # Failure: parseTopLevel is not a function
@@ -1050,7 +1050,7 @@ Widget := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 145. 6. Test case
 # Original file: valid-toplevel.parseset, line 40
 # Failure: parseTopLevel is not a function
@@ -1064,7 +1064,7 @@ Calculator := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 146. 7. Test case
 # Original file: valid-toplevel.parseset, line 51
 # Failure: parseTopLevel is not a function
@@ -1082,7 +1082,7 @@ Player := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 147. 8. Test case
 # Original file: valid-toplevel.parseset, line 66
 # Failure: parseTopLevel is not a function
@@ -1098,7 +1098,7 @@ Game := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 148. 9. Test case
 # Original file: valid-toplevel.parseset, line 79
 # Failure: parseTopLevel is not a function
@@ -1109,14 +1109,14 @@ Test := class:
             _ => 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 149. 10. Empty interface with brace syntax
 # Original file: valid-toplevel.parseset, line 87
 # Failure: parseTopLevel is not a function
 Empty1 := interface {}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 150. 11. Basic interfaces
 # Original file: valid-toplevel.parseset, line 91
 # Failure: parseTopLevel is not a function
@@ -1126,7 +1126,7 @@ MyInterface2:=interface{
     }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 151. 12. Interface with properties (brace style)
 # Original file: valid-toplevel.parseset, line 98
 # Failure: parseTopLevel is not a function
@@ -1136,7 +1136,7 @@ IGameObject := interface {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 152. 13. Interface with inheritance
 # Original file: valid-toplevel.parseset, line 105
 # Failure: parseTopLevel is not a function
@@ -1145,7 +1145,7 @@ IAdvancedPlayer := interface(IPlayer):
     SetArmor(value:int):void
 
 
-#! Valid TopLevel
+#! Valid Program
 # 153. 14. Struct with methods
 # Original file: valid-toplevel.parseset, line 111
 # Failure: parseTopLevel is not a function
@@ -1156,7 +1156,7 @@ ComplexNumber := struct:
     Add(other:ComplexNumber):ComplexNumber = ComplexNumber{Real: Real + other.Real, Imaginary: Imaginary + other.Imaginary}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 154. 15. Struct with inheritance
 # Original file: valid-toplevel.parseset, line 119
 # Failure: parseTopLevel is not a function
@@ -1164,7 +1164,7 @@ ColoredPoint := struct(Point):
     Color: color
 
 
-#! Valid TopLevel
+#! Valid Program
 # 155. 16. Enum with explicit values (brace style)
 # Original file: valid-toplevel.parseset, line 124
 # Failure: parseTopLevel is not a function
@@ -1175,7 +1175,7 @@ Priority := enum {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 156. 17. Interface with nested types
 # Original file: valid-toplevel.parseset, line 132
 # Failure: parseTopLevel is not a function
@@ -1188,14 +1188,14 @@ IContainer := interface:
     GetItem(id:int):ItemType?
 
 
-#! Valid TopLevel
+#! Valid Program
 # 157. 18. Empty interface with colon
 # Original file: valid-toplevel.parseset, line 142
 # Failure: parseTopLevel is not a function
 Empty3 := interface():
 
 
-#! Valid TopLevel
+#! Valid Program
 # 158. 19. Test case
 # Original file: valid-toplevel.parseset, line 146
 # Failure: parseTopLevel is not a function
@@ -1204,7 +1204,7 @@ Test := class {
 }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 159. 20. Test case
 # Original file: valid-toplevel.parseset, line 152
 # Failure: parseTopLevel is not a function
@@ -1213,7 +1213,7 @@ Test := class:
         x := 42
 
 
-#! Valid TopLevel
+#! Valid Program
 # 160. 21. Test case
 # Original file: valid-toplevel.parseset, line 158
 # Failure: parseTopLevel is not a function
@@ -1222,7 +1222,7 @@ Test := class:
         var result:int = 10
 
 
-#! Valid TopLevel
+#! Valid Program
 # 161. 22. Test case
 # Original file: valid-toplevel.parseset, line 164
 # Failure: parseTopLevel is not a function
@@ -1232,7 +1232,7 @@ Test := class:
             DoSomething(item)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 162. 23. Test case
 # Original file: valid-toplevel.parseset, line 171
 # Failure: parseTopLevel is not a function
@@ -1243,7 +1243,7 @@ Test := class:
             _ => DoDefault()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 163. 24. Empty case branch - parser bug: currently passes when it should fail
 # Original file: valid-toplevel.parseset, line 179
 # Failure: parseTopLevel is not a function
@@ -1259,28 +1259,28 @@ CaptureControl := class:
                 _ => 1
 
 
-#! Valid TopLevel
+#! Valid Program
 # 164. 25. Using statement with simple path
 # Original file: valid-toplevel.parseset, line 192
 # Failure: parseTopLevel is not a function
 using { std }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 165. 26. Using statement with absolute path
 # Original file: valid-toplevel.parseset, line 196
 # Failure: parseTopLevel is not a function
 using { /std/io }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 166. 27. Using statement with nested path
 # Original file: valid-toplevel.parseset, line 200
 # Failure: parseTopLevel is not a function
 using { /std/collections/map }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 167. 28. Multiple using statements in program
 # Original file: valid-toplevel.parseset, line 204
 # Failure: parseTopLevel is not a function
@@ -1289,77 +1289,77 @@ using { /io }
 using { math/complex }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 168. 29. Multiple const declarations with zero values
 # Original file: valid-toplevel.parseset, line 210
 # Failure: parseTopLevel is not a function
 x := 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 169. 30. Multiple const declarations
 # Original file: valid-toplevel.parseset, line 214
 # Failure: parseTopLevel is not a function
 firstName := "John"
 
 
-#! Valid TopLevel
+#! Valid Program
 # 170. 31. Expression const declaration
 # Original file: valid-toplevel.parseset, line 218
 # Failure: parseTopLevel is not a function
 result := x + y
 
 
-#! Valid TopLevel
+#! Valid Program
 # 171. 32. Function declaration
 # Original file: valid-toplevel.parseset, line 222
 # Failure: parseTopLevel is not a function
 add(x, y) := x + y
 
 
-#! Valid TopLevel
+#! Valid Program
 # 172. 33. Function with single parameter
 # Original file: valid-toplevel.parseset, line 226
 # Failure: parseTopLevel is not a function
 square(x) := x * x
 
 
-#! Valid TopLevel
+#! Valid Program
 # 173. 34. Const declaration with function call
 # Original file: valid-toplevel.parseset, line 230
 # Failure: parseTopLevel is not a function
 value := f(42)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 174. 35. Const declaration with object construction
 # Original file: valid-toplevel.parseset, line 234
 # Failure: parseTopLevel is not a function
 point := Point{x:=10, y:=20}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 175. 36. Function declaration with string concatenation
 # Original file: valid-toplevel.parseset, line 238
 # Failure: parseTopLevel is not a function
 greet(name) := "Hello, " + name
 
 
-#! Valid TopLevel
+#! Valid Program
 # 176. 37. Function declaration returning zero
 # Original file: valid-toplevel.parseset, line 242
 # Failure: parseTopLevel is not a function
 area() := 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 177. 38. Function declaration with simple return
 # Original file: valid-toplevel.parseset, line 246
 # Failure: parseTopLevel is not a function
 println(x) := x
 
 
-#! Valid TopLevel
+#! Valid Program
 # 178. 39. Complex program with using statements and declarations
 # Original file: valid-toplevel.parseset, line 250
 # Failure: parseTopLevel is not a function
@@ -1369,7 +1369,7 @@ using { /io }
 main() := "Hello World"
 
 
-#! Valid TopLevel
+#! Valid Program
 # 179. 40. Multiple top-level declarations in one program
 # Original file: valid-toplevel.parseset, line 257
 # Failure: parseTopLevel is not a function
@@ -1380,14 +1380,14 @@ z := 0
 calculate(p1, p2) := 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 180. 41. Assignment with function call
 # Original file: valid-toplevel.parseset, line 265
 # Failure: parseTopLevel is not a function
 result := Calculate(10, 20)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 181. 42. Method with typed parameters
 # Original file: valid-toplevel.parseset, line 269
 # Failure: parseTopLevel is not a function
@@ -1399,7 +1399,7 @@ Manager := class:
         X + Y
 
 
-#! Valid TopLevel
+#! Valid Program
 # 182. 43. Method with complex parameter types
 # Original file: valid-toplevel.parseset, line 278
 # Failure: parseTopLevel is not a function
@@ -1408,7 +1408,7 @@ System := class:
         AddToTeam(Player, Team)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 183. 44. Event subscription pattern
 # Original file: valid-toplevel.parseset, line 284
 # Failure: parseTopLevel is not a function
@@ -1422,7 +1422,7 @@ event_manager := class:
         Print("Player joined")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 184. 45. State machine pattern
 # Original file: valid-toplevel.parseset, line 295
 # Failure: parseTopLevel is not a function
@@ -1434,14 +1434,14 @@ state_machine := class:
             CurrentState = NewState
 
 
-#! Valid TopLevel
+#! Valid Program
 # 185. 46. Using statement with nested path
 # Original file: valid-toplevel.parseset, line 304
 # Failure: parseTopLevel is not a function
 using { /Verse.org/Simulation/Tags }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 186. 47. Multiple using statements
 # Original file: valid-toplevel.parseset, line 308
 # Failure: parseTopLevel is not a function
@@ -1449,7 +1449,7 @@ using { /Fortnite.com/Devices }
 using { /Verse.org/Simulation }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 187. 48. Three using statements
 # Original file: valid-toplevel.parseset, line 313
 # Failure: parseTopLevel is not a function
@@ -1458,7 +1458,7 @@ using { /Verse.org/Simulation }
 using { /Fortnite.com/Characters }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 188. Keywords
 # Original file: valid-toplevel.parseset, line 319
 # Failure: parseTopLevel is not a function
@@ -1476,7 +1476,7 @@ teleporter_device := class(creative_device):
         TeleportPlayer(Agent)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 189. 50. Complex class with multiple members (working version)
 # Original file: valid-toplevel.parseset, line 336
 # Failure: parseTopLevel is not a function
@@ -1490,7 +1490,7 @@ game_device := class(creative_device):
     OnEnabled(Agent:agent):void = Print("Device enabled")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 190. 51. Class with inheritance and decorators
 # Original file: valid-toplevel.parseset, line 347
 # Failure: parseTopLevel is not a function
@@ -1499,7 +1499,7 @@ simple_device := class(creative_device):
     value:int = 42
 
 
-#! Valid TopLevel
+#! Valid Program
 # 191. 52. Class with method specifiers
 # Original file: valid-toplevel.parseset, line 353
 # Failure: parseTopLevel is not a function
@@ -1507,7 +1507,7 @@ my_device := class:
     OnBegin<override>():void = Print("Starting")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 192. 53. Class with suspends method
 # Original file: valid-toplevel.parseset, line 358
 # Failure: parseTopLevel is not a function
@@ -1515,14 +1515,14 @@ async_device := class:
     DoAsync<suspends>():void = Wait(1.0)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 193. 54. Class with empty parentheses (no inheritance, no body)
 # Original file: valid-toplevel.parseset, line 363
 # Failure: parseTopLevel is not a function
 MyDevice := class()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 194. 55. Module with interface, struct, and enum
 # Original file: valid-toplevel.parseset, line 367
 # Failure: parseTopLevel is not a function
@@ -1543,7 +1543,7 @@ GameTypes := module:
     }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 195. 56. Class implementing interface
 # Original file: valid-toplevel.parseset, line 385
 # Failure: parseTopLevel is not a function
@@ -1553,14 +1553,14 @@ Player := class(IPlayer):
     SetHealth(value:int):void = { Health = value }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 196. 57. Module with empty body (colon style)
 # Original file: valid-toplevel.parseset, line 392
 # Failure: parseTopLevel is not a function
 EmptyModule := module:
 
 
-#! Valid TopLevel
+#! Valid Program
 # 197. 58. Nested declarations in module
 # Original file: valid-toplevel.parseset, line 396
 # Failure: parseTopLevel is not a function
@@ -1574,7 +1574,7 @@ Container := module:
         Count: int
 
 
-#! Valid TopLevel
+#! Valid Program
 # 198. 59. Known issue: reconstruction has spacing/newline issues with consecutive var fields
 # Original file: valid-toplevel.parseset, line 407
 # Failure: parseTopLevel is not a function
@@ -1584,7 +1584,7 @@ Test := class:
     var Count : int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 199. 60. Class with calculated method
 # Original file: valid-toplevel.parseset, line 414
 # Failure: parseTopLevel is not a function
@@ -1593,7 +1593,7 @@ MyClass := class:
         x + y * z
 
 
-#! Valid TopLevel
+#! Valid Program
 # 200. 61. Class with conditional in method
 # Original file: valid-toplevel.parseset, line 420
 # Failure: parseTopLevel is not a function
@@ -1603,28 +1603,28 @@ MyClass := class:
             DoWork()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 201. 62. Empty class with various syntaxes
 # Original file: valid-toplevel.parseset, line 427
 # Failure: parseTopLevel is not a function
 EmptyClass1 := class{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 202. 63. Class inheriting from tag
 # Original file: valid-toplevel.parseset, line 431
 # Failure: parseTopLevel is not a function
 Tag_Player := class(tag){}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 203. 64. Class with inheritance and colon
 # Original file: valid-toplevel.parseset, line 435
 # Failure: parseTopLevel is not a function
 MyDevice := class(creative_device):
 
 
-#! Valid TopLevel
+#! Valid Program
 # 204. 65. Class with field
 # Original file: valid-toplevel.parseset, line 439
 # Failure: parseTopLevel is not a function
@@ -1632,7 +1632,7 @@ Player := class:
     Name:string = "Unknown"
 
 
-#! Valid TopLevel
+#! Valid Program
 # 205. 66. Class with multiple fields on separate lines
 # Original file: valid-toplevel.parseset, line 444
 # Failure: parseTopLevel is not a function
@@ -1642,7 +1642,7 @@ Player := class:
     Position:vector3 = vector3{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 206. 67. Class with decorated field
 # Original file: valid-toplevel.parseset, line 451
 # Failure: parseTopLevel is not a function
@@ -1651,7 +1651,7 @@ teleporter_device := class(creative_device):
     TriggerDevice:trigger_device = trigger_device{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 207. 68. Class with method (simple)
 # Original file: valid-toplevel.parseset, line 457
 # Failure: parseTopLevel is not a function
@@ -1660,7 +1660,7 @@ MyClass := class:
         42
 
 
-#! Valid TopLevel
+#! Valid Program
 # 208. 69. Class with method having specifiers
 # Original file: valid-toplevel.parseset, line 463
 # Failure: parseTopLevel is not a function
@@ -1669,7 +1669,7 @@ teleporter_device := class(creative_device):
         Print("Started")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 209. 70. Complex class with multiple members
 # Original file: valid-toplevel.parseset, line 469
 # Failure: parseTopLevel is not a function
@@ -1687,21 +1687,21 @@ game_device := class(creative_device):
         Print("Device enabled")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 210. 71. Identifier with public specifier in const declaration
 # Original file: valid-toplevel.parseset, line 484
 # Failure: parseTopLevel is not a function
 MyClass<public> := class{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 211. 72. Class with public specifier and inheritance
 # Original file: valid-toplevel.parseset, line 488
 # Failure: parseTopLevel is not a function
 DominationSpawnTags<public> := class(tag){}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 212. 73. Nested class-like structure
 # Original file: valid-toplevel.parseset, line 492
 # Failure: parseTopLevel is not a function
@@ -1710,7 +1710,7 @@ Outer := class:
         Value:int = 5
 
 
-#! Valid TopLevel
+#! Valid Program
 # 213. 74. Class with const field
 # Original file: valid-toplevel.parseset, line 498
 # Failure: parseTopLevel is not a function
@@ -1718,7 +1718,7 @@ Settings := class:
     MaxPlayers<const>:int = 100
 
 
-#! Valid TopLevel
+#! Valid Program
 # 214. 75. Class with multiple decorators
 # Original file: valid-toplevel.parseset, line 503
 # Failure: parseTopLevel is not a function
@@ -1728,7 +1728,7 @@ ui_device := class(creative_device):
     UIText:string = "Hello"
 
 
-#! Valid TopLevel
+#! Valid Program
 # 215. 76. Class with constructor-like method
 # Original file: valid-toplevel.parseset, line 510
 # Failure: parseTopLevel is not a function
@@ -1737,7 +1737,7 @@ player_manager := class:
         SetName(Name)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 216. 77. Full Fortnite device example
 # Original file: valid-toplevel.parseset, line 516
 # Failure: parseTopLevel is not a function
@@ -1756,14 +1756,14 @@ teleporter_device := class(creative_device):
             TeleportDestination.Teleport(Agent)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 217. 78. Module with public specifier
 # Original file: valid-toplevel.parseset, line 532
 # Failure: parseTopLevel is not a function
 MyModule<public> := module:
 
 
-#! Valid TopLevel
+#! Valid Program
 # 218. 79. Class with decorated fields
 # Original file: valid-toplevel.parseset, line 536
 # Failure: parseTopLevel is not a function
@@ -1775,7 +1775,7 @@ ui_device := class(creative_device):
     Count:int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 219. 80. Class with fields and methods
 # Original file: valid-toplevel.parseset, line 545
 # Failure: parseTopLevel is not a function
@@ -1789,7 +1789,7 @@ game_device := class:
         Score = NewScore
 
 
-#! Valid TopLevel
+#! Valid Program
 # 220. 81. Class with decorated field and method
 # Original file: valid-toplevel.parseset, line 556
 # Failure: parseTopLevel is not a function
@@ -1801,7 +1801,7 @@ teleporter := class:
         MoveTo(Destination)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 221. 82. Class with multiple methods with specifiers
 # Original file: valid-toplevel.parseset, line 565
 # Failure: parseTopLevel is not a function
@@ -1813,7 +1813,7 @@ game := class:
         Cleanup()
 
 
-#! Valid TopLevel
+#! Valid Program
 # 222. 83. Class with nested object construction
 # Original file: valid-toplevel.parseset, line 574
 # Failure: parseTopLevel is not a function
@@ -1824,7 +1824,7 @@ Config := class:
     }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 223. 84. Class with method returning constructed object
 # Original file: valid-toplevel.parseset, line 582
 # Failure: parseTopLevel is not a function
@@ -1836,7 +1836,7 @@ Factory := class:
         }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 224. 85. Complex class with all features
 # Original file: valid-toplevel.parseset, line 591
 # Failure: parseTopLevel is not a function
@@ -1855,7 +1855,7 @@ advanced_device<public> := class(creative_device):
         Parse(Input)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 225. 86. Class with single field no initializer
 # Original file: valid-toplevel.parseset, line 607
 # Failure: parseTopLevel is not a function
@@ -1863,7 +1863,7 @@ Simple := class:
     Value:int
 
 
-#! Valid TopLevel
+#! Valid Program
 # 226. 87. Class with const field
 # Original file: valid-toplevel.parseset, line 612
 # Failure: parseTopLevel is not a function
@@ -1872,7 +1872,7 @@ Constants := class:
     MinValue<const>:int = 0
 
 
-#! Valid TopLevel
+#! Valid Program
 # 227. 88. Fortnite device pattern
 # Original file: valid-toplevel.parseset, line 618
 # Failure: parseTopLevel is not a function
@@ -1890,7 +1890,7 @@ capture_point := class(creative_device):
         AwardPoints(Agent)
 
 
-#! Valid TopLevel
+#! Valid Program
 # 228. 89. Using statements with class definition
 # Original file: valid-toplevel.parseset, line 633
 # Failure: parseTopLevel is not a function
@@ -1899,7 +1899,7 @@ using { /Fortnite.com/Devices }
 MyClass := class{}
 
 
-#! Valid TopLevel
+#! Valid Program
 # 229. Whitespace
 # Original file: valid-toplevel.parseset, line 639
 # Failure: parseTopLevel is not a function
@@ -1911,7 +1911,7 @@ MyDevice := class(creative_device):
     MyField:int = 5
 
 
-#! Valid TopLevel
+#! Valid Program
 # 230. 91. Class with method (indented body)
 # Original file: valid-toplevel.parseset, line 650
 # Failure: parseTopLevel is not a function
@@ -1920,21 +1920,21 @@ MyClass := class:
         x + y
 
 
-#! Valid TopLevel
+#! Valid Program
 # 231. 92. Class with empty parentheses (no inheritance, no body) with spaces
 # Original file: valid-toplevel.parseset, line 656
 # Failure: parseTopLevel is not a function
 MyDevice2 := class( )
 
 
-#! Valid TopLevel
+#! Valid Program
 # 232. 93. Using statement for Playspaces
 # Original file: valid-toplevel.parseset, line 660
 # Failure: parseTopLevel is not a function
 using { /Fortnite.com/Playspaces }
 
 
-#! Valid TopLevel
+#! Valid Program
 # 233. 94. Interface with members (indentation style)
 # Original file: valid-toplevel.parseset, line 664
 # Failure: parseTopLevel is not a function
@@ -1943,7 +1943,7 @@ IPlayer := interface:
     SetHealth(value:int):void
 
 
-#! Valid TopLevel
+#! Valid Program
 # 234. 95. Struct with fields (indentation style)
 # Original file: valid-toplevel.parseset, line 670
 # Failure: parseTopLevel is not a function
@@ -1953,7 +1953,7 @@ Vector3 := struct:
     Z: float
 
 
-#! Valid TopLevel
+#! Valid Program
 # 235. Comments
 # Original file: valid-toplevel.parseset, line 677
 # Failure: parseTopLevel is not a function
@@ -1964,7 +1964,7 @@ CardSuit := enum:
     Spades
 
 
-#! Valid TopLevel
+#! Valid Program
 # 236. 97. Class with line comments
 # Original file: valid-toplevel.parseset, line 687
 # Failure: parseTopLevel is not a function
@@ -1977,7 +1977,7 @@ MyClass := class:
         Print("test")
 
 
-#! Valid TopLevel
+#! Valid Program
 # 237. 98. Class with multiline comments
 # Original file: valid-toplevel.parseset, line 697
 # Failure: parseTopLevel is not a function
@@ -1987,7 +1987,7 @@ MyClass := class:
     Field1:int = 1
 
 
-#! Valid TopLevel
+#! Valid Program
 # 238. 99. Function with comments throughout
 # Original file: valid-toplevel.parseset, line 704
 # Failure: parseTopLevel is not a function

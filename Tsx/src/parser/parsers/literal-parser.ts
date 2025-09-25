@@ -56,9 +56,7 @@ export class LiteralParser {
     const tokenOffset = state.currentOffset();
     const token = state.current();
 
-    if (!token) {
-      throw new ParseError('Expected literal', state.position);
-    }
+    if (!token) throw new ParseError('Expected literal', state.position);
 
     let value: any;
     let literalType: 'string' | 'integer' | 'float' | 'boolean';
@@ -125,8 +123,8 @@ export class LiteralParser {
     // Accept: IDENTIFIER, TYPE_KEYWORD, RESERVED_WORD as valid identifiers in expression context
     // Note: BLOCK_FORMING_KEYWORD and DATA_STRUCTURE_KEYWORD are handled separately
     if (!token || (token.type !== TokenType.IDENTIFIER &&
-                   token.type !== TokenType.TYPE_KEYWORD &&
-                   token.type !== TokenType.RESERVED_WORD)) {
+      token.type !== TokenType.TYPE_KEYWORD &&
+      token.type !== TokenType.RESERVED_WORD)) {
       throw new ParseError('Expected identifier', state.position, token || undefined);
     }
 

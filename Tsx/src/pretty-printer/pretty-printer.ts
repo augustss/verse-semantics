@@ -15,6 +15,19 @@
 import { TokenStream } from '../lexer/tokenstream';
 import { Token, TokenType } from '../lexer/token';
 import * as AST from '../parser/ast';
+import { ColorFormatter, OutputFormat } from './color-formatter';
+
+/**
+ * Options for pretty printing
+ */
+export interface PrettyPrintOptions {
+  /** Output format for coloring */
+  format?: OutputFormat;
+  /** Color theme name */
+  theme?: string;
+  /** Whether to include colors */
+  colored?: boolean;
+}
 
 /**
  * Pretty printer that reconstructs source from AST using token offsets.
@@ -22,10 +35,21 @@ import * as AST from '../parser/ast';
 export class PrettyPrinter {
   private tokens: Token[];
   private printedUpTo: number;
+  private colorFormatter?: ColorFormatter;
+  private useColor: boolean;
 
-  constructor(private tokenStream: TokenStream) {
+  constructor(private tokenStream: TokenStream, options?: PrettyPrintOptions) {
     this.tokens = tokenStream.getAllTokens();
     this.printedUpTo = 0;
+
+    // Set up color formatting if requested
+    this.useColor = options?.colored ?? false;
+    if (this.useColor) {
+      this.colorFormatter = new ColorFormatter(
+        options?.format ?? OutputFormat.Terminal,
+        options?.theme ?? 'default'
+      );
+    }
   }
 
   /**
@@ -43,11 +67,19 @@ export class PrettyPrinter {
     if (offset >= this.tokens.length) return '';
 
     const token = this.tokens[offset];
-    let result = token.content;
+    let content = token.content;
 
     // Add quotes for strings if not present
     if (token.type === TokenType.STRING && !token.content.startsWith('"') && !token.content.startsWith("'")) {
-      result = '"' + result + '"';
+      content = '"' + content + '"';
+    }
+
+    // Apply coloring if enabled
+    let result: string;
+    if (this.useColor && this.colorFormatter) {
+      result = this.colorFormatter.formatToken(token, content);
+    } else {
+      result = content;
     }
 
     // Collect trailing trivia
@@ -72,7 +104,12 @@ export class PrettyPrinter {
         break;
       }
 
-      result += token.content;
+      // Apply coloring to trivia if needed (mainly for comments)
+      if (this.useColor && this.colorFormatter) {
+        result += this.colorFormatter.formatToken(token);
+      } else {
+        result += token.content;
+      }
       pos++;
     }
 
@@ -91,10 +128,16 @@ export class PrettyPrinter {
     let result = '';
     for (let i = start; i < end && i < this.tokens.length; i++) {
       const token = this.tokens[i];
+      let content = token.content;
+
       if (token.type === TokenType.STRING && !token.content.startsWith('"') && !token.content.startsWith("'")) {
-        result += '"' + token.content + '"';
+        content = '"' + content + '"';
+      }
+
+      if (this.useColor && this.colorFormatter) {
+        result += this.colorFormatter.formatToken(token, content);
       } else {
-        result += token.content;
+        result += content;
       }
     }
     return result;
@@ -160,8 +203,6 @@ export class PrettyPrinter {
         return this.printObjectConstructorExpression(node as AST.ObjectConstructorExpression);
       case 'BreakExpression':
         return this.printBreakExpression(node as AST.BreakExpression);
-      case 'ContinueExpression':
-        return this.printContinueExpression(node as AST.ContinueExpression);
       case 'ReturnExpression':
         return this.printReturnExpression(node as AST.ReturnExpression);
       default:
@@ -659,12 +700,6 @@ export class PrettyPrinter {
   private printBreakExpression(node: AST.BreakExpression): string {
     let result = this.printSkippedTokens(node.tokenOffset);
     result += this.printToken(node.tokenOffset); // break
-    return result;
-  }
-
-  private printContinueExpression(node: AST.ContinueExpression): string {
-    let result = this.printSkippedTokens(node.tokenOffset);
-    result += this.printToken(node.tokenOffset); // continue
     return result;
   }
 

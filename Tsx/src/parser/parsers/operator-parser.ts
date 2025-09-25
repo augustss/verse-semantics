@@ -68,7 +68,7 @@ export class OperatorParser {
     const token = state.current();
 
     // Check for unary operators
-    if (token && ((token.type === TokenType.OPERATOR && token.content === '-') ||
+    if (token && ((token.type === TokenType.OPERATOR && (token.content === '-' || token.content === '*')) ||
                   (token.type === TokenType.IDENTIFIER && token.content === 'not'))) {
       const operatorOffset = state.currentOffset();
       const operator = token;
@@ -79,15 +79,25 @@ export class OperatorParser {
       // Parse the operand (which could be another unary expression)
       const operandResult = parseUnary(state);
 
-      // Create unary expression node
-      const node: AST.UnaryExpression = {
-        type: 'UnaryExpression',
-        operator: operator.content,
-        operand: operandResult.node,
-        operatorOffset
-      };
-
-      return { node, state: operandResult.state };
+      // Create appropriate expression node based on operator
+      if (operator.content === '*') {
+        // Tuple expansion operator
+        const node: AST.TupleExpansionExpression = {
+          type: 'TupleExpansionExpression',
+          tuple: operandResult.node,
+          operatorOffset
+        };
+        return { node, state: operandResult.state };
+      } else {
+        // Regular unary expression
+        const node: AST.UnaryExpression = {
+          type: 'UnaryExpression',
+          operator: operator.content,
+          operand: operandResult.node,
+          operatorOffset
+        };
+        return { node, state: operandResult.state };
+      }
     }
 
     // No unary operator, parse as postfix expression
@@ -558,14 +568,28 @@ export class OperatorParser {
         }
         state = state.advance();
 
-        node = {
-          type: 'CallExpression',
-          callee: node,
-          arguments: args,
-          openParenOffset,
-          closeParenOffset,
-          argumentSeparatorOffsets
-        } as AST.CallExpression;
+        // Check if this could be tuple element access (single argument)
+        // Tuple access: expr(index) where index is an expression
+        if (args.length === 1 && argumentSeparatorOffsets.length === 0) {
+          // This could be tuple access - create TupleAccessExpression
+          node = {
+            type: 'TupleAccessExpression',
+            tuple: node,
+            index: args[0],
+            openParenOffset,
+            closeParenOffset
+          } as AST.TupleAccessExpression;
+        } else {
+          // Regular function call with multiple arguments or no arguments
+          node = {
+            type: 'CallExpression',
+            callee: node,
+            arguments: args,
+            openParenOffset,
+            closeParenOffset,
+            argumentSeparatorOffsets
+          } as AST.CallExpression;
+        }
 
       } else if (token.type === TokenType.OPERATOR && token.content === '{' &&
                  node.type === 'Identifier') {
@@ -667,6 +691,18 @@ export class OperatorParser {
           fieldSeparatorOffsets
         } as AST.ObjectConstructorExpression;
 
+      } else if (token.type === TokenType.OPERATOR && token.content === '?') {
+        // Query operator for option types: x?
+        const operatorOffset = state.currentOffset();
+        state = state.advance();
+
+        // Create unary expression with postfix notation
+        node = {
+          type: 'UnaryExpression',
+          operator: '?',
+          operand: node,
+          operatorOffset
+        } as AST.UnaryExpression;
       } else {
         // No more postfix operators
         break;

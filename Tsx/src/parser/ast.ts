@@ -216,6 +216,25 @@ export interface ObjectConstructorExpression extends Expression {
 }
 
 /**
+ * Option expression for creating option types
+ *
+ * Represents expressions like: option{ x }, option{ value + 1 }
+ *
+ * Stores:
+ * - optionOffset: Position of the 'option' keyword
+ * - openBraceOffset: Position of the '{' token
+ * - closeBraceOffset: Position of the '}' token
+ * - value: The expression inside the braces
+ */
+export interface OptionExpression extends Expression {
+  readonly type: 'OptionExpression';
+  readonly optionOffset: number;  // Offset of 'option' keyword
+  readonly value: Expression;  // The wrapped expression
+  readonly openBraceOffset: number;  // Offset of '{' token
+  readonly closeBraceOffset: number; // Offset of '}' token
+}
+
+/**
  * Object field in constructor expression
  *
  * Represents field assignments like x:=1, name:="value"
@@ -270,6 +289,76 @@ export interface RangeExpression extends Expression {
   readonly start: Expression;
   readonly end: Expression;
   readonly operatorOffset: number;  // Offset of the '..' operator token in the token stream
+}
+
+/**
+ * Tuple expressions ((1, 2, 3))
+ *
+ * Represents tuple literals with mixed-type elements.
+ * Unlike arrays, tuples can contain different types and have fixed size known at compile time.
+ *
+ * Examples:
+ * - (1, 2, 3) - simple tuple
+ * - (1, 2.0, "three") - mixed types
+ * - (1, (10, 20), "nested") - nested tuples
+ *
+ * Stores:
+ * - openParenOffset: Position of opening '('
+ * - closeParenOffset: Position of closing ')'
+ * - separatorOffsets: Positions of commas between elements
+ */
+export interface TupleExpression extends Expression {
+  readonly type: 'TupleExpression';
+  readonly elements: Expression[];
+  readonly openParenOffset: number;  // Offset of '(' token
+  readonly closeParenOffset: number; // Offset of ')' token
+  readonly separatorOffsets: number[]; // Offsets of ',' separators between elements
+}
+
+/**
+ * Tuple element access (tuple(0), tuple(1))
+ *
+ * Non-failing indexed access to tuple elements by compile-time constant index.
+ * Unlike array access, tuple access cannot fail since bounds are known at compile time.
+ *
+ * Examples:
+ * - MyTuple(0) - first element
+ * - MyTuple(2) - third element
+ * - NestedTuple(1)(0) - chained access
+ *
+ * Stores:
+ * - openParenOffset: Position of opening '('
+ * - closeParenOffset: Position of closing ')'
+ * - indexOffset: Position of the index expression
+ */
+export interface TupleAccessExpression extends Expression {
+  readonly type: 'TupleAccessExpression';
+  readonly tuple: Expression;  // The tuple being accessed
+  readonly index: Expression;  // Index expression (must be compile-time constant)
+  readonly openParenOffset: number;  // Offset of '(' token
+  readonly closeParenOffset: number; // Offset of ')' token
+}
+
+/**
+ * Tuple expansion expression (*tuple)
+ *
+ * Expands tuple elements as separate arguments in function calls.
+ * The expansion operator (*) unpacks tuple elements for passing to functions
+ * that expect multiple arguments.
+ *
+ * Examples:
+ * - f(*myTuple) - expands tuple elements as function arguments
+ * - process(*coords) - expands coordinate tuple
+ * - combine(*first, *second) - multiple expansions in one call
+ *
+ * Stores:
+ * - operatorOffset: Position of the '*' operator
+ * - tuple: The tuple expression being expanded
+ */
+export interface TupleExpansionExpression extends Expression {
+  readonly type: 'TupleExpansionExpression';
+  readonly tuple: Expression;  // The tuple being expanded
+  readonly operatorOffset: number;  // Offset of '*' token
 }
 
 /**
@@ -364,11 +453,15 @@ export interface ForExpression extends Expression {
  * - if expr then expr else expr
  * - if expr then expr
  * - if: expr then: expr else: expr (indented forms)
+ * - if (condition). expression1; expression2 (dot format)
+ * - if (condition). expression else. expression (dot format with else)
  *
  * Stores:
  * - ifOffset: Position of 'if' keyword
  * - thenOffset: Optional 'then' keyword position
  * - elseOffset: Optional 'else' keyword position
+ * - dotOffset: Optional '.' position for dot format
+ * - elseDotOffset: Optional '.' position after else in dot format
  */
 export interface IfExpression extends Expression {
   readonly type: 'IfExpression';
@@ -376,8 +469,10 @@ export interface IfExpression extends Expression {
   readonly ifOffset: number;  // Offset of 'if' keyword
   readonly thenBranch?: Expression;  // Optional then branch
   readonly thenOffset?: number;  // Offset of 'then' keyword if present
+  readonly dotOffset?: number;  // Offset of '.' for dot format
   readonly elseBranch?: Expression;  // Optional else branch
   readonly elseOffset?: number;  // Offset of 'else' keyword if present
+  readonly elseDotOffset?: number;  // Offset of '.' after else in dot format
 }
 
 /**
@@ -474,9 +569,29 @@ export interface IdentedCompoundExpression extends Expression {
 }
 
 /**
+ * Where constraint for type parameters
+ *
+ * Represents constraints like "T:type", "T:comparable", etc.
+ * Examples: T:type, U:comparable, V:numeric
+ *
+ * Offset tracking:
+ * - parameterOffset: Position of constrained type parameter
+ * - colonOffset: Position of ':' separator
+ * - constraintOffset: Position of constraint type
+ */
+export interface WhereConstraint extends ASTNode {
+  readonly type: 'WhereConstraint';
+  readonly parameter: string;          // name of constrained type parameter (e.g., "T")
+  readonly parameterOffset: number;    // offset of parameter name
+  readonly constraint: string;         // constraint type (e.g., "type", "comparable")
+  readonly constraintOffset: number;   // offset of constraint type name
+  readonly colonOffset: number;        // offset of ':' separator
+}
+
+/**
  * Type expression
  *
- * Represents a type annotation (e.g., int, string, array{int}, ?int, []int, ?[][]int)
+ * Represents a type annotation (e.g., int, string, array{int}, ?int, []int, ?[][]int, T where T:type)
  */
 export interface TypeExpression extends ASTNode {
   readonly type: 'TypeExpression';
@@ -486,6 +601,14 @@ export interface TypeExpression extends ASTNode {
   readonly arrayDimensions?: number;      // number of [] pairs (e.g., 2 for [][]int)
   readonly optionalOffset?: number;       // offset of ? token if present
   readonly arrayOffsets?: number[];       // offsets of [ tokens for each array dimension
+  readonly typeParameters?: TypeExpression[];  // type parameters for generic types (e.g., weak_map(session, int))
+  readonly typeParameterOffsets?: number[];    // offsets of comma separators between type parameters
+  readonly mapKeyType?: TypeExpression;   // key type for map types [keytype]valuetype
+  readonly mapBracketOffsets?: number[];  // offsets of [ and ] tokens for map type
+  readonly typeExpression?: Expression;   // expression for type{expression} construct
+  readonly typeExpressionOffsets?: number[];  // offsets of { and } tokens for type{expression}
+  readonly whereConstraint?: WhereConstraint;  // where clause for type parameters
+  readonly whereOffset?: number;  // offset of 'where' keyword
 }
 
 /**
@@ -569,22 +692,28 @@ export interface VariableDeclaration extends Declaration {
  * 2. f<public>()<decides> := body
  * 3. f():int = body
  * 4. f(x:int, y:string):result_type = body
+ *
+ * Note: visibilitySpecifier (after name) must be unique and one of: public, protected, private, internal, scoped
+ *       postSpecifiers (after parameters) can be multiple non-visibility specifiers like: decides, suspends, etc.
  */
 export interface FunctionDeclaration extends Declaration {
   readonly type: 'FunctionDeclaration';
   readonly name: string;
   readonly nameOffset: number;
-  readonly preSpecifiers?: SpecifierList;  // Specifiers before ()
+  readonly visibilitySpecifier?: SpecifierList;  // Visibility specifier after name (public, protected, private, internal, scoped)
   readonly parameters: Parameter[];
   readonly openParenOffset: number;
   readonly closeParenOffset: number;
   readonly paramSeparatorOffsets: number[];
-  readonly postSpecifiers?: SpecifierList; // Specifiers after ()
+  readonly postSpecifiers?: SpecifierList; // Non-visibility specifiers after ()
   readonly returnType?: TypeExpression;
   readonly returnColonOffset?: number;
   readonly assignOffset?: number;  // := operator
   readonly equalsOffset?: number;  // = operator
   readonly body: Expression;  // Can be any expression or IdentedCompoundExpression
+  readonly isConstructor?: boolean;  // true if this is a constructor function
+  readonly constructedType?: string;  // For constructors: the class name being constructed (e.g., "class1")
+  readonly constructedTypeOffset?: number;  // Offset of the constructed type name
 }
 
 /**
@@ -652,17 +781,6 @@ export interface BreakExpression extends Expression {
 }
 
 /**
- * Continue statement
- *
- * Stores:
- * - tokenOffset: Position of the 'continue' keyword
- */
-export interface ContinueExpression extends Expression {
-  readonly type: 'ContinueExpression';
-  readonly tokenOffset: number;  // Offset of the 'continue' keyword
-}
-
-/**
  * Return statement
  *
  * Stores:
@@ -673,4 +791,85 @@ export interface ReturnExpression extends Expression {
   readonly type: 'ReturnExpression';
   readonly tokenOffset: number;  // Offset of the 'return' keyword
   readonly value?: Expression;  // Optional return value
+}
+
+/**
+ * Spawn expression for async execution
+ *
+ * Forms:
+ * - spawn{expression}
+ * - spawn: indented-expression-list
+ *
+ * Stores:
+ * - spawnOffset: Position of 'spawn' keyword
+ * - openBraceOffset/closeBraceOffset: Positions of { } for brace form
+ * - colonOffset: Position of ':' for indented form
+ */
+export interface SpawnExpression extends Expression {
+  readonly type: 'SpawnExpression';
+  readonly body: Expression;  // Expression(s) to spawn
+  readonly spawnOffset: number;  // Offset of 'spawn' keyword
+  readonly openBraceOffset?: number;  // Offset of '{' token (for brace form)
+  readonly closeBraceOffset?: number; // Offset of '}' token (for brace form)
+  readonly colonOffset?: number;      // Offset of ':' token (for indented form)
+}
+
+/**
+ * Race expression - first to complete wins
+ *
+ * Forms:
+ * - race: indented-expression-list
+ * - race{expression1, expression2}
+ *
+ * Stores:
+ * - raceOffset: Position of 'race' keyword
+ * - colonOffset: Position of ':' for indented form
+ */
+export interface RaceExpression extends Expression {
+  readonly type: 'RaceExpression';
+  readonly branches: Expression[];  // Competing expressions
+  readonly raceOffset: number;      // Offset of 'race' keyword
+  readonly openBraceOffset?: number;  // Offset of '{' token (for brace form)
+  readonly closeBraceOffset?: number; // Offset of '}' token (for brace form)
+  readonly colonOffset?: number;      // Offset of ':' token (for indented form)
+}
+
+/**
+ * Sync expression - synchronized execution
+ *
+ * Forms:
+ * - sync: indented-expression-list
+ * - sync{expression1, expression2}
+ *
+ * Stores:
+ * - syncOffset: Position of 'sync' keyword
+ * - colonOffset: Position of ':' for indented form
+ */
+export interface SyncExpression extends Expression {
+  readonly type: 'SyncExpression';
+  readonly operations: Expression[];  // Synchronized operations
+  readonly syncOffset: number;       // Offset of 'sync' keyword
+  readonly openBraceOffset?: number;  // Offset of '{' token (for brace form)
+  readonly closeBraceOffset?: number; // Offset of '}' token (for brace form)
+  readonly colonOffset?: number;      // Offset of ':' token (for indented form)
+}
+
+/**
+ * Branch expression - branching control
+ *
+ * Forms:
+ * - branch: indented-expression-list
+ * - branch{expression1, expression2}
+ *
+ * Stores:
+ * - branchOffset: Position of 'branch' keyword
+ * - colonOffset: Position of ':' for indented form
+ */
+export interface BranchExpression extends Expression {
+  readonly type: 'BranchExpression';
+  readonly branches: Expression[];   // Branch paths
+  readonly branchOffset: number;     // Offset of 'branch' keyword
+  readonly openBraceOffset?: number;  // Offset of '{' token (for brace form)
+  readonly closeBraceOffset?: number; // Offset of '}' token (for brace form)
+  readonly colonOffset?: number;      // Offset of ':' token (for indented form)
 }

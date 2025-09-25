@@ -12,16 +12,8 @@
 import { TokenStream } from '../lexer/tokenstream';
 import { Token, TokenType } from '../lexer/token';
 import * as AST from '../parser/ast';
+import { Console } from 'console';
 
-/**
- * Options for AST reconstruction
- */
-export interface ReconstructionOptions {
-  /** Whether to include trailing trivia after the last token */
-  includeTrailingTrivia?: boolean;
-  /** Custom token stream if different from original */
-  tokenStream?: TokenStream;
-}
 
 /**
  * AST Reconstructor
@@ -34,36 +26,22 @@ export class ASTReconstructor {
   private source: string;
   private lastTokenIndex: number = -1;
   private result: string = '';
-  private offsetToTokenMap: Map<number, number> = new Map();
 
   constructor(source: string, tokenStream?: TokenStream) {
     this.source = source;
     const stream = tokenStream || TokenStream.fromString(source);
-    this.tokens = stream.getAllTokens();
-    this.buildOffsetToTokenMap();
-  }
-
-  /**
-   * Build a mapping from character offsets in source to token indices
-   */
-  private buildOffsetToTokenMap(): void {
-    let sourceOffset = 0;
-
-    for (let tokenIndex = 0; tokenIndex < this.tokens.length; tokenIndex++) {
-      const token = this.tokens[tokenIndex];
-
-      // Map the start of this token
-      this.offsetToTokenMap.set(sourceOffset, tokenIndex);
-
-      // Advance the source offset by the token's content length
-      sourceOffset += token.content.length;
+    // Match the parser's token processing - combine trivia tokens
+    if (!tokenStream) {
+      stream.combineTrivia();
     }
+    this.tokens = stream.getAllTokens();
   }
+
 
   /**
    * Reconstruct source from an AST node
    */
-  reconstruct(node: AST.ASTNode, options?: ReconstructionOptions): string {
+  reconstruct(node: AST.ASTNode, options?: { includeTrailingTrivia?: boolean }): string {
     this.result = '';
     this.lastTokenIndex = -1;
     this.reconstructNode(node);
@@ -78,7 +56,7 @@ export class ASTReconstructor {
   /**
    * Reconstruct source from multiple AST nodes (e.g., a program)
    */
-  reconstructProgram(nodes: AST.ASTNode[], options?: ReconstructionOptions): string {
+  reconstructProgram(nodes: AST.ASTNode[]): string {
     this.result = '';
     this.lastTokenIndex = -1;
 
@@ -86,41 +64,17 @@ export class ASTReconstructor {
       this.reconstructNode(node);
     }
 
-    if (options?.includeTrailingTrivia) {
-      this.appendRemainingTrivia();
-    }
+    // Always include trailing trivia for programs
+    this.appendRemainingTrivia();
 
     return this.result;
   }
 
   /**
-   * Append a token at the given character offset, including preceding trivia
+   * Append a token at the given token index, including preceding trivia
+   * Note: The offsets in AST nodes are actually token indices, not character offsets
    */
-  private appendToken(charOffset: number): void {
-    const tokenIndex = this.offsetToTokenMap.get(charOffset);
-    if (tokenIndex === undefined) {
-      // Try to find the closest token
-      let bestIndex = -1;
-      let bestDistance = Infinity;
-      for (const [offset, index] of this.offsetToTokenMap.entries()) {
-        const distance = Math.abs(offset - charOffset);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestIndex = index;
-        }
-      }
-      if (bestIndex === -1) return;
-      this.appendTokenByIndex(bestIndex);
-      return;
-    }
-
-    this.appendTokenByIndex(tokenIndex);
-  }
-
-  /**
-   * Append a token by token index, including preceding trivia
-   */
-  private appendTokenByIndex(tokenIndex: number): void {
+  private appendToken(tokenIndex: number): void {
     if (tokenIndex < 0 || tokenIndex >= this.tokens.length) return;
 
     // Append all trivia between lastTokenIndex and current tokenIndex
@@ -143,7 +97,14 @@ export class ASTReconstructor {
 
     // Append the actual token
     const token = this.tokens[tokenIndex];
-    this.result += token.content;
+
+    // Special handling for STRING tokens - need to add quotes
+    if (token.type === TokenType.STRING) {
+      this.result += '"' + token.content + '"';
+    } else {
+      this.result += token.content;
+    }
+
     this.lastTokenIndex = tokenIndex;
   }
 
@@ -166,11 +127,11 @@ export class ASTReconstructor {
    */
   private isTrivia(token: Token): boolean {
     return token.type === TokenType.SPACE ||
-           token.type === TokenType.TAB ||
-           token.type === TokenType.NEWLINE ||
-           token.type === TokenType.COMMENT ||
-           token.type === TokenType.MULTILINE_COMMENT ||
-           token.type === TokenType.TRIVIA;
+      token.type === TokenType.TAB ||
+      token.type === TokenType.NEWLINE ||
+      token.type === TokenType.COMMENT ||
+      token.type === TokenType.MULTILINE_COMMENT ||
+      token.type === TokenType.TRIVIA;
   }
 
   /**
@@ -179,145 +140,80 @@ export class ASTReconstructor {
   private reconstructNode(node: AST.ASTNode): void {
     switch (node.type) {
       case 'Program':
-        this.reconstructProgramNode(node as any);
-        break;
-
+        this.reconstructProgramNode(node as any); break;
       case 'Literal':
-        this.reconstructLiteral(node as AST.LiteralExpression);
-        break;
-
+        this.reconstructLiteral(node as AST.LiteralExpression); break;
       case 'Identifier':
-        this.reconstructIdentifier(node as AST.IdentifierExpression);
-        break;
-
+        this.reconstructIdentifier(node as AST.IdentifierExpression); break;
       case 'BinaryExpression':
-        this.reconstructBinary(node as AST.BinaryExpression);
-        break;
-
+        this.reconstructBinary(node as AST.BinaryExpression); break;
       case 'UnaryExpression':
-        this.reconstructUnary(node as AST.UnaryExpression);
-        break;
-
+        this.reconstructUnary(node as AST.UnaryExpression); break;
       case 'ParenthesizedExpression':
-        this.reconstructParenthesized(node as AST.ParenthesizedExpression);
-        break;
-
+        this.reconstructParenthesized(node as AST.ParenthesizedExpression); break;
       case 'AssignmentExpression':
-        this.reconstructAssignment(node as AST.AssignmentExpression);
-        break;
-
+        this.reconstructAssignment(node as AST.AssignmentExpression); break;
       case 'MemberExpression':
-        this.reconstructMember(node as AST.MemberExpression);
-        break;
-
+        this.reconstructMember(node as AST.MemberExpression); break;
       case 'CallExpression':
-        this.reconstructCall(node as AST.CallExpression);
-        break;
-
+        this.reconstructCall(node as AST.CallExpression); break;
+      case 'TupleAccessExpression':
+        this.reconstructTupleAccess(node as AST.TupleAccessExpression); break;
       case 'ObjectConstructorExpression':
-        this.reconstructObjectConstructor(node as AST.ObjectConstructorExpression);
-        break;
-
+        this.reconstructObjectConstructor(node as AST.ObjectConstructorExpression); break;
       case 'ArrayExpression':
-        this.reconstructArray(node as AST.ArrayExpression);
-        break;
-
+        this.reconstructArray(node as AST.ArrayExpression); break;
       case 'RangeExpression':
-        this.reconstructRange(node as AST.RangeExpression);
-        break;
-
+        this.reconstructRange(node as AST.RangeExpression); break;
       case 'LambdaExpression':
-        this.reconstructLambda(node as AST.LambdaExpression);
-        break;
-
+        this.reconstructLambda(node as AST.LambdaExpression); break;
       case 'CompoundExpression':
-        this.reconstructCompound(node as AST.CompoundExpression);
-        break;
-
+        this.reconstructCompound(node as AST.CompoundExpression); break;
       case 'IdentedCompoundExpression':
-        this.reconstructIdentedCompound(node as AST.IdentedCompoundExpression);
-        break;
-
+        this.reconstructIdentedCompound(node as AST.IdentedCompoundExpression); break;
       case 'SetExpression':
-        this.reconstructSet(node as AST.SetExpression);
-        break;
-
+        this.reconstructSet(node as AST.SetExpression); break;
       case 'ForExpression':
-        this.reconstructFor(node as AST.ForExpression);
-        break;
-
+        this.reconstructFor(node as AST.ForExpression); break;
       case 'IfExpression':
-        this.reconstructIf(node as AST.IfExpression);
-        break;
-
+        this.reconstructIf(node as AST.IfExpression); break;
       case 'LoopExpression':
-        this.reconstructLoop(node as AST.LoopExpression);
-        break;
-
+        this.reconstructLoop(node as AST.LoopExpression); break;
       case 'BlockExpression':
-        this.reconstructBlock(node as AST.BlockExpression);
-        break;
-
+        this.reconstructBlock(node as AST.BlockExpression); break;
       case 'CaseExpression':
-        this.reconstructCase(node as AST.CaseExpression);
-        break;
-
+        this.reconstructCase(node as AST.CaseExpression); break;
       case 'IdentedCompoundExpression':
-        this.reconstructIndentedCompound(node as AST.IdentedCompoundExpression);
-        break;
-
+        this.reconstructIndentedCompound(node as AST.IdentedCompoundExpression); break;
       case 'BreakExpression':
-        this.reconstructBreak(node as AST.BreakExpression);
-        break;
-
-      case 'ContinueExpression':
-        this.reconstructContinue(node as AST.ContinueExpression);
-        break;
-
+        this.reconstructBreak(node as AST.BreakExpression); break;
       case 'ReturnExpression':
-        this.reconstructReturn(node as AST.ReturnExpression);
-        break;
-
+        this.reconstructReturn(node as AST.ReturnExpression); break;
       case 'ConstantDeclaration':
-        this.reconstructConstant(node as AST.ConstantDeclaration);
-        break;
-
+        this.reconstructConstant(node as AST.ConstantDeclaration); break;
       case 'VariableDeclaration':
-        this.reconstructVariable(node as AST.VariableDeclaration);
-        break;
-
+        this.reconstructVariable(node as AST.VariableDeclaration); break;
       case 'FunctionDeclaration':
-        this.reconstructFunction(node as AST.FunctionDeclaration);
-        break;
-
+        this.reconstructFunction(node as AST.FunctionDeclaration); break;
       case 'DataStructureDeclaration':
-        this.reconstructDataStructure(node as AST.DataStructureDeclaration);
-        break;
-
+        this.reconstructDataStructure(node as AST.DataStructureDeclaration); break;
       case 'TypeExpression':
-        this.reconstructType(node as AST.TypeExpression);
-        break;
-
+        this.reconstructType(node as AST.TypeExpression); break;
       case 'SpecifierList':
-        this.reconstructSpecifiers(node as AST.SpecifierList);
-        break;
-
+        this.reconstructSpecifiers(node as AST.SpecifierList); break;
       case 'Parameter':
-        this.reconstructParameter(node as AST.Parameter);
-        break;
-
+        this.reconstructParameter(node as AST.Parameter); break;
       case 'EnumMember':
-        this.reconstructEnumMember(node as AST.EnumMember);
-        break;
+        this.reconstructEnumMember(node as AST.EnumMember); break;
+      case 'OptionExpression':
+        this.reconstructOption(node as AST.OptionExpression); break;
     }
   }
 
   // Individual node reconstruction methods
 
   private reconstructLiteral(node: AST.LiteralExpression): void {
-    // Special handling for string literals - need to add quotes back
     if (node.literalType === 'string') {
-      // Get the actual token to preserve original quotes if possible
       const token = this.tokens[node.tokenOffset];
       if (token && token.type === TokenType.STRING) {
         // The token content doesn't have quotes, so we need to add them
@@ -331,10 +227,10 @@ export class ASTReconstructor {
 
   /**
    * Append a token with prefix and suffix (for string quotes)
+   * Note: The tokenIndex parameter is a token index, not a character offset
    */
-  private appendTokenWithPrefix(charOffset: number, prefix: string, suffix: string): void {
-    const tokenIndex = this.offsetToTokenMap.get(charOffset);
-    if (tokenIndex === undefined || tokenIndex < 0 || tokenIndex >= this.tokens.length) return;
+  private appendTokenWithPrefix(tokenIndex: number, prefix: string, suffix: string): void {
+    if (tokenIndex < 0 || tokenIndex >= this.tokens.length) return;
 
     // Append all trivia between lastTokenIndex and current tokenIndex
     if (this.lastTokenIndex >= 0) {
@@ -416,6 +312,13 @@ export class ASTReconstructor {
       }
     }
 
+    this.appendToken(node.closeParenOffset);
+  }
+
+  private reconstructTupleAccess(node: AST.TupleAccessExpression): void {
+    this.reconstructNode(node.tuple);
+    this.appendToken(node.openParenOffset);
+    this.reconstructNode(node.index);
     this.appendToken(node.closeParenOffset);
   }
 
@@ -599,6 +502,8 @@ export class ASTReconstructor {
         return this.getLastTokenOffset((node as AST.UnaryExpression).operand);
       case 'CallExpression':
         return (node as AST.CallExpression).closeParenOffset;
+      case 'TupleAccessExpression':
+        return (node as AST.TupleAccessExpression).closeParenOffset;
       case 'MemberExpression':
         const member = node as AST.MemberExpression;
         if (member.computed && member.closeBracketOffset !== undefined) {
@@ -627,6 +532,8 @@ export class ASTReconstructor {
         return arr.colonOffset ?? arr.openBraceOffset ?? 0;
       case 'ObjectConstructorExpression':
         return (node as AST.ObjectConstructorExpression).closeBraceOffset;
+      case 'OptionExpression':
+        return (node as AST.OptionExpression).closeBraceOffset;
       case 'RangeExpression':
         return this.getLastTokenOffset((node as AST.RangeExpression).end);
       case 'LambdaExpression':
@@ -695,12 +602,12 @@ export class ASTReconstructor {
         return (node as AST.SetExpression).setOffset;
       case 'BreakExpression':
         return (node as AST.BreakExpression).tokenOffset;
-      case 'ContinueExpression':
-        return (node as AST.ContinueExpression).tokenOffset;
       case 'ReturnExpression':
         return (node as AST.ReturnExpression).tokenOffset;
       case 'CallExpression':
         return this.getFirstTokenOffset((node as AST.CallExpression).callee);
+      case 'TupleAccessExpression':
+        return this.getFirstTokenOffset((node as AST.TupleAccessExpression).tuple);
       case 'MemberExpression':
         return this.getFirstTokenOffset((node as AST.MemberExpression).object);
       case 'AssignmentExpression':
@@ -750,6 +657,8 @@ export class ASTReconstructor {
         const identedCompound = node as AST.IdentedCompoundExpression;
         // The first token is the keyword that starts the indented compound (e.g., 'block')
         return identedCompound.keywordOffset;
+      case 'OptionExpression':
+        return (node as AST.OptionExpression).optionOffset;
       default:
         // Fallback - this shouldn't happen if all node types are handled
         console.warn(`Unknown node type in getFirstTokenOffset: ${node.type}`);
@@ -758,14 +667,14 @@ export class ASTReconstructor {
   }
 
   /**
-   * Append all tokens from current position until the target character offset (exclusive)
+   * Append all tokens from current position until the target token index (exclusive)
+   * Note: The targetTokenIndex parameter is a token index, not a character offset
    */
-  private appendTokensUntil(targetCharOffset: number): void {
-    const targetTokenIndex = this.offsetToTokenMap.get(targetCharOffset);
-    if (targetTokenIndex === undefined) return;
+  private appendTokensUntil(targetTokenIndex: number): void {
+    if (targetTokenIndex < 0 || targetTokenIndex > this.tokens.length) return;
 
     while (this.lastTokenIndex + 1 < targetTokenIndex && this.lastTokenIndex + 1 < this.tokens.length) {
-      this.appendTokenByIndex(this.lastTokenIndex + 1);
+      this.appendToken(this.lastTokenIndex + 1);
     }
   }
 
@@ -914,9 +823,35 @@ export class ASTReconstructor {
 
   private reconstructIf(node: AST.IfExpression): void {
     this.appendToken(node.ifOffset);
+
+    // Handle dot format with special reconstruction
+    if (node.dotOffset !== undefined) {
+      // For dot format, manually reconstruct tokens to avoid duplication issues
+      // Append everything from after 'if' up to and including the dot
+      this.appendTokensUntil(node.dotOffset + 1);
+
+      if (node.thenBranch) {
+        this.reconstructNode(node.thenBranch);
+      }
+
+      // Handle else branch in dot format
+      if (node.elseOffset !== undefined && node.elseBranch) {
+        this.appendToken(node.elseOffset);
+
+        if (node.elseDotOffset !== undefined) {
+          this.appendToken(node.elseDotOffset);
+        }
+
+        this.reconstructNode(node.elseBranch);
+      }
+
+      return; // Done with dot format
+    }
+
+    // Handle traditional format (non-dot)
     this.reconstructNode(node.condition);
 
-    // Handle then branch
+    // Handle traditional format (non-dot)
     if (node.thenBranch) {
       if (node.thenOffset !== undefined) {
         // Has explicit 'then' keyword
@@ -953,7 +888,7 @@ export class ASTReconstructor {
       this.reconstructNode(node.thenBranch);
     }
 
-    // Handle else branch
+    // Handle else branch for traditional format
     if (node.elseOffset !== undefined && node.elseBranch) {
       this.appendToken(node.elseOffset);
 
@@ -1116,10 +1051,6 @@ export class ASTReconstructor {
     this.appendToken(node.tokenOffset);
   }
 
-  private reconstructContinue(node: AST.ContinueExpression): void {
-    this.appendToken(node.tokenOffset);
-  }
-
   private reconstructReturn(node: AST.ReturnExpression): void {
     this.appendToken(node.tokenOffset);
     if (node.value) {
@@ -1132,7 +1063,7 @@ export class ASTReconstructor {
     const decoratorOffsets = (node as any).decoratorOffsets;
     if (decoratorOffsets) {
       for (const tokenIndex of decoratorOffsets) {
-        this.appendTokenByIndex(tokenIndex);
+        this.appendToken(tokenIndex);
       }
     }
 
@@ -1196,8 +1127,8 @@ export class ASTReconstructor {
 
     this.appendToken(node.nameOffset);
 
-    if (node.preSpecifiers) {
-      this.reconstructSpecifiers(node.preSpecifiers);
+    if (node.visibilitySpecifier) {
+      this.reconstructSpecifiers(node.visibilitySpecifier);
     }
 
     this.appendToken(node.openParenOffset);
@@ -1226,6 +1157,16 @@ export class ASTReconstructor {
       this.appendToken(node.equalsOffset);
     }
 
+    // For constructors, add the constructed type and colon before the body
+    if (node.isConstructor && node.constructedType && node.constructedTypeOffset !== undefined) {
+      this.appendToken(node.constructedTypeOffset);
+      // The colon after the class name should be the next token after constructedTypeOffset
+      const colonOffset = node.constructedTypeOffset + 1;
+      if (colonOffset < this.tokens.length) {
+        this.appendToken(colonOffset);
+      }
+    }
+
     this.reconstructNode(node.body);
   }
 
@@ -1239,6 +1180,7 @@ export class ASTReconstructor {
       }
     }
 
+    // Assignment syntax: Name := class
     this.appendToken(node.nameOffset);
 
     if (node.nameSpecifiers) {
@@ -1300,8 +1242,8 @@ export class ASTReconstructor {
         // Append the closing bracket that follows the opening bracket
         const closeBracketOffset = offset + 1;
         if (closeBracketOffset < this.tokens.length &&
-            this.tokens[closeBracketOffset].type === TokenType.OPERATOR &&
-            this.tokens[closeBracketOffset].content === ']') {
+          this.tokens[closeBracketOffset].type === TokenType.OPERATOR &&
+          this.tokens[closeBracketOffset].content === ']') {
           this.appendToken(closeBracketOffset);
         }
       }
@@ -1359,6 +1301,13 @@ export class ASTReconstructor {
       this.reconstructNode(node.value);
     }
   }
+
+  private reconstructOption(node: AST.OptionExpression): void {
+    this.appendToken(node.optionOffset);
+    this.appendToken(node.openBraceOffset);
+    this.reconstructNode(node.value);
+    this.appendToken(node.closeBraceOffset);
+  }
 }
 
 /**
@@ -1367,7 +1316,7 @@ export class ASTReconstructor {
 export function reconstructFromAST(
   source: string,
   node: AST.ASTNode,
-  options?: ReconstructionOptions
+  options?: { includeTrailingTrivia?: boolean; tokenStream?: TokenStream }
 ): string {
   const reconstructor = new ASTReconstructor(source, options?.tokenStream);
   return reconstructor.reconstruct(node, options);
@@ -1379,8 +1328,8 @@ export function reconstructFromAST(
 export function reconstructProgramFromAST(
   source: string,
   nodes: AST.ASTNode[],
-  options?: ReconstructionOptions
+  options?: { tokenStream?: TokenStream }
 ): string {
   const reconstructor = new ASTReconstructor(source, options?.tokenStream);
-  return reconstructor.reconstructProgram(nodes, options);
+  return reconstructor.reconstructProgram(nodes);
 }

@@ -1,0 +1,1706 @@
+# Real-World Verse Code Test Suite
+# Complex patterns and edge cases from actual Verse codebases
+
+
+#! Valid Program
+# Real-world Verse file: Deserted_Plugins_Deserted_Content_CineLobbyControl
+# Source: Samples__Deserted__Plugins__Deserted__Content__CineLobbyController.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+
+##################################################################
+# Our game features a looping cinematic in the pregame.  This class simply tells that cinematic to stop!
+# The second cleanup cinematic resets all the material parameters
+##################################################################
+cinematic_lobby_controller := class(creative_device):
+
+    @editable
+    CineLobby_Sequence:cinematic_sequence_device := cinematic_sequence_device{}
+    @editable
+    CineLobby_Cleanup_Sequence:cinematic_sequence_device := cinematic_sequence_device{}
+
+
+    OnBegin<override>()<suspends>:void=
+        CineLobby_Sequence.Stop()
+        CineLobby_Cleanup_Sequence.Play()
+
+#! Valid Program
+# Real-world Verse file: Deserted_Plugins_Deserted_Content_Deserted
+# Source: Samples__Deserted__Plugins__Deserted__Content__Deserted.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Verse.org/Simulation/Tags }
+
+DominationSpawnTags<public> := module:
+    Tag_SpawnGroup<public>:=            class(tag){}
+    Tag_SpawnGroup_Initial<public>:=    class(Tag_SpawnGroup){}
+    Tag_SpawnGroup_GroupA<public>:=     class(Tag_SpawnGroup){}
+    Tag_SpawnGroup_GroupB<public>:=     class(Tag_SpawnGroup){}
+    Tag_SpawnGroup_GroupC<public>:=     class(Tag_SpawnGroup){}
+
+    Tag_TeamOwnership<public>:=         class(tag){}
+    Tag_TeamOwnership_Team1<public>:=   class(Tag_TeamOwnership){}
+    Tag_TeamOwnership_Team2<public>:=   class(Tag_TeamOwnership){}
+
+#! Valid Program
+# Real-world Verse file: Deserted_Plugins_Deserted_Content_DominationSpawnM
+# Source: Samples__Deserted__Plugins__Deserted__Content__DominationSpawnManager.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Fortnite.com/Devices }
+using { /Fortnite.com/Teams }
+using { /Verse.org/Simulation }
+using { /Verse.org/Simulation/Tags }
+
+## This device manages the player spawners
+## An intial set of spawners starts enabled
+## After a short time, the initial spawners are disabled
+## From there, team spawns associated with each capture point are enabled/disabled based off a weighting score
+##     Owning the point adds 1 to the weighting score (or -1 if team 2)
+##     Each ally in the area adds 1 to the weighting score (or -1 if team 2)
+##     If the weighting score is > 0, team 1 can spawn near the point.  
+##     If the weighting score is < 0, team 2 can spawn near the point
+
+##################################################################
+## Event Handler Class - We'll spawn one of these per capture point and bind events through it
+##################################################################
+capture_point_event_handler := class:
+
+    CapturePointIndex:int
+    DominationSpawnManagerRef:domination_spawn_manager
+    TeamCollectionRef:fort_team_collection
+
+    var CaptureWeightOfThisPoint:int = 0
+    var PlayerWeightOfThisPoint:float = 0.0
+    WeightForEachPlayer:float = 0.5
+
+    # If Team 1, we return 1.  If Team 2, we return -1.
+    GetTeamDirectionOfAgent<private>(MyAgent:agent)<transacts>:int=
+        if (FirstTeam := TeamCollectionRef.GetTeams()[0]):
+            if (TeamCollectionRef.IsOnTeam[MyAgent, FirstTeam]):
+                return 1
+        return -1
+    
+    # Set state of capture point
+    OnCaptured(MyAgent:agent):void=
+        set CaptureWeightOfThisPoint = GetTeamDirectionOfAgent(MyAgent)
+        DominationSpawnManagerRef.CalculateWeightForPoint(CapturePointIndex)
+
+    # Shift player weighting of point as players enter or leave
+    PlayerEnteredLargeZone(MyAgent:agent):void=
+        set PlayerWeightOfThisPoint = PlayerWeightOfThisPoint + (GetTeamDirectionOfAgent(MyAgent) * WeightForEachPlayer)
+        DominationSpawnManagerRef.CalculateWeightForPoint(CapturePointIndex)
+    PlayerLeftLargeZone(MyAgent:agent):void=
+        set PlayerWeightOfThisPoint = PlayerWeightOfThisPoint - (GetTeamDirectionOfAgent(MyAgent) * WeightForEachPlayer)
+        DominationSpawnManagerRef.CalculateWeightForPoint(CapturePointIndex)
+    
+
+##################################################################
+## Domination Spawn Manager Class
+##################################################################
+domination_spawn_manager := class(creative_device):
+
+    # Player Spawner Device Groups - Populated by searching for Verse tags
+    var SpawnPointGroupInitial:[]player_spawner_device = array{}
+    var SpawnPointGroupsCapPoint:[][]player_spawner_device = array{array{}, array{}, array{}}
+
+    # Capture Zone
+    @editable  
+    CapturePoints:[]capture_area_device = array{}
+    @editable  
+    LargeZones:[]player_counter_device = array{}
+
+    # Initial Spawners will disable after this many seconds
+    InitialGroupDisableTime:float = 5.0
+
+    # Cap Point Event Handler Class Refs
+    var CapturePointListeners:[]capture_point_event_handler = array{} 
+
+
+    # OnBegin will run when the game starts
+    OnBegin<override>()<suspends>:void=
+        BeginPlayEventSubscriptions()
+        FindAndCacheSpawnDevices()
+        DisableInitialSpawnGroup()
+        
+
+    # Subscribe to events from our attribute triggers
+    BeginPlayEventSubscriptions<private>():void=
+        for (I -> EachCapPoint:CapturePoints):
+            MyHandler := capture_point_event_handler:
+                CapturePointIndex := I
+                DominationSpawnManagerRef := Self
+                TeamCollectionRef := Self.GetPlayspace().GetTeamCollection()
+
+            set CapturePointListeners = CapturePointListeners + array{MyHandler}
+            
+            EachCapPoint.ControlChangeEvent.Subscribe(MyHandler.OnCaptured)
+
+            if (EachLargeZone := LargeZones[I]):
+                EachLargeZone.CountedEvent.Subscribe(MyHandler.PlayerEnteredLargeZone)
+                EachLargeZone.RemovedEvent.Subscribe(MyHandler.PlayerLeftLargeZone)
+
+
+    # Get all our various Player Spawner devices, and store them in the appropriate arrays
+    FindAndCacheSpawnDevices<private>():void=
+        InitialSpawnPoints:[]creative_object_interface = GetCreativeObjectsWithTag(DominationSpawnTags.Tag_SpawnGroup_Initial{})
+        for (FoundDevice : InitialSpawnPoints, DeviceAsSpawner:= player_spawner_device[FoundDevice]):
+            set SpawnPointGroupInitial = SpawnPointGroupInitial + array{DeviceAsSpawner}
+
+        GroupTags:[]tag = array:
+            DominationSpawnTags.Tag_SpawnGroup_GroupA{}
+            DominationSpawnTags.Tag_SpawnGroup_GroupB{}
+            DominationSpawnTags.Tag_SpawnGroup_GroupC{}
+
+        for (I -> GroupTag:GroupTags): 
+            FoundSpawnGroup:[]creative_object_interface := GetCreativeObjectsWithTag(GroupTag)
+            for (FoundDevice : FoundSpawnGroup, DeviceAsSpawner:= player_spawner_device[FoundDevice]):
+                if:
+                    CapPoint := SpawnPointGroupsCapPoint[I] + array{DeviceAsSpawner}
+                    set SpawnPointGroupsCapPoint[I] = CapPoint
+            
+
+    # Turn off initial spawn points     
+    DisableInitialSpawnGroup<private>()<suspends>:void=
+        Sleep(InitialGroupDisableTime)
+        for (SpawnPoint : SpawnPointGroupInitial):
+            SpawnPoint.Disable()
+        
+
+    # Whenever the CapPointCaptureWeight or CapPointPlayerWeight for a point changes, this runs to see who should be allowed to spawn from the associated spawn group
+    CalculateWeightForPoint(PointIndex:int):void=
+        var WeightOfPoint:int = 0
+
+        if:
+            CapPointData := CapturePointListeners[PointIndex]
+            CapPlayerWeightToInt := Floor[CapPointData.PlayerWeightOfThisPoint]
+        then:
+            set WeightOfPoint = CapPointData.CaptureWeightOfThisPoint + CapPlayerWeightToInt
+        
+        for (SpawnDevice:SpawnPointGroupsCapPoint[PointIndex]):
+            var DeviceIsTeam1:logic = false
+            DeviceTags := SpawnDevice.GetTags()
+            if (DeviceTags.Has[DominationSpawnTags.Tag_TeamOwnership_Team1{}]):
+                set DeviceIsTeam1 = true
+            
+            if (DeviceIsTeam1?):
+                if (WeightOfPoint > 0):
+                    SpawnDevice.Enable()
+                else:
+                    SpawnDevice.Disable()
+            else:
+                if (WeightOfPoint < 0):
+                    SpawnDevice.Enable()
+                else:
+                    SpawnDevice.Disable()
+
+#! Valid Program
+# Real-world Verse file: Deserted_Plugins_Deserted_Content_DominationVOCont
+# Source: Samples__Deserted__Plugins__Deserted__Content__DominationVOController.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Fortnite.com/Devices }
+using { /Fortnite.com/Teams }
+using { /Verse.org/Simulation }
+
+
+##################################################################
+## Event Handler Class - We'll spawn one of these per capture point and bind events through it
+##################################################################
+vo_cappoint_event_handler := class:
+    CapturePointIndex:int
+    VOControlRef:domination_vo_controller
+
+    # Only play losing control audio if the point has been captured.  Otherwise you get 'losing control' vo for neutral points at the start of game.
+    var HasBeenCaptured:logic = false
+
+    OnCaptured(MyAgent:agent):void=
+        VOControlRef.UpdateCapturePointTracking(MyAgent, CapturePointIndex)
+        VOControlRef.QueueVO_PointCapturedOrLost(MyAgent, CapturePointIndex)
+
+        set HasBeenCaptured = true
+
+    OnStartedCapture(MyAgent:agent):void=
+        if (HasBeenCaptured?):
+            VOControlRef.QueueVO_PointCaptureStarted(MyAgent, CapturePointIndex)     
+
+
+##################################################################
+## VO Controller Device Class
+##################################################################   
+
+audioqueue_type := enum:
+    CaptureStarted
+    CaptureOrLost
+    AllPointsCaptured
+
+audioqueue_entry:= struct:
+    InitiatingAgent:agent
+    CapturePointID:int
+    AudioEventType:audioqueue_type
+
+domination_vo_controller := class(creative_device):
+
+    # Capture Zone
+    @editable  
+    CapturePoints:[]capture_area_device = array{}
+
+    # Audio Players
+    @editable
+    VO_PointCaptured:[]audio_player_device = array{}
+    @editable
+    VO_PointLost_A:[]audio_player_device = array{}
+    @editable
+    VO_PointLost_B:[]audio_player_device = array{}
+    @editable
+    VO_PointLost_C:[]audio_player_device = array{}
+
+    @editable
+    VO_PointStartedLosing_A:[]audio_player_device = array{}
+    @editable
+    VO_PointStartedLosing_B:[]audio_player_device = array{}
+    @editable
+    VO_PointStartedLosing_C:[]audio_player_device = array{}
+
+    @editable
+    VO_SelectLoadout:audio_player_device = audio_player_device{}
+
+    @editable
+    FriendlyTeamIsDominating:[]audio_player_device = array{}
+    @editable
+    EnemyTeamIsDominating:[]audio_player_device = array{}
+
+    # Hud Messages
+    @editable
+    HUDMessage_PointCaptured:[]hud_message_device = array{}
+    @editable
+    HUDMessage_PointLost:[]hud_message_device = array{}
+    @editable
+    HUDMessage_LosingPoint:[]hud_message_device = array{}
+
+    # Cycle Audio Clips to avoid repeats
+    var AudioIndex_CapOrLost:int = 0
+    var AudioIndex_Losing:int = 0
+
+    # Domination State
+    var CapturePointOwnership:[]int = array{0,0,0}
+    var AnyTeamIsDominating:logic = false
+
+    # VO Play Cooldown
+    VOCooldownTime:float = 2.0
+    var VOIsOnCooldown:logic = false
+
+    # Audio queue for important messages
+    var AudioToPlayQueue:[]audioqueue_entry = array{}
+
+    # Class Selector Device Ref
+    @editable
+    ClassSelectUI:class_selector_ui_device = class_selector_ui_device{}
+    @editable
+    ClassSelectOpenedRouter:attribute_evaluator_device = attribute_evaluator_device{}
+    var ValidAudioTargets:[]agent = array{}
+    var ValidClassSelectAudioTargets:[]agent = array{}
+
+
+    @editable
+    GameIntroHUDMessage:hud_message_device = hud_message_device{}
+
+
+    # Cache Listener Classes to Prevent GC - In the future you won't need to do this!
+    var CachedListeners:[]vo_cappoint_event_handler = array{} 
+
+
+    OnBegin<override>()<suspends>:void=
+        # Create an event handler class for each capture point, and subscribe
+        for (I->EachCapPoint : CapturePoints):
+            MyHandler := vo_cappoint_event_handler:
+                CapturePointIndex := I
+                VOControlRef := Self
+            EachCapPoint.ControlChangeEvent.Subscribe(MyHandler.OnCaptured)
+            EachCapPoint.ControlChangeStartsEvent.Subscribe(MyHandler.OnStartedCapture)
+            set CachedListeners = CachedListeners + array{MyHandler}
+
+        # Player spawned in world event (we don't play audio until the player has spawned once and heard the intro VO)
+        ClassSelectUI.ClassSelectedEvent.Subscribe(PlayerSpawnedIntoWorld)
+        # Player entered class UI
+        ClassSelectOpenedRouter.PassEvent.Subscribe(ClassSelectUIOpen)
+
+
+    ClassSelectUIOpen <private>(MyAgent:agent):void=
+        if (not ValidClassSelectAudioTargets.Find[MyAgent]):
+            set ValidClassSelectAudioTargets = ValidClassSelectAudioTargets + array{MyAgent}
+            VO_SelectLoadout.Play(MyAgent)
+        
+
+    PlayerSpawnedIntoWorld<private>(MyAgent:agent):void=
+        if (not ValidAudioTargets.Find[MyAgent]):
+            spawn{AddPlayerToValidAudioTargets(MyAgent)}
+
+
+    AddPlayerToValidAudioTargets<private>(MyAgent:agent)<suspends>:void=
+        # After a delay to account for initial class popup, permit audio
+        Sleep(0.5)
+        GameIntroHUDMessage.Show(MyAgent)
+        Sleep(2.0)
+        if (not ValidAudioTargets.Find[MyAgent]):
+            set ValidAudioTargets = ValidAudioTargets + array{MyAgent}
+
+
+    UpdateCapturePointTracking(MyAgent:agent, CapturePointID:int):void=
+        TeamCollection := GetPlayspace().GetTeamCollection()
+        if:
+            Team1 := TeamCollection.GetTeams()[0]
+            TeamCollection.IsOnTeam[MyAgent, Team1]
+            set CapturePointOwnership[CapturePointID]=1
+        else if:
+            set CapturePointOwnership[CapturePointID]=-1
+
+        if (Abs(CapturePointOwnership[0] + CapturePointOwnership[1] + CapturePointOwnership[2]) = 3):
+            set AnyTeamIsDominating = true
+        else:
+            set AnyTeamIsDominating = false
+        
+
+    ##################################################################
+    # Play VO Methods
+    # These should not be used directly. Instead use the Audio Queue
+    ##################################################################
+    PlayVO_PointCapturedOrLost<private>(MyAgent:agent, CapturePointID:int, SkipDominationCheck:logic):void=
+        # Increment VO Index
+        set AudioIndex_CapOrLost = AudioIndex_CapOrLost + 1
+        
+        # For each player in the game, play the appropriate audio & associated HUD message
+        TeamCollection := GetPlayspace().GetTeamCollection()
+        for (EachPlayer : GetPlayspace().GetPlayers()):
+            if (TeamCollection.GetTeamAttitude[MyAgent, EachPlayer] = team_attitude.Friendly):
+                HUDMessageToShow:?hud_message_device = option{ HUDMessage_PointCaptured[CapturePointID] }
+
+                if (AnyTeamIsDominating? and not SkipDominationCheck?):
+                    PlayVOForPlayer(EachPlayer, FriendlyTeamIsDominating, AudioIndex_CapOrLost, HUDMessageToShow)
+                else:
+                    PlayVOForPlayer(EachPlayer, VO_PointCaptured, AudioIndex_CapOrLost, HUDMessageToShow)
+
+            else:
+                HUDMessageToShow:?hud_message_device = option{ HUDMessage_PointLost[CapturePointID] }
+
+                if (AnyTeamIsDominating? and not SkipDominationCheck?):
+                    PlayVOForPlayer(EachPlayer, EnemyTeamIsDominating, AudioIndex_CapOrLost, HUDMessageToShow)
+                else:
+                    VOPointLostArray := array{VO_PointLost_A, VO_PointLost_B, VO_PointLost_C}
+                    if (VOToPlay := VOPointLostArray[CapturePointID]):
+                        PlayVOForPlayer(EachPlayer, VOToPlay, AudioIndex_CapOrLost, HUDMessageToShow)
+    
+
+    PlayPointCaptureStartedVO<private>(MyAgent:agent, CapturePointID:int):void=
+        # Increment VO Index
+        set AudioIndex_Losing = AudioIndex_Losing + 1
+        
+        # For each enemy (we don't tell friendlies capture has tarted), play VO and associated hud message
+        TeamCollection := GetPlayspace().GetTeamCollection()
+        for (EachPlayer : GetPlayspace().GetPlayers()):
+            if (TeamCollection.GetTeamAttitude[MyAgent, EachPlayer] <> team_attitude.Friendly):
+                HUDMessageToShow:?hud_message_device = option{ HUDMessage_LosingPoint[CapturePointID] }
+
+                VOPointLostArray := array{VO_PointStartedLosing_A, VO_PointStartedLosing_B, VO_PointStartedLosing_C}
+                if (VOToPlay := VOPointLostArray[CapturePointID]):
+                    PlayVOForPlayer(EachPlayer, VOToPlay, AudioIndex_Losing, HUDMessageToShow)
+
+
+    PlayVOForPlayer<private>(MyAgent:agent, DeviceList:[]audio_player_device, ClipIndex:int, OptionalHUDMessage:?hud_message_device):void=
+        # Make sure the incoming device list is populated!
+        if (DeviceList.Length = 0):
+            return
+        # Is player a valid audio target?
+        if (not ValidAudioTargets.Find[MyAgent]):
+            return
+
+        if (Device := DeviceList[Mod[ClipIndex, DeviceList.Length]]):
+            Device.Play(MyAgent)
+        if (HUDMessage := OptionalHUDMessage?):
+            HUDMessage.Show(MyAgent)
+
+
+    ##################################################################
+    # Audio Queue Management
+    ##################################################################
+    QueueVO_PointCapturedOrLost(MyAgent:agent, CapturePointID:int):void=
+        if (AnyTeamIsDominating?):
+            EnqueueAudioEntry(MyAgent, CapturePointID, audioqueue_type.AllPointsCaptured)
+        else:
+            EnqueueAudioEntry(MyAgent, CapturePointID, audioqueue_type.CaptureOrLost)
+
+
+    QueueVO_PointCaptureStarted(MyAgent:agent, CapturePointID:int):void=
+        # Only add these to the queue if they're the only audio to play.
+        # They aren't important enough to queue up compared to other audio sources.
+        if (AudioToPlayQueue.Length = 0):
+            EnqueueAudioEntry(MyAgent, CapturePointID, audioqueue_type.CaptureStarted)
+
+
+    EnqueueAudioEntry<private>(MyAgent:agent, CaptureID:int, AudioType:audioqueue_type):void=
+        set AudioToPlayQueue = AudioToPlayQueue + array:
+            audioqueue_entry{InitiatingAgent := MyAgent, CapturePointID := CaptureID, AudioEventType := AudioType}
+
+        spawn { PlayQueuedVO() }
+
+
+    PlayQueuedVO<private>()<suspends>:void =
+        if (VOIsOnCooldown?):
+            return
+
+        set VOIsOnCooldown = true
+
+        loop: 
+            if:
+                NextAudioToPlay := AudioToPlayQueue[0]
+                NewQueue := AudioToPlayQueue.RemoveElement[0]
+                set AudioToPlayQueue = NewQueue
+            then:
+                case (NextAudioToPlay.AudioEventType):
+                    audioqueue_type.CaptureStarted =>
+                        PlayPointCaptureStartedVO(NextAudioToPlay.InitiatingAgent, NextAudioToPlay.CapturePointID)
+                    audioqueue_type.CaptureOrLost =>
+                        PlayVO_PointCapturedOrLost(NextAudioToPlay.InitiatingAgent, NextAudioToPlay.CapturePointID, true)
+                    audioqueue_type.AllPointsCaptured =>
+                        PlayVO_PointCapturedOrLost(NextAudioToPlay.InitiatingAgent, NextAudioToPlay.CapturePointID, false)
+
+                # Sleep between each play
+                Sleep(VOCooldownTime)
+            else:
+                break
+
+        set VOIsOnCooldown = false
+
+#! Valid Program
+# Real-world Verse file: Deserted_Plugins_Deserted_Content_SequencerRandomi
+# Source: Samples__Deserted__Plugins__Deserted__Content__SequencerRandomizer.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Fortnite.com/Devices }
+using { /Verse.org/Random }
+using { /Verse.org/Simulation }
+
+################################################################################
+## This device references an array of Cinematic Sequence Devices, and plays them randomly with a variable cooldown in between.
+################################################################################
+sequencer_randomization_device := class<concrete>(creative_device):
+
+    # Array of Cinematic Sequence Devices to randomize between
+    @editable   
+    SequencerList : []cinematic_sequence_device = array{}
+
+    # Minimum / Maximum time to wait before triggering another sequence
+    @editable   
+    CooldownMin:float = 120.0
+    @editable   
+    CooldownMax:float = 240.0
+
+    # If we have more than 1 sequence to choose from, should we prevent the same sequence playing two times in a row?
+    @editable   
+    PreventBackToBackRepeats:logic = true 
+
+
+    # OnBegin will run when the game starts
+    OnBegin<override>()<suspends>:void=
+        if (SequencerList.Length > 0):
+            QueueSequence(GetRandomInt(0, SequencerList.Length-1))
+
+
+    # Wait a random amount of time, then play the sequence
+    QueueSequence<private>(Index:int)<suspends>:void=
+        CooldownTime:float = GetRandomFloat(CooldownMin, CooldownMax)
+        Sleep(CooldownTime)
+
+        if (MySequencer := SequencerList[Index]):
+            MySequencer.Play()
+
+        QueueSequence(GetNextIndexToPlay(Index))
+
+    
+    # Decide the next sequence index, either completely random, or excluding the last-played sequence
+    GetNextIndexToPlay<private>(LastIndex:int):int=
+        if (SequencerList.Length > 1 and PreventBackToBackRepeats?):
+            var IndexToReturn:int = LastIndex + GetRandomInt(1, SequencerList.Length-1)
+            if (Value := Mod[IndexToReturn, SequencerList.Length]):
+                set IndexToReturn = Value
+                return IndexToReturn
+
+        return GetRandomInt(0, SequencerList.Length-1)
+
+#! Valid Program
+# Real-world Verse file: Deserted_Plugins_Deserted_Content_capturepoint_lig
+# Source: Samples__Deserted__Plugins__Deserted__Content__capturepoint_lighting_control.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+
+##################################################################
+# We want a bit more control over our capture point lighting than what the default capture device light can do
+# This script plays a cinematic sequence device for each capture point depending on which team owns it
+# Within the sequence, we set our lighting values to desired color & intensity
+##################################################################
+
+capturepoint_lighting_control := class(creative_device):
+
+    @editable
+    CapturePoints:[]capture_area_device = array{}
+    @editable
+    Sequencers_Team1:[]cinematic_sequence_device = array{}
+    @editable
+    Sequencers_Team2:[]cinematic_sequence_device = array{}
+
+    OnBegin<override>()<suspends>:void=
+        for (i -> EachCapPoint : CapturePoints):
+            case (i):
+                0 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_A)
+                1 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_B)
+                2 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_C)
+                _ => 
+
+    CaptureChange_A(MyAgent:agent):void=
+        PointCaptured(MyAgent, 0)
+    CaptureChange_B(MyAgent:agent):void=
+        PointCaptured(MyAgent, 1)
+    CaptureChange_C(MyAgent:agent):void=
+        PointCaptured(MyAgent, 2)
+
+    PointCaptured(MyAgent:agent, CaptureIndex:int):void=
+        TeamCollection := GetPlayspace().GetTeamCollection()
+        if:
+            Team1Sequence := Sequencers_Team1[CaptureIndex]
+            Team2Sequence := Sequencers_Team2[CaptureIndex]
+        then:
+            if (TeamCollection.IsOnTeam[MyAgent, TeamCollection.GetTeams()[0]]):
+                Team1Sequence.Play()
+                Team2Sequence.Stop()
+            else:
+                Team1Sequence.Stop()
+                Team2Sequence.Play()
+
+#! Valid Program
+# Real-world Verse file: VKT_Talisman_Template_Plugins_VKT_Talisman_Templat
+# Source: Samples__VKT_Talisman_Template__Plugins__VKT_Talisman_Template__Content__camera_switch_mode_device.verse
+# This file handles swapping between different cameras when an input is pressed.
+
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /Fortnite.com/Characters }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+
+# See https://dev.epicgames.com/documentation/en-us/uefn/create-your-own-device-in-verse for how to create a verse device.
+
+# Registers the channel for debug logs.
+camera_switch_mode_log := class(log_channel){}
+
+# Container class for a gameplay camera and whether it should
+# hide the player character when the camera is added to a player.
+gameplay_camera := class<concrete>():
+
+    # The camera device associated with this class.
+    @editable
+    Camera:gameplay_camera_orbit_device = gameplay_camera_orbit_device{}
+
+    # Whether this camera should hide the player character.
+    @editable
+    ShouldHideCharacter:logic = false
+
+# Swaps between different cameras when an input trigger is activated.
+camera_switch_mode_device := class(creative_device):
+
+    # A device for printing debug log information.
+    Logger:log = log{Channel := camera_switch_mode_log}
+
+    # How long to wait before hiding the player character model
+    # when a camera is added to a player.
+    @editable
+    HideDelay:float = 0.20
+
+    # How long to wait before showing the player character model
+    # when a camera is removed from a player.
+    @editable
+    ShowDelay:float = 0.3
+
+    # Listens for a given input and swaps the camera between different modes when the input is pressed.
+    @editable
+    SwapCameraInputTrigger:input_trigger_device = input_trigger_device{}
+
+
+    # The array of cameras to swap between. You can change the order of elements in this
+    # array to change the order of camera switching.
+    @editable
+    Cameras:[]gameplay_camera = array{}
+
+    # Runs when the device is started in a running game
+    OnBegin<override>()<suspends>:void=
+
+        # Spawn a camera loop per player.
+        Players := GetPlayspace().GetPlayers()
+        for(Player : Players):
+            spawn{CameraLoop(Player)}
+
+    # Listen for the input trigger, and swap through camers in the Cameras array.
+    CameraLoop(Agent:agent)<suspends>:void=
+
+        # Index of the current camera in the Cameras array.
+        var CameraIndex:int = 0
+
+        # Reference to the current camera.
+        var MaybeCurrentCamera:?gameplay_camera_device = false
+
+        # Continuously listen for the input trigger, then swap 
+        # to the next camera. Return to the default camera when 
+        # reaching the end of the array.
+        loop:
+            SwapCameraInputTrigger.PressedEvent.Await()
+            # If the player has a camera, remove it from their camera stack.
+            if:
+                CurrentCamera := MaybeCurrentCamera?
+            then:
+                CurrentCamera.RemoveFrom(Agent)
+                Logger.Print("Removed a camera at {CameraIndex}.")
+            if:
+                # Get the next camera in the Cameras array.
+                NextCamera := Cameras[CameraIndex]
+            then:
+                # Add the camera to the agent.
+                NextCamera.Camera.AddTo(Agent)
+                set MaybeCurrentCamera = option{NextCamera.Camera}
+                set CameraIndex += 1
+                Logger.Print("Added a camera at {CameraIndex}.")
+                # Check if the next camera should hide the agent's fort_character.
+                # Otherwise, show the fort_character.
+                if:
+                    NextCamera.ShouldHideCharacter?
+                then:
+                    HideCharacter(Agent)
+                else:
+                    ShowCharacter(Agent)
+            else:
+                # Otherwise return to the default camera and reset the
+                # CameraIndex count.
+                set CameraIndex = 0
+                set MaybeCurrentCamera = false
+                ShowCharacter(Agent)
+                Logger.Print("Reset Cameras")
+            # Sleep for a short amount of time to prevent spamming 
+            # the input trigger.
+            Sleep(1.0)
+
+    # Wait for a HideDelay amount of seconds, the hide the 
+    # agent's fort_character.
+    HideCharacter(Agent:agent)<suspends>:void=
+        Sleep(HideDelay)
+        if (FortCharacter := Agent.GetFortCharacter[]):
+            FortCharacter.Hide()
+
+    # Wait for a HideDelay amount of seconds, the show the 
+    # agent's fort_character.
+    ShowCharacter(Agent:agent)<suspends>:void=
+        Sleep(ShowDelay)
+        if (FortCharacter := Agent.GetFortCharacter[]):
+            FortCharacter.Show()
+
+#! Valid Program
+# Real-world Verse file: VKT_Talisman_Template_Plugins_VKT_Talisman_Templat
+# Source: Samples__VKT_Talisman_Template__Plugins__VKT_Talisman_Template__Content__starting_sequence_device.verse
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /Fortnite.com/Characters }
+using { /UnrealEngine.com/Temporary/UI }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+
+# See https://dev.epicgames.com/documentation/en-us/uefn/create-your-own-device-in-verse for how to create a verse device.
+
+# Registers the channel for debug logs.
+starting_sequence_log := class(log_channel){}
+
+# Coordinates audio for the start of the game and enables the minimap
+# when a player interacts with a console.
+starting_sequence_device := class(creative_device):
+
+    # A device for printing debug log information.
+    Logger:log = log{Channel := starting_sequence_log}
+
+    # HUD message device for displaying quest message.
+    @editable
+    AssignQuestHudMsg:hud_message_device = hud_message_device{}
+
+    # The button to activate the upper deck map.
+    @editable
+    CrewQuartersButton:button_device = button_device{}
+
+    # How long to wait before enabling the minimap and HUD.
+    @editable
+    MapAndHUDDelay:float = 1.0
+
+    # Audio played when map indicator is added.
+    @editable
+    MapIndicatorAudio:audio_player_device = audio_player_device{}
+
+    # HUD controller that only displays minimap.
+    @editable
+    MapOnlyHud:hud_controller_device = hud_controller_device{}
+    
+    # Map for the lower deck.
+    @editable
+    NewUpperDeckMap:map_controller_device = map_controller_device{}
+
+    # Enables multiple ambient audio zones around the ship.
+    @editable
+    TriggerAudioChannelEnable:trigger_device = trigger_device{}
+
+    # Starts playing ambient audio from multiple zones around the ship.
+    @editable
+    TriggerAudioChannelPlay:trigger_device = trigger_device{}
+
+    # Initial audio that plays when the player spawns.
+    @editable
+    WelcomeAudio:audio_player_device = audio_player_device{}
+
+    # Runs when the device is started in a running game.
+    OnBegin<override>()<suspends>:void =
+
+        # Transmit on the channel to enable ambient audio volumes throughout the ship.
+        TriggerAudioChannelEnable.Trigger()
+        # Transmit on the channel to start playing audio from ambient audio volumes.
+        TriggerAudioChannelPlay.Trigger()
+    
+        # Wait for the player to interact with the console in the crew quarters.
+        CrewQuartersButton.InteractedWithEvent.Await()
+
+        # Cancel the welcome audio if its already playing.
+        WelcomeAudio.Stop()
+
+        # Enable the upper deck map controller, then enable the minimap.
+        Sleep(MapAndHUDDelay)
+        NewUpperDeckMap.Enable()
+        MapOnlyHud.Enable()
+        Sleep(MapAndHUDDelay)
+
+        # Show the quest message and play the map indicator audio.
+        AssignQuestHudMsg.Show()
+        MapIndicatorAudio.Play()
+
+#! Valid Program
+# Real-world Verse file: VKT_Village_Plugins_VKT_Village_Content_village_pl
+# Source: Samples__VKT_Village__Plugins__VKT_Village__Content__village_player_spawner.verse
+# This device manages player spawning and assigns players to a specific home.
+# In its Details panel in the editor, you can:
+# - Add player spawn info classes to the PlayerSpawnList Array
+# - Set the information for each player spawn area
+# - This includes the spawn pad, camera device, and counter being used
+
+
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+using { /Fortnite.com/Game }
+using { /Fortnite.com/FortPlayerUtilities }
+using { /Fortnite.com/Characters }
+
+
+PlayerSpawnerTip<localizes>:message := "This is the player spawner being used in the Homestead."
+IntroCameraTip<localizes>:message := "This is the intro camera (pointed at the player) when the player spawns for the first time."
+HomeCounterTip<localizes>:message := "This is a Player Counter used to check if a player is in a Homestead at game start."
+SpawnListTip<localizes>:message := "This is a collection of Player Spawn Information. Each one represents a separate Homestead"
+DialogTip<localizes>:message := "The initial dialog that pops up at game start"
+IntroSequenceTip<localizes>:message := "This is the fade from black during the intro."
+StasisControlModeTip<localizes>:message := "This is used to hold the player in position during the intro."
+
+
+
+
+# This class handles collecting the information used to assign a player to a homestead
+initial_player_spawn_info := class<concrete>():
+    # The initial player spawner used when a player starts a game
+    @editable {ToolTip := PlayerSpawnerTip}
+    PlayerSpawner:player_spawner_device = player_spawner_device{}
+    
+    # The initial camera tied to the player spawn pad, this is the camera that points at the player during the intro,
+    @editable {ToolTip := IntroCameraTip}
+    PlayerIntroCamera:gameplay_camera_fixed_point_device = gameplay_camera_fixed_point_device{}
+
+
+    # This counter is used as a failsafe in case the we miss the PlayerSpawned Event
+    @editable {ToolTip := HomeCounterTip}
+    HomeCounter:player_counter_device = player_counter_device{}
+   
+
+
+# This is being used to handle players "Owning" a particular spawn pad.
+# This assigns a Homestead to a player, and handles their intro camera and initial pop up dialog.
+village_player_spawner := class(creative_device):
+
+
+    # This tracks each spawn set up for each home.
+    @editable {ToolTip := SpawnListTip}
+    PlayerSpawnList:[]initial_player_spawn_info = array{}
+
+
+ 
+    # This handles the intro fade from black.
+    @editable {ToolTip := IntroSequenceTip}
+    StartSequence:cinematic_sequence_device = cinematic_sequence_device{}
+    
+    # The intro dialog “Welcome to Village…”.
+    @editable {ToolTip := DialogTip}
+    FirstDialog:popup_dialog_device = popup_dialog_device{}
+    
+    # An extra failsafe method to put the player in stasis during the intro
+    @editable {ToolTip := StasisControlModeTip}
+    ControlModeStasis:gameplay_controls_third_person_device = gameplay_controls_third_person_device{}
+
+
+    #Used to tie the player to a spawner
+    var PlayerToSpawner:[agent]player_spawner_device = map{}
+
+
+    # On begin turn on the events to listen for players spawning in and listen for players leaving the game.
+    OnBegin<override>()<suspends>:void=
+
+
+        InitializeListener()
+        GetPlayspace().PlayerRemovedEvent().Subscribe(ReactivateSpawner)
+        #Backup in case PlayerSpawned didn't get called.
+        for (PlayerSpawnInfo : PlayerSpawnList):
+            PlayerSpawnInfo.HomeCounter.TransmitForAllCounted()
+
+
+    #When a player is spawned, disable the spawner and add the player to the map so we can enable that spawner later.
+    PlayerSpawned(Agent:agent,Spawner:player_spawner_device,Camera:gameplay_camera_fixed_point_device)<suspends>:void=
+       
+        if(FortCharacter := Agent.GetFortCharacter[]):
+            #Check if the player already is in a map of player spawners
+            if (PlayerToSpawner[Agent]):
+                return
+            if (set PlayerToSpawner[Agent] = Spawner):
+                FortCharacter.PutInStasis(stasis_args{AllowFalling := true})            
+                StartSequence.Play(Agent)
+                Spawner.Disable()
+                Camera.RemoveFrom(Agent)
+                Camera.AddTo(Agent)
+                race:
+                    block:
+                        StartSequence.StoppedEvent.Await()
+                    block:
+                        #Timeout in case the Sequence fails for some reason.
+                        Sleep(6.0)
+                        StartSequence.GoToEndAndStop(Agent)
+                FirstDialog.Show(Agent)
+                FortCharacter.ReleaseFromStasis()
+                ControlModeStasis.RemoveFrom(Agent)
+
+
+    InitializeListener():void=
+        for (PlayerSpawnInfo:PlayerSpawnList):
+            PlayerSpawnListener:player_spawned_listener = player_spawned_listener{PlayerSpawnerInfo:=PlayerSpawnInfo,VillagePlayerSpawnerRef:=Self}
+                spawn{PlayerSpawnedListenerEvent(PlayerSpawnListener,PlayerSpawnInfo.PlayerSpawner)}
+                spawn{PlayerCountedListenerEvent(PlayerSpawnListener,PlayerSpawnInfo.HomeCounter)}
+
+    #Listen for the PlayerSpawned event.  Await() is used here because the SpawnPad asset that called the event is needed later to shut it off.
+    PlayerSpawnedListenerEvent(ClassListener:player_spawned_listener,PlayerSpawnPad:player_spawner_device)<suspends>:void=
+        loop:
+            Agent := PlayerSpawnPad.SpawnedEvent.Await()
+            ClassListener.PlayerSpawned(Agent)
+    PlayerCountedListenerEvent(ClassListener:player_spawned_listener,Counter:player_counter_device)<suspends>:void=
+        loop:
+            Agent := Counter.CountedEvent.Await()
+            ClassListener.PlayerSpawned(Agent)
+
+
+
+
+    #Turn That Spawn Pad back on once a player leaves the match, so it is available for the next player to join
+    ReactivateSpawner(Player:player):void=      
+        if:
+            Agent := agent[Player]
+            SpawnerToReactivate := PlayerToSpawner[Agent]
+        then: 
+            SpawnerToReactivate.Enable()
+            RemoveAgentFromMap(Agent)
+   
+    RemoveAgentFromMap(Agent:agent):void=
+        var NewMap:[agent]player_spawner_device = map{}
+        for (Key -> Value : PlayerToSpawner, Key <> Agent):
+            set NewMap = ConcatenateMaps(NewMap, map{Key => Value})
+        set PlayerToSpawner = NewMap
+
+
+player_spawned_listener := class:
+
+
+    PlayerSpawnerInfo:initial_player_spawn_info
+    VillagePlayerSpawnerRef:village_player_spawner
+       
+    PlayerSpawned(Agent:agent)<suspends>:void=
+        VillagePlayerSpawnerRef.PlayerSpawned(Agent,PlayerSpawnerInfo.PlayerSpawner,PlayerSpawnerInfo.PlayerIntroCamera)
+
+#! Valid Program
+# Real-world Verse file: VKT_Village_Plugins_VKT_Village_Content_village_ti
+# Source: Samples__VKT_Village__Plugins__VKT_Village__Content__village_time_manager.verse
+# This device manages the time in village, allowing designers to hook events up to specific hours.
+# In its Details panel in the editor, you can:
+# - Set the time when it becomes “daytime” in village
+# - Set the time when it becomes “nighttime” in village
+
+
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+
+
+
+
+MessageMakerTimeHour<localizes>(HourToSet:int):message = "{HourToSet}:00"
+
+
+HudDayTip<localizes>:message := "This determines the time HUD displayed during the day."
+HudNightTip<localizes>:message := "This determines the time HUD displayed during the night."
+TimerTip<localizes>:message := "This determines the length of each hour of the day."
+DayNightSwitchTip<localizes>:message := "This track if it is day or night, and sends an event when the switch has happened"
+MorningHourTip<localizes>:message := "This determines the time of day should shift to day."
+EveningHourTip<localizes>:message := "This determines the time of day should shift to night."
+DayLengthTip<localizes>:message := "This determines how long a day is in hours."
+
+village_time_manager := class(creative_device):
+
+
+    # Displays the UI for day
+    @editable {ToolTip := HudDayTip}
+    TimerHudDeviceDay:hud_message_device = hud_message_device{}
+
+
+    # Displays the UI for night
+    @editable {ToolTip := HudNightTip}
+    TimerHudDeviceNight:hud_message_device = hud_message_device{}
+
+
+    # Tracks each hour of the day
+    @editable {ToolTip := TimerTip}
+    TimerDay:timer_device = timer_device{}
+    
+    # Used to track if it is day or night in game, and sends an event when the switch has happened
+    @editable {ToolTip := DayNightSwitchTip}
+    DayNightSwitch:switch_device = switch_device{}
+
+
+    var CurrentHour:int = 6
+    # This can be changed to set when it is considered "morning" in village.
+    @editable {ToolTip := MorningHourTip}
+    var MorningHour:int = 6
+    # This can be changed to set when it is considered "night" in village.
+    @editable {ToolTip := EveningHourTip}
+    var EveningHour:int = 20
+    # This can be changed to set the length of a day in village.
+    @editable {ToolTip := DayLengthTip}
+    var HoursInDay:int = 24
+	
+
+
+    #An event other devices can await if they want to listen for a specific time. The int payload represents the current hour.
+    HourIncrementEvent:event(int) = event(int){}
+
+
+    # Runs when the device is started in a running game
+    OnBegin<override>()<suspends>:void=
+        TimerDay.SuccessEvent.Subscribe(IncrementHour)
+        DayNightSwitch.TurnedOffEvent.Subscribe(DayForcedOff)
+        DayNightSwitch.TurnedOnEvent.Subscribe(DayForcedOn)
+
+
+    IncrementHour(Agent:?agent):void=
+        GenericAgents := GetPlayspace().GetPlayers()
+        #The switch device needs an agent to turn the switch on and off.
+        if(GenericAgent := GenericAgents[0]):
+            set CurrentHour+=1
+
+            if (CurrentHour = MorningHour):
+                DayNightSwitch.TurnOn(GenericAgent)
+            if (CurrentHour = EveningHour):
+                DayNightSwitch.TurnOff(GenericAgent)
+            if (CurrentHour = HoursInDay):
+                set CurrentHour = 0
+
+            HourIncrementEvent.Signal(CurrentHour)
+            SetHourText(CurrentHour)
+
+
+    #Update the messaging on the HUD
+    SetHourText(Hour:int):void=
+        if (IsDay[]):
+            TimerHudDeviceDay.SetText(MessageMakerTimeHour(Hour))
+        else:
+            TimerHudDeviceNight.SetText(MessageMakerTimeHour(Hour))
+
+
+    #Making sure the current hour tracks properly if the Core switch is turned on/off        
+    DayForcedOff(Agent:agent):void=
+        set CurrentHour = EveningHour   
+        TimerHudDeviceNight.SetText(MessageMakerTimeHour(CurrentHour))
+        TimerHudDeviceNight.Show()
+        TimerHudDeviceDay.Hide()
+       
+    DayForcedOn(Agent:agent):void=
+        set CurrentHour = MorningHour 
+        TimerHudDeviceDay.SetText(MessageMakerTimeHour(CurrentHour))
+        TimerHudDeviceDay.Show()
+        TimerHudDeviceNight.Hide()
+
+
+    IsDay()<decides><transacts>:void=
+        CurrentHour >= MorningHour or CurrentHour < EveningHour
+
+#! Valid Program
+# Real-world Verse file: VKT_Village_Plugins_VKT_Village_Content_village_zo
+# Source: Samples__VKT_Village__Plugins__VKT_Village__Content__village_zonetransition.verse
+# This device manages transitions from the exterior map to interior spaces and back again, as well as teleports within the mines.
+# The transitions are broken up between button and trigger classes for easier tracking and management in the editor.
+
+
+using { /Fortnite.com/Characters }
+using { /Fortnite.com/Devices }
+using { /Fortnite.com/Playspaces }
+using { /Verse.org/Simulation }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+using { /UnrealEngine.com/Temporary/SpatialMath }
+
+
+TeleportDestinationTip<localizes>:message := "This determines the location the player is teleported to."
+TeleportButtonTip<localizes>:message := "This determines the button used to start teleporting the instigating player"
+TeleportTriggerTip<localizes>:message := "This determines volume used to start teleporting the instigating player"
+TeleportButtonListTip<localizes>:message := "This contains all the buttons and their destinations for teleporting"
+TeleportVolumeListTip<localizes>:message := "This contains all the volumes and their destinations for teleporting"
+
+
+# Transitions that are initiated with a button device
+zone_transition_buttons := class<concrete>():
+    @editable {ToolTip := TeleportDestinationTip}
+    TeleportDestination:teleporter_device = teleporter_device{}
+
+
+    @editable {ToolTip := TeleportButtonTip}
+    TransitionButton:button_device = button_device{}
+
+
+# Transitions that are initiated with a trigger volume
+zone_transition_triggers := class<concrete>():
+    @editable {ToolTip := TeleportDestinationTip}
+    TeleportDestination:teleporter_device = teleporter_device{}
+
+
+    @editable {ToolTip := TeleportTriggerTip}
+    TransitionTrigger:volume_device = volume_device{}
+
+
+# Relevant data to send when a player is teleported through a transition.
+# The TeleportDestination is the teleporter the player is headed to.
+# The TeleportInstigator is the character class of the player being teleported.  This is used to put the player in stasis.
+# The TeleportInstigatorAsAgent is the agent that is passed through for use with the teleport function.
+zone_transition_payload := class():
+    TeleportDestination:teleporter_device
+    TeleportInstigator:fort_character
+    TeleportInstigatorAsAgent:agent
+    ParentSubscription:zone_transition_subscription
+
+
+zone_transition_subscription := class:
+    DoTransitionEvent:event(zone_transition_payload) = event(zone_transition_payload){}
+    ZoneTransitionDevice:village_zonetransition
+    ZoneDestination:teleporter_device
+
+
+    var TransitioningPlayerAgents:[]agent = array{}
+
+
+    TriggerTransition(Agent:agent):void=
+        # Validate the agent used here is a player and not an NPC or vehicle
+        if (FortCharacter := Agent.GetFortCharacter[]):   
+            Payload := zone_transition_payload:
+                TeleportDestination := ZoneDestination
+                TeleportInstigator := FortCharacter
+                TeleportInstigatorAsAgent := Agent
+                ParentSubscription := Self
+            DoTransitionEvent.Signal(Payload)
+
+# This class handles managing the transitions in the world and doing the actual teleporting of the player.
+# To use, add the buttons or volumes along with their respective teleporters to the ZoneButtonList or ZoneTriggerList arrays.
+village_zonetransition := class(creative_device):
+    @editable {ToolTip := TeleportButtonListTip}
+    ZoneButtonList:[]zone_transition_buttons = array{}
+
+
+    @editable {ToolTip := TeleportVolumeListTip}
+    ZoneTriggerList:[]zone_transition_triggers = array{}
+
+
+    var ZoneTransitionSubscriptions:[]zone_transition_subscription = array{}
+    var PlayersInTransition:[]agent = array{}
+
+
+    OnBegin<override>()<suspends>:void=
+        CreateZoneTransitionSubscriptions()
+        StartListenToTransitionEvents()
+
+
+    CreateZoneTransitionSubscriptions():void=
+        # Setup the subscription data for button/interact based zone transitions
+        for (EachBinding:ZoneButtonList):
+            NewSubscription := zone_transition_subscription:
+                ZoneTransitionDevice := Self
+                ZoneDestination := EachBinding.TeleportDestination
+            EachBinding.TransitionButton.InteractedWithEvent.Subscribe(NewSubscription.TriggerTransition)
+            NewArray:[]zone_transition_subscription = array{NewSubscription}
+            set ZoneTransitionSubscriptions = Concatenate(ZoneTransitionSubscriptions,NewArray)
+
+
+        # Setup the subscription data for volume event based zone transitions
+        for (EachBinding:ZoneTriggerList):
+            NewSubscription := zone_transition_subscription:
+                ZoneTransitionDevice := Self
+                ZoneDestination := EachBinding.TeleportDestination
+            EachBinding.TransitionTrigger.AgentEntersEvent.Subscribe(NewSubscription.TriggerTransition)
+            NewArray:[]zone_transition_subscription = array{NewSubscription}
+            set ZoneTransitionSubscriptions = Concatenate(ZoneTransitionSubscriptions,NewArray)
+
+
+    StartListenToTransitionEvents():void=
+        # For each zone subscription, spawn an event to listen for a player attempting to move between zones.  
+        # This is done using spawn events so it can pass along a payload
+        for:
+            ZoneSubscription : ZoneTransitionSubscriptions
+        do:
+           spawn{ListenToSubscription(ZoneSubscription)}
+
+
+    ListenToSubscription(ZoneSubscription:zone_transition_subscription)<suspends>:void=
+        loop:
+            AwaitedPayload := ZoneSubscription.DoTransitionEvent.Await()
+            spawn{TransitionToNewZone(AwaitedPayload)}
+
+
+    TransitionToNewZone(Payload:zone_transition_payload)<suspends>:void=
+        #Make sure we're trying to send a player, and not a chicken that may have wandered into a zone.
+        if(AgentIsAPlayer:=player[Payload.TeleportInstigatorAsAgent]):
+            Payload.TeleportInstigator.PutInStasis(stasis_args{AllowFalling := true})
+            Payload.TeleportDestination.Teleport(Payload.TeleportInstigatorAsAgent)
+            Sleep(2.0) #Give some time for the fade to black to play
+            Payload.TeleportInstigator.ReleaseFromStasis()
+
+#! Valid Program
+# Real-world Verse file: multiplayer_teleporter
+# Source: Samples__multiplayer_teleporter.verse
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /Fortnite.com/Playspaces }
+using { /Fortnite.com/Characters }
+using { /UnrealEngine.com/Temporary/SpatialMath }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+
+# This device is used to handle teleporting players around the map to ensure all players are always in the action!
+multiplayer_teleporter := class(creative_device):
+
+    #The trigger device used to initiate teleporting players
+    @editable
+    TriggerDevice : trigger_device = trigger_device{}
+
+    # The world axis in which the offset is applied to the teleporting character i.e. X: 0 Y:1 Z:0 will apply the offset in the Y axis
+    @editable
+    TeleportOffsetAxis : vector3 = vector3{X := 0.0, Y := 1.0, Z := 0.0}
+
+    # Runs when the device is started in a running game
+    OnBegin<override>()<suspends> : void=   
+        TriggerDevice.TriggeredEvent.Subscribe(TeleportPlayers)
+
+    TeleportPlayers(TriggeringAgent : ?agent)<transacts> : void = 
+    
+        # Check if the triggering player's agent is valid and then use it's FortCharacter to set TriggeringCharacter
+        if (TriggeringCharacter := TriggeringAgent?.GetFortCharacter[]):
+            var TeleportOffset : float = 0.0
+            CurrentPlayers := GetPlayspace().GetPlayers()
+            # Iterate through all of the players, checking to make sure they aren't the triggering player, then teleport them to the triggering player
+            for (Player : CurrentPlayers, Player.GetFortCharacter[] <> TriggeringCharacter, CharacterToTeleport := Player.GetFortCharacter[]):
+                set TeleportOffset += 100.0  
+                # Teleport PlayerToTeleport to TriggeringPlayer's position, if the teleport fails to find the required space, players will remain where they are
+                if (CharacterToTeleport.TeleportTo[TriggeringCharacter.GetTransform().Translation + (TeleportOffsetAxis * TeleportOffset),
+                TriggeringCharacter.GetTransform().Rotation]):
+
+#! Valid Program
+# Real-world Verse file: Plugins_SolarisTests_LanguageServerTests_Project_M
+# Source: SolarisTestbed__Plugins__SolarisTests__LanguageServerTests__Project__Math__Vector3.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+
+vector3<public> := class<concrete><final>:
+
+    
+    IsZero<public>()<decides>:void = (X = 0.0 and Y = 0.0 and Z = 0.0)
+
+    
+    SizeSquared<public>():float =
+    {
+        return (X*X + Y*Y + Z*Z)
+    }
+
+    
+    X<public>:float = 0.0
+
+    
+    Y<public>:float = 0.0
+
+    
+    Z<public>:float = 0.0
+
+
+Vector3<public> := module:
+    
+    CreateZero<public>()<transacts>:vector3 =
+        vector3{X:=0.0, Y:=0.0, Z:=0.0}
+
+prefix'-'<public>(Operand:vector3):vector3=
+    return vector3{X := -Operand.X, Y := -Operand.Y, Z := -Operand.Z}
+
+operator'+'<public>(Left:vector3, Right:vector3):vector3=
+    return vector3{X := Left.X + Right.X, Y := Left.Y + Right.Y, Z := Left.Z + Right.Z}
+
+operator'*'<public>(Left:vector3, Right:vector3):vector3=
+    return vector3{X := Left.X * Right.X, Y := Left.Y * Right.Y, Z := Left.Z * Right.Z}
+
+operator'*'<public>(Left:vector3, Right:float):vector3=
+    return vector3{X := Left.X * Right, Y := Left.Y * Right, Z := Left.Z * Right}
+
+operator'*'<public>(Left:float, Right:vector3):vector3=
+    return vector3{X := Left * Right.X, Y := Left * Right.Y, Z := Left * Right.Z}
+
+#! Valid Program
+# Real-world Verse file: Plugins_SolarisTests_LanguageServerTests_Project_M
+# Source: SolarisTestbed__Plugins__SolarisTests__LanguageServerTests__Project__Misc__Misc.verse
+using { LspMath }
+
+cube_style<public> := enum:
+    Cube
+    Cone
+    Sphere
+
+test_class<public> := class:
+
+    # Default access
+    DataDefault : float = 1.0
+
+    DataPublic<public> : float = 2.0
+
+    DataInternal<internal> : float = 3.0
+
+    # Default access
+    MethodDefault()<transacts> : float =
+        return (11.0)
+
+    MethodPublic<public>()<transacts> : float =
+        return (22.0)
+
+    MethodInternal<internal>()<transacts> : float =
+        return (33.0)
+
+math_test_class<public> := class(test_class):
+
+    var MutableVector<public>:?vector3
+
+    ConstVector<private>:vector3 = vector3{X:=1.0, Y:=2.0, Z:=3.0}
+
+    var TestEnum<public >:cube_style
+
+    DoStuff<public>() : void =
+        set MutableVector = option{Vector3.CreateZero()}
+        set MutableVector = option{Self.ConstVector}
+        set TestEnum = cube_style.Sphere
+        set MutableVector = option{vector3{X:=DataDefault, Y:=DataPublic, Z:=DataInternal}}
+        set MutableVector = option{vector3{X:=MethodDefault(), Y:=MethodPublic(), Z:=MethodInternal()}}
+
+#! Valid Program
+# Real-world Verse file: Plugins_SolarisTests_Source_SolarisEditorTests_Ver
+# Source: SolarisTestbed__Plugins__SolarisTests__Source__SolarisEditorTests__Verse__EditableAttribute.native.verse
+# Copyright Epic Games, Inc. All Rights Reserved.
+
+using { /Verse.org/Simulation }
+
+s0 := struct<concrete>:
+    @editable
+    v:logic = true
+
+c0 := class<concrete>:
+    @editable i:int = 0
+
+e0 := enum:
+    value1
+    value2
+    value3
+
+c1 := class:
+    @editable
+    boolean:logic = false
+
+    @editable 
+    integer:int
+
+    @editable 
+    real:float
+
+    @editable 
+    str:string
+
+    @editable
+    enumeration:e0 = e0.value1
+
+    @editable
+    child_class:c0 = c0{}
+
+    @editable
+    child_struct:s0 = s0{}
+
+    @editable 
+    arr_int:[]int = array{1,2,3}
+
+    <#
+    @editable
+    empty_opt_int:?int = false
+
+    @editable
+    opt_int:?int = option{123}
+
+    @editable 
+    arr_opt_int:[]?int = array{option{1},option{2},option{3}}
+
+    @editable 
+    opt_arr_opt_int:?[]?int = option{array{option{1},option{2},option{3}}}
+
+    @editable
+    opt_child_class:?c0 = option{c0{}}
+
+    @editable
+    opt_child_struct:?s0 = option{s0{}}
+
+    @editable
+    opt_boolean:?logic = option{true}
+
+    @editable
+    opt_enumeration:?e0 = option{e0.value1}
+
+#>
+
+
+#! Valid Program
+# 1. Array type field without spaces
+Items:[]item = array{}
+
+#! Valid Program
+# 2. Function with optional type parameter
+TeleportPlayers(Agent:?agent):void = Print("test")
+
+#! Valid Program
+# 3. Class with parent class
+item_hub := class(creative_device):
+    Name:string = "hub"
+
+#! Valid Program
+# 4. Multiple fields on one line with comma
+item_definition := class:
+    ItemName:string = "", ItemTexture:texture = default
+
+#! Valid Program
+# 5. Enum declaration with members
+cube_style := enum:
+    Cube
+    Cone
+    Sphere
+
+#! Valid Program
+# 6. Variable declaration with var keyword
+var CaptureWeight:int = 0
+
+#! Valid Program
+# 7. Function with indented body
+GetIndex():int =
+    var Index:int = 0
+    Index + 1
+
+#! Valid Program
+# 8. Class with array member
+inventory := class:
+    var Items:[]item = array{}
+
+#! Valid Program
+# 9. Function with for loop
+Process():void =
+    for (I : Range):
+        Print(I)
+
+#! Valid Program
+# 10. Nested classes in module
+Tags := module:
+    Tag1 := class(tag){}
+    Tag2 := class(tag){}
+
+#! Valid Program
+# 11. Class with editable decorator
+item := class:
+    @editable
+    Name:string = "item"
+
+#! Valid Program
+# 12. Function with multiple specifiers
+OnBegin<override>()<suspends>:void =
+    Sleep(1.0)
+
+#! Valid Program
+# 13. Class with concrete and unique specifiers
+entity := class<concrete><unique>:
+    ID:int = 0
+
+#! Valid Program
+# 14. Function returning expression without parens
+IsZero():logic = X = 0.0 and Y = 0.0
+
+#! Valid Program
+# 15. If expression with block
+Test():int =
+    if (x > 0):
+        1
+    else:
+        0
+
+#! Valid Program
+# 16. Direct class syntax
+class GameManager:
+    Score:int = 0
+    Level:int = 1
+
+#! Valid Program
+# 17. Direct struct syntax
+struct Point:
+    X:float = 0.0
+    Y:float = 0.0
+
+#! Valid Program
+# 18. Direct interface syntax
+interface IWeapon:
+    Fire():void
+    Reload():void
+
+#! Valid Program
+# 19. Direct enum syntax
+enum Direction:
+    North, South, East, West
+
+#! Valid Program
+# 20. Direct module syntax
+module Utils:
+    Log(Message:string):void = Print(Message)
+    Max(A:int, B:int):int = if (A > B) then A else B
+#! Valid Program
+# 1. Function with complex indented body
+item_hub := class:
+    GetItemIndex(ItemToIndex:item):int=
+        var ItemIndex:int = 0
+        for(IndexedItem:Items):
+            if(IndexedItem = ItemToIndex):
+                return ItemIndex
+            set ItemIndex += 1
+        Print("Error")
+        -1
+
+#! Valid Program
+# 2. Function with optional parameter type
+TeleportPlayers(Agent:?agent):void=
+    Print("Teleporting")
+
+#! Valid Program
+# 3. Nested classes within a module
+DominationSpawnTags := module:
+    Tag_SpawnGroup := class(tag){}
+    Tag_SpawnGroup_Initial := class(tag){}
+    Tag_SpawnGroup_GroupA := class(tag){}
+
+#! Valid Program
+# 4. Class member with array type and no space
+item_hub := class:
+    Items:[]item=array{}
+
+#! Valid Program
+# 5. Enum with indented members and specifier
+cube_style<public> := enum:
+    Cube
+    Cone
+    Sphere
+
+#! Valid Program
+# 6. Function returning a value expression without parentheses
+IsZero():logic = X = 0.0 and Y = 0.0 and Z = 0.0
+
+#! Valid Program
+# 7. Multiple decorators on class members
+item_definition := class:
+    @editable
+    ItemName<public>:string = "", ItemTexture<public>:texture = default
+
+#! Valid Program
+# 8. Complex function body with nested control flow
+OnBegin<override>()<suspends>:void=
+    GetPlayspace()
+    for (Player : GetPlayspace().GetPlayers()):
+        if (FortChar := Player.GetFortCharacter[]):
+            spawn:
+                ProcessPlayer(FortChar)
+
+#! Valid Program
+# 9. Variable declaration with var keyword in class
+capture_point := class:
+    var CaptureWeight:int = 0
+    var PlayerWeight:float = 0.0
+
+#! Valid Program
+# 10. Class with multiple specifiers
+item := class<concrete><unique>:
+    Name:string = "item"
+
+#! Valid Program
+# 11. Complex conditional assignment in function
+ProcessItem():int =
+    if (Item := GetItem[]):
+        if (Item.IsValid[]):
+            Item.Value
+        else:
+            0
+    else:
+        -1
+
+#! Valid Program
+# 12. Module with indented function definitions
+MathUtils := module:
+    Min(A:float, B:float):float = if (A < B) then A else B
+    Max(A:float, B:float):float = if (A > B) then A else B
+    Clamp(Value:float, MinVal:float, MaxVal:float):float = Min(Max(Value, MinVal), MaxVal)
+
+#! Valid Program
+# 13. Class inheritance with complex body
+player_controller := class(base_controller):
+    @editable
+    Speed:float = 100.0
+
+    var Health:int = 100
+
+    Move(Direction:vector3):void =
+        SetPosition(GetPosition() + Direction * Speed)
+
+#! Valid Program
+# 14. Function with multiple parameter types
+CreateWeapon(Type:weapon_type, Owner:?player, Config:weapon_config = DefaultConfig):weapon =
+    NewWeapon{Type := Type, Owner := Owner, Config := Config}
+
+#! Valid Program
+# 15. Enum with assigned values
+game_state := enum:
+    Waiting = 0
+    Starting = 1
+    Playing = 2
+    Ending = 3
+    Finished = 4
+#! Valid Program
+# Game logic with loops and variables
+# Source: SolarisTestbed__RpcTestScripts__player_enemy_iteration_manager.verse
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+using { /Verse.org/Random }
+
+player_enemy_iteration_manager := class(creative_device):
+    var PlayerHealth : int = 100
+    var EnemyHealth : int = 100
+    var AttackDamage : int = 5
+    
+    OnBegin<override>()<suspends>:void=
+        var CombatIteration : int = 0
+        loop:
+            set CombatIteration = CombatIteration + 1
+            Print ("Loop Iteration: {CombatIteration}")
+            var PlayerDiceResult : int = GetRandomInt(1,20)
+            var EnemyDiceResult : int = GetRandomInt(1,20)
+            Print ("Player Dice: {PlayerDiceResult}")
+            Print ("Enemy Dice: {EnemyDiceResult}")
+
+            if (EnemyDiceResult > PlayerDiceResult):
+                set PlayerHealth = PlayerHealth - AttackDamage
+                Print ("Enemy attack successful! Player takes {AttackDamage} damage to their HP!")
+            else if (EnemyDiceResult = PlayerDiceResult):
+                set PlayerHealth = PlayerHealth - 1
+                set EnemyHealth = EnemyHealth - 1
+                Print ("Roll was a tie. Player and Enemy lose 1 HP")
+            else:
+                set EnemyHealth = EnemyHealth - AttackDamage
+                Print ("Player attack successful! The enemy takes {AttackDamage} damage to their HP!")
+            if (PlayerHealth <= 0):
+                Print ("Player has died")
+                break
+            else if (EnemyHealth <= 0):
+                Print("Enemy has died")
+                break
+
+        Print ("The Game has ended!")
+
+#! Valid Program
+# Event management system
+# Source: SolarisTestbed__VerseTestMaps__VNMap_TicTakToeAuto__Plugins__VNMap_TicTakToeAuto__Content__EventsBus.verse
+using { /Fortnite.com/Devices }
+using { /Verse.org/Simulation }
+using { /UnrealEngine.com/Temporary/Diagnostics }
+using { /UnrealEngine.com/Temporary/SpatialMath }
+using { /Verse.org/Random }
+
+
+
+EventsBus := class(creative_device):
+
+    GameFinishEvent:event(int) = event(int){}
+
+    FigureTurnEvent:event(int) = event(int){}
+
+
+#! Valid Program
+# 1. Array type without spaces
+Items:[]item = array{}
+
+#! Valid Program
+# 2. Function with optional parameter
+TeleportPlayers(Agent:?agent):void = Print("test")
+
+#! Valid Program
+# 3. Class with parent
+item_hub := class(creative_device):
+    Name:string = "hub"
+
+#! Valid Program
+# 4. Multiple declarations on one line
+item_definition := class:
+    ItemName:string = "", ItemTexture:texture = default
+
+#! Valid Program
+# 5. Enum with members
+cube_style := enum:
+    Cube
+    Cone
+    Sphere
+
+#! Valid Program
+# 6. Variable declarations with var
+var CaptureWeight:int = 0
+
+#! Valid Program
+# 7. Function with complex body
+GetItemIndex():int =
+    var ItemIndex:int = 0
+    for (Item : Items):
+        if (Item = Target):
+            return ItemIndex
+        set ItemIndex += 1
+    -1

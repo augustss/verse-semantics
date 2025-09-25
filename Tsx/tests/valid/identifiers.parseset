@@ -1,0 +1,36 @@
+# Continue as Identifier Tests
+# Tests that 'continue' can now be used as a regular identifier
+
+#! Valid expression
+# 1. continue as variable name
+continue := 42
+
+#! Valid expression
+# 2. continue as function name
+continue() := true
+
+#! Valid expression
+# 3. continue as function with parameters
+continue(x: int, y: string): logic = x > 0
+
+#! Valid expression
+# 4. continue as method call
+obj.continue()
+
+#! Valid expression
+# 5. continue as field access
+data.continue
+
+#! Valid expression
+# 6. continue in compound expression
+{ x := 1; continue := x + 1; continue }
+
+#! Valid expression
+# 7. continue as class field
+TestClass := class {
+  continue: int = 42
+}
+
+#! Valid expression
+# 8. continue as parameter name
+process(continue: int): int = continue * 2

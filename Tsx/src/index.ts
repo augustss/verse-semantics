@@ -31,11 +31,11 @@
  * SUPPORTED VERSE FEATURES:
  * - ✅ All basic expressions (literals, operators, function calls)
  * - ✅ Control flow (if/then/else, for, loop, case, block)
- * - ✅ Control flow statements (break, continue, return)
+ * - ✅ Control flow statements (break, return)
  * - ✅ Data structures (class, interface, struct, enum, module)
  * - ✅ Variable and function declarations
  * - ✅ Comments (single-line #, multi-line <# #>)
- * - ✅ Specifiers (<public>, <private>, <scoped()>)
+ * - ✅ Specifiers (<public>, <private>, <scoped{}>)
  * - ⚠️  Type annotations (parsed but not fully validated)
  * - ❌ Array literals [1, 2, 3] (use array{1, 2, 3})
  * - ❌ C-style operators (&&, ||, ! - use 'and', 'or', 'not')
@@ -61,4 +61,7 @@ export * from './parser';
 
 // Export the pretty printer
 export * from './pretty-printer';
+
+// Export convenient color functions
+export { prettyPrintColored, toHTML, ColorPrintOptions, OutputFormat } from './lexer';
 

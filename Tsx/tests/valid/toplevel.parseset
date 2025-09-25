@@ -3,30 +3,30 @@
 
 # Complex
 
-#! Valid TopLevel
+#! Valid Program
 # 1. Test case
 @public
 MyClass := class { }
 
-#! Valid TopLevel
+#! Valid Program
 # 2. Test case
 @editable
 @public
 Component := class { x := 1 }
 
-#! Valid TopLevel
+#! Valid Program
 # 3. Test case
 @override
 DerivedClass := class(BaseClass) { }
 
-#! Valid TopLevel
+#! Valid Program
 # 4. Test case
 @editable
 MyClass := class:
   x := 1
   y := 2
 
-#! Valid TopLevel
+#! Valid Program
 # 5. Test case
 @component
 Widget := class {
@@ -37,7 +37,7 @@ Widget := class {
   name: string = "widget"
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 6. Test case
 @service
 Calculator := class {
@@ -48,7 +48,7 @@ Calculator := class {
   }
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 7. Test case
 @entity
 Player := class {
@@ -63,7 +63,7 @@ Player := class {
   }
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 8. Test case
 @main
 Game := class {
@@ -76,7 +76,7 @@ Game := class {
     }
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 9. Test case
 Test := class:
     Method():void=
@@ -84,31 +84,31 @@ Test := class:
             1 => DoSomething()
             _ => 0
 
-#! Valid TopLevel
+#! Valid Program
 # 10. Empty interface with brace syntax
 Empty1 := interface {}
 
-#! Valid TopLevel
+#! Valid Program
 # 11. Basic interfaces
 MyInterface := interface {}
 MyInterface2:=interface{
 
     }
 
-#! Valid TopLevel
+#! Valid Program
 # 12. Interface with properties (brace style)
 IGameObject := interface {
     Position: vector3
     Rotation: quaternion
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 13. Interface with inheritance
 IAdvancedPlayer := interface(IPlayer):
     GetArmor():int
     SetArmor(value:int):void
 
-#! Valid TopLevel
+#! Valid Program
 # 14. Struct with methods
 ComplexNumber := struct:
     Real: float
@@ -116,12 +116,12 @@ ComplexNumber := struct:
     Magnitude():float = Math.Sqrt(Real * Real + Imaginary * Imaginary)
     Add(other:ComplexNumber):ComplexNumber = ComplexNumber{Real: Real + other.Real, Imaginary: Imaginary + other.Imaginary}
 
-#! Valid TopLevel
+#! Valid Program
 # 15. Struct with inheritance
 ColoredPoint := struct(Point):
     Color: color
 
-#! Valid TopLevel
+#! Valid Program
 # 16. Enum with explicit values (brace style)
 Priority := enum {
     Low,
@@ -129,7 +129,7 @@ Priority := enum {
     High
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 17. Interface with nested types
 IContainer := interface:
     ItemType := struct {
@@ -139,36 +139,36 @@ IContainer := interface:
     AddItem(item:ItemType):void
     GetItem(id:int):ItemType?
 
-#! Valid TopLevel
+#! Valid Program
 # 18. Empty interface with colon
 Empty3 := interface():
 
-#! Valid TopLevel
+#! Valid Program
 # 19. Test case
 Test := class {
     DoSomething():void= x
 }
 
-#! Valid TopLevel
+#! Valid Program
 # 20. Test case
 Test := class:
     DoSomething  ( ) :       void =
         x := 42
 
-#! Valid TopLevel
+#! Valid Program
 # 21. Test case
 Test := class:
     TestMethod():void=
         var result:int = 10
 
-#! Valid TopLevel
+#! Valid Program
 # 22. Test case
 Test := class:
     ProcessItems():void=
         for(item : items):
             DoSomething(item)
 
-#! Valid TopLevel
+#! Valid Program
 # 23. Test case
 Test := class:
     HandleInput():void=
@@ -176,7 +176,7 @@ Test := class:
             0 => DoAction()
             _ => DoDefault()
 
-#! Valid TopLevel
+#! Valid Program
 # 24. Empty case branch - parser bug: currently passes when it should fail
 CaptureControl := class:
     @editable
@@ -189,72 +189,72 @@ CaptureControl := class:
                 1 => EachCapPoint.ControlChangeEvent.Subscribe(CaptureChange_B)
                 _ => 1
 
-#! Valid TopLevel
+#! Valid Program
 # 25. Using statement with simple path
 using { std }
 
-#! Valid TopLevel
+#! Valid Program
 # 26. Using statement with absolute path
 using { /std/io }
 
-#! Valid TopLevel
+#! Valid Program
 # 27. Using statement with nested path
 using { /std/collections/map }
 
-#! Valid TopLevel
+#! Valid Program
 # 28. Multiple using statements in program
 using { std }
 using { /io }
 using { math/complex }
 
-#! Valid TopLevel
+#! Valid Program
 # 29. Multiple const declarations with zero values
 x := 0
 
-#! Valid TopLevel
+#! Valid Program
 # 30. Multiple const declarations
 firstName := "John"
 
-#! Valid TopLevel
+#! Valid Program
 # 31. Expression const declaration
 result := x + y
 
-#! Valid TopLevel
+#! Valid Program
 # 32. Function declaration
 add(x, y) := x + y
 
-#! Valid TopLevel
+#! Valid Program
 # 33. Function with single parameter
 square(x) := x * x
 
-#! Valid TopLevel
+#! Valid Program
 # 34. Const declaration with function call
 value := f(42)
 
-#! Valid TopLevel
+#! Valid Program
 # 35. Const declaration with object construction
 point := Point{x:=10, y:=20}
 
-#! Valid TopLevel
+#! Valid Program
 # 36. Function declaration with string concatenation
 greet(name) := "Hello, " + name
 
-#! Valid TopLevel
+#! Valid Program
 # 37. Function declaration returning zero
 area() := 0
 
-#! Valid TopLevel
+#! Valid Program
 # 38. Function declaration with simple return
 println(x) := x
 
-#! Valid TopLevel
+#! Valid Program
 # 39. Complex program with using statements and declarations
 using { std }
 using { /io }
 
 main() := "Hello World"
 
-#! Valid TopLevel
+#! Valid Program
 # 40. Multiple top-level declarations in one program
 y := 0
 
@@ -262,11 +262,11 @@ z := 0
 
 calculate(p1, p2) := 0
 
-#! Valid TopLevel
+#! Valid Program
 # 41. Assignment with function call
 result := Calculate(10, 20)
 
-#! Valid TopLevel
+#! Valid Program
 # 42. Method with typed parameters
 Manager := class:
     Process(Agent:agent):void=
@@ -275,13 +275,13 @@ Manager := class:
     Calculate(X:int, Y:int):int=
         X + Y
 
-#! Valid TopLevel
+#! Valid Program
 # 43. Method with complex parameter types
 System := class:
     Register(Player:player, Team:team):void=
         AddToTeam(Player, Team)
 
-#! Valid TopLevel
+#! Valid Program
 # 44. Event subscription pattern
 event_manager := class:
     OnPlayerJoined:event(player) = event(player){}
@@ -292,7 +292,7 @@ event_manager := class:
     HandlePlayer(Player:player):void=
         Print("Player joined")
 
-#! Valid TopLevel
+#! Valid Program
 # 45. State machine pattern
 state_machine := class:
     CurrentState:state = state.Idle
@@ -301,22 +301,22 @@ state_machine := class:
         if (CanTransition(CurrentState, NewState)):
             CurrentState = NewState
 
-#! Valid TopLevel
+#! Valid Program
 # 46. Using statement with nested path
 using { /Verse.org/Simulation/Tags }
 
-#! Valid TopLevel
+#! Valid Program
 # 47. Multiple using statements
 using { /Fortnite.com/Devices }
 using { /Verse.org/Simulation }
 
-#! Valid TopLevel
+#! Valid Program
 # 48. Three using statements
 using { /Fortnite.com/Devices }
 using { /Verse.org/Simulation }
 using { /Fortnite.com/Characters }
 
-#! Valid TopLevel
+#! Valid Program
 # 49. Complete program with using statements
 using { /Fortnite.com/Devices }
 using { /Verse.org/Simulation }
@@ -333,7 +333,7 @@ teleporter_device := class(creative_device):
 
 # Keywords
 
-#! Valid TopLevel
+#! Valid Program
 # 50. Complex class with multiple members (working version)
 game_device := class(creative_device):
     @editable
@@ -344,27 +344,27 @@ game_device := class(creative_device):
 
     OnEnabled(Agent:agent):void = Print("Device enabled")
 
-#! Valid TopLevel
+#! Valid Program
 # 51. Class with inheritance and decorators
 simple_device := class(creative_device):
     @editable
     value:int = 42
 
-#! Valid TopLevel
+#! Valid Program
 # 52. Class with method specifiers
 my_device := class:
     OnBegin<override>():void = Print("Starting")
 
-#! Valid TopLevel
+#! Valid Program
 # 53. Class with suspends method
 async_device := class:
     DoAsync<suspends>():void = Wait(1.0)
 
-#! Valid TopLevel
+#! Valid Program
 # 54. Class with empty parentheses (no inheritance, no body)
 MyDevice := class()
 
-#! Valid TopLevel
+#! Valid Program
 # 55. Module with interface, struct, and enum
 GameTypes := module:
     Direction := enum {
@@ -382,18 +382,18 @@ GameTypes := module:
         Move(direction:Direction):void
     }
 
-#! Valid TopLevel
+#! Valid Program
 # 56. Class implementing interface
 Player := class(IPlayer):
     var Health:int = 100
     GetHealth():int = Health
     SetHealth(value:int):void = { Health = value }
 
-#! Valid TopLevel
+#! Valid Program
 # 57. Module with empty body (colon style)
 EmptyModule := module:
 
-#! Valid TopLevel
+#! Valid Program
 # 58. Nested declarations in module
 Container := module:
     Data := struct:
@@ -404,69 +404,69 @@ Container := module:
         Value: InnerEnum
         Count: int
 
-#! Valid TopLevel
+#! Valid Program
 # 59. Known issue: reconstruction has spacing/newline issues with consecutive var fields
 Test := class:
     @editable
     var Points : []int = array{}
     var Count : int = 0
 
-#! Valid TopLevel
+#! Valid Program
 # 60. Class with calculated method
 MyClass := class:
     Calculate():int=
         x + y * z
 
-#! Valid TopLevel
+#! Valid Program
 # 61. Class with conditional in method
 MyClass := class:
     Process():void=
         if (x > 0):
             DoWork()
 
-#! Valid TopLevel
+#! Valid Program
 # 62. Empty class with various syntaxes
 EmptyClass1 := class{}
 
-#! Valid TopLevel
+#! Valid Program
 # 63. Class inheriting from tag
 Tag_Player := class(tag){}
 
-#! Valid TopLevel
+#! Valid Program
 # 64. Class with inheritance and colon
 MyDevice := class(creative_device):
 
-#! Valid TopLevel
+#! Valid Program
 # 65. Class with field
 Player := class:
     Name:string = "Unknown"
 
-#! Valid TopLevel
+#! Valid Program
 # 66. Class with multiple fields on separate lines
 Player := class:
     Name:string = "Unknown"
     Health:int = 100
     Position:vector3 = vector3{}
 
-#! Valid TopLevel
+#! Valid Program
 # 67. Class with decorated field
 teleporter_device := class(creative_device):
     @editable
     TriggerDevice:trigger_device = trigger_device{}
 
-#! Valid TopLevel
+#! Valid Program
 # 68. Class with method (simple)
 MyClass := class:
     GetValue():int=
         42
 
-#! Valid TopLevel
+#! Valid Program
 # 69. Class with method having specifiers
 teleporter_device := class(creative_device):
     OnBegin<override>()<suspends>:void=
         Print("Started")
 
-#! Valid TopLevel
+#! Valid Program
 # 70. Complex class with multiple members
 game_device := class(creative_device):
     @editable
@@ -481,39 +481,39 @@ game_device := class(creative_device):
     OnEnabled(Agent:agent):void=
         Print("Device enabled")
 
-#! Valid TopLevel
+#! Valid Program
 # 71. Identifier with public specifier in const declaration
 MyClass<public> := class{}
 
-#! Valid TopLevel
+#! Valid Program
 # 72. Class with public specifier and inheritance
 DominationSpawnTags<public> := class(tag){}
 
-#! Valid TopLevel
+#! Valid Program
 # 73. Nested class-like structure
 Outer := class:
     Inner := class:
         Value:int = 5
 
-#! Valid TopLevel
+#! Valid Program
 # 74. Class with const field
 Settings := class:
     MaxPlayers<const>:int = 100
 
-#! Valid TopLevel
+#! Valid Program
 # 75. Class with multiple decorators
 ui_device := class(creative_device):
     @editable
     @replicated
     UIText:string = "Hello"
 
-#! Valid TopLevel
+#! Valid Program
 # 76. Class with constructor-like method
 player_manager := class:
     Initialize(Name:string):void=
         SetName(Name)
 
-#! Valid TopLevel
+#! Valid Program
 # 77. Full Fortnite device example
 teleporter_device := class(creative_device):
     @editable
@@ -529,11 +529,11 @@ teleporter_device := class(creative_device):
         if (FortCharacter := Agent.GetFortCharacter[]):
             TeleportDestination.Teleport(Agent)
 
-#! Valid TopLevel
+#! Valid Program
 # 78. Module with public specifier
 MyModule<public> := module:
 
-#! Valid TopLevel
+#! Valid Program
 # 79. Class with decorated fields
 ui_device := class(creative_device):
     @editable
@@ -542,7 +542,7 @@ ui_device := class(creative_device):
     @replicated
     Count:int = 0
 
-#! Valid TopLevel
+#! Valid Program
 # 80. Class with fields and methods
 game_device := class:
     Score:int = 0
@@ -553,7 +553,7 @@ game_device := class:
     SetScore(NewScore:int):void=
         Score = NewScore
 
-#! Valid TopLevel
+#! Valid Program
 # 81. Class with decorated field and method
 teleporter := class:
     @editable
@@ -562,7 +562,7 @@ teleporter := class:
     Teleport():void=
         MoveTo(Destination)
 
-#! Valid TopLevel
+#! Valid Program
 # 82. Class with multiple methods with specifiers
 game := class:
     Start<public>()<suspends>:void=
@@ -571,7 +571,7 @@ game := class:
     Stop<public>():void=
         Cleanup()
 
-#! Valid TopLevel
+#! Valid Program
 # 83. Class with nested object construction
 Config := class:
     Settings:options = options{
@@ -579,7 +579,7 @@ Config := class:
         Level:int = 1
     }
 
-#! Valid TopLevel
+#! Valid Program
 # 84. Class with method returning constructed object
 Factory := class:
     Create():player=
@@ -588,7 +588,7 @@ Factory := class:
             Score:int = 0
         }
 
-#! Valid TopLevel
+#! Valid Program
 # 85. Complex class with all features
 advanced_device<public> := class(creative_device):
     @editable
@@ -604,18 +604,18 @@ advanced_device<public> := class(creative_device):
     ProcessInput(Input:string):result=
         Parse(Input)
 
-#! Valid TopLevel
+#! Valid Program
 # 86. Class with single field no initializer
 Simple := class:
     Value:int
 
-#! Valid TopLevel
+#! Valid Program
 # 87. Class with const field
 Constants := class:
     MaxValue<const>:int = 100
     MinValue<const>:int = 0
 
-#! Valid TopLevel
+#! Valid Program
 # 88. Fortnite device pattern
 capture_point := class(creative_device):
     @editable
@@ -630,13 +630,13 @@ capture_point := class(creative_device):
     OnCapture(Agent:agent):void=
         AwardPoints(Agent)
 
-#! Valid TopLevel
+#! Valid Program
 # 89. Using statements with class definition
 using { /Fortnite.com/Devices }
 
 MyClass := class{}
 
-#! Valid TopLevel
+#! Valid Program
 # 90. Using statements with device class
 using { /Fortnite.com/Devices }
 using { /Verse.org/Simulation }
@@ -647,34 +647,34 @@ MyDevice := class(creative_device):
 
 # Whitespace
 
-#! Valid TopLevel
+#! Valid Program
 # 91. Class with method (indented body)
 MyClass := class:
     Calculate():int=
         x + y
 
-#! Valid TopLevel
+#! Valid Program
 # 92. Class with empty parentheses (no inheritance, no body) with spaces
 MyDevice2 := class( )
 
-#! Valid TopLevel
+#! Valid Program
 # 93. Using statement for Playspaces
 using { /Fortnite.com/Playspaces }
 
-#! Valid TopLevel
+#! Valid Program
 # 94. Interface with members (indentation style)
 IPlayer := interface:
     GetHealth():int
     SetHealth(value:int):void
 
-#! Valid TopLevel
+#! Valid Program
 # 95. Struct with fields (indentation style)
 Vector3 := struct:
     X: float
     Y: float
     Z: float
 
-#! Valid TopLevel
+#! Valid Program
 # 96. Enum with values (indentation style)
 CardSuit := enum:
     Hearts
@@ -684,7 +684,7 @@ CardSuit := enum:
 
 # Comments
 
-#! Valid TopLevel
+#! Valid Program
 # 97. Class with line comments
 MyClass := class:
     # This is a field
@@ -694,14 +694,14 @@ MyClass := class:
     Method1():void=
         Print("test")
 
-#! Valid TopLevel
+#! Valid Program
 # 98. Class with multiline comments
 MyClass := class:
     <# This is a
        multiline comment #>
     Field1:int = 1
 
-#! Valid TopLevel
+#! Valid Program
 # 99. Function with comments throughout
 add(x, y) := x + y # Add two numbers
 

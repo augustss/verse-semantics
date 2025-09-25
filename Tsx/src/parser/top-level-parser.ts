@@ -84,8 +84,14 @@ export class TopLevelParser {
         const declResult = this.parser.parseDeclaration(state);
         declarations.push(declResult.node);
         state = this.skipAllTrivia(declResult.state);
-      } catch (error) {
-        // If we can't parse as a declaration, break
+      } catch (error: any) {
+        // If we can't parse as a declaration, log details and break
+        const currentToken = state.current();
+        let tempState = state;
+        for (let i = 0; i < 5 && !tempState.isAtEnd(); i++) {
+          const tok = tempState.current();
+          tempState = tempState.advance();
+        }
         break;
       }
     }

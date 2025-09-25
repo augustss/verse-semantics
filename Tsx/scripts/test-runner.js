@@ -9,8 +9,8 @@
  *
  * - #! Valid expression     - Should parse as a valid expression
  * - #! Error expression     - Should fail when parsed as an expression
- * - #! Valid TopLevel       - Should parse as a valid top-level declaration
- * - #! Error TopLevel       - Should fail when parsed as a top-level declaration
+ * - #! Valid Program        - Should parse as a valid top-level declaration
+ * - #! Error Program        - Should fail when parsed as a top-level declaration
  *
  * The script provides detailed reporting including pass rates, failure analysis,
  * and error categorization to help identify parsing issues.
@@ -19,6 +19,30 @@
 const fs = require('fs');
 const path = require('path');
 const { parseExpression, parseProgram, lex, reconstructProgramFromAST, reconstructFromAST, TokenStream } = require('../dist');
+
+/**
+ * Recursively find all .parseset files in a directory
+ * @param {string} dir - Directory to search
+ * @returns {string[]} - Array of .parseset file paths
+ */
+function findParsesetFiles(dir) {
+  const parsesetFiles = [];
+  const entries = fs.readdirSync(dir);
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry);
+    const stat = fs.statSync(fullPath);
+
+    if (stat.isDirectory()) {
+      // Recursively search subdirectories
+      parsesetFiles.push(...findParsesetFiles(fullPath));
+    } else if (entry.endsWith('.parseset')) {
+      parsesetFiles.push(fullPath);
+    }
+  }
+
+  return parsesetFiles;
+}
 
 /**
  * Main test runner function that processes multiple .parseset files or directories
@@ -46,9 +70,7 @@ function runTests(filePaths, options = {}) {
   filePaths.forEach(filePath => {
     if (fs.statSync(filePath).isDirectory()) {
       // If directory, find all .parseset files recursively
-      const parsesetFiles = fs.readdirSync(filePath)
-        .filter(f => f.endsWith('.parseset'))
-        .map(f => path.join(filePath, f));
+      const parsesetFiles = findParsesetFiles(filePath);
 
       parsesetFiles.forEach(file => {
         const result = runParsesetFile(file, options);
@@ -267,7 +289,7 @@ function runParsesetFile(filePath, options = {}) {
         }
       }
       continue;
-    } else if (line.startsWith('#! Error TopLevel')) {
+    } else if (line.match(/^#!\s+Error\s+Program/i)) {
       // Process previous test if we have accumulated test lines
       if (currentTestLines.length > 0) {
         const result = runSingleTest(currentTestLines.join('\n'), expectError, expectTopLevel, currentLineStart, path.basename(filePath), options, currentTestNumber);
@@ -303,7 +325,7 @@ function runParsesetFile(filePath, options = {}) {
         }
       }
       continue;
-    } else if (line.startsWith('#! Valid TopLevel')) {
+    } else if (line.match(/^#!\s+Valid\s+Program/i)) {
       // Process previous test if we have accumulated test lines
       if (currentTestLines.length > 0) {
         const result = runSingleTest(currentTestLines.join('\n'), expectError, expectTopLevel, currentLineStart, path.basename(filePath), options, currentTestNumber);

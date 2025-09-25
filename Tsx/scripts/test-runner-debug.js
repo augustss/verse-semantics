@@ -9,8 +9,8 @@
  *
  * - #! Valid expression     - Should parse as a valid expression
  * - #! Error expression     - Should fail when parsed as an expression
- * - #! Valid TopLevel       - Should parse as a valid top-level declaration
- * - #! Error TopLevel       - Should fail when parsed as a top-level declaration
+ * - #! Valid Program        - Should parse as a valid top-level declaration
+ * - #! Error Program        - Should fail when parsed as a top-level declaration
  *
  * The script provides detailed reporting including pass rates, failure analysis,
  * and error categorization to help identify parsing issues.
@@ -262,7 +262,7 @@ function runParsesetFile(filePath, options = {}) {
         }
       }
       continue;
-    } else if (line.startsWith('#! Error TopLevel')) {
+    } else if (line.match(/^#!\s+Error\s+Program/i)) {
       // Process previous test if we have accumulated test lines
       if (currentTestLines.length > 0) {
         const result = runSingleTest(currentTestLines.join('\n'), expectError, expectTopLevel, currentLineStart, path.basename(filePath), options, currentTestNumber);
@@ -298,7 +298,7 @@ function runParsesetFile(filePath, options = {}) {
         }
       }
       continue;
-    } else if (line.startsWith('#! Valid TopLevel')) {
+    } else if (line.match(/^#!\s+Valid\s+Program/i)) {
       // Process previous test if we have accumulated test lines
       if (currentTestLines.length > 0) {
         const result = runSingleTest(currentTestLines.join('\n'), expectError, expectTopLevel, currentLineStart, path.basename(filePath), options, currentTestNumber);

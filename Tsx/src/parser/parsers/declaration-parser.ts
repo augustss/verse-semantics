@@ -35,7 +35,7 @@
  *    - Access: <public>, <private>, <protected>
  *    - Behavior: <override>, <abstract>, <final>
  *    - Effects: <suspends>, <transacts>, <decides>
- *    - Scoped: <scoped(path)>
+ *    - Scoped: <scoped{path}>
  *    - Custom: <editable>, <replicated>
  *
  * KEY DESIGN DECISIONS:
@@ -58,6 +58,16 @@ import * as AST from '../ast';
  * various syntactic forms.
  */
 export class DeclarationParser {
+  // Visibility specifiers that can appear after function name (only one allowed)
+  private static readonly VISIBILITY_SPECIFIERS = new Set([
+    'public',
+    'protected',
+    'private',
+    'internal',
+    'scoped',
+    'constructor'
+  ]);
+
   private parseExpression: (state: ParserState) => ParseResult<AST.Expression>;
   private parseIdentedCompound: (state: ParserState) => ParseResult<AST.IdentedCompoundExpression>;
 
@@ -106,6 +116,7 @@ export class DeclarationParser {
       }
       return result;
     }
+
 
     // Handle declarations starting with specifier (e.g., <decides> MyFunction())
     if (token.type === TokenType.SPECIFIER) {
@@ -182,12 +193,16 @@ export class DeclarationParser {
         }
         return result;
       } else if (lookahead === 'datastructure') {
-        const result = this.parseDataStructureDeclaration(state);
-        if (decorators.length > 0) {
-          (result.node as any).decorators = decorators;
-          (result.node as any).decoratorOffsets = decoratorOffsets;
+        try {
+          const result = this.parseDataStructureDeclaration(state);
+          if (decorators.length > 0) {
+            (result.node as any).decorators = decorators;
+            (result.node as any).decoratorOffsets = decoratorOffsets;
+          }
+          return result;
+        } catch (err: any) {
+          throw err;
         }
-        return result;
       } else {
         const result = this.parseConstantDeclaration(state);
         if (decorators.length > 0) {
@@ -324,18 +339,58 @@ export class DeclarationParser {
       // Type inference with initializer
       state = state.advance();
 
-      const initResult = this.parseExpression(state);
+      // Try parsing as type first only for patterns that look like type aliases
+      // (e.g., starts with [], contains type keywords, etc.)
+      // Otherwise, parse as expression first to avoid object constructor conflicts
+      let initResult: ParseResult<AST.Expression> | undefined;
+      let typeAliasResult: ParseResult<AST.TypeExpression> | undefined;
+      const stateBeforeParsing = state;
 
-      const node: AST.ConstantDeclaration = {
-        type: 'ConstantDeclaration',
-        name,
-        nameOffset,
-        specifiers,
-        assignOffset: colonOffset,
-        initializer: initResult.node
-      };
+      if (this.looksLikeTypeAlias(state)) {
+        try {
+          typeAliasResult = this.parseType(state);
+        } catch {
+          // Type parsing failed, try expression parsing
+          initResult = this.parseExpression(stateBeforeParsing);
+        }
+      } else {
+        // Parse as expression first for most cases
+        try {
+          initResult = this.parseExpression(state);
+        } catch {
+          // Expression parsing failed, try type parsing as fallback
+          typeAliasResult = this.parseType(stateBeforeParsing);
+        }
+      }
 
-      return { node, state: initResult.state };
+      let finalState: ParserState;
+      let node: AST.ConstantDeclaration;
+
+      if (typeAliasResult) {
+        // This is a type alias (like "numbers := []float")
+        node = {
+          type: 'ConstantDeclaration',
+          name,
+          nameOffset,
+          specifiers,
+          assignOffset: colonOffset,
+          declaredType: typeAliasResult.node
+        };
+        finalState = typeAliasResult.state;
+      } else {
+        // This is a regular constant with an expression initializer
+        node = {
+          type: 'ConstantDeclaration',
+          name,
+          nameOffset,
+          specifiers,
+          assignOffset: colonOffset,
+          initializer: initResult!.node
+        };
+        finalState = initResult!.state;
+      }
+
+      return { node, state: finalState };
     } else if (colonToken && colonToken.type === TokenType.OPERATOR && colonToken.content === ':') {
       // Explicit type
       state = state.advance();
@@ -458,6 +513,26 @@ export class DeclarationParser {
   private parseFunctionDeclarationWithSpecifiers(state: ParserState, preSpecifiers: AST.SpecifierList): ParseResult<AST.FunctionDeclaration> {
     state = state.skipTrivia();
 
+    // Separate visibility specifiers from other specifiers for logical AST
+    const allSpecifiers = preSpecifiers.specifiers;
+    const visibilitySpecs = allSpecifiers.filter(s => DeclarationParser.VISIBILITY_SPECIFIERS.has(s));
+
+    let visibilitySpecifier: AST.SpecifierList | undefined;
+    if (visibilitySpecs.length > 0) {
+      // Create a new SpecifierList with only visibility specifiers
+      const visibilityOffsets = preSpecifiers.specifierOffsets.filter((_, i) =>
+        DeclarationParser.VISIBILITY_SPECIFIERS.has(allSpecifiers[i]));
+
+      visibilitySpecifier = {
+        type: 'SpecifierList',
+        specifiers: visibilitySpecs,
+        specifierOffsets: visibilityOffsets,
+        openAngleOffset: preSpecifiers.openAngleOffset,
+        closeAngleOffset: preSpecifiers.closeAngleOffset,
+        separatorOffsets: preSpecifiers.separatorOffsets
+      };
+    }
+
     // Parse name
     const nameOffset = state.currentOffset();
     const nameToken = state.current();
@@ -532,8 +607,49 @@ export class DeclarationParser {
       throw new ParseError('Expected := or = after function signature', state.position, state.current() || undefined);
     }
 
-    // Parse function body
-    const bodyResult = this.parseExpression(state);
+    // Check if this is a constructor function
+    let isConstructor = false;
+    if (visibilitySpecifier) {
+      isConstructor = visibilitySpecifier.specifiers.includes('constructor');
+    }
+    if (postSpecifiers && !isConstructor) {
+      isConstructor = postSpecifiers.specifiers.includes('constructor');
+    }
+
+    // Parse body (different logic for constructors vs regular functions)
+    state = state.skipTrivia();
+    let body: AST.Expression;
+    let constructedType: string | undefined;
+    let constructedTypeOffset: number | undefined;
+
+    if (isConstructor) {
+      // For constructors: parse class name followed by : and constructor body
+      const classNameToken = state.current();
+      if (!classNameToken || classNameToken.type !== TokenType.IDENTIFIER) {
+        throw new ParseError('Expected class name after := in constructor', state.position, classNameToken || undefined);
+      }
+
+      constructedType = classNameToken.content;
+      constructedTypeOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Expect : after class name
+      const colonToken = state.current();
+      if (!colonToken || colonToken.type !== TokenType.OPERATOR || colonToken.content !== ':') {
+        throw new ParseError('Expected : after class name in constructor', state.position, colonToken || undefined);
+      }
+      state = state.advance().skipTrivia();
+
+      // Parse constructor body
+      const bodyResult = this.parseExpression(state);
+      body = bodyResult.node;
+      state = bodyResult.state;
+    } else {
+      // Regular function: parse body as expression
+      const bodyResult = this.parseExpression(state);
+      body = bodyResult.node;
+      state = bodyResult.state;
+    }
 
     const node: AST.FunctionDeclaration = {
       type: 'FunctionDeclaration',
@@ -543,16 +659,19 @@ export class DeclarationParser {
       openParenOffset,
       closeParenOffset,
       paramSeparatorOffsets: separatorOffsets,
-      preSpecifiers,
+      visibilitySpecifier, // separated visibility specifiers
       postSpecifiers,
       returnType,
       returnColonOffset,
       assignOffset,
       equalsOffset,
-      body: bodyResult.node
+      body,
+      isConstructor: isConstructor || undefined,
+      constructedType,
+      constructedTypeOffset
     };
 
-    return { node, state: bodyResult.state };
+    return { node, state };
   }
 
   /**
@@ -645,12 +764,31 @@ export class DeclarationParser {
     const name = nameToken.content;
     state = state.advance();
 
-    // Parse optional pre-specifiers
-    let preSpecifiers: AST.SpecifierList | undefined;
-    const preSpecResult = this.parseSpecifiers(state);
-    if (preSpecResult) {
-      preSpecifiers = preSpecResult.node;
-      state = preSpecResult.state;
+    // Parse optional visibility specifier (separate visibility from other specifiers)
+    let visibilitySpecifier: AST.SpecifierList | undefined;
+    const visSpecResult = this.parseSpecifiers(state);
+    if (visSpecResult) {
+      // Separate visibility specifiers from other specifiers for logical AST
+      const allSpecifiers = visSpecResult.node.specifiers;
+      const visibilitySpecs = allSpecifiers.filter(s => DeclarationParser.VISIBILITY_SPECIFIERS.has(s));
+
+      // If we have visibility specifiers, create a separate node for them
+      if (visibilitySpecs.length > 0) {
+        // Create a new SpecifierList with only visibility specifiers
+        const visibilityOffsets = visSpecResult.node.specifierOffsets.filter((_, i) =>
+          DeclarationParser.VISIBILITY_SPECIFIERS.has(allSpecifiers[i]));
+
+        visibilitySpecifier = {
+          type: 'SpecifierList',
+          specifiers: visibilitySpecs,
+          specifierOffsets: visibilityOffsets,
+          openAngleOffset: visSpecResult.node.openAngleOffset,
+          closeAngleOffset: visSpecResult.node.closeAngleOffset,
+          separatorOffsets: visSpecResult.node.separatorOffsets
+        };
+      }
+
+      state = visSpecResult.state;
     }
 
     state = state.skipTrivia();
@@ -702,6 +840,15 @@ export class DeclarationParser {
       }
     }
 
+    // Check if this is a constructor function
+    let isConstructor = false;
+    if (visibilitySpecifier) {
+      isConstructor = visibilitySpecifier.specifiers.includes('constructor');
+    }
+    if (postSpecifiers && !isConstructor) {
+      isConstructor = postSpecifiers.specifiers.includes('constructor');
+    }
+
     // Parse := or =
     let assignOffset: number | undefined;
     let equalsOffset: number | undefined;
@@ -719,7 +866,7 @@ export class DeclarationParser {
         type: 'FunctionDeclaration',
         name,
         nameOffset,
-        preSpecifiers,
+        visibilitySpecifier,
         parameters,
         openParenOffset,
         closeParenOffset,
@@ -736,29 +883,54 @@ export class DeclarationParser {
       throw new ParseError('Expected := or = for function body', state.position, assignToken || undefined);
     }
 
-    // Parse body
-    // Check if next token is a block-forming keyword for indented compound
+    // Parse body (different logic for constructors vs regular functions)
     state = state.skipTrivia();
     let body: AST.Expression;
+    let constructedType: string | undefined;
+    let constructedTypeOffset: number | undefined;
 
-    // Check for indented compound by looking for colon and indentation
-    const nextToken = state.current();
-    if (nextToken && nextToken.type === TokenType.BLOCK_FORMING_KEYWORD) {
-      const compoundResult = this.parseIdentedCompound(state);
-      body = compoundResult.node;
-      state = compoundResult.state;
-    } else {
-      // Regular expression body
+    if (isConstructor) {
+      // For constructors: parse class name followed by : and constructor body
+      const classNameToken = state.current();
+      if (!classNameToken || classNameToken.type !== TokenType.IDENTIFIER) {
+        throw new ParseError('Expected class name after := in constructor', state.position, classNameToken || undefined);
+      }
+
+      constructedType = classNameToken.content;
+      constructedTypeOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Expect : after class name
+      const colonToken = state.current();
+      if (!colonToken || colonToken.type !== TokenType.OPERATOR || colonToken.content !== ':') {
+        throw new ParseError('Expected : after class name in constructor', state.position, colonToken || undefined);
+      }
+      state = state.advance().skipTrivia();
+
+      // Parse constructor body (can be compound expression with field initialization)
       const bodyResult = this.parseExpression(state);
       body = bodyResult.node;
       state = bodyResult.state;
+    } else {
+      // Regular function: parse body as normal
+      const nextToken = state.current();
+      if (nextToken && nextToken.type === TokenType.BLOCK_FORMING_KEYWORD) {
+        const compoundResult = this.parseIdentedCompound(state);
+        body = compoundResult.node;
+        state = compoundResult.state;
+      } else {
+        // Regular expression body
+        const bodyResult = this.parseExpression(state);
+        body = bodyResult.node;
+        state = bodyResult.state;
+      }
     }
 
     const node: AST.FunctionDeclaration = {
       type: 'FunctionDeclaration',
       name,
       nameOffset,
-      preSpecifiers,
+      visibilitySpecifier,
       parameters,
       openParenOffset,
       closeParenOffset,
@@ -768,7 +940,10 @@ export class DeclarationParser {
       returnColonOffset,
       assignOffset,
       equalsOffset,
-      body
+      body,
+      isConstructor: isConstructor || undefined,
+      constructedType,
+      constructedTypeOffset
     };
 
     return { node, state };
@@ -917,6 +1092,10 @@ export class DeclarationParser {
    *   - Combined: ?[]int, ?[][]string
    */
   private parseType(state: ParserState): ParseResult<AST.TypeExpression> {
+    return this.parseTypeWithModifiers(state);
+  }
+
+  private parseTypeWithModifiers(state: ParserState): ParseResult<AST.TypeExpression> {
     state = state.skipTrivia();
 
     // Check for optional modifier (?)
@@ -928,20 +1107,131 @@ export class DeclarationParser {
       state = state.advance().skipTrivia();
     }
 
-    // Check for array modifiers ([])
+    // Parse the base type (which might be a map or array type)
+    const baseTypeResult = this.parseBaseType(state);
+    let baseType = baseTypeResult.node;
+    state = baseTypeResult.state;
+
+    // Apply optional modifier if present
+    if (isOptional) {
+      baseType = {
+        ...baseType,
+        isOptional,
+        optionalOffset
+      };
+    }
+
+    return { node: baseType, state };
+  }
+
+  private parseBaseType(state: ParserState): ParseResult<AST.TypeExpression> {
+    state = state.skipTrivia();
+
+    // Check for array modifiers ([]) or map types ([keytype])
     let arrayDimensions = 0;
     const arrayOffsets: number[] = [];
-    while (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '[') {
-      const openBracketOffset = state.currentOffset();
-      arrayOffsets.push(openBracketOffset);
-      state = state.advance().skipTrivia();
+    let mapKeyType: AST.TypeExpression | undefined;
+    const mapBracketOffsets: number[] = [];
 
-      // Expect closing ]
-      if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== ']') {
-        throw new ParseError('Expected ] after [', state.position, state.current() || undefined);
+    // Look ahead to distinguish between array [] and map [keytype]
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '[') {
+      const openBracketOffset = state.currentOffset();
+      let lookaheadState = state.advance().skipTrivia();
+
+      // Check if it's an empty bracket (array type) or has content (map type)
+      if (lookaheadState.current()?.type === TokenType.OPERATOR && lookaheadState.current()?.content === ']') {
+        // This is an array type: []
+        arrayOffsets.push(openBracketOffset);
+        state = lookaheadState.advance().skipTrivia();
+        arrayDimensions++;
+
+        // Continue checking for more array dimensions (but stop if we encounter a map type)
+        while (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '[') {
+          // Look ahead to see if this is another array dimension [] or a map type [keytype]
+          const tempOpenOffset = state.currentOffset();
+          let tempState = state.advance().skipTrivia();
+
+          if (tempState.current()?.type === TokenType.OPERATOR && tempState.current()?.content === ']') {
+            // This is another array dimension
+            arrayOffsets.push(tempOpenOffset);
+            state = tempState.advance().skipTrivia();
+            arrayDimensions++;
+          } else {
+            // This is a map type, break out of the array dimension loop
+            break;
+          }
+        }
+
+        // After parsing array dimensions, check if there's a map type
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '[') {
+          const mapOpenBracketOffset = state.currentOffset();
+          let mapLookaheadState = state.advance().skipTrivia();
+
+          // Check if this is a map type (not an empty array dimension)
+          if (!(mapLookaheadState.current()?.type === TokenType.OPERATOR && mapLookaheadState.current()?.content === ']')) {
+            // This is a map type: [keytype]
+            mapBracketOffsets.push(mapOpenBracketOffset);
+            state = mapLookaheadState;
+
+            // Parse the key type
+            const keyTypeResult = this.parseTypeWithModifiers(state);
+            mapKeyType = keyTypeResult.node;
+            state = keyTypeResult.state.skipTrivia();
+
+            // Expect closing ]
+            const mapCloseBracketOffset = state.currentOffset();
+            if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== ']') {
+              throw new ParseError('Expected ] after map key type', state.position, state.current() || undefined);
+            }
+            mapBracketOffsets.push(mapCloseBracketOffset);
+            state = state.advance().skipTrivia();
+          }
+        }
+      } else {
+        // This is a map type: [keytype]
+        mapBracketOffsets.push(openBracketOffset);
+        state = lookaheadState;
+
+        // Parse the key type
+        const keyTypeResult = this.parseTypeWithModifiers(state);
+        mapKeyType = keyTypeResult.node;
+        state = keyTypeResult.state.skipTrivia();
+
+        // Expect closing ]
+        const closeBracketOffset = state.currentOffset();
+        if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== ']') {
+          throw new ParseError('Expected ] after map key type', state.position, state.current() || undefined);
+        }
+        mapBracketOffsets.push(closeBracketOffset);
+        state = state.advance().skipTrivia();
       }
-      state = state.advance().skipTrivia();
-      arrayDimensions++;
+    }
+
+    // For map types, we need to parse the value type recursively
+    if (mapKeyType) {
+      // Parse the value type (which could itself be a complex type with optional, arrays, etc.)
+      const valueTypeResult = this.parseTypeWithModifiers(state);
+      const valueType = valueTypeResult.node;
+      state = valueTypeResult.state;
+
+      // Create map type node by combining the map key with the value type
+      // If we also have array dimensions, they apply to the whole map type
+      const node: AST.TypeExpression = {
+        type: 'TypeExpression',
+        typeName: valueType.typeName,
+        typeNameOffset: valueType.typeNameOffset,
+        mapKeyType,
+        mapBracketOffsets,
+        ...(arrayDimensions > 0 && { arrayDimensions, arrayOffsets }),
+        ...(valueType.isOptional && { isOptional: valueType.isOptional, optionalOffset: valueType.optionalOffset }),
+        ...(valueType.arrayDimensions && {
+          arrayDimensions: (arrayDimensions || 0) + valueType.arrayDimensions,
+          arrayOffsets: [...(arrayOffsets || []), ...(valueType.arrayOffsets || [])]
+        }),
+        ...(valueType.typeParameters && { typeParameters: valueType.typeParameters, typeParameterOffsets: valueType.typeParameterOffsets })
+      };
+
+      return { node, state };
     }
 
     // Parse the base type name
@@ -953,16 +1243,151 @@ export class DeclarationParser {
       throw new ParseError('Expected type name', state.position, typeToken || undefined);
     }
 
+    const typeName = typeToken.content;
+    state = state.advance().skipTrivia();
+
+    // Check for type{expression} construct
+    let typeExpression: AST.Expression | undefined;
+    let typeExpressionOffsets: number[] | undefined;
+
+    if (typeName === 'type' && state.current()?.type === TokenType.OPERATOR && state.current()?.content === '{') {
+      const openBraceOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Parse the function type expression inside type{...}
+      // This could be a function signature like "_(:int)<transacts><decides> : void"
+      const exprResult = this.parseFunctionTypeExpression(state);
+      typeExpression = exprResult.node;
+      state = exprResult.state.skipTrivia();
+
+      // Expect closing }
+      const closeBraceOffset = state.currentOffset();
+      if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== '}') {
+        throw new ParseError('Expected } after type expression', state.position, state.current() || undefined);
+      }
+      typeExpressionOffsets = [openBraceOffset, closeBraceOffset];
+      state = state.advance().skipTrivia();
+    }
+
+    // Check for type parameters (e.g., weak_map(session, int) or option<int>)
+    let typeParameters: AST.TypeExpression[] | undefined;
+    let typeParameterOffsets: number[] | undefined;
+
+    // Handle parenthesized type parameters like weak_map(session, int)
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '(') {
+      state = state.advance().skipTrivia();
+      typeParameters = [];
+      typeParameterOffsets = [];
+
+      while (state.current() && !(state.current()!.type === TokenType.OPERATOR && state.current()!.content === ')')) {
+        // Parse each type parameter
+        const paramResult = this.parseTypeWithModifiers(state);
+        typeParameters.push(paramResult.node);
+        state = paramResult.state.skipTrivia();
+
+        // Check for comma separator
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ',') {
+          typeParameterOffsets.push(state.currentOffset());
+          state = state.advance().skipTrivia();
+        }
+      }
+
+      // Expect closing )
+      if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== ')') {
+        throw new ParseError('Expected ) after type parameters', state.position, state.current() || undefined);
+      }
+      state = state.advance();
+    }
+    // Handle angle bracket type parameters like option<int>
+    else if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '<') {
+      state = state.advance().skipTrivia();
+      typeParameters = [];
+      typeParameterOffsets = [];
+
+      while (state.current() && !(state.current()!.type === TokenType.OPERATOR && state.current()!.content === '>')) {
+        // Parse each type parameter
+        const paramResult = this.parseTypeWithModifiers(state);
+        typeParameters.push(paramResult.node);
+        state = paramResult.state.skipTrivia();
+
+        // Check for comma separator
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ',') {
+          typeParameterOffsets.push(state.currentOffset());
+          state = state.advance().skipTrivia();
+        }
+      }
+
+      // Expect closing >
+      if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== '>') {
+        throw new ParseError('Expected > after type parameters', state.position, state.current() || undefined);
+      }
+      state = state.advance();
+    }
+
+    // Parse optional where clause (e.g., "T where T:type")
+    let whereConstraint: AST.WhereConstraint | undefined;
+    let whereOffset: number | undefined;
+
+    state = state.skipTrivia();
+    if (state.current()?.type === TokenType.IDENTIFIER && state.current()?.content === 'where') {
+      whereOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Parse constraint: parameter:constraint_type
+      const parameterOffset = state.currentOffset();
+      const parameterToken = state.current();
+      if (!parameterToken || parameterToken.type !== TokenType.IDENTIFIER) {
+        throw new ParseError('Expected type parameter after where', state.position, parameterToken || undefined);
+      }
+      const parameter = parameterToken.content;
+      state = state.advance().skipTrivia();
+
+      // Expect colon
+      const colonOffset = state.currentOffset();
+      const colonToken = state.current();
+      if (!colonToken || colonToken.type !== TokenType.OPERATOR || colonToken.content !== ':') {
+        throw new ParseError('Expected : after type parameter in where clause', state.position, colonToken || undefined);
+      }
+      state = state.advance().skipTrivia();
+
+      // Parse constraint type
+      const constraintOffset = state.currentOffset();
+      const constraintToken = state.current();
+      if (!constraintToken || constraintToken.type !== TokenType.IDENTIFIER) {
+        throw new ParseError('Expected constraint type after :', state.position, constraintToken || undefined);
+      }
+      const constraint = constraintToken.content;
+      state = state.advance().skipTrivia();
+
+      whereConstraint = {
+        type: 'WhereConstraint',
+        parameter,
+        parameterOffset,
+        constraint,
+        constraintOffset,
+        colonOffset
+      };
+    }
+
     const node: AST.TypeExpression = {
       type: 'TypeExpression',
-      typeName: typeToken.content,
+      typeName,
       typeNameOffset,
-      ...(isOptional && { isOptional, optionalOffset }),
-      ...(arrayDimensions > 0 && { arrayDimensions, arrayOffsets })
+      ...(arrayDimensions > 0 && { arrayDimensions, arrayOffsets }),
+      ...(typeParameters && typeParameters.length > 0 && { typeParameters, typeParameterOffsets }),
+      ...(typeExpression && { typeExpression, typeExpressionOffsets }),
+      ...(whereConstraint && { whereConstraint, whereOffset })
     };
 
-    return { node, state: state.advance() };
+    return { node, state };
   }
+
+  /**
+   * Parse a direct data structure declaration (class Name: or class Name { }).
+   *
+   * Grammar:
+   *   direct_ds_decl = (struct|class|interface|module|enum) name generics? (superclass)? (":" indented_body | "{" body "}")
+   */
 
   /**
    * Parse a data structure declaration.
@@ -1178,11 +1603,14 @@ export class DeclarationParser {
       // Skip trailing trivia
       state = state.skipTrivia();
 
-      // Check for separator (newline or semicolon)
+      // Check for separator (newline, semicolon, or comma)
       if (state.current()?.type === TokenType.NEWLINE) {
         separatorOffsets.push(state.currentOffset());
         state = state.advance();
       } else if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ';') {
+        separatorOffsets.push(state.currentOffset());
+        state = state.advance();
+      } else if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ',') {
         separatorOffsets.push(state.currentOffset());
         state = state.advance();
       }
@@ -1202,6 +1630,19 @@ export class DeclarationParser {
     const declarations: AST.Declaration[] = [];
     const separatorOffsets: number[] = [];
 
+
+    // Skip initial newline to get to first declaration line
+    if (state.current()?.type === TokenType.NEWLINE) {
+      state = state.advance();
+    }
+
+    // Skip trivia (spaces/tabs) which acts as indentation
+    while (state.current()?.type === TokenType.TRIVIA ||
+           state.current()?.type === TokenType.SPACE ||
+           state.current()?.type === TokenType.TAB) {
+      state = state.advance();
+    }
+
     while (!state.isAtEnd()) {
       // Check if still indented
       const currentToken = state.current();
@@ -1217,12 +1658,30 @@ export class DeclarationParser {
       // Skip trailing trivia
       state = state.skipTrivia();
 
+      // Check for comma separator (multiple declarations on same line)
+      if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ',') {
+        separatorOffsets.push(state.currentOffset());
+        state = state.advance().skipTrivia();
+        // Continue parsing next declaration on same line
+        continue;
+      }
+
       // Check for newline separator
       if (state.current()?.type === TokenType.NEWLINE) {
         separatorOffsets.push(state.currentOffset());
-        state = state.advance().skipTrivia();
+        state = state.advance();
+
+        // Skip additional newlines and whitespace (blank lines)
+        while (state.current()?.type === TokenType.NEWLINE ||
+               state.current()?.type === TokenType.SPACE ||
+               state.current()?.type === TokenType.TAB ||
+               state.current()?.type === TokenType.TRIVIA ||
+               state.current()?.type === TokenType.COMMENT ||
+               state.current()?.type === TokenType.MULTILINE_COMMENT) {
+          state = state.advance();
+        }
       } else {
-        // No newline, we're done
+        // No separator, we're done
         break;
       }
     }
@@ -1434,5 +1893,256 @@ export class DeclarationParser {
     };
 
     return { node, state };
+  }
+
+  /**
+   * Parse function type expressions inside type{} constructs.
+   *
+   * Function type expressions have the syntax:
+   *   _(...params) <specifiers> : returnType
+   *
+   * For example:
+   *   _(:int)<transacts><decides> : void
+   *   _() : string
+   *   __(:t, :t)<computes><decides>:void
+   */
+  private parseFunctionTypeExpression(state: ParserState): ParseResult<AST.Expression> {
+    state = state.skipTrivia();
+
+    // Check if this looks like a function type signature (starts with _ or __)
+    const firstToken = state.current();
+    if (firstToken && firstToken.type === TokenType.IDENTIFIER &&
+        (firstToken.content === '_' || firstToken.content === '__')) {
+
+      try {
+        return this.parseFunctionTypeSignature(state);
+      } catch (error) {
+        // Fall back to regular expression parsing
+        const resetState = state;
+        try {
+          return this.parseExpression(resetState);
+        } catch {
+          // Create a placeholder if both approaches fail
+          return this.createFunctionTypePlaceholder(state);
+        }
+      }
+    }
+
+    // Try parsing as a regular expression first for non-function patterns
+    try {
+      return this.parseExpression(state);
+    } catch (error) {
+      return this.createFunctionTypePlaceholder(state);
+    }
+  }
+
+  /**
+   * Parse a function type signature like _(:int, :string)<decides> : void
+   */
+  private parseFunctionTypeSignature(state: ParserState): ParseResult<AST.Expression> {
+    state = state.skipTrivia();
+
+    // Parse function name (_ or __)
+    const nameOffset = state.currentOffset();
+    const nameToken = state.current();
+    if (!nameToken || nameToken.type !== TokenType.IDENTIFIER ||
+        (nameToken.content !== '_' && nameToken.content !== '__')) {
+      throw new ParseError('Expected _ or __ for function type', state.position, nameToken || undefined);
+    }
+    const functionName = nameToken.content;
+    state = state.advance().skipTrivia();
+
+    // Parse parameter list
+    let parameters: AST.Parameter[] = [];
+    let openParenOffset: number | undefined;
+    let closeParenOffset: number | undefined;
+    let paramSeparatorOffsets: number[] = [];
+
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '(') {
+      openParenOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Parse parameters
+      while (state.current() &&
+             !(state.current()!.type === TokenType.OPERATOR && state.current()!.content === ')')) {
+
+        // Parse parameter - expecting :type format
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+          const colonOffset = state.currentOffset();
+          state = state.advance().skipTrivia();
+
+          // Parse parameter type
+          const paramTypeResult = this.parseType(state);
+
+          // Create parameter with anonymous name
+          const param: AST.Parameter = {
+            type: 'Parameter',
+            name: '_', // Anonymous parameter
+            nameOffset: colonOffset,
+            paramType: paramTypeResult.node,
+            colonOffset
+          };
+
+          parameters.push(param);
+          state = paramTypeResult.state.skipTrivia();
+        } else {
+          // Handle regular parameter names if present
+          const paramNameToken = state.current();
+          if (paramNameToken && paramNameToken.type === TokenType.IDENTIFIER) {
+            const paramNameOffset = state.currentOffset();
+            state = state.advance().skipTrivia();
+
+            let colonOffset: number | undefined;
+            let paramType: AST.TypeExpression | undefined;
+
+            if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+              colonOffset = state.currentOffset();
+              state = state.advance().skipTrivia();
+
+              const paramTypeResult = this.parseType(state);
+              paramType = paramTypeResult.node;
+              state = paramTypeResult.state.skipTrivia();
+            }
+
+            const param: AST.Parameter = {
+              type: 'Parameter',
+              name: paramNameToken.content,
+              nameOffset: paramNameOffset,
+              paramType,
+              colonOffset
+            };
+
+            parameters.push(param);
+          } else {
+            throw new ParseError('Expected parameter name or :type', state.position, paramNameToken || undefined);
+          }
+        }
+
+        // Check for comma separator
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ',') {
+          paramSeparatorOffsets.push(state.currentOffset());
+          state = state.advance().skipTrivia();
+        } else {
+          break;
+        }
+      }
+
+      // Expect closing )
+      if (!state.current() || state.current()!.type !== TokenType.OPERATOR || state.current()!.content !== ')') {
+        throw new ParseError('Expected ) after parameters', state.position, state.current() || undefined);
+      }
+      closeParenOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+    }
+
+    // Parse specifiers (effects like <decides>, <transacts>, etc.)
+    let postSpecifiers: AST.SpecifierList | undefined;
+    if (state.current()?.type === TokenType.SPECIFIER) {
+      const specifiersResult = this.parseSpecifierList(state);
+      postSpecifiers = specifiersResult.node;
+      state = specifiersResult.state.skipTrivia();
+    }
+
+    // Parse return type
+    let returnType: AST.TypeExpression | undefined;
+    let returnColonOffset: number | undefined;
+
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+      returnColonOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      const returnTypeResult = this.parseType(state);
+      returnType = returnTypeResult.node;
+      state = returnTypeResult.state;
+    }
+
+    // Create a function declaration node to represent the function type
+    const functionTypeNode: AST.FunctionDeclaration = {
+      type: 'FunctionDeclaration',
+      name: functionName,
+      nameOffset,
+      parameters,
+      openParenOffset: openParenOffset ?? nameOffset, // Use nameOffset as fallback
+      closeParenOffset: closeParenOffset ?? nameOffset, // Use nameOffset as fallback
+      paramSeparatorOffsets,
+      ...(postSpecifiers && { postSpecifiers }),
+      ...(returnType && { returnType }),
+      ...(returnColonOffset !== undefined && { returnColonOffset }),
+      body: undefined as any, // Function types don't have bodies
+      assignOffset: undefined,
+      equalsOffset: undefined
+    };
+
+    return { node: functionTypeNode as any, state };
+  }
+
+  /**
+   * Create a placeholder for unparseable function types
+   */
+  private createFunctionTypePlaceholder(state: ParserState): ParseResult<AST.Expression> {
+    const placeholderExpr: AST.Expression = {
+      type: 'Identifier',
+      name: 'UnparsedFunctionType',
+      nameOffset: state.currentOffset()
+    } as any;
+
+    // Consume tokens until we find the closing }
+    while (!state.isAtEnd() &&
+           (state.current()?.type !== TokenType.OPERATOR || state.current()?.content !== '}')) {
+      state = state.advance();
+    }
+
+    return { node: placeholderExpr, state };
+  }
+
+  /**
+   * Check if the current state looks like a type alias pattern.
+   *
+   * Type aliases typically start with:
+   * - Array syntax: [], [][], [key]
+   * - Tuple syntax: tuple(...)
+   * - Optional syntax: ?type
+   * - Type keyword: type{...}
+   * - Known type keywords: int, float, string, void, etc.
+   *
+   * This helps avoid parsing object constructors (Point{...}) as types.
+   */
+  private looksLikeTypeAlias(state: ParserState): boolean {
+    state = state.skipTrivia();
+    const token = state.current();
+
+    if (!token) return false;
+
+    // Starts with array syntax []
+    if (token.type === TokenType.OPERATOR && token.content === '[') {
+      return true;
+    }
+
+    // Starts with optional syntax ?
+    if (token.type === TokenType.OPERATOR && token.content === '?') {
+      return true;
+    }
+
+    // Starts with known type keywords
+    if (token.type === TokenType.TYPE_KEYWORD) {
+      return true;
+    }
+
+    // Check for specific type identifiers
+    if (token.type === TokenType.IDENTIFIER) {
+      const typeKeywords = ['tuple', 'type', 'int', 'float', 'string', 'void', 'logic', 'comparable'];
+      if (typeKeywords.includes(token.content)) {
+        return true;
+      }
+
+      // Look ahead to see if it's followed by parentheses (like tuple(...))
+      let lookahead = state.advance().skipTrivia();
+      if (lookahead.current()?.type === TokenType.OPERATOR && lookahead.current()?.content === '(') {
+        return true;
+      }
+    }
+
+    // Default to false - parse as expression first
+    return false;
   }
 }

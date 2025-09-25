@@ -1,5 +1,5 @@
-# Valid Control Flow
-# If expressions, for loops, case expressions, loop expressions
+# Valid Control Flow Test Suite
+# Tests for if expressions, for loops, case expressions, loop expressions, and other control structures
 
 #! Valid expression
 # 1. Allow if expression

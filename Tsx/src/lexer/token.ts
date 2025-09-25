@@ -10,7 +10,7 @@ export enum TokenType {
   DATA_STRUCTURE_KEYWORD = 'DATA_STRUCTURE_KEYWORD',  // module, interface, class, struct, enum
   DECL_KEYWORD = 'DECL_KEYWORD',  // var, set, using
   TYPE_KEYWORD = 'TYPE_KEYWORD',  // int, float, string, logic, char, any, void
-  RESERVED_WORD = 'RESERVED_WORD',  // do, while, break, continue, return, yield, spawn, sync, race
+  RESERVED_WORD = 'RESERVED_WORD',  // do, while, break, return, yield, spawn, sync, race
   COMMENT = 'COMMENT',
   MULTILINE_COMMENT = 'MULTILINE_COMMENT',
   SPACE = 'SPACE',
@@ -34,7 +34,7 @@ export class Token {
   public readonly endPosition: Position;
   public readonly length: number;
   public readonly indentation: number;
-  public readonly scopedContent?: string; // For <scoped(...)> specifiers
+  public readonly scopedContent?: string; // For <scoped{...}> specifiers
   private static tabWidth: number = 4;
 
   constructor(

@@ -1,0 +1,54 @@
+# Error Tests for Map Type Syntax
+# Tests for invalid map type usage
+
+#! Error expression
+# 2. Missing closing bracket
+incompleteMap: [string int = GetMap()
+
+#! Error expression
+# 4. Multiple commas in key type
+multiCommaMap: [string, int, float]User = GetMap()
+
+#! Error expression
+# 5. Invalid nested brackets
+nestedBracketMap: [[string]]int = GetMap()
+
+#! Error expression
+# 6. Missing value type after map key
+noValueMap: [string] = GetMap()
+
+#! Error expression
+# 7. Malformed bracket syntax
+malformedMap: [string}int = GetMap()
+
+#! Error expression
+# 8. Double opening brackets
+doubleOpenMap: [[string]int = GetMap()
+
+#! Error expression
+# 9. Trailing comma in key type
+trailingCommaMap: [string,]int = GetMap()
+
+#! Error expression
+# 10. Mixed bracket types
+mixedBracketsMap: [string)int = GetMap()
+
+#! Error expression
+# 11. Invalid characters in key type
+invalidKeyMap: [string&int]User = GetMap()
+
+#! Error expression
+# 12. Missing opening bracket
+missingOpenMap: string]int = GetMap()
+
+#! Error expression
+# 13. Nested array syntax in key
+arrayKeyMap: [[]]int = GetMap()
+
+#! Error expression
+# 14. Invalid operator in key type
+operatorKeyMap: [string+int]User = GetMap()
+
+#! Error expression
+# 15. Unmatched parentheses in key type
+parenKeyMap: [string(]int = GetMap()

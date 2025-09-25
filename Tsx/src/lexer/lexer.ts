@@ -11,7 +11,7 @@ import * as fs from 'fs';
  * KEY FEATURES:
  *
  * VERSE-SPECIFIC SYNTAX:
- * - Specifiers: <public>, <private>, <scoped(path)>
+ * - Specifiers: <public>, <private>, <scoped{path}>
  * - Combined operators: :=, =>, .., ->, +=, -=, *=, /=
  * - Block comments: <# nested comments supported #>
  * - Decorators: @editable, @replicated
@@ -48,11 +48,12 @@ export class Lexer {
 
   /**
    * Set of allowed specifier keywords in Verse.
-   * These appear in angle brackets like <public>, <private>, <scoped(...)>
+   * These appear in angle brackets like <public>, <private>, <scoped{...}>
    */
   private static readonly ALLOWED_SPECIFIERS = new Set([
     'abstract',
     'computes',
+    'constructor',
     'private',
     'public',
     'protected',
@@ -129,7 +130,12 @@ export class Lexer {
     'logic',
     'char',
     'any',
-    'void'
+    'void',
+    'option',
+    'comparable',
+    'rational',
+    'tuple',
+    'type'
   ]);
 
   /**
@@ -139,12 +145,13 @@ export class Lexer {
     'do',
     'while',
     'break',
-    'continue',
     'return',
     'yield',
     'spawn',
     'sync',
-    'race'
+    'race',
+    'Self',
+    'where'
   ]);
 
   /**
@@ -610,7 +617,7 @@ export class Lexer {
 
   /**
    * Lexes specifier tokens in angle brackets like <public>, <private>.
-   * Special handling for <scoped(...)> which captures content in parentheses.
+   * Special handling for <scoped{...}> which captures content in braces.
    * Only recognizes keywords from ALLOWED_SPECIFIERS set.
    * @returns A SPECIFIER token or null if not at a specifier
    */
@@ -638,33 +645,33 @@ export class Lexer {
       lookahead++;
     }
 
-    // Special handling for <scoped(...)>
-    if (wordContent === 'scoped' && this.peek(lookahead) === '(') {
-      lookahead++; // skip '('
+    // Special handling for <scoped{...}>
+    if (wordContent === 'scoped' && this.peek(lookahead) === '{') {
+      lookahead++; // skip '{'
 
-      let parenContent = '';
-      let parenDepth = 1;
+      let braceContent = '';
+      let braceDepth = 1;
 
-      // Collect everything inside parentheses, handling nested parens
-      while (this.peek(lookahead) && parenDepth > 0) {
+      // Collect everything inside braces, handling nested braces
+      while (this.peek(lookahead) && braceDepth > 0) {
         const char = this.peek(lookahead)!;
-        if (char === '(') {
-          parenDepth++;
-          parenContent += char;
-        } else if (char === ')') {
-          parenDepth--;
-          if (parenDepth > 0) {
-            parenContent += char;
+        if (char === '{') {
+          braceDepth++;
+          braceContent += char;
+        } else if (char === '}') {
+          braceDepth--;
+          if (braceDepth > 0) {
+            braceContent += char;
           }
         } else {
-          parenContent += char;
+          braceContent += char;
         }
         lookahead++;
       }
 
-      // Check if we have closing ) and >
-      if (parenDepth === 0 && this.peek(lookahead) === '>') {
-        scopedContentValue = parenContent;
+      // Check if we have closing } and >
+      if (braceDepth === 0 && this.peek(lookahead) === '>') {
+        scopedContentValue = braceContent;
 
         // Now consume the entire specifier
         let content = '';
@@ -672,11 +679,11 @@ export class Lexer {
         for (let i = 0; i < wordContent.length; i++) {
           content += this.advance(); // consume 'scoped'
         }
-        content += this.advance()!; // consume '('
-        for (let i = 0; i < parenContent.length; i++) {
+        content += this.advance()!; // consume '{'
+        for (let i = 0; i < braceContent.length; i++) {
           content += this.advance(); // consume the content
         }
-        content += this.advance()!; // consume ')'
+        content += this.advance()!; // consume '}'
         content += this.advance()!; // consume '>'
 
         const token = new Token(content, TokenType.SPECIFIER, startPos, this.getCurrentPosition(), startIndent, scopedContentValue);

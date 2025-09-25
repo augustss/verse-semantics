@@ -1,0 +1,62 @@
+# Error Tests for Tuple Syntax
+# Tests for invalid tuple usage and edge cases
+
+#! Error expression
+# 1. Trailing comma in tuple
+(1, 2, 3,)
+
+#! Error expression
+# 2. Empty element in tuple
+(1, , 3)
+
+#! Error expression
+# 3. Missing closing parenthesis
+(1, 2, 3
+
+#! Error expression
+# 4. Missing opening parenthesis
+1, 2, 3)
+
+#! Error expression
+# 5. Double comma in tuple
+(1,, 2)
+
+#! Valid expression
+# 6. Function call with multiple arguments (valid syntax)
+myTuple(0, 1)
+
+#! Valid expression
+# 7. Function call with no arguments (valid syntax)
+myTuple()
+
+#! Error expression
+# 8. Invalid expansion operator placement
+f(*, tuple)
+
+#! Error expression
+# 9. Invalid expansion without operand
+f(*)
+
+#! Error expression
+# 10. Invalid tuple type syntax with missing parentheses
+coords: tuple int, int = (1, 2)
+
+#! Valid expression
+# 11. Tuple type with trailing comma (valid in type syntax)
+position: tuple(float, float,) = (1.0, 2.0)
+
+#! Error expression
+# 12. Invalid nested parentheses in tuple literal
+((1, 2), (3, 4),)
+
+#! Valid expression
+# 13. Empty tuple type (valid syntax)
+data: tuple() = ()
+
+#! Error expression
+# 14. Invalid tuple literal with semicolon
+(1; 2; 3)
+
+#! Valid expression
+# 15. Expansion in assignment context (valid unary expression)
+result := *tuple

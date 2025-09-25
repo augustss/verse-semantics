@@ -1,5 +1,5 @@
-# Valid Declarations
-# Variable declarations, constants, and function declarations
+# Valid Declarations Test Suite
+# Tests for variable declarations, constants, function declarations, and classes with various type annotations and specifiers
 
 #! Valid expression
 # 1. Simple const declaration without type
@@ -50,6 +50,50 @@ var x:int = 5
 var data <mut> : int = 42
 
 #! Valid expression
+# 13. Option type as identifier
+field : option = Some(5)
+
+#! Valid expression
+# 14. Option type in function parameter
+ProcessOption(value: option): void = Print(value)
+
+#! Valid expression
+# 15. Option type variable
+maybe_list : option = None
+
+#! Valid expression
+# 16. Option type with var declaration
+var maybe_value : option = Some(3.14)
+
+#! Valid expression
+# 17. Option type in complex expression
+result : option = if (x > 0) then Some(player) else None
+
+#! Valid expression
+# 18. Parameterized type with parentheses
+var GlobalInt:weak_map(session, int) = map{}
+
+#! Valid expression
+# 19. Type with angle bracket parameters
+field : option<int> = None
+
+#! Valid expression
+# 20. Comparable type usage
+value : comparable = 42
+
+#! Valid expression
+# 21. Rational type usage
+ratio : rational = CreateRatio(3, 4)
+
+#! Valid expression
+# 22. Function with visibility specifier
+Foo<public>(X:int):int = X > 0
+
+#! Valid expression
+# 23. Function with visibility and post specifiers
+Bar<private>(Y:string)<decides>:string = ProcessString(Y)
+
+#! Valid expression
 # 13. Var declaration with underscore in name
 var my_variable : int = 100
 
@@ -91,7 +135,7 @@ var data <export> : Array = f[1, 2, 3]
 
 #! Valid expression
 # 23. Variable with path specifier
-var config <scoped(config.json)> : Config = loadConfig()
+var config <scoped{config.json}> : Config = loadConfig()
 
 #! Valid expression
 # 24. Variable with nested objects

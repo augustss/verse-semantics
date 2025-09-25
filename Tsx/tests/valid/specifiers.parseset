@@ -1,0 +1,62 @@
+# Valid Specifier Separation Tests
+# Tests to verify logical AST separation of visibility vs behavior specifiers
+
+#! Valid expression
+# 1. Visibility specifier separated from behavior specifier
+VisibilityBehavior<public>(x:int)<decides>:int = ProcessValue(x)
+
+#! Valid expression
+# 2. Only visibility specifier after function name
+VisibilityOnly<private>():int = 42
+
+#! Valid expression
+# 3. Visibility specifier followed by separate behavior specifier
+SeparateGroups<public><override>():void = DoWork()
+
+#! Valid expression
+# 4. Behavior specifiers only after parameters
+BehaviorOnly(x:int)<decides>:logic = ValidateAsync(x)
+
+#! Valid expression
+# 5. Multiple separate specifier groups
+MultipleGroups<protected><final>(x:int)<decides>:void = Process(x)
+
+#! Valid expression
+# 6. Internal visibility with behavior specifiers
+InternalFunction<internal>(data:string)<decides>:string = ProcessComplex(data)
+
+#! Valid expression
+# 7. Scoped visibility with parameters
+ScopedFunction<scoped>(x:int, y:string)<decides>:logic = ValidateInputs(x, y)
+
+#! Valid expression
+# 8. Visibility in nested class context
+OuterClass := class { InnerMethod<private>()<final>:void = {} }
+
+#! Valid expression
+# 9. Interface method with visibility
+IProcessor := interface { Process<public>(input:Data):Result }
+
+#! Valid expression
+# 10. Struct method with visibility and behavior
+Point := struct { Distance<public>(other:Point)<inline>:float = CalculateDistance(other) }
+
+#! Valid expression
+# 11. Module function with visibility
+Utils := module { Helper<internal>(x:int, y:string)<decides>:logic = ValidateInputs(x, y) }
+
+#! Valid expression
+# 12. Function with visibility and array parameters
+ArrayProcessor<public>(items:[]int, filters:[]Filter)<decides>:[]int = FilterItems(items, filters)
+
+#! Valid expression
+# 13. Function with visibility and optional parameters
+OptionalProcessor<protected>(required:int, optional:?string)<decides>:?string = ProcessOptionalArray(required, optional)
+
+#! Valid expression
+# 14. Function with visibility and complex return type
+SecurityCheck<scoped>(credentials:Credentials, resource:Resource)<decides>:AccessLevel = ValidateAccess(credentials, resource)
+
+#! Valid expression
+# 15. Performance-critical method with visibility and behavior
+FastPath<public>(data:[]byte)<inline>:int = CountBytes(data)

@@ -1,5 +1,5 @@
-# Valid expression Tests
-# All valid expression tests consolidated
+# Valid Expression Test Suite
+# Comprehensive tests for all valid Verse expressions including operators, functions, objects, and control flow
 
 # Whitespace
 
@@ -4164,3 +4164,20 @@ continue
 for(i : 0..10) {
   if(i > 5) then { break } else { continue }
 }
+
+
+#! Valid expression
+# 751. Query operator for option types
+x?
+
+#! Valid expression
+# 752. Query operator on member access
+player.health?
+
+#! Valid expression
+# 753. Query operator on array access
+items[0]?
+
+#! Valid expression
+# 754. Chained query operators
+optional_value??

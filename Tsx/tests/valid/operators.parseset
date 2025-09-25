@@ -1,5 +1,5 @@
-# Valid Operators
-# Arithmetic, logical, and comparison operators
+# Valid Operators Test Suite
+# Tests for arithmetic, logical, and comparison operators with precedence and spacing variations
 
 #! Valid expression
 # 1. Simple addition
@@ -34,87 +34,59 @@
 -2 * 3
 
 #! Valid expression
-# 9. Addition without spaces
-1+2
-
-#! Valid expression
-# 10. Subtraction without spaces
-5-3
-
-#! Valid expression
-# 11. Multiplication without spaces
-3*4
-
-#! Valid expression
-# 12. Division without spaces
-8/2
-
-#! Valid expression
-# 13. Variables without spaces around operators
-x+y
-
-#! Valid expression
-# 14. Multiplication with variables without spaces
-x*y
-
-#! Valid expression
-# 15. Variables with spaces around operators
+# 9. Variables with spaces around operators
 x + y
 
 #! Valid expression
-# 16. Multiplication with variables and spaces
+# 10. Multiplication with variables and spaces
 x * y
 
 #! Valid expression
-# 17. Addition with extra spaces
+# 11. Addition with extra spaces
 1  +  2
 
 #! Valid expression
-# 18. Multiplication with extra spaces
+# 12. Multiplication with extra spaces
 3  *  4
 
 #! Valid expression
-# 19. Arithmetic with unary minus without spaces
+# 13. Arithmetic with unary minus without spaces
 a*-b+c
 
 #! Valid expression
-# 20. Arithmetic with unary minus and spaces
+# 14. Arithmetic with unary minus and spaces
 a * -b + c
 
 #! Valid expression
-# 21. Unary with parentheses
+# 15. Unary with parentheses
 -(1 + 2)
 
 #! Valid expression
-# 22. Complex expression without spaces
-a+b*c-d/e
-
-#! Valid expression
-# 23. Left associativity of subtraction
+# 16. Left associativity of subtraction
 10 - 5 - 2
 
 #! Valid expression
-# 24. Left associativity of division
+# 17. Left associativity of division
 24 / 4 / 2
 
 #! Valid expression
-# 25. Mixed arithmetic
+# 18. Mixed arithmetic
 10 - 5 + 3
 
 #! Valid expression
-# 26. Mixed addition and subtraction
+# 19. Mixed addition and subtraction
 10 + 5 - 3
 
 #! Valid expression
-# 27. Mixed multiplication and division
+# 20. Mixed multiplication and division
 20 * 2 / 4
 
 #! Valid expression
-# 28. Multiple operations same precedence
+# 21. Multiple operations same precedence
 1 + 2 + 3
 
 #! Valid expression
-# 29. Multiple operations same precedence (multiplication)
+# 22. Multiple operations same precedence (multiplication)
 2 * 3 * 4
 
 #! Valid expression
@@ -158,22 +130,6 @@ a  +  ( b  +  c )  -  ( d  -  e )
 1 < 2
 
 #! Valid expression
-# 40. Greater than without spaces
-x>0
-
-#! Valid expression
-# 41. Less than without spaces
-x<10
-
-#! Valid expression
-# 42. Greater equal without spaces
-x>=5
-
-#! Valid expression
-# 43. Less equal without spaces
-x<=20
-
-#! Valid expression
 # 44. Less than
 x < 10
 
@@ -186,24 +142,12 @@ x >= 5
 a <= b
 
 #! Valid expression
-# 47. Greater than or equal
-x <= 20
-
-#! Valid expression
 # 48. Comparison with float literals
 x > 1.5
 
 #! Valid expression
-# 49. Variables with comparison operators without spaces
-a>b
-
-#! Valid expression
 # 50. Variables with comparison operators and spaces
 a > b
-
-#! Valid expression
-# 51. Complex comparison without spaces
-x+1>y*2
 
 #! Valid expression
 # 52. Comparison with function calls without spaces

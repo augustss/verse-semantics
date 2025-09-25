@@ -1,0 +1,62 @@
+# Error Tests for Type{Expression} Construct
+# Tests for invalid type{expression} usage
+
+#! Error expression
+# 1. Missing closing brace
+result : type{getValue() = getValue()
+
+#! Error expression
+# 2. Empty type{} construct
+emptyType : type{} = getValue()
+
+#! Error expression
+# 3. Missing opening brace
+result : typegetValue()} = getValue()
+
+#! Error expression
+# 4. Invalid expression inside type{}
+result : type{+++} = getValue()
+
+#! Error expression
+# 5. Unclosed parentheses in type{expression}
+result : type{getValue(} = getValue()
+
+#! Error expression
+# 6. Invalid token sequence in type{expression}
+result : type{getValue() + +} = getValue()
+
+#! Error expression
+# 7. Missing expression after type{
+result : type{} = getValue()
+
+#! Error expression
+# 8. Nested type{} constructs (invalid)
+result : type{type{getValue()}} = getValue()
+
+#! Error expression
+# 9. Type{expression} with assignment inside
+result : type{x := 5} = getValue()
+
+#! Error expression
+# 10. Type{expression} with statement inside
+result : type{set x = 5} = getValue()
+
+#! Error expression
+# 11. Type{expression} with return statement
+result : type{return 5} = getValue()
+
+#! Error expression
+# 12. Type{expression} with break statement
+result : type{break} = getValue()
+
+#! Error expression
+# 13. Incomplete type{expression} declaration
+result : type{getValue = incomplete
+
+#! Error expression
+# 14. Double opening braces
+result : type{{getValue()}} = getValue()
+
+#! Error expression
+# 15. Mixed bracket types
+result : type{getValue()] = getValue()

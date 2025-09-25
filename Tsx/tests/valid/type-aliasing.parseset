@@ -1,0 +1,4 @@
+# Type Aliasing Tests
+
+#! Valid Expression
+number := float

@@ -158,12 +158,16 @@ export class Parser {
   }
 
   /**
-   * Parse equality expressions.
-   * This level is skipped as Verse doesn't use equality operators at this precedence.
+   * Parse equality expressions (==, !=).
+   * Non-associative: equality comparisons don't typically chain.
    */
   private parseEquality(state: ParserState): ParseResult<AST.Expression> {
-    // Skip this precedence level - no equality operators in Verse
-    return this.parseComparison(state);
+    return this.operatorParser.parseBinaryOp(
+      state,
+      this.parseComparison.bind(this),
+      this.parseComparison.bind(this),
+      ['==', '!=']
+    );
   }
 
   /**
@@ -264,7 +268,7 @@ export class Parser {
    * - Object construction: Point{x := 1, y := 2}
    *
    * CONTROL FLOW STATEMENTS:
-   * - break, continue, return (parsed as special expressions)
+   * - break, return (parsed as special expressions)
    */
   private parsePrimary(state: ParserState): ParseResult<AST.Expression> {
     state = state.skipTrivia();
@@ -318,7 +322,11 @@ export class Parser {
 
     // Handle TYPE_KEYWORD as identifiers in expression context
     if (token.type === TokenType.TYPE_KEYWORD) {
-      // These can be used as identifiers in expressions
+      // Special case: option{ expression } syntax
+      if (token.content === 'option') {
+        return this.parseOptionExpression(state);
+      }
+      // Other type keywords can be used as identifiers in expressions
       return this.parseIdentifier(state);
     }
 
@@ -339,17 +347,6 @@ export class Parser {
         return { node, state };
       }
 
-      if (token.content === 'continue') {
-        // Continue statement: skip to next iteration of current loop
-        // Example: for(i : 0..10) { if(i == 5) then { continue } }
-        const tokenOffset = state.currentOffset();
-        state = state.advance();
-        const node: AST.ContinueExpression = {
-          type: 'ContinueExpression',
-          tokenOffset
-        };
-        return { node, state };
-      }
 
       if (token.content === 'return') {
         // Return statement: exit function with optional value
@@ -387,6 +384,20 @@ export class Parser {
           tokenOffset
         };
         return { node, state };
+      }
+
+      // CONCURRENT PROGRAMMING CONSTRUCTS
+      if (token.content === 'spawn') {
+        return this.parseSpawnExpression(state);
+      }
+      if (token.content === 'race') {
+        return this.parseRaceExpression(state);
+      }
+      if (token.content === 'sync') {
+        return this.parseSyncExpression(state);
+      }
+      if (token.content === 'branch') {
+        return this.parseBranchExpression(state);
       }
 
       // OTHER RESERVED WORDS
@@ -522,13 +533,46 @@ export class Parser {
       return this.parseIdentedCompound(state);
     }
 
-    // Parenthesized expression
+    // Parenthesized expression or tuple literal
     if (token.type === TokenType.OPERATOR && token.content === '(') {
       const openParenOffset = state.currentOffset();
-      state = state.advance();
+      state = state.advance().skipTrivia();
 
-      const exprResult = this.parseExpression(state);
-      state = exprResult.state.skipTrivia();
+      // Check for empty tuple/parentheses
+      const nextToken = state.current();
+      if (nextToken?.type === TokenType.OPERATOR && nextToken.content === ')') {
+        const closeParenOffset = state.currentOffset();
+        state = state.advance();
+
+        // Empty parentheses represent an empty tuple
+        const node: AST.TupleExpression = {
+          type: 'TupleExpression',
+          elements: [],
+          openParenOffset,
+          closeParenOffset,
+          separatorOffsets: []
+        };
+        return { node, state };
+      }
+
+      // Parse the first expression
+      const firstExprResult = this.parseExpression(state);
+      state = firstExprResult.state.skipTrivia();
+
+      // Check if this is a tuple (has commas) or a parenthesized expression
+      const elements: AST.Expression[] = [firstExprResult.node];
+      const separatorOffsets: number[] = [];
+
+      // Look for comma-separated elements to determine if it's a tuple
+      while (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ',') {
+        separatorOffsets.push(state.currentOffset());
+        state = state.advance().skipTrivia();
+
+        // Parse the next element
+        const nextExprResult = this.parseExpression(state);
+        elements.push(nextExprResult.node);
+        state = nextExprResult.state.skipTrivia();
+      }
 
       const closeParenOffset = state.currentOffset();
       const closeParen = state.current();
@@ -537,15 +581,26 @@ export class Parser {
       }
       state = state.advance();
 
-      // Create a parenthesized expression node
-      const node: AST.ParenthesizedExpression = {
-        type: 'ParenthesizedExpression',
-        expression: exprResult.node,
-        openParenOffset,
-        closeParenOffset
-      };
-
-      return { node, state };
+      // If we have more than one element, it's a tuple
+      if (elements.length > 1) {
+        const node: AST.TupleExpression = {
+          type: 'TupleExpression',
+          elements,
+          openParenOffset,
+          closeParenOffset,
+          separatorOffsets
+        };
+        return { node, state };
+      } else {
+        // Single element, it's a parenthesized expression
+        const node: AST.ParenthesizedExpression = {
+          type: 'ParenthesizedExpression',
+          expression: elements[0],
+          openParenOffset,
+          closeParenOffset
+        };
+        return { node, state };
+      }
     }
 
     // Compound expression
@@ -725,6 +780,52 @@ export class Parser {
   }
 
   /**
+   * Parse an option expression: option{ expression }
+   */
+  private parseOptionExpression(state: ParserState): ParseResult<AST.OptionExpression> {
+    const optionOffset = state.currentOffset();
+    const optionToken = state.current();
+
+    if (!optionToken || optionToken.type !== TokenType.TYPE_KEYWORD || optionToken.content !== 'option') {
+      throw new ParseError('Expected option keyword', state.position, optionToken || undefined);
+    }
+
+    state = state.advance().skipTrivia();
+
+    // Expect opening brace
+    const openBraceOffset = state.currentOffset();
+    const openBraceToken = state.current();
+    if (!openBraceToken || openBraceToken.type !== TokenType.OPERATOR || openBraceToken.content !== '{') {
+      throw new ParseError('Expected { after option keyword', state.position, openBraceToken || undefined);
+    }
+
+    state = state.advance().skipTrivia();
+
+    // Parse the inner expression
+    const valueResult = this.parseExpression(state);
+    state = valueResult.state.skipTrivia();
+
+    // Expect closing brace
+    const closeBraceOffset = state.currentOffset();
+    const closeBraceToken = state.current();
+    if (!closeBraceToken || closeBraceToken.type !== TokenType.OPERATOR || closeBraceToken.content !== '}') {
+      throw new ParseError('Expected } to close option expression', state.position, closeBraceToken || undefined);
+    }
+
+    state = state.advance();
+
+    const node: AST.OptionExpression = {
+      type: 'OptionExpression',
+      optionOffset,
+      value: valueResult.node,
+      openBraceOffset,
+      closeBraceOffset
+    };
+
+    return { node, state };
+  }
+
+  /**
    * Parse a for-loop expression.
    *
    * Forms:
@@ -770,14 +871,21 @@ export class Parser {
         }
       }
 
-      // For simplified AST, we'll wrap the spec in a ForExpression
-      // In a real implementation, we'd parse the spec to extract variable and iterable
+      // For indented for: form without explicit iteration variable
+      // The entire indented block is the body, and we create a dummy iterable
+      // In the actual Verse language, this would be parsed differently
+      const dummyIterable: AST.IdentifierExpression = {
+        type: 'Identifier',
+        name: '_implicit_',
+        tokenOffset: colonOffset
+      };
+
       const node: AST.ForExpression = {
         type: 'ForExpression',
-        variable: '_',  // Placeholder - would need to extract from spec
+        variable: '_',  // Implicit iteration variable
         variableOffset: colonOffset,
-        iterable: specResult.node,  // The spec expression
-        body: body || specResult.node,  // Use spec as body if no explicit do:
+        iterable: body ? specResult.node : dummyIterable,  // If there's a do:, spec is the iterable
+        body: body || specResult.node,  // Use do: body if present, otherwise spec is the body
         forOffset,
         colonOffset,
         doOffset
@@ -965,6 +1073,347 @@ export class Parser {
     };
 
     return { node, state: bodyResult.state };
+  }
+
+  /**
+   * Parse a spawn expression.
+   *
+   * Forms:
+   * - spawn{expression}
+   * - spawn: <indented-expression-list>
+   */
+  private parseSpawnExpression(state: ParserState): ParseResult<AST.SpawnExpression> {
+    const spawnOffset = state.currentOffset();
+    const spawnToken = state.current();
+
+    if (!spawnToken || spawnToken.content !== 'spawn') {
+      throw new ParseError('Expected spawn keyword', state.position, spawnToken || undefined);
+    }
+
+    state = state.advance().skipTrivia();
+
+    // Check for brace form (spawn{...})
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '{') {
+      const openBraceOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Parse expression inside braces
+      const bodyResult = this.parseExpression(state);
+      state = bodyResult.state.skipTrivia();
+
+      // Expect closing brace
+      if (!state.current() || state.current()?.content !== '}') {
+        throw new ParseError('Expected }', state.position, state.current() || undefined);
+      }
+      const closeBraceOffset = state.currentOffset();
+      state = state.advance();
+
+      const node: AST.SpawnExpression = {
+        type: 'SpawnExpression',
+        body: bodyResult.node,
+        spawnOffset,
+        openBraceOffset,
+        closeBraceOffset
+      };
+
+      return { node, state };
+    }
+
+    // Check for indented form (spawn:)
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+      const colonOffset = state.currentOffset();
+      state = state.advance();
+
+      // Parse indented expression list
+      const bodyResult = this.parseIndentedExpressionList(state);
+
+      const node: AST.SpawnExpression = {
+        type: 'SpawnExpression',
+        body: bodyResult.node,
+        spawnOffset,
+        colonOffset
+      };
+
+      return { node, state: bodyResult.state };
+    }
+
+    // No body form - just spawn as a statement
+    throw new ParseError('Expected { or : after spawn', state.position, state.current() || undefined);
+  }
+
+  /**
+   * Parse a race expression.
+   *
+   * Forms:
+   * - race: <indented-expression-list>
+   */
+  private parseRaceExpression(state: ParserState): ParseResult<AST.RaceExpression> {
+    const raceOffset = state.currentOffset();
+    const raceToken = state.current();
+
+    if (!raceToken || raceToken.content !== 'race') {
+      throw new ParseError('Expected race keyword', state.position, raceToken || undefined);
+    }
+
+    state = state.advance().skipTrivia();
+
+    // Check for indented form (race:)
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+      const colonOffset = state.currentOffset();
+      state = state.advance();
+
+      // Parse indented expression list
+      const bodyResult = this.parseIndentedExpressionList(state);
+
+      // Extract branches from compound expression
+      let branches: AST.Expression[];
+      if (bodyResult.node.type === 'CompoundExpression' || bodyResult.node.type === 'IdentedCompoundExpression') {
+        branches = (bodyResult.node as any).expressions || [];
+      } else {
+        branches = [bodyResult.node];
+      }
+
+      const node: AST.RaceExpression = {
+        type: 'RaceExpression',
+        branches,
+        raceOffset,
+        colonOffset
+      };
+
+      return { node, state: bodyResult.state };
+    }
+
+    throw new ParseError('Expected : after race', state.position, state.current() || undefined);
+  }
+
+  /**
+   * Parse a sync expression.
+   *
+   * Forms:
+   * - sync: <indented-expression-list>
+   */
+  private parseSyncExpression(state: ParserState): ParseResult<AST.SyncExpression> {
+    const syncOffset = state.currentOffset();
+    const syncToken = state.current();
+
+    if (!syncToken || syncToken.content !== 'sync') {
+      throw new ParseError('Expected sync keyword', state.position, syncToken || undefined);
+    }
+
+    state = state.advance().skipTrivia();
+
+    // Check for indented form (sync:)
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+      const colonOffset = state.currentOffset();
+      state = state.advance();
+
+      // Parse indented expression list
+      const bodyResult = this.parseIndentedExpressionList(state);
+
+      // Extract operations from compound expression
+      let operations: AST.Expression[];
+      if (bodyResult.node.type === 'CompoundExpression' || bodyResult.node.type === 'IdentedCompoundExpression') {
+        operations = (bodyResult.node as any).expressions || [];
+      } else {
+        operations = [bodyResult.node];
+      }
+
+      const node: AST.SyncExpression = {
+        type: 'SyncExpression',
+        operations,
+        syncOffset,
+        colonOffset
+      };
+
+      return { node, state: bodyResult.state };
+    }
+
+    throw new ParseError('Expected : after sync', state.position, state.current() || undefined);
+  }
+
+  /**
+   * Parse a branch expression.
+   *
+   * Forms:
+   * - branch: <indented-expression-list>
+   * - branch{expression1, expression2}
+   */
+  private parseBranchExpression(state: ParserState): ParseResult<AST.BranchExpression> {
+    const branchOffset = state.currentOffset();
+    const branchToken = state.current();
+
+    if (!branchToken || branchToken.content !== 'branch') {
+      throw new ParseError('Expected branch keyword', state.position, branchToken || undefined);
+    }
+
+    state = state.advance().skipTrivia();
+
+    // Check for brace form (branch{...})
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '{') {
+      const openBraceOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Parse expressions inside braces
+      const branches: AST.Expression[] = [];
+      while (state.current() && state.current()?.content !== '}') {
+        const exprResult = this.parseExpression(state);
+        branches.push(exprResult.node);
+        state = exprResult.state.skipTrivia();
+
+        // Check for comma separator
+        if (state.current()?.content === ',') {
+          state = state.advance().skipTrivia();
+        }
+      }
+
+      // Expect closing brace
+      if (!state.current() || state.current()?.content !== '}') {
+        throw new ParseError('Expected }', state.position, state.current() || undefined);
+      }
+      const closeBraceOffset = state.currentOffset();
+      state = state.advance();
+
+      const node: AST.BranchExpression = {
+        type: 'BranchExpression',
+        branches,
+        branchOffset,
+        openBraceOffset,
+        closeBraceOffset
+      };
+
+      return { node, state };
+    }
+
+    // Check for indented form (branch:)
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+      const colonOffset = state.currentOffset();
+      state = state.advance();
+
+      // Parse indented expression list
+      const bodyResult = this.parseIndentedExpressionList(state);
+
+      // Extract branches from compound expression
+      let branches: AST.Expression[];
+      if (bodyResult.node.type === 'CompoundExpression' || bodyResult.node.type === 'IdentedCompoundExpression') {
+        branches = (bodyResult.node as any).expressions || [];
+      } else {
+        branches = [bodyResult.node];
+      }
+
+      const node: AST.BranchExpression = {
+        type: 'BranchExpression',
+        branches,
+        branchOffset,
+        colonOffset
+      };
+
+      return { node, state: bodyResult.state };
+    }
+
+    throw new ParseError('Expected { or : after branch', state.position, state.current() || undefined);
+  }
+
+  /**
+   * Helper method to continue parsing if expression after the condition
+   */
+  private parseIfWithCondition(state: ParserState, ifOffset: number, condition: AST.Expression): ParseResult<AST.IfExpression> {
+    // Look for then/else
+    let thenBranch: AST.Expression | undefined;
+    let thenOffset: number | undefined;
+    let elseBranch: AST.Expression | undefined;
+    let elseOffset: number | undefined;
+
+    // Skip trivia to check for 'then' keyword or ':'
+    if (!state.indentationSensitive) {
+      state = state.skipTrivia();
+    }
+
+    // Check for ':' after condition (indented form without explicit 'then')
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+      // Parse indented body as implicit then branch
+      state = state.advance();
+      const thenResult = this.parseIndentedExpressionList(state);
+      thenBranch = thenResult.node;
+      state = thenResult.state.skipTrivia();
+
+      // Check for 'else:' with indented expression list
+      if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'else') {
+        elseOffset = state.currentOffset();
+        state = state.advance().skipTrivia();
+
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+          state = state.advance();
+          const elseResult = this.parseIndentedExpressionList(state);
+          elseBranch = elseResult.node;
+          state = elseResult.state;
+        } else {
+          // else without colon - parse as regular expression
+          const elseResult = this.parseExpression(state);
+          elseBranch = elseResult.node;
+          state = elseResult.state;
+        }
+      }
+    }
+    // Check for 'then' keyword
+    else if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'then') {
+      thenOffset = state.currentOffset();
+      state = state.advance();
+      if (!state.indentationSensitive) {
+        state = state.skipTrivia();
+      }
+
+      // Check if 'then' is followed by ':' for indented form
+      if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+        state = state.advance();
+        const thenResult = this.parseIndentedExpressionList(state);
+        thenBranch = thenResult.node;
+        state = thenResult.state.skipTrivia();
+      } else {
+        // Parse then expression normally
+        const thenResult = this.parseExpression(state);
+        thenBranch = thenResult.node;
+        state = state.indentationSensitive ? thenResult.state : thenResult.state.skipTrivia();
+      }
+
+      // Check for 'else' keyword
+      if (!state.indentationSensitive) {
+        state = state.skipTrivia();
+      }
+
+      if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'else') {
+        elseOffset = state.currentOffset();
+        state = state.advance();
+
+        if (!state.indentationSensitive) {
+          state = state.skipTrivia();
+        }
+
+        // Check if 'else' is followed by ':' for indented form
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+          state = state.advance();
+          const elseResult = this.parseIndentedExpressionList(state);
+          elseBranch = elseResult.node;
+          state = elseResult.state;
+        } else {
+          // Parse else expression normally
+          const elseResult = this.parseExpression(state);
+          elseBranch = elseResult.node;
+          state = elseResult.state;
+        }
+      }
+    }
+
+    const node: AST.IfExpression = {
+      type: 'IfExpression',
+      condition,
+      ifOffset,
+      thenBranch,
+      thenOffset,
+      elseBranch,
+      elseOffset
+    };
+
+    return { node, state };
   }
 
   /**
@@ -1394,6 +1843,154 @@ export class Parser {
 
     state = state.advance().skipTrivia();
 
+    // Check for parenthesized condition with dot format
+    // Pattern: if (condition). expressions
+    if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '(') {
+      const openParenOffset = state.currentOffset();
+      state = state.advance().skipTrivia();
+
+      // Parse the condition inside parentheses
+      const condResult = this.parseExpression(state);
+      state = condResult.state.skipTrivia();
+
+      // Check for closing paren
+      if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ')') {
+        const closeParenOffset = state.currentOffset();
+        state = state.advance().skipTrivia();
+
+        // Now check for dot
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '.') {
+          // This is dot format!
+          const dotOffset = state.currentOffset();
+          state = state.advance().skipTrivia();
+
+          // Parse expressions separated by semicolons until we hit 'else' or end
+          const expressions: AST.Expression[] = [];
+
+          while (state.current()) {
+            // Check if we've hit 'else'
+            if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'else') {
+              break;
+            }
+
+            // Parse an expression
+            const exprResult = this.parseExpression(state);
+            expressions.push(exprResult.node);
+            state = exprResult.state.skipTrivia();
+
+            // Check for semicolon separator
+            if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ';') {
+              state = state.advance().skipTrivia();
+            } else if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'else') {
+              // Reached else, stop
+              break;
+            } else {
+              // No more expressions
+              break;
+            }
+          }
+
+          let thenBranch: AST.Expression | undefined;
+          let elseBranch: AST.Expression | undefined;
+          let elseOffset: number | undefined;
+          let elseDotOffset: number | undefined;
+
+          // If we have expressions, create the then branch
+          if (expressions.length === 1) {
+            thenBranch = expressions[0];
+          } else if (expressions.length > 1) {
+            // Create a compound expression
+            thenBranch = {
+              type: 'CompoundExpression',
+              expressions,
+              openBraceOffset: dotOffset,
+              closeBraceOffset: state.currentOffset(),
+              separatorOffsets: []
+            } as AST.CompoundExpression;
+          }
+
+          // Check for 'else' with dot format
+          if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'else') {
+            elseOffset = state.currentOffset();
+            state = state.advance().skipTrivia();
+
+            // Check for '.' after else
+            if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === '.') {
+              elseDotOffset = state.currentOffset();
+              state = state.advance().skipTrivia();
+
+              // Parse expressions after else.
+              const elseExpressions: AST.Expression[] = [];
+
+              while (state.current()) {
+                // Parse an expression
+                const exprResult = this.parseExpression(state);
+                elseExpressions.push(exprResult.node);
+                state = exprResult.state.skipTrivia();
+
+                // Check for semicolon separator
+                if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ';') {
+                  state = state.advance().skipTrivia();
+                } else {
+                  // No more expressions
+                  break;
+                }
+              }
+
+              // If we have expressions, create the else branch
+              if (elseExpressions.length === 1) {
+                elseBranch = elseExpressions[0];
+              } else if (elseExpressions.length > 1) {
+                // Create a compound expression
+                elseBranch = {
+                  type: 'CompoundExpression',
+                  expressions: elseExpressions,
+                  openBraceOffset: elseDotOffset,
+                  closeBraceOffset: state.currentOffset(),
+                  separatorOffsets: []
+                } as AST.CompoundExpression;
+              }
+            }
+          }
+
+          // Create a parenthesized expression for the condition to preserve parentheses
+          const parenCondition: AST.ParenthesizedExpression = {
+            type: 'ParenthesizedExpression',
+            expression: condResult.node,
+            openParenOffset,
+            closeParenOffset
+          };
+
+          const node: AST.IfExpression = {
+            type: 'IfExpression',
+            condition: parenCondition,
+            ifOffset,
+            thenBranch,
+            dotOffset,
+            elseBranch,
+            elseOffset,
+            elseDotOffset
+          };
+
+          return { node, state };
+        }
+
+        // Not dot format, continue with normal parsing
+        // Create a parenthesized expression and continue
+        const parenCondition: AST.ParenthesizedExpression = {
+          type: 'ParenthesizedExpression',
+          expression: condResult.node,
+          openParenOffset,
+          closeParenOffset: state.currentOffset() - 1
+        };
+
+        // Not dot format, fall back to normal parsing with parenthesized condition
+        return this.parseIfWithCondition(state, ifOffset, parenCondition);
+      }
+    }
+
+    // Fall back to the original parsing for non-parenthesized conditions
+
     // Check for indented form (if:)
     if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
       // Handle indented if: form
@@ -1432,6 +2029,24 @@ export class Parser {
               state = elseResult.state;
             }
           }
+        }
+      }
+      // Check for 'else:' directly (without explicit 'then')
+      // In this case, there is NO then branch - the condition block is just the condition
+      else if (state.current()?.type === TokenType.BLOCK_FORMING_KEYWORD && state.current()?.content === 'else') {
+        elseOffset = state.currentOffset();
+        state = state.advance().skipTrivia();
+
+        if (state.current()?.type === TokenType.OPERATOR && state.current()?.content === ':') {
+          state = state.advance();
+          const elseResult = this.parseIndentedExpressionList(state);
+          elseBranch = elseResult.node;
+          state = elseResult.state;
+        } else {
+          // else without colon - parse as regular expression
+          const elseResult = this.parseExpression(state);
+          elseBranch = elseResult.node;
+          state = elseResult.state;
         }
       }
 
@@ -1762,6 +2377,15 @@ export class Parser {
       // Check for inconsistent indentation (over-indented)
       if (currentToken.position.column > nextLineIndent) {
         // Over-indented - this is an error, exit the block leaving this token unparsed
+        break;
+      }
+
+      // Check for 'else' or 'then' at the base indentation level
+      // These should terminate the expression list as they belong to a parent if statement
+      if (currentToken.position.column === nextLineIndent &&
+          currentToken.type === TokenType.BLOCK_FORMING_KEYWORD &&
+          (currentToken.content === 'else' || currentToken.content === 'then')) {
+        // These keywords at base indentation terminate the expression list
         break;
       }
 
