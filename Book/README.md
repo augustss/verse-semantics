@@ -2,10 +2,57 @@
 
 Bits of a Verse documentation...
 
+## Installation
+
+### Automated Setup (Recommended)
+
+The easiest way to get started is using the automated setup script:
+
+```bash
+# Make the script executable (first time only)
+chmod +x setup_and_build.sh
+
+# Run the setup script
+./setup_and_build.sh
+```
+
+This script will:
+- Check for Python 3.8+ and install it if missing
+- Create a Python virtual environment
+- Install all required dependencies (MkDocs, Material theme, Pygments)
+- Install the custom Verse syntax highlighter
+- Build the documentation site
+
+### Manual Setup
+
+If you prefer to set up manually:
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On macOS/Linux
+# or
+venv\Scripts\activate     # On Windows
+
+# Install dependencies
+pip install mkdocs mkdocs-material pygments
+
+# Install custom Verse syntax highlighter
+python install_verse_lexer.py
+
+# Build the documentation
+mkdocs build
+```
+
 ## Quick Start
+
+After installation, you can:
 
 ```bash
 # Start the development server
+source venv/bin/activate
 mkdocs serve
 ```
 
@@ -15,6 +62,7 @@ Then open http://localhost:8000 in your browser.
 
 ```bash
 # Build the documentation site
+source venv/bin/activate
 mkdocs build
 ```
 
@@ -63,8 +111,10 @@ GameController := class<public>:
 ## Requirements
 
 - Python 3.8 or higher
-- MkDocs with Material theme (installed via pipx or pip)
-- Pygments for syntax highlighting
+- MkDocs 1.6+ with Material theme
+- Pygments 2.16+ for syntax highlighting
+
+All dependencies are automatically installed by the setup script.
 
 ## Customization
 
@@ -88,6 +138,16 @@ markdown_extensions:
 
 ## Troubleshooting
 
+### Installation Issues
+
+If the setup script fails:
+
+```bash
+# Clean up and retry
+rm -rf venv site
+./setup_and_build.sh
+```
+
 ### Port Already in Use
 
 ```bash
@@ -95,7 +155,18 @@ markdown_extensions:
 pkill -f "mkdocs serve"
 
 # Or use different port
-mkdocs serve -a localhost:8001
+venv/bin/mkdocs serve -a localhost:8001
+```
+
+### Verse Syntax Highlighting Not Working
+
+If Verse code blocks aren't highlighted:
+
+```bash
+# Reinstall the Verse lexer
+source venv/bin/activate
+python install_verse_lexer.py
+mkdocs build
 ```
 
 ## Contributing

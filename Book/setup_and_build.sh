@@ -113,6 +113,7 @@ pip install pygments
 
 # Install the custom Verse lexer
 echo -e "${YELLOW}Installing custom Verse syntax highlighter...${NC}"
+
 if [ -d "libs/pygments" ]; then
     pip install -e libs/
     echo -e "${GREEN}Custom Verse lexer installed${NC}"
