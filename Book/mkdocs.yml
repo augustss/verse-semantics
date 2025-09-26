@@ -1,0 +1,66 @@
+site_name: Verse Language 
+theme:
+  name: material
+  logo: images/verse.png
+  palette:
+    scheme: slate  # Dark theme
+    primary: black
+    accent: deep orange
+  features:
+#    - content.footnote.tooltips
+#    - navigation.tabs
+    - search.suggest
+
+markdown_extensions:
+ - admonition
+ - pymdownx.details
+ - footnotes
+ - pymdownx.highlight:
+      default_lang: verse
+      linenums: false
+      pygments_style: monokai
+ - pymdownx.superfences
+
+plugins:
+  - search
+
+extra_css:
+  - extra.css
+
+nav:
+  - Overview: index.md
+  - Effects: effects.md
+  - Verse Reference:
+    - Overview: verse_reference/index.md
+    - Updates and Deprecations: verse_reference/updates_and_deprecations.md
+    - Expressions: verse_reference/expressions.md
+    - Comments: verse_reference/comments.md
+    - Constants and Variables: verse_reference/constants_and_variables.md
+    - Common Types: verse_reference/common_types.md
+    - Any: verse_reference/any_type.md
+    - Comparable: verse_reference/comparable_type.md
+    - Operators: verse_reference/operators.md
+    - Grouping: verse_reference/grouping.md
+    - Code Blocks: verse_reference/code_blocks.md
+    - Functions: verse_reference/functions.md
+    - Failure: verse_reference/failure.md
+    - Access Specifiers: verse_reference/access_specifiers.md
+    - Control Flow: verse_reference/control_flow.md
+    - Time Flow and Concurrency: verse_reference/concurrency.md
+    - Container Types: verse_reference/container_types.md
+    - Composite Types: verse_reference/composite_types.md
+    - Working with Types: verse_reference/working_with_types.md
+    - Modules and Paths: verse_reference/modules_and_paths.md
+  - Verse In-Depth:
+    - Overview: verse/index.md
+    - Introduction: verse/introduction.md
+    - Variables: verse/variables.md
+    - Functions: verse/functions.md
+    - Paths and Modules: verse/paths_and_modules.md
+    - Pointers and References: verse/pointers_and_references.md
+    - Classes and Structs: verse/classes_and_structs.md
+    - Built-in Types: verse/builtin_types.md
+  - Data Types: datatypes.md
+  - Mutability: mutability.md
+  
+  

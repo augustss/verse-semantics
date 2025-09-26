@@ -1,0 +1,16 @@
+/* Reduce space between list items */
+.md-typeset ul li,
+.md-typeset ol li {
+  margin-bottom: 0.1em; /* default is around 0.5em */
+}
+
+/* Optional: reduce space before/after lists */
+.md-typeset ul,
+.md-typeset ol {
+  margin-top: 0.25em;   /* default is ~1em */
+  margin-bottom: 0.25em;
+}
+
+table th, table td {
+  padding: 2px;
+}
