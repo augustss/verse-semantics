@@ -231,6 +231,13 @@ rewriteExp expr = for expr $ \case
   Parse.All e2 ->
     All <$> rewriteExp e2
 
+  Parse.Inst (extract -> ExpSpecs a bs) e2 | isPredefined "check" a -> do
+    let find_eff x | isPredefined "succeeds" x = Effect.Succeeds
+                   | isPredefined "fails"    x = Effect.Fails
+                   | isPredefined "decides"  x = Effect.Decides
+                   | otherwise = error $ "expSpecs with unknown effect: " ++ show x
+        eff = head $ find_eff <$> bs
+    Check eff <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "option" e1 -> do
     x <- freshIdent $ loc expr
     e' <- rewriteExp e2
