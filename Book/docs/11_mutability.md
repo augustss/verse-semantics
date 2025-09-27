@@ -85,7 +85,7 @@ set C2.Pt.X = 123		# C2 is deeply mutable
 C1<>C2				# Not the same
 ```
 
-Copying from one variable to another entails a deep copy of the structure. Thus `set C2 = C1` means that `C2` has a mutable copy of `C1` – changes made to one of the structures are not mirrored in the other.  Containers such as arrays and tuples behave in the same way with respect to `var` and `set`.
+Copying from one variable to another entails a deep copy of the structure. Thus `set C2 = C1` means that `C2` has a mutable copy of `C1` — changes made to one of the structures are not mirrored in the other.  Containers such as arrays and tuples behave in the same way with respect to `var` and `set`.
 
 ```
 I1:[]int= array{1,2,3}
@@ -94,7 +94,7 @@ set I2[0] = 42
 I1 <> I2
 ```
 
-What to make of this? First it shows that Verse has a strong notion of immutability, a value that is held in an immutable variable will remain immutable even if passed as argument to a function that chooses to move that value in a mutable variable. A corollary of this observation is that one may think that a language implementation must copy values frequently – in theory, yes, but in practice language implementers are wily and find ways to avoid many unnecessary copies.
+What to make of this? First it shows that Verse has a strong notion of immutability, a value that is held in an immutable variable will remain immutable even if passed as argument to a function that chooses to move that value in a mutable variable. A corollary of this observation is that one may think that a language implementation must copy values frequently — in theory, yes, but in practice language implementers are wily and find ways to avoid many unnecessary copies.
 
 ## Classes and their mutability
 

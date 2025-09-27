@@ -1,8 +1,9 @@
+# Effects
+
 This document provides a gentle introduction to the Verse effect
 system, starting with a simple “Hello, World!” function:
 
-
-```
+```verse
 Return Type   --------------------\
 An Effect     -------------\      |
 Argument List --------\    |      |
@@ -43,13 +44,12 @@ function annotated `<computes>` is pure: it cannot read from memory,
 print output, or even query the current time.  This benefits both the
 programmer and the compiler:
 
-  * **For developers:** clearer understanding of what a function may
+* **For developers:** clearer understanding of what a function may
     do
 
-  * **For the compiler:** enables compile-time detection of
+* **For the compiler:** enables compile-time detection of
    side-effect bugs, enforcement of invariants, and more aggressive
    optimizations
-
 
 ## Families and Specifiers
 
@@ -63,11 +63,11 @@ function may perform.
 The six effect families are:
 
 * **Cardinality**: Whether and how a function returns  
-* **Heap**: Access to mutable memory 
+* **Heap**: Access to mutable memory
 * **Suspension**: Whether a function may suspend execution  
 * **Divergence**: Whether a function may run forever  
-* **Prediction**: Where a function runs 
-* **Internal**: Reserved for internal use 
+* **Prediction**: Where a function runs
+* **Internal**: Reserved for internal use
 
 Some effects, like `fails`, have no specifier. Some specifiers imply
 multiple effects, for instance `<transacts>` implies `reads`,
@@ -102,11 +102,11 @@ in design documents but are not yet available.[^0] They are discussed
 here for completeness.
 
 [^0]: `<ambiguates>` and `<abstracts>` are key to the planned logic
-	features of Verse, they denote functions that may return
-	different values due to use of the choice
-	operator. `<diverges>` (and `<converges>`) will indicate
-	whether a function may not terminate or if it is provably
-	guaranteed to return a value in a finite number of steps.
+ features of Verse, they denote functions that may return
+ different values due to use of the choice
+ operator. `<diverges>` (and `<converges>`) will indicate
+ whether a function may not terminate or if it is provably
+ guaranteed to return a value in a finite number of steps.
 
 ### Effect Specifiers
 
@@ -121,10 +121,9 @@ per fundamental effect. Without any annotation, a function such as
 ThisIsHelloV1( ):void= ...
 ```
 
-| dictates | suspends | reads | writes | allocates | succeeds | fails | 
-| :---:    | :---:    | :---: | :---:  | :---:     | :---:    | :---: | 
+| dictates | suspends | reads | writes | allocates | succeeds | fails |
+| :---:    | :---:    | :---: | :---:  | :---:     | :---:    | :---: |
 | ✔️  ️    | ❌      | ✔️    | ✔️     | ✔️        | ✔️      | ❌    |
-
 
 This means the function allows `diverges`, `reads`, `writes`,
 `allocates` and `succeeds`. It is *almost* like writing
@@ -141,14 +140,14 @@ family. So `<reads>`, sets the `reads` bit within the Heap family and
 clears the others bits. For example: with annotations `<reads>` and
 `<predicts>` has the following bits set:
 
-```
+```verse
 ThisIsHelloV2( )<reads><predicts>:void= ... 
 ```
 
 yields:
 
-| dicates |  suspends | reads | writes | allocates | succeeds | fails | 
-| :---:   |  :---:    | :---: | :---:  | :---:     | :---:    | :---: | 
+| dicates |  suspends | reads | writes | allocates | succeeds | fails |
+| :---:   |  :---:    | :---: | :---:  | :---:     | :---:    | :---: |
 | ❌      | ❌       | ✔️    | ❌️     | ❌️       | ✔️       | ❌    |
 
 Specifying `<reads><predicts>` clears the `writes` and `allocates`
@@ -217,7 +216,7 @@ which implies that the function is *deterministic*, a fancy way of
 saying that if you call the function with the same value, it will
 return the same result over and over again.
 
-```
+```verse
 Succ(i:int)<computes>:int=      # Deterministic
     return i + 1
 
@@ -235,21 +234,21 @@ heap, or more plainly, read from a field marked as `var`. Consider a
 and a `greeter` class with one one mutable field and one immutable
 field:
 
-```
+```verse
 monster := class:
     Name:string               # immutable
     var Health:float= 100.0   # mutable
 
 greeter := class:
- 	var Goblin:monster = monster{Name:="Boblin"}   # mutable
-	OtherGoblin := monster{Name:="Joblin"}         # immutable
+  var Goblin:monster = monster{Name:="Boblin"}   # mutable
+ OtherGoblin := monster{Name:="Joblin"}         # immutable
 ```
 
 Accessing a `Goblin` reads the mutable heap, as does any read of
 `OtherGoblin.Health`.  The following three functions illustrate which
 specifiers are needed:
 
-```
+```verse
 Greet(Greeting:string)<reads>:string = Greeting + Goblin.Name
 
 GreetNR(Greeting:string)<computes>:string = Greeting + OtherGoblin.Name
@@ -269,10 +268,10 @@ specifier.[^4] The following updates an object's
 `Health` field, so it must have both annotations:
 
 [^4]:
-	The `reads` effect is need due to another planned feature
-	of the language: live variables.
+ The `reads` effect is need due to another planned feature
+ of the language: live variables.
 
-```
+```verse
 ResetHealth()<writes><reads>:void = set OtherGoblin.Health = 0.0
 ```
 
@@ -286,7 +285,7 @@ apply to the constructor of the data structure, be that a class,
 struct or interface. The following limits a class's constructor to
 have the `<allocates>` effects:
 
-```
+```verse
 npc := class<computes>:
     Name: string = "Default"
 ```
@@ -309,9 +308,9 @@ constructor does not access the mutable heap -- the class has no
 mutable fields. Thus the `MakeJoe` function can also be `<computes>`
 as it creates an immutable value.
 
-```
+```verse
 joe := class<computes>:
-	Name:string = "Joe"
+ Name:string = "Joe"
 
 MakeJoe()<computes>:joe= joe{}      # No allocates effect
 
@@ -321,16 +320,16 @@ Class `jil` is unique and class `jon` has a mutable field, so
 functions that create objects of either class will have to be marked
 as `<allocates>`:
 
-```
+```verse
 jil := class<unique><allocates>:
-	Name:string = "Jil"
+ Name:string = "Jil"
 
 MakeJil()<allocates>:jil= jil{}     # Allocates because unique
 
 jon := class<allocates>:
-	var Name:string = "Jon"
+ var Name:string = "Jon"
 
-MakeJon()<allocates>:jon= jon{}	    # Allocates because jon has a var
+MakeJon()<allocates>:jon= jon{}     # Allocates because jon has a var
 ```
 
 Finally a function that uses a mutable variable needs the `<reads>`
@@ -338,12 +337,11 @@ and `<writes>` effects as well as the `<allocates>`.  This can be
 expressed by `<transacts>` or by omitting the heap annotation
 altogether as it is the default.
 
-```
+```verse
 UseVar()<transacts>:void=        
-	var X = 3
-	set X = 4
+ var X = 3
+ set X = 4
 ```
-
 
 ## Predicts Family
 
@@ -356,7 +354,7 @@ allow functions to run directly on the user’s machine. To be clear,
 chance to run them first, and automatically synchronize after the
 server runs them.
 
-```
+```verse
 OnBegin()<suspends>:void =
   MyPlayer.JumpedEvent().Subscribe(HandleJumpButtonPress)
 
@@ -370,13 +368,13 @@ A `dictates{}` statement is used to force code to run on the server.
 
 The `suspends` effect indicate that a function may suspend execution.
 
-```
+```verse
 OnSimulate<override>()<suspends>:void =
         Print("Starting Entity Lifetime Test")
         Sleep(0.0)
         for (LifetimeRecord : EntityLifetimes):
             spawn{ ProcessLifetimeRecord(LifetimeRecord)}
-```	    
+```
 
 When within a `spawn{}` statement, the suspends effect is suppressed.
 

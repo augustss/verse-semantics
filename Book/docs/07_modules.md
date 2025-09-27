@@ -1,6 +1,4 @@
-# Modules and Paths - Complete Reference
-
-## Overview
+# Modules
 
 Modules and paths are fundamental concepts in Verse that provide code organization, namespace management, and the ability to share and reuse code across projects. Think of modules as containers that group related functionality together, similar to packages in other programming languages, but with stronger guarantees about versioning and compatibility.
 
@@ -120,6 +118,7 @@ module_folder := module:
 ## Module Members
 
 A module can contain:
+
 - Constants and variables
 - Functions
 - Classes, interfaces, and structs
@@ -420,6 +419,7 @@ SavePlayerProgress(Player:player, NewData:player_data):void =
 ### Publishing Modules
 
 When you publish a module to the Metaverse:
+
 1. The module path becomes globally accessible
 2. Public members become part of the module's API
 3. The module must maintain backward compatibility
@@ -446,6 +446,7 @@ Thing<public>:nat = 20  # nat is a subtype of int
 ### Backward Compatibility Guarantees
 
 The Metaverse provides guarantees for published modules:
+
 - Public members will never stop existing
 - Types will never change in incompatible ways
 - Values can be updated by the publisher
@@ -576,6 +577,7 @@ When working with modules, you may encounter various issues. Understanding these
 **Common Causes and Solutions**:
 
 1. **Incorrect path**: Double-check the module path in your `using` statement. Remember that paths are case-sensitive.
+
    ```verse
    # Wrong: different case
    using { /verse.org/random }  # Error: module not found
@@ -585,6 +587,7 @@ When working with modules, you may encounter various issues. Understanding these
    ```
 
 2. **Missing parent module import**: When importing nested modules, ensure the parent is imported first.
+
    ```verse
    # Wrong: child before parent
    using { inventory }  # Error if inventory is nested
@@ -603,6 +606,7 @@ When working with modules, you may encounter various issues. Understanding these
 **Common Causes and Solutions**:
 
 1. **Missing access specifier**: Members without the `<public>` specifier are internal by default.
+
    ```verse
    # In module_a
    SecretValue:int = 42  # Internal by default
@@ -615,6 +619,7 @@ When working with modules, you may encounter various issues. Understanding these
    ```
 
 2. **Protected or private members**: These are not accessible outside their defining scope.
+
    ```verse
    # In a class
    class_a := class:
@@ -643,6 +648,7 @@ When working with modules, you may encounter various issues. Understanding these
 **Problem**: Two imported modules define members with the same name.
 
 **Solution**: Use fully qualified names to disambiguate:
+
 ```verse
 using { /GameA/Combat }
 using { /GameB/Combat }
@@ -670,6 +676,7 @@ DamageB := /GameB/Combat.CalculateDamage(10.0)  # Clear
 **Problem**: Shadowing errors when local identifiers conflict with module members.
 
 **Solution**: Use the `(local:)` qualifier to disambiguate:
+
 ```verse
 module_x := module:
     Value:int = 10
@@ -685,12 +692,14 @@ Let's walk through building a complete module system for a game, explaining each
 ### Step 1: Planning the Module Structure
 
 First, we need to plan our module hierarchy. For a typical game, we might want:
+
 - Core game systems (player, combat, inventory)
 - UI components
 - Game configuration
 - Utility functions
 
 This translates to a folder structure:
+
 ```
 MyGame/
 ├── Core/
@@ -735,6 +744,7 @@ game_mode<public> := enum:
 ```
 
 This configuration module demonstrates several important concepts:
+
 - Public members that other modules can access
 - Nested modules for organizing related settings
 - Functions within modules for configuration-related calculations
@@ -811,6 +821,7 @@ HandlePlayerDeath(Player:player):void =
 ```
 
 This player module shows:
+
 - How to import and use configuration from another module
 - Separation of persistent and runtime data
 - Public functions for external module interaction
@@ -870,6 +881,7 @@ LogCombatEvent(Event:combat_event):void =
 ```
 
 This combat module demonstrates:
+
 - Importing multiple modules
 - Using public functions from other modules
 - Creating module-specific data structures
@@ -885,14 +897,3 @@ Verse follows specific naming conventions that, while not enforced by the compil
 - **Function names**: Use `CamelCase` (e.g., `CalculateDamage`, `GetPlayerStats`)
 
 Following these conventions makes your code consistent with Epic's standard library and easier for other Verse developers to understand.
-
-## Summary
-
-Modules and paths provide the foundation for code organization and sharing in Verse. They enable:
-- Clean separation of concerns through encapsulation
-- Reusable code libraries that can be shared across projects
-- Clear API boundaries between different systems
-- Namespace management to avoid naming conflicts
-- Version evolution with strong compatibility guarantees
-
-Understanding modules is essential for building maintainable, scalable Verse applications that can integrate with the broader Metaverse ecosystem. The module system's design reflects Verse's vision of a persistent, shared universe where code can be published once and trusted to work forever, while still allowing for updates and improvements.

@@ -23,7 +23,7 @@ var Arrows :int= 3                         # The player currently has 3 arrows
 var TotalPurchases :int= 0                 # Track total purchases
 ```
 
-You can use the four basic math operations with integers in Verse: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
+You can use the four basic math operations with integers: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
 
 ```verse
 var C :int= (-MyInt + MyHugeInt - 2) * 3   # arithmetic
@@ -43,7 +43,7 @@ if (NumberOfQuiversYouCanBuy := Floor(Coins / CoinsPerQuiver)):
 ## Rationals
 
 `rational` represents the result of **integer division**. Unlike `int` or `float`, you cannot write a `rational` literal directly. Instead, rationals arise only as intermediate results when dividing integers with the `/` operator.  
-Because rational numbers are not meant to be used as general-purpose values in Verse, their role is intentionally limited. They serve as an intermediate type that can be rounded to an integer when needed.  
+Because rational numbers are not meant to be used as general-purpose values, their role is intentionally limited. They serve as an intermediate type that can be rounded to an integer when needed.  
 
 ```verse
 X := 7 / 3    # type of X is rational
@@ -51,7 +51,7 @@ X := 7 / 3    # type of X is rational
 
 Here, `X` is not an `int` and not a `float`. It is a `rational`, representing the exact ratio `7 ÷ 3`.  
 
-Since rationals are mainly useful for rounding, Verse provides two functions that consume them:  
+Since rationals are mainly useful for rounding, two functions consume them:  
 
 - `Floor()` — rounds a rational down to the nearest integer.  
 - `Ceil()` — rounds a rational up to the nearest integer.  
@@ -82,13 +82,13 @@ Rationals therefore serve a narrow but important role in Verse: they capture the
 
 The `float` type represents all non-integer numerical values. It can hold large values and precise fractions.
 
-Verse uses float as the type for storing and handling floating point numbers, such as 1.0, -50.5, and 3.14159. A float in Verse is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range [-2^1024 + 1, … , 0, … , 2^1024 - 1], or has the value NaN (Not a Number).
+The float type is used for storing and handling floating point numbers, such as 1.0, -50.5, and 3.14159. A float is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range [-2^1024 + 1, … , 0, … , 2^1024 - 1], or has the value NaN (Not a Number).
 
 The implementation for float differs from the IEEE standard in the following ways:
 
 - There is only one NaN value.
 - NaN is equal to itself.
-- Every number is equal to itself. If two numbers are equal, then no pure Verse code can observe the difference between them.
+- Every number is equal to itself. If two numbers are equal, then no pure code can observe the difference between them.
 - 0 cannot be negative.
 
 You can include predefined float values within your code as float literals. A float literal is a floating point number in your code:
@@ -159,16 +159,16 @@ not GotIt?                                        # and this fails too
 
 ## Characters and Strings
 
-In Verse, text is represented in terms of characters and strings.  
+Text is represented in terms of characters and strings.  
 
-A `char` is a single **UTF-8 code unit** (not a full Unicode code point). A string is therefore an array of characters, written as `[]char`. For convenience, Verse provides the type alias `string` for `[]char`:  
+A `char` is a single **UTF-8 code unit** (not a full Unicode code point). A string is therefore an array of characters, written as `[]char`. For convenience, the type alias `string` is provided for `[]char`:  
 
 ```verse
 MyName :string = "Joseph"
 MyAlterEgo := "José"
 ```
 
-Verse uses UTF-8 as its character encoding scheme. Each UTF-8 code unit is one byte. A Unicode code point may require between one and four code units. Code points with lower values use fewer bytes, while higher values require more.  
+UTF-8 is used as the character encoding scheme. Each UTF-8 code unit is one byte. A Unicode code point may require between one and four code units. Code points with lower values use fewer bytes, while higher values require more.  
 
 For example:  
 
@@ -176,7 +176,7 @@ For example:
 - `"á"` requires two bytes (`{0oC3}{0oA1}`),  
 - `"🐈"` (cat emoji) requires four bytes (`{0u1f408}`).  
 
-Thus, strings in Verse are sequences of code units, not necessarily sequences of Unicode characters in the abstract sense.  
+Thus, strings are sequences of code units, not necessarily sequences of Unicode characters in the abstract sense.  
 
 Because strings are arrays of `char`, you can index into them with `[]`. Indexing has the `<decides>` effect: it succeeds when the index is valid and fails otherwise.  
 
@@ -339,13 +339,13 @@ A common use case is searching for something that may or may not be there. Imagi
 ```verse
 var Numbers:[]int = array{10, 20, 30}
 
-Find[N:[]int, x:int]:?int =
-    for {i := 0..N.Length} do
-        if N[i] = x then return option{i}
+Find[N:[]int, X:int]:?int =
+    for {I := 0..N.Length} do
+        if N[I] = X then return option{I}
     return false
 
-idx:?int = Find[Numbers, 20]    # succeeds with option{1}
-y := idx?                       # succeeds with 1
+Idx:?int = Find[Numbers, 20]    # succeeds with option{1}
+Y := Idx?                       # succeeds with 1
 ```
 
 Here the optional signals the possibility of failure directly in the type. The `?` operator makes it easy to use the result in an expression, while `option{...}` allows you to turn conditional computations back into optionals. The effect is that the idea of “maybe a value, maybe not” becomes a first-class part of the language, rather than an afterthought, and programmers are encouraged to handle the absence of values in a disciplined way.

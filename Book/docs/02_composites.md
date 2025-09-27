@@ -1,8 +1,6 @@
-# Composite Types - Complete Reference
+# Composite Types
 
-## Overview
-
-Composite types in Verse allow you to create custom data structures that model the entities and concepts in your game world. Rather than working solely with primitive types like integers and strings, you can define rich, structured types that represent players, weapons, game states, and any other domain-specific concepts your game requires.
+Composite types allow you to create custom data structures that model the entities and concepts in your game world. Rather than working solely with primitive types like integers and strings, you can define rich, structured types that represent players, weapons, game states, and any other domain-specific concepts your game requires.
 
 Verse provides four fundamental composite type constructors, each serving a distinct purpose in your type architecture. Classes provide object-oriented programming with inheritance and polymorphism, enabling you to model complex hierarchies of game entities. Interfaces define contracts that classes must fulfill, promoting loose coupling and enabling multiple inheritance of behavior specifications. Structs offer lightweight, value-oriented data containers perfect for simple data aggregation without the overhead of object-oriented features. Enums represent fixed sets of named values, ideal for modeling game states, item types, or any domain with a known set of alternatives.
 
@@ -666,7 +664,7 @@ Use interfaces to define capabilities rather than identities. An interface named
 
 Keep structs simple and focused on data. If you find yourself wanting to add methods or complex validation to a struct, consider using a class instead. Structs should remain pure data containers.
 
-Make enums intention-revealing through clear naming. Each enum value should be self-explanatory, eliminating the need for comments or external documentation to understand what it represents.
+Make enums intention-revealing. Each enum value should be self-explanatory, eliminating the need for comments or external documentation to understand what it represents.
 
 ### Performance Considerations
 
@@ -677,11 +675,3 @@ Structs use value semantics, creating copies when assigned or passed to function
 Interfaces involve dynamic dispatch, adding a small runtime cost for method calls. This overhead is negligible for most game code but might matter in tight loops processing thousands of objects per frame.
 
 Enums compile to simple integer comparisons, making them extremely efficient. Use enums freely without performance concerns—they're as fast as integer constants but far more maintainable.
-
-## Summary
-
-Verse's composite types provide a complete toolkit for modeling game concepts with appropriate abstractions. Classes bring object-oriented programming with inheritance and polymorphism, perfect for complex game entities and systems. Interfaces enable programming to contracts rather than implementations, promoting loose coupling and flexibility. Structs offer lightweight data containers with value semantics, ideal for simple data aggregation. Enums provide type-safe named constants that make code more readable and maintainable.
-
-These types work best in combination, each serving its purpose in a larger architecture. Classes implement interfaces to provide concrete behavior, contain structs for value-type data, and use enums for type-safe categorization. This layered approach creates systems that are both powerful and maintainable, expressing game concepts naturally while maintaining type safety and performance.
-
-Understanding when and how to use each composite type transforms you from someone who writes Verse code to someone who designs Verse systems. The types you choose shape not just your data structures but your entire program's architecture, affecting everything from performance to maintainability to how easily others can understand and extend your code.

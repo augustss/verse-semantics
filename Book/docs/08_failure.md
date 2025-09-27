@@ -1,6 +1,4 @@
-# Failure in Verse: A Different Way of Thinking
-
-## Beyond Boolean: The Philosophy of Failure
+# Failure
 
 Most programming languages treat control flow as a matter of true or false, yes or no, one or zero. They evaluate boolean conditions and branch accordingly, creating a world of binary decisions that often requires checking conditions twice - once to see if something is possible, and again to actually do it. Verse takes a radically different approach. Instead of asking "is this true?", Verse asks "does this succeed?"
 

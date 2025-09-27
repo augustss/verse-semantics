@@ -582,29 +582,3 @@ if (not (set Counter += 1)):
 if (set Counter += 1):
     Print("Counter: {Counter}")  # Now 1
 ```
-
-## Implementation Notes
-
-Based on analysis of the Verse parser implementation, there are some discrepancies between documentation and actual implementation:
-
-1. **Equality operators**: The parser supports both `==`/`!=` and `=`/`<>` for equality comparisons
-2. **Modulo operator**: The parser includes `%` for modulo operations, not always documented
-3. **Bracket syntax**: Square brackets `[]` can be used for function calls in addition to indexing
-4. **Tuple operations**: The parser includes specific support for tuple element access with `()`
-5. **Line continuation**: The parser supports line continuation after binary operators and dots
-
-## Summary
-
-Operators in Verse provide powerful and concise ways to manipulate data and control program flow. Key points to remember:
-
-- Operators have strict precedence rules that determine evaluation order (11 levels from postfix to assignment)
-- Many operators are failable and must be used in failure contexts
-- Type conversions are generally explicit, not implicit
-- Logical operators interact with Verse's failure system
-- Integer division has unique behavior returning rationals
-- Compound assignment operators provide cleaner syntax
-- Effects can be rolled back with the `not` operator
-- Multiple syntaxes exist for some operations (e.g., function calls with `()` or `[]`)
-- The parser supports both traditional and Verse-specific operator behaviors
-
-Understanding these operators and their behaviors is essential for writing idiomatic and correct Verse code.

@@ -1,56 +1,9 @@
-# Control Flow, Code Blocks, and Comments in Verse
-
-## The Flow of Programs
+# Control Flow
 
 Every program has a natural rhythm to its execution, a sequence in which instructions are processed and decisions are made. In Verse, this flow is more than just a mechanical progression through lines of code - it's a carefully orchestrated dance between different types of expressions, each contributing to the overall behavior of your program. Understanding how to control this flow, structure your code into meaningful blocks, and document your thinking through comments is essential to mastering Verse.
 
 At its heart, Verse executes code sequentially, processing expressions line by line in the order they appear. But this simple foundation gives way to a rich set of control flow mechanisms that allow you to make decisions, repeat operations, handle failures gracefully, and even run code concurrently. What makes Verse unique is that everything is an expression - there's no distinction between statements and expressions like in many other languages. This means that every piece of code you write produces a result, even control flow constructs like `if` and `loop`.
 
-## Comments: Documenting Your Thinking
-
-Before diving into the mechanics of control flow, let's start with something fundamental: comments. Comments are the programmer's way of leaving notes in the code, explaining not just what the code does, but why it does it. In Verse, comments are ignored during execution but are invaluable for understanding and maintaining code.
-
-Verse offers several styles of comments to suit different documentation needs. The simplest is the single-line comment, which begins with `#` and continues to the end of the line:
-
-```verse
-CalculateDamage := 100 * 1.5  # Apply critical hit multiplier
-```
-
-When you need to document something within a line of code without breaking it up, inline block comments provide the perfect solution. These are enclosed between `<#` and `#>`:
-
-```verse
-Result := BaseValue <# original amount #> * Multiplier <# scaling factor #> + Bonus
-```
-
-For more extensive documentation, multi-line block comments span across multiple lines, making them ideal for explaining complex algorithms or providing detailed context:
-
-```verse
-<# This function implements the quadratic damage falloff formula
-   used throughout the game. The falloff ensures that damage
-   decreases smoothly with distance, creating strategic positioning
-   choices for players. #>
-CalculateFalloffDamage(Distance:float, MaxDamage:float):float =
-    # Implementation here
-```
-
-One of Verse's more elegant features is nested block comments, which allow you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
-
-```verse
-<# Temporarily disabled for testing
-   OriginalFunction()  <# This had a bug #>
-   NewFunction()       # Testing this approach
-#>
-```
-
-Verse also supports indented comments, a unique feature that begins with `<#>` on its own line. Everything indented by four spaces on subsequent lines becomes part of the comment:
-
-```verse
-<#>
-    This entire block is a comment because it's indented.
-    It provides a clean way to write longer documentation
-    without cluttering each line with comment markers.
-DoSomething()  # This is not part of the indented comment
-```
 
 ## Code Blocks: Creating Structure and Scope
 

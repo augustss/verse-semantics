@@ -1,6 +1,4 @@
-# Concurrency Features - Complete Reference
-
-## Overview
+# Concurrency
 
 Concurrency is a fundamental aspect of Verse, allowing you to control time flow as naturally as you control program flow. Unlike traditional programming languages that bolt on concurrency as an afterthought, Verse integrates time flow control directly into the language through dedicated expressions and effects.
 
@@ -483,13 +481,3 @@ The concurrency model is cooperative rather than preemptive. Tasks voluntarily y
 ### Effect Interactions
 
 The effect system that makes Verse's concurrency safe also introduces some restrictions. The `decides` effect, which marks functions that can fail, cannot be combined with the `suspends` effect. This separation keeps the failure model and the concurrency model orthogonal, preventing complex interactions that would be difficult to reason about. Transactional operations and certain device-specific operations may also have restrictions when used in concurrent contexts, ensuring that operations that must be atomic remain so.
-
-## Summary
-
-Verse's concurrency model represents a thoughtful evolution in concurrent programming design. Rather than exposing low-level threading primitives and leaving developers to build safe abstractions, Verse provides high-level, composable expressions that make concurrent programming accessible and safe.
-
-The structured concurrency expressions—`sync`, `race`, `rush`, and `branch`—cover the vast majority of concurrent programming patterns while maintaining clear ownership and lifecycle semantics. When you need to break free from structure, `spawn` provides that flexibility, though with appropriate constraints to prevent misuse. The entire system builds on async expressions and the `suspends` effect, creating a unified model where time flow becomes just another dimension of program flow.
-
-This approach transforms concurrent programming from a source of bugs and complexity into a natural extension of sequential programming. You express what you want to happen concurrently, and Verse handles the how, managing tasks, cancellation, and resource cleanup automatically. The result is concurrent code that's easier to write, easier to read, and easier to get right.
-
-The key insight underlying Verse's concurrency is that games are inherently concurrent systems. Rather than fighting this reality with complex synchronization mechanisms, Verse embraces it, providing language-level constructs that map naturally to game development patterns. Whether you're orchestrating complex cutscenes, managing AI behaviors, or simply adding polish with parallel effects, Verse's concurrency expressions let you express your intent clearly and safely.

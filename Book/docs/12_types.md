@@ -1,14 +1,12 @@
-# Types, Subtyping, Casting, and Comparables in Verse
+# Types
 
-## The Architecture of Types
-
-Every value in Verse has a type, and understanding the type system is fundamental to mastering the language. Types aren't merely labels or constraints - they form a rich hierarchy that governs how values flow through your program, what operations are permitted, and how the compiler reasons about your code. Verse's type system combines static verification with practical flexibility, catching errors at compile time while still allowing sophisticated patterns of code reuse and abstraction.
+Every value has a type, and understanding the type system is fundamental to mastering the language. Types aren't merely labels or constraints - they form a rich hierarchy that governs how values flow through your program, what operations are permitted, and how the compiler reasons about your code. The type system combines static verification with practical flexibility, catching errors at compile time while still allowing sophisticated patterns of code reuse and abstraction.
 
 At the apex of this hierarchy sits `any`, the universal supertype from which all other types descend. At the opposite extreme lies `void`, the empty type that contains no values at all. Between these extremes exists a carefully designed lattice of types, each with its own capabilities and constraints. This structure isn't arbitrary - it reflects deep principles about computation, abstraction, and the relationships between different kinds of data.
 
 ## Understanding Subtyping
 
-Subtyping is the foundation of Verse's type hierarchy. When we say that type A is a subtype of type B, we mean that every value of type A can be used wherever a value of type B is expected. This relationship creates a natural ordering among types, from the most specific to the most general.
+Subtyping is the foundation of the type hierarchy. When we say that type A is a subtype of type B, we mean that every value of type A can be used wherever a value of type B is expected. This relationship creates a natural ordering among types, from the most specific to the most general.
 
 Consider the relationship between `nat` (natural numbers) and `int` (integers). Every natural number is an integer, but not every integer is a natural number. Therefore, `nat` is a subtype of `int`. This means you can pass a `nat` to any function expecting an `int`, but not vice versa:
 
@@ -44,7 +42,7 @@ This inheritance hierarchy means that a `sports_car` can be used anywhere a `car
 
 ## Type Casting and Conversion
 
-Verse requires all type conversions to be explicit, a design choice that eliminates entire categories of bugs while making the programmer's intent clear. There's no implicit coercion between types - you must explicitly state how you want values to be converted.
+All type conversions must be explicit, a design choice that eliminates entire categories of bugs while making the programmer's intent clear. There's no implicit coercion between types - you must explicitly state how you want values to be converted.
 
 Converting between numeric types illustrates this principle clearly. To convert an integer to a float, you multiply by 1.0:
 
@@ -90,7 +88,7 @@ The constraint `t:subtype(any)` might seem redundant since all types are subtype
 
 ## Where Clauses and Type Constraints
 
-Where clauses are Verse's mechanism for constraining type parameters in generic code. They appear after type parameters and specify requirements that types must satisfy to be valid arguments. This creates a powerful system for writing generic code that is both flexible and type-safe.
+Where clauses are the mechanism for constraining type parameters in generic code. They appear after type parameters and specify requirements that types must satisfy to be valid arguments. This creates a powerful system for writing generic code that is both flexible and type-safe.
 
 ### Basic Where Clause Syntax
 
@@ -267,7 +265,7 @@ Where clauses thus provide the foundation for Verse's generic programming capabi
 
 ## The Comparable Type and Equality
 
-The `comparable` type represents a special subset of types that support equality comparison. Not all types in Verse can be compared for equality - this is a deliberate design choice that prevents meaningless comparisons and ensures that equality has well-defined semantics.
+The `comparable` type represents a special subset of types that support equality comparison. Not all types can be compared for equality - this is a deliberate design choice that prevents meaningless comparisons and ensures that equality has well-defined semantics.
 
 A type is comparable if its values can be meaningfully tested for equality. The basic scalar types are all comparable: `int`, `float`, `rational`, `logic`, `char`, and `char32`. Compound types are comparable if all their components are comparable. This means arrays of integers are comparable, tuples of floats and strings are comparable, and maps with comparable keys and values are comparable.
 
@@ -307,7 +305,7 @@ The comparable type also constrains what can be used as map keys. Map keys must 
 
 ## Type Hierarchies and Relationships
 
-The type system in Verse forms a directed acyclic graph (DAG) rather than a simple tree. This means types can have multiple supertypes, though Verse currently limits multiple inheritance to interfaces. Understanding these relationships helps you design flexible, reusable code.
+The type system forms a directed acyclic graph (DAG) rather than a simple tree. This means types can have multiple supertypes, though multiple inheritance is currently limited to interfaces. Understanding these relationships helps you design flexible, reusable code.
 
 At the top of the hierarchy, `any` serves as the universal supertype. Every type is a subtype of `any`, which means a value of any type can be assigned to a variable of type `any`. However, once a value is typed as `any`, you lose access to type-specific operations:
 
@@ -320,7 +318,7 @@ MyInt:int = 42
 ProcessValue(MyInt)  # Works, but loses type information
 ```
 
-The `void` type occupies the opposite position - it's the empty type with no values. Functions with `void` return type don't produce a value (though in Verse, they actually return `false` for consistency). The `void` type is useful for marking functions that exist for their side effects:
+The `void` type occupies the opposite position - it's the empty type with no values. Functions with `void` return type don't produce a value (though they actually return `false` for consistency). The `void` type is useful for marking functions that exist for their side effects:
 
 ```verse
 LogEvent(Event:string):void =
@@ -440,7 +438,7 @@ type update_handler = type{_(Delta:float):void}
 
 These aliases improve code readability and make refactoring easier. They're particularly valuable for function types, which can become syntactically complex.
 
-The type macro provides runtime type information, enabling a form of reflection:
+The type construct provides runtime type information, enabling a form of reflection:
 
 ```verse
 InspectType(Value:int):void =
