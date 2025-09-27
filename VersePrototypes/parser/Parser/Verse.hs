@@ -908,6 +908,8 @@ pBase =
   <|>
   (\ n -> Exp.Block <$> duplicate n) <$ pKeyword "block" <* pSpace <*> pBlock   -- TODO Here for refimpl
   <|>
+  pcOption
+  <|>
   (Exp.True <$) <$> pKeyword "true"  -- TODO: Is "true" a reserved words?
   <|>
   (Exp.False <$) <$> pKeyword "false" -- TODO: Is "false" a reserved words?
@@ -927,6 +929,14 @@ pBase =
   pIf
   <|>
   pParenOrQualIdent <* pSpace
+
+-- | option is not directly implemented in the refimpl for some reason.
+pcOption :: Parser (L (Exp SimpleName))
+pcOption = lexeme (pKeyword "option") *> do
+  beg <- pos
+  body <- pcBraces (P.optionMaybe pExpr)
+  end <- pos
+  return $ wrapLoc beg (Exp.Option body) end
 
 -- Call      := Base    {Space Postfix}
 pCall :: Parser (L (Exp SimpleName))

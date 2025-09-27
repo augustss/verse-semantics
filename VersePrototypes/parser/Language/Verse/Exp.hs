@@ -108,7 +108,7 @@ data Exp a
   | Module (L (Exp a))
   | Not (L (Exp a))
   | One (L (Exp a))
-  | Option (L (Exp a))
+  | Option (Maybe (L (Exp a)))
   | Or (L (Exp a)) (L (Exp a))
   | Paren (L (Exp a))
   | ParenInvoke (L (Exp a)) (L (Exp a))
@@ -233,6 +233,7 @@ instance ( Pretty a
     Fail -> "fail"
     One e -> "one" <+> braces (pretty e)
     All e -> "all" <+> braces (pretty e)
+    Option body -> "option" <+> braces (pretty body)
     And e1 e2 -> pretty e1 <+> "and" <+> pretty e2
     Or e1 e2 -> pretty e1 <+> "or" <+> pretty e2
     Return (Just e) -> "return" <+> parens (pretty e)

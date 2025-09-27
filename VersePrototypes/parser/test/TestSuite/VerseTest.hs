@@ -39,6 +39,7 @@ unitTests = testGroup "parser/test_data/all.verse"
   [ comments
   , sequences
   , tuples
+  , options
   ]
 
 comments :: TestTree
@@ -117,4 +118,22 @@ tuples =
   in testGroup "tuples" $
   [ passes ("( (1, 2, 3) )"             , "(1, 2, 3)")
   , passes ("( (1, 2, 3)\n, (1, 1, 5) )", "((1, 2, 3), (1, 1, 5))")
+  ]
+
+
+options :: TestTree
+options =
+  let passes = prettyTest $ pcExpr
+      passes' = makeTest  $ pcExpr
+  in testGroup "options" $
+  [ passes ("option{ }"        , "option {\n\n}")
+  , passes ("option{ 2 }"      , "option {\n  2\n}")
+  , passes ("a := option{ 2 }" , "a := option {\n  2\n}")
+  , passes ("a := option{ }"   , "a := option {\n\n}")
+  ] ++
+  -- why does option parse to a list?
+  -- FIXME: parse directly to Option
+  [ passes' ("option{ 2 }"      , List [L (Loc (Pos {line = 1, column = 7, offset = 0}) (Pos {line = 1, column = 12, offset = 0})) (Option (Just (L (Loc (Pos {line = 1, column = 9, offset = 0}) (Pos {line = 1, column = 10, offset = 0})) (Int 2))))]
+             )
+
   ]

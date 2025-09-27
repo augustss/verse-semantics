@@ -58,6 +58,7 @@ expToSrcExpr' l (R.Where e1 e2)   = Src.InfixOp (lexp e1) (inOp l "where") (lexp
 expToSrcExpr' _ R.Fail            = Src.Fail
 expToSrcExpr' l (R.One e)         = Src.Macro1 (macro l "one") [] (lexp e)
 expToSrcExpr' l (R.All e)         = Src.Macro1 (macro l "all") [] (lexp e)
+expToSrcExpr' _ (R.Option e)      = Src.Option (lexp <$> e)
 expToSrcExpr' l (R.Not e)         = Src.PrefixOp (preOp l "not") (lexp e)
 expToSrcExpr' l (R.Verify e)      = Src.Macro1 (macro l "verify") [] (lexp e)
 expToSrcExpr' _ (R.Check eff e)   = Src.Check (refImplEffToSrcEff eff) (lexp e)

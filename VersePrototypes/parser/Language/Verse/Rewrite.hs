@@ -230,6 +230,8 @@ rewriteExp expr = for expr $ \case
     One <$> rewriteExp e2
   Parse.All e2 ->
     All <$> rewriteExp e2
+  Parse.Option Nothing  -> pure $ Option Nothing
+  Parse.Option (Just e) -> Option . Just <$> rewriteExp e
 
   Parse.Inst (extract -> ExpSpecs a bs) e2 | isPredefined "check" a -> do
     let find_eff x | isPredefined "succeeds" x = Effect.Succeeds

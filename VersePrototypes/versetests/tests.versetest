@@ -382,14 +382,14 @@ testeq("EV53",pass,tim=skip) { a := truth{5}; a = truth{b:int}; b } { 5 }
 testeq("EV54",pass,tim=skip) { a := truth{5}; a? } { 5 }
 testeq("EV54b",pass,tim=skip) { a := truth{5}; a[5] } { 5 }
 testeq("EV55",pass,tim=skip) { true } { truth{()} }
-testeq("EV56",pass,tim=skip, libparser=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
+testeq("EV56",pass,tim=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
                     { array{(), truth{5}, (), truth{1} } }
 # tim=skip: Tim is not happy with this. Bug?
-testeq("EV57",pass,tim=skip, libparser=skip) { a := option{   }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
+testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
 testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
 testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) { 1 } else { 0 } } { 0 }
 testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) { 1 } else { 0 } } { 0 }
-testeq("EV61",pass,tim=skip, libparser=skip) { a := option{   }; if (a?) then { 1 } else { 0 } } { 0 }
+testeq("EV61",pass,tim=skip) { a := option{   }; if (a?) then { 1 } else { 0 } } { 0 }
 testeq("EV62",pass,tim=skip) { a := option{1  }; if (a?) then { 1 } else { 0 } } { 1 }
 
 testeq("AndyExe12", pass, broken)
