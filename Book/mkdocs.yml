@@ -1,10 +1,10 @@
 site_name: Verse Language Documentation
-site_url: https://YOUR_USERNAME.github.io/verse-paper/
+site_url: https://augustss.github.io/verse-paper/
 site_description: Comprehensive documentation for the Verse programming language
-site_author: Your Name
+site_author: Jan Vitek
 
-repo_name: YOUR_USERNAME/verse-paper
-repo_url: https://github.com/YOUR_USERNAME/verse-paper
+repo_name: augustss/verse-paper
+repo_url: https://github.com/augustss/verse-paper
 edit_uri: edit/main/Book/docs/
 
 theme:
