@@ -48,6 +48,7 @@ data Exp f a
   | f (Exp f a) `Where` f (Exp f a)
   | Fail
   | One (f (Exp f a))
+  | Option (Maybe (f (Exp f a)))
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Verify (f (Exp f a))
@@ -120,6 +121,8 @@ instance ( Pretty (f (Exp f a))
     Fail -> "fail"
     One e -> "one" <+> braces (pretty e)
     All e -> "all" <+> braces (pretty e)
+    Option Nothing -> "option" <+> "{}"
+    Option (Just e) -> "option" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
     Check eff e -> "check" <> angles (pretty eff) <+> braces (pretty e)
