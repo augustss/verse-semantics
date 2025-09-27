@@ -1,32 +1,34 @@
 # Built-in Data Types
 
-Built-in data types are the basic building blocks of computation. These include numeric types (`int`, `float`,  `rational`), booleans (`logic`), sequences of characters (`char` and `string`). Two handy types are `any`, the supertype of all types, and `void`, the empty type.
+Verse provides a rich set of built-in types that cover the full spectrum of programming needs. The numeric types `int`, `float`, and `rational` handle mathematical operations, counters, and measurements. The `logic` type represents boolean values for conditions and flags. Text is handled through `char`, `char32`, and `string` types for character data, player names, and messages. Container types like arrays, maps, optionals, and tuples manage collections and structured data. Two special types, `any` and `void`, serve unique roles in the type hierarchy as the supertype of all types and the empty type respectively.
+
+Let's explore each built-in type in detail, starting with the numeric types that form the backbone of game logic.
 
 ## Integers
 
-The `int` type represents integer, non-fractional, values.  An `int` can contain a positive number, a negative number, or zero. Supported integers range from `-9,223,372,036,854,775,808` to `9,223,372,036,854,775,807`, inclusive.
+The `int` type represents integer, non-fractional values. An `int` can contain a positive number, a negative number, or zero. Supported integers range from `-9,223,372,036,854,775,808` to `9,223,372,036,854,775,807`, inclusive.
 
 You can include `int` values within your code as literals.
 
 ```verse
-A :int= -42                                      # civilian size
+A :int= -42                                 # civilian size
 B := 42424242424242424242424242424242424242424242424242 # scary 
 
-AnswerToTheQuestion :int= 42                     # A variable that never changes
-CoinsPerQuiver :int= 100                         # A quiver costs this many coins
-ArrowsPerQuiver :int= 15                         # A quiver contains this many arrows
+AnswerToTheQuestion :int= 42               # A variable that never changes
+CoinsPerQuiver :int= 100                   # A quiver costs this many coins
+ArrowsPerQuiver :int= 15                   # A quiver contains this many arrows
 
-var Coins :int= 225                              # The player currently has 225 coins
-var Arrows :int= 3                               # The player currently has 3 arrows
-var TotalPurchases :int= 0                       # Track total purchases
+var Coins :int= 225                        # The player currently has 225 coins
+var Arrows :int= 3                         # The player currently has 3 arrows
+var TotalPurchases :int= 0                 # Track total purchases
 ```
 
 You can use the four basic math operations with integers in Verse: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
 
 ```verse
-var C :int= (-MyInt + MyHugeInt - 2) * 3        # arithmetic
-set C += 1                                      # like saying, set C = C + 1
-set C *= 2                                      # like saying, set C = C * 2
+var C :int= (-MyInt + MyHugeInt - 2) * 3   # arithmetic
+set C += 1                                 # like saying, set C = C + 1
+set C *= 2                                 # like saying, set C = C * 2
 ```
 
 For integers, the operator `/` is failable, and the result is a `rational` type if it succeeds.
@@ -40,14 +42,45 @@ if (NumberOfQuiversYouCanBuy := Floor(Coins / CoinsPerQuiver)):
 
 ## Rationals
 
-The rational type can only be used as a parameter to the following functions:
+`rational` represents the result of **integer division**. Unlike `int` or `float`, you cannot write a `rational` literal directly. Instead, rationals arise only as intermediate results when dividing integers with the `/` operator.  
+Because rational numbers are not meant to be used as general-purpose values in Verse, their role is intentionally limited. They serve as an intermediate type that can be rounded to an integer when needed.  
 
-- `Floor()`: Rounds the rational value down to the closest integer.
-- `Ceil()`: Rounds the rational value up to the closest integer.
+```verse
+X := 7 / 3    # type of X is rational
+```
+
+Here, `X` is not an `int` and not a `float`. It is a `rational`, representing the exact ratio `7 ÷ 3`.  
+
+Since rationals are mainly useful for rounding, Verse provides two functions that consume them:  
+
+- `Floor()` — rounds a rational down to the nearest integer.  
+- `Ceil()` — rounds a rational up to the nearest integer.  
+
+```verse
+Quotient1 :int = Floor(7 / 3)   # Quotient1 = 2
+Quotient2 :int = Ceil(7 / 3)    # Quotient2 = 3
+```
+
+These functions are the only way to convert a `rational` to an `int` directly.  
+
+Rationals are often used in game logic to determine how many items a player can afford or carry when resources are limited.  
+
+```verse
+Coins :int = 225
+CoinsPerQuiver :int = 100
+ArrowsPerQuiver :int = 15
+
+if (NumberOfQuivers := Floor(Coins / CoinsPerQuiver)):
+    TotalArrows :int = NumberOfQuivers * ArrowsPerQuiver
+```
+
+Here, the rational `Coins / CoinsPerQuiver` represents the exact division of coins into quivers. Applying `Floor` converts it into the number of whole quivers the player can actually buy.  
+
+Rationals therefore serve a narrow but important role in Verse: they capture the result of dividing integers, and allow precise rounding into whole numbers when needed.  
 
 ## Floats
 
-The float type represents all non-integer numerical values. It can hold large values and precise fractions.
+The `float` type represents all non-integer numerical values. It can hold large values and precise fractions.
 
 Verse uses float as the type for storing and handling floating point numbers, such as 1.0, -50.5, and 3.14159. A float in Verse is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range [-2^1024 + 1, … , 0, … , 2^1024 - 1], or has the value NaN (Not a Number).
 
@@ -66,16 +99,13 @@ B := 2.14
 MaxHealth : float = 100.0
 
 var C:float = A + B
-C = 3.14                  # succeeds
-
+C = 3.14              # succeeds
 set C -= 3.14
-C = 0.0                   # succeeds
-
-C = 0                     # compile error; 0 is not a `float` literal
-
+C = 0.0               # succeeds
+C = 0                 # compile error; 0 is not a `float` literal
 ```
 
-You can do the four basic math operations with floats: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
+You can use the four basic math operations with floats: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
 
 There are also combined operators for doing the basic math operations (addition, subtraction, multiplication, and division), and updating the value of a variable. These combined operators are the same as assigning the result to the first operand of the math operation.
 
@@ -96,17 +126,17 @@ The `logic` type represents the Boolean values `true` and `false`.
 A:logic = true
 B := false
 
-A = B                              # fails
-A?                                 # succeeds
-B?                                 # fails
+A = B             # fails
+A?                # succeeds
+B?                # fails
 
-true?                              # succeeds
-false?                             # fails
+true?             # succeeds
+false?            # fails
 ```
 
 The `logic` type only supports query operations and comparison operations.
 
-Query expressions use the query operator `?` to check if a logic value is true and fail if the logical is `false`.
+Query expressions use the query operator `?` to check if a logic value is true and fail if the logic value is `false`.
 
 For comparison operations, use the failable operator `=` to test if two logic values are the same, and `<>` to test for inequality.
 
@@ -122,287 +152,322 @@ To convert an expression that has the `<decides>` effect to `true` on success or
 
 ```verse
 GotIt := logic{GetRandomInt(0, Frequency) <> 0}   # if success
-GotIt?                                            # then succeeds
-GotIt = false                                     # fails
-not GotIt?                                        # fails
+GotIt?                                            # then this succeeds
+GotIt = false                                     # and this fails
+not GotIt?                                        # and this fails too
 ```
 
 ## Characters and Strings
 
-A `char` is a single 8-byte UTF8 code unit (not code-point). Strings in Verse are thus represented as `[]char` (pronounced "array of `char`s"), or by its more common type alias `string`:
+In Verse, text is represented in terms of characters and strings.  
+
+A `char` is a single **UTF-8 code unit** (not a full Unicode code point). A string is therefore an array of characters, written as `[]char`. For convenience, Verse provides the type alias `string` for `[]char`:  
 
 ```verse
-MyName:string = "Joseph"
+MyName :string = "Joseph"
 MyAlterEgo := "José"
 ```
 
-Verse uses the UTF-8 Unicode character-encoding scheme, a standard developed by the Unicode Consortium to provide comparable support for characters across languages, platforms, and devices. For example, the emoji in this string "🐈" can be represented by its Unicode code point "{0u1f408}".  The UTF-8 code unit is 8-bits (one byte), and encodes characters with code points that are one to four bytes long. Code points with a lower value use fewer bytes than code points with higher values. For example, "a" uses one byte "{0o61}", while "á" uses two bytes "{0oC3}{0oA1}".
+Verse uses UTF-8 as its character encoding scheme. Each UTF-8 code unit is one byte. A Unicode code point may require between one and four code units. Code points with lower values use fewer bytes, while higher values require more.  
 
-The string's individual `char`s are accessed using `[]`. Like all function calls that use `[]`, this has the `<decides>` effect:
+For example:  
+
+- `"a"` requires one byte (`{0o61}`),  
+- `"á"` requires two bytes (`{0oC3}{0oA1}`),  
+- `"🐈"` (cat emoji) requires four bytes (`{0u1f408}`).  
+
+Thus, strings in Verse are sequences of code units, not necessarily sequences of Unicode characters in the abstract sense.  
+
+Because strings are arrays of `char`, you can index into them with `[]`. Indexing has the `<decides>` effect: it succeeds when the index is valid and fails otherwise.  
 
 ```verse
-TheLetterJ := MyName[0]            # succeeds
-TheLetterJ = 'J'                   # succeeds
-MyName[100]                        # fails
+TheLetterJ := MyName[0]     # succeeds
+TheLetterJ = 'J'            # succeeds
+MyName[100]                 # fails
 ```
 
-`string.Length` is just `[]char.Length`, that is, the number of `char`s in the array, or the number of UTF8 _code units_ (not code _points_!):
+The length of a string is the number of UTF-8 code units it contains, accessed via `.Length`. Note that this is **not the same as the number of Unicode characters**:  
 
 ```verse
-"José".Length = 5           # succeeds; 5 utf8 code units (not points)
-"Jose".Length = 4           # succeeds; 4 utf8 code units (and points, coincidentally!)
+"José".Length = 5           # succeeds; 5 UTF-8 code units
+"Jose".Length = 4           # succeeds; 4 UTF-8 code units
 ```
 
-Because `string` is `[]char`, strings can be "mutated" through `var`:
+Because `string` is just `[]char`, strings declared as `var` can be mutated:  
 
 ```verse
-var OuterSpaceFriend:string = "Glorblex"
+var OuterSpaceFriend :string = "Glorblex"
 set OuterSpaceFriend[0] = 'F'
-
 ```
 
-To concatenate strings, use the `+` operator:
+Strings can be concatenated using the `+` operator:  
 
 ```verse
 MyAttemptAtFormatting := "My name is " + MyName + " but my alter ego is " + MyAlterEgo + "."
-
 ```
 
-To make life a little easier, Verse also supports string "interpolation":
+Verse also supports string interpolation for more readable formatting:  
 
 ```verse
-MyAttemptAtFormatting2 := "My name is {MyName} but my alter ego is {MyAlterEgo}."           # ah... much better
-MyAttemptAtFormatting = MyAttemptAtFormatting2                                              # succeeds
-
+Formatting := "My name is {MyName} but my alter ego is {MyAlterEgo}."
 ```
 
-To support Unicode code point literals beyond the ASCII range, the type of `'`_X_`'` is `char` if _X_ is in the range `U+0000` through `U+007F`, or
-`char32` otherwise:
+Interpolation works for any value that has a `ToString()` function in scope.  
 
- A:char = 'e'                       # ok
- B:char32 = 'é'                     # ok
- C:char = 'é'                       # compile error; the type of 'é' is `char32`
- D:char32 = 'e'                     # compile error; the type of 'e' is `char`
+Literal characters in Verse are written with single quotes. The type depends on whether the character falls within the ASCII range (`U+0000`–`U+007F`) or not:  
+
+- `'e'` has type `char`,  
+- `'é'` has type `char32`.  
 
 ```verse
-E:char = 0o145                     # ok; same as 'e'
-F:char32 = 0u00E9                  # ok; same as 'é'
-
+A :char = 'e'                       # ok
+B :char32 = 'é'                     # ok
+C :char = 'é'                       # error: type of 'é' is char32
+D :char32 = 'e'                     # error: type of 'e' is char
 ```
 
-Unlike some other languages, there is no implicit conversion between characters and integers.
-
-Keep in mind that `[]char`/`string` doesn't automatically validate/guarantee that its contents actually represent a valid UTF8 string; validation is delegated to Verse frameworks and user code.
-
-Strings support concatenation, comparison, indexing, getting the length of the string, and string interpolation.
-
-Concatenation is when one string is appended to another string. You can use the operator + to concatenate strings.
-For example, the following code results in the variable Announcement containing the string "...And the winner is: Player One!".
+Character literals can also be written using numeric escape sequences:  
 
 ```verse
-# The winning player's name:
-WinningPlayerName : string = "Player One"
-# Build a message announcing the winner.
-Announcement : string = "...And the winner is: " + WinningPlayerName + "!"
+E :char = 0o145                     # ok; same as 'e'
+F :char32 = 0u00E9                  # ok; same as 'é'
 ```
 
-You can inject a value into a string if it has a valid ToString() function defined in the current scope.
-For example, the following code results in the variable Announcement containing the string "...And the winner is: Player One!".
+- `char` represents a single UTF-8 code unit (one byte, `0oXX`).  
+- `char32` represents a full Unicode code point (`0uXXXX`).  
+
+Unlike some languages, Verse does not allow implicit conversion between characters and integers.  
+
+Strings can be compared using the failable operators `=` (equality) and `<>` (inequality). Comparison is done by code point, and is case sensitive.  
 
 ```verse
-# The winning player's name:
-WinningPlayerName : string = "Player One"
-# Build a message announcing the winner.
-Announcement : string = "...And the winner is: {WinningPlayerName}!"
+WinningPlayerName :string = "Player One"
+Announcement :string = "...And the winner is: " + WinningPlayerName + "!"
 ```
 
-Whether two strings are equal depends on whether they use the same characters.
-
-Comparison of strings in Verse is done by comparing the code points of each character. Comparison of two strings is case sensitive, because uppercase and lowercase characters have different code points.
-You can use the failable operator = to test if two strings are equal, and the failable operator <> to test for inequality.
-There can be multiple ways to represent the same character in Unicode. For example, "é" is "{0u0049}", but you can also use two code points: "{0u0065}", which is "e", and "{0u0301}", which is a combining accent. This means that if you compare these strings, which both appear to be the character "é" but the strings use different code points, the strings will not be equal. "{0u0049}" is not the same as "{0u0065}{0u0301}".
-
-The following example would check to see if the player has used the correct item to make progress in an adventure/puzzle game:
+Interpolation provides a shorter equivalent:  
 
 ```verse
-# This is the item the puzzle requires to unlock the next step:
-ExpectedItemInternalName : string = "RedPotion"
-# This is the item that the player has selected:
-SelectedItemInternalName : string = "BluePotion"
-# Check to see if the player has the right item selected.
+WinningPlayerName :string = "Player One"
+Announcement :string = "...And the winner is: {WinningPlayerName}!"
+```
+
+Equality depends on exact code unit sequences, not visual appearance. Unicode allows multiple encodings for the same abstract character. For example, `"é"` may appear as the single code point `{0u00E9}`, or as the two-code-point sequence `"e"` (`{0u0065}`) plus a combining accent (`{0u0301}`). These two strings look the same, but they are not equal in Verse.  
+
+Checking whether a player has selected the correct item:  
+
+```verse
+ExpectedItemInternalName :string = "RedPotion"
+SelectedItemInternalName :string = "BluePotion"
+
 if (SelectedItemInternalName = ExpectedItemInternalName):
-    # They do! Report that the puzzle can proceed to the next step.
-    return true
-# They do not. Report that this item does not advance the puzzle.
+    return true 
 return false
 ```
 
-You can get the number of UTF-8 code units in a string by accessing the member Length on the string. For example, "hey".Length is 3.
-
-The length of a string accounts for the amount of data it takes to represent the string in UTF-8 code units. For example, "héy".Length is 4, because it takes an extra UTF-8 code unit to represent the character é, even though the string appears to have three characters. The following code displays a "seconds" timer with two digits. It will pad the display with a leading zero if needed.
+Padding a timer with leading zeros:  
 
 ```verse
-# SecondsRemaining is assumed to be non-negative
-SecondsRemaining : int = 30
-# Automatically convert the int representation to a string:
-SecondsString:string = SecondsRemaining
-# Set up the timer display string.
-var Combined : string = "Time Remaining: "
-# If the string is too long, replace it the maximum two-digit value, 99.
+SecondsLeft :int = 30
+SecondsString :string = SecondsLeft   # convert int to string
+
+var Combined :string = "Time Remaining: "
 if (SecondsString.Length > 2):
-    # Too much time on the clock! Set the string to a hard-coded max value.
-    set Combined += "99"
+    set Combined += "99"              # clamp to maximum
 else if (SecondsString.Length < 2):
-    # Pad the display with a leading zero.
-    set Combined += "0{SecondsString}"
+    set Combined += "0{SecondsString}" # pad with zero
 else:
-    # The string is already the exact length, so add it.
     set Combined += SecondsString
 ```
 
-You can access the UTF-8 code unit at a specific index of the string. The first UTF-8 code unit in a string has an index of 0, and each subsequent code unit index increases in number.
-For example, "cat"[0] is "c" and "cat"[1] is "a".
+Certain characters have special meaning inside strings and must be escaped:  
 
-In cases where a string has characters that are represented by more than one code unit, there will be an index for each code unit. For example, "á" is represented by two UTF-8 code units "{0oC3}{0oA1}", so "cát"[1] is "{0oC3}" and "cát"[2] is "{0oA1}".
+- `{` and `}` are used for interpolation and code points, so literal braces must be written as `"\{\}"`.  
+- `"\n"` represents a newline.  
 
-The last index in a string is one less than the length of the string. For example, "cat".Length is 3 and the index for "t" in "cat" is 2.
+## Optionals
 
-Alternate Representations of Characters
+An optional is an immutable container that either holds one value of type `t` or nothing at all. The type is written `?t`. Optionals are useful whenever a value may or may not be present, such as when looking up a key in a map or calling a function that can fail. By making this possibility explicit in the type, Verse allows programmers to handle “no result” situations directly and consistently, instead of relying on ad hoc error codes or special values.
 
-Some characters have alternate representations when they’re used in a string. For example, "{}" can be used for string interpolation or for the code points of characters, but they can also be used as the brace characters {} themselves in text.
-To be able to use an alternate representation of a character in a string, you must add the escape character "\" before the character in the string. For example, "\{\}" is rendered as {} in text, and "\n" starts a new line in text.
-
-The string type is a type alias of []char, an array of UTF-8 code units. Because string is a type alias for an array, string has the same behavior as arrays.
-There are two primitive types for characters, depending on their size and code point format — char and char32. The only capabilities of char and char32 in Verse are for comparison, and to access their values.
-
-Primitive Type Description Supported Formats
-
-char
-
-A primitive type that represents a single UTF-8 code unit (one byte), up to the value 256 (0off).
-Code units of the form 0oXX. For example, 0o52.
-
-char32
-
-A primitive type that represents a Unicode code point.
-
-Code points of the form 0uXXXX. For example, 0u0041.
-
-You can also express literals with single quotes. Whether the primitive type of the string in single quotes is char or char32 depends on the UTF-8 code units used for the character. For example, 'e' is char, and 'é' is char32.
-
-## `?t`: Optional
-
-An immutable container that holds zero or one elements of type `t`, spelled `?t`:
+You can create a non-empty optional with `option{...}`, which wraps a value into an optional. For example:
 
 ```verse
-A:?int = option{42}                            # the `option` macro is used to construct a nonempty `option(t)` value
-
+A:?int = option{42}    # an optional containing the integer 42
 ```
 
-An empty optional is just `false`:
+If you want to represent “no value,” you use the special constant `false`. This is how Verse spells the empty optional:
 
 ```verse
-var B:?int = false                             # use `false` to mean "this optional has no element"
-B = false                                      # succeeds
-
+var B:?int = false     # this optional has no element
+B = false              # still empty
 ```
 
-To convert an optional to a `<decides>` expression that produces the optional's element (or fails if the optional is unset) use `?` like this:
+To extract the element of an optional, you write `?` after the optional expression. This produces a `<decides>` expression that succeeds if the optional has an element and fails otherwise. For example:
 
 ```verse
-S := A? + 2                                    # `A?` succeeds with 42
-
+S := A? + 2            # succeeds with 44 because A contains 42
 ```
 
-To convert an expression with the `<decides>` effect into a nonempty `option(t)` on success and `false` otherwise, use the `option` macro:
+If `A` had been `false`, then the attempt to use `A?` would fail and so would the whole computation. A failing case makes this clearer:
+
+```verse
+T := B? + 1            # fails, because B is false and has no element
+```
+
+This shows how Verse integrates optionals tightly with the effect system: the presence or absence of a value can cause an entire computation to succeed or fail.
+
+The `option{...}` form also works in the opposite direction. When you have a computation with the `<decides>` effect, wrapping it in `option{...}` converts it to an optional. On success you get a non-empty optional; on failure you get `false`:
 
 ```verse
 MaybeAFloat := option{GetAFloatOrFail[]}
-
 ```
 
-Use `set` to change what optional value a `var`s is referring to:
+This symmetry is important. The `?` operator unwraps an optional into a `<decides>` expression, while `option{...}` wraps a `<decides>` expression into an optional. Together they provide a smooth bridge between computations that may fail and values that may be absent.
+
+Although an optional value itself is immutable, you can keep one in a variable and change which optional the variable points to. The keyword `set` is used for this:
 
 ```verse
 var C:?int = false
-set C = option{2}                              # C now refers to a brand new option(int) with a 2 inside
+set C = option{2}      # C now refers to an optional containing 2
+C? = 2                 # succeeds, since C is not empty
 ```
 
- C? = 2                                         # succeeds
- C = option{2}                                  # succeeds
+This ability is useful whenever you want to track success or failure over time, such as gradually computing a result and updating the variable only when you succeed.
 
-## `[]t`: Array
-
-An immutable container that holds zero or more values of `t`, and lets you address these values with a `0`-based index:
+A common use case is searching for something that may or may not be there. Imagine a function `Find` that looks through an array of integers and returns the index of the element you want. If the element exists, the function returns `option{index}`; if not, it returns `false`. The caller can then safely decide what to do:
 
 ```verse
-A:[]int = array{}
-B:[]int = array{1, 2, 3}
+var Numbers:[]int = array{10, 20, 30}
 
+Find[N:[]int, x:int]:?int =
+    for {i := 0..N.Length} do
+        if N[i] = x then return option{i}
+    return false
+
+idx:?int = Find[Numbers, 20]    # succeeds with option{1}
+y := idx?                       # succeeds with 1
 ```
 
-Accessing elements:
+Here the optional signals the possibility of failure directly in the type. The `?` operator makes it easy to use the result in an expression, while `option{...}` allows you to turn conditional computations back into optionals. The effect is that the idea of “maybe a value, maybe not” becomes a first-class part of the language, rather than an afterthought, and programmers are encouraged to handle the absence of values in a disciplined way.
+
+## Tuple
+
+The tuple is a container that groups two or more expressions into a single expression. Unlike arrays, which can only contain elements of one type, tuples allow you to combine values of mixed types and treat them as one unit. The elements of a tuple appear in the order in which you list them, and you access them by their position, called the index. Because the number of elements is always known at compile time, a tuple is both simple to create and safe to use.
+
+The term *tuple* is a back formation from *quadruple*, *quintuple*, *sextuple*, and so on. Conceptually, a tuple is like an unnamed data structure with ordered fields, or like a fixed-size array where each element may have a different type.
+
+A tuple literal is written by enclosing a comma-separated list of expressions in parentheses. For example:
 
 ```verse
-B[0] = 1                                       # succeeds; there's an element at index 0, and its value is 1
-B[10]                                          # fails; there's no element at index 10
-
+(1, 2, 3)
 ```
 
-Concatenating arrays:
+The order of elements matters, so `(3, 2, 1)` is a completely different value. Since tuples allow mixed types, you might write:
 
 ```verse
-var C:[]int = B + array{4}                     # concatenate arrays using `+`
-C = array{1, 2, 3, 4}                          # succeeds
-
-set C += array{5}                              # shorthand for `set C = C + array{5}`
-
+(1, 2.0, "three")
 ```
 
-Getting the length of an array:
+Tuples can also nest inside each other:
 
 ```verse
-C.Length = 5                                   # succeeds
-
+(1, (10, 20.0, "thirty"), "three")
 ```
 
-Although `array(t)` is immutable, we can still "mutate" arrays through `var`:
+Tuples are particularly useful when you want to return multiple values from a function or when you want a lightweight grouping of values without the overhead of defining a struct or class. The type of a tuple is written with the `tuple` keyword followed by the types of the elements, but in most cases it can be inferred. For instance, you can write `MyTuple : tuple(int, float, string) = (1, 2.0, "three")`, or simply `MyTuple := (1, 2.0, "three")` and let the compiler deduce the type.
+
+The elements of a tuple are accessed using a zero-based index operator written with parentheses. If `MyTuple := (1, 2.0, "three")`, then `MyTuple(0)` is the integer `1`, `MyTuple(1)` is the float `2.0`, and `MyTuple(2)` is the string `"three"`. Because the compiler knows the number of elements in every tuple, tuple indexing cannot fail: any attempt to use an out-of-bounds index results in a compile-time error.
+
+Another feature of tuples is *expansion* (or *splatting*). When a tuple is passed to a function as a single argument, its elements are automatically expanded as if the function had been called with each element separately. For example:
 
 ```verse
-var D:[]int = array{1, 2, 3}                   # notice the `var`
-set D[0] = 3                                   # succeeds; `D` has an element at index 0
-D = array{3, 2, 3}                             # succeeds
+F(Arg1 : int, Arg2 : string) : void =
+    Print("{Arg1}, {Arg2}")
 
+G() : void =
+    MyTuple := (1, "two")
+    F(MyTuple)   # expands to F(1, "two")
 ```
 
-This works because the `var` itself is mutable (whoa): it's a mutable reference to an immutable array. Thus when we write
+Tuples also play an important role in structured concurrency. The `sync` expression produces a tuple of results, allowing several computations that unfold over time to be evaluated simultaneously. In this way, tuples provide not only a convenient grouping mechanism but also a foundation for composing concurrent computations in Verse.
+
+## Arrays
+
+An array is an immutable container that holds zero or more values of the same type `t`. The elements of an array are ordered, and each can be accessed by a zero-based index. Arrays are written with square brackets in their type, for example `[]int` or `[]float`, and are created with the `array{...}` literal form. For instance, `A : []int = array{}` creates an empty array, while `B : []int = array{1, 2, 3}` creates an array of three integers. Accessing elements by index is a failable operation: `B[0]` succeeds with the value `1`, while `B[10]` fails because the index is out of bounds.
+
+Arrays can be concatenated with the `+` operator, and when declared as `var` they can be extended with the shorthand operator `+=`. For example, `var C : []int = B + array{4}` gives `C` the value `array{1, 2, 3, 4}`, and `set C += array{5}` updates it to `array{1, 2, 3, 4, 5}`. The length of an array is available through the `.Length` member, so `C.Length` here would be `5`. Elements are always stored in the order they are inserted, and indexing starts at `0`. Thus `array{10, 20, 30}[0]` is `10`, and the last valid index of any array is always one less than its length.
+
+Although arrays themselves are immutable, variables declared with `var` can be reassigned to new arrays, or can appear to have their elements changed. For example, `var D : []int = array{1, 2, 3}` allows the update `set D[0] = 3`, after which `D` will hold `array{3, 2, 3}`. What actually happens is that a brand new array is created under the hood, with the specified element updated. In effect, `set D[0] = 3` is compiled into `set D = array{3, D[1], D[2]}`. The old array continues to exist if another variable was referencing it, which means that if `A` and `B` both start as `array{1}` and we update `A[0]`, then `A` and `B` will diverge: `A[0]` is now `2` while `B[0]` is still `1`.
+
+Arrays are useful whenever you want to store multiple values of the same type, such as a list of players in a game: `Players : []player = array{Player1, Player2}`. Access is by index, for example `Players[0]` is the first player. Since indexing is failable, it is often combined with `if` expressions or iteration. For instance, the following code safely prints out every element of an array:  
 
 ```verse
-set D[0] = 3
-
+ExampleArray : []int = array{10, 20, 30, 40, 50}
+for (Index := 0..ExampleArray.Length - 1):
+    if (Element := ExampleArray[Index]):
+        Print("{Element} in ExampleArray at index {Index}")
 ```
 
-... the compiler treats it as if we wrote something like:
+which produces  
+
+```
+10 in ExampleArray at index 0
+20 in ExampleArray at index 1
+30 in ExampleArray at index 2
+40 in ExampleArray at index 3
+50 in ExampleArray at index 4
+```
+
+Because arrays are values, “changing” them always means replacing the old array with a new one. With `var` this feels natural, since variables can be reassigned. For example, you can concatenate arrays and then update an element:  
 
 ```verse
-set D = array{3, D[1], D[2]}                   # element 0 has the "new" value we specified, the others stay the same
-
+Array1 : []int = array{10, 11, 12}
+var Array2 : []int = array{20, 21, 22}
+set Array2 = Array1 + Array2 + array{30, 31}
+if (set Array2[1] = 77) {}
 ```
 
-Now `D` refers to a _brand new immutable array_ whose elements are `3, 2, 3`. We can verify that the array is in fact brand new:
+After this code runs, iterating through `Array2` prints `10, 77, 12, 20, 21, 22, 30, 31`.
+
+Arrays can also be nested to form multi-dimensional structures, similar to rows and columns of a table. For example, the following creates a two-dimensional 4×3 array of integers:
 
 ```verse
-var A:[]int = array{1}                         # a single-element array
-var B:[]int = A                                # A and B now refer to the same array
-set A[0] = 2                                   # now A refers to a brand new array
-A[0] = 2                                       # succeeds
-B[0] = 1                                       # succeeds
-
+var Counter : int = 0
+Example : [][]int =
+    for (Row := 0..3):
+        for (Column := 0..2):
+            set Counter += 1
 ```
 
-## `[k]v`: Map
+This array can be visualized as  
 
-An immutable associative container (like a dictionary) that holds zero or more `(`_Key_`:k,` _Value_`:v)` pairs:
+```
+Row 0:  1  2  3
+Row 1:  4  5  6
+Row 2:  7  8  9
+Row 3: 10 11 12
+```
+
+and is accessed with two indices: `Example[0][0]` is `1`, `Example[0][1]` is `2`, and `Example[1][0]` is `4`. You can loop through all rows and columns with nested iteration. Arrays in Verse are not restricted to rectangular shapes: each row can have a different length, producing a jagged structure. For example,  
+
+```verse
+Example : [][]int =
+    for (Row := 0..3):
+        for (Column := 0..Row):
+            Row * Column
+```
+
+produces a triangular array with rows of increasing length: row 0 has none, row 1 has a single `0`, row 2 has `0, 2, 4`, and row 3 has `0, 3, 6, 9`.
+
+Arrays in Verse are thus immutable values with predictable behavior, but through `var` they offer the convenience of mutable variables. They can be concatenated, iterated, or nested, and are one of the most flexible and fundamental data structures in the language.
+
+## Maps
+
+Maps are one of the core container types, alongside arrays and optionals. Arrays are ordered sequences indexed by integers, while optionals are the smallest container of all, holding either zero or one value. Maps generalize both ideas: like arrays, they provide efficient lookup, but instead of being limited to integer indices, they allow any *comparable* type as a key. You can think of a map as an array indexed by arbitrary keys, or as a larger optional that can hold many key–value associations at once.
+
+A map is an immutable associative container that stores zero or more key–value pairs of type `[k]v`, written as `(Key:k, Value:v)`. Maps are the standard way to associate values with other values: you supply a key, and the map returns the value associated with it. This is similar to a dictionary in many programming languages.  
+
+Maps are useful whenever you want to store data that is naturally indexed by something other than an integer position. For example, you might want to store the weights of different objects keyed by their names:  
 
 ```verse
 Empty := map{}
@@ -412,56 +477,102 @@ var Weights:[string]float = map{
     "elephant" => 500.0,
     "galaxy" => 500000000000.0
 }
-
 ```
 
-A key's value can be looked up using `[]` in amortized _O(1)_ time:
+Looking up a value in a map uses square brackets. The expression succeeds if the key is present and fails if it is not. Lookups are designed to be fast, with amortized *O(1)* time complexity:  
 
 ```verse
-0.00001 < Weights["ant"]                       # succeeds
-Weights["car"]                                 # fails; no "car" key
-
+0.00001 < Weights["ant"]    # succeeds, since "ant" is a key
+Weights["car"]              # fails, since "car" is not a key
 ```
 
-To (re)associate a value with a key, use `set` through a `var`:
+If you want to update a map stored in a variable, you use `set`. This works both for adding a new key–value pair and for changing the value of an existing key. If you try to modify a key that is not present, the operation fails:  
 
 ```verse
-var Friendliness[string]int = map{"peach" => 1000}
+var Friendliness:[string]int = map{"peach" => 1000}
 
-set Friendliness["pelican"] = 17                            # add a new value
-set Friendliness["peach"] += 2000                           # ... or change an existing one
-set Friendliness["tomato"] += 1000                          # fails; no "tomato" key
-
+set Friendliness["pelican"] = 17     # add a new key
+set Friendliness["peach"] += 2000    # update an existing key
+set Friendliness["tomato"] += 1000   # fails; "tomato" is not in the map
 ```
 
-The number of key/value pairs can be obtain by calling `Length`:
+Every map also carries its size, accessible as the `Length` field:  
 
 ```verse
-Friendliness.Length = 2                                     # succeeds
-
+Friendliness.Length = 2              # the map has 2 entries
 ```
 
-Any subclass of the `comparable` class may be used as a map's key type. This includes: `int`, `float`, `rational`, `logic`, `char`, `char8`, `char32`, and any combination of arrays, maps, tuples, or `struct`s consisting of other `comparable` values, but not instances of `class`es or `interface`s.
+When constructing a map with duplicate keys, only the last value is kept. This is because a map enforces uniqueness of keys, so earlier entries are silently overwritten:  
 
-TODO: maybe worth mentioning what iterating over maps looks like? "since we're here"
+```verse
+WordCount:[string]int = map{
+    "apple" => 0,
+    "apple" => 1,
+    "apple" => 2
+}
+# WordCount contains only {"apple" => 2}
+```
 
-## `tuple(t1, ...)`: Tuple
+Maps can also be iterated over, letting you traverse all key–value pairs in the order they were inserted:  
 
-TODO: fill this in
+```verse
+ExampleMap:[string]string = map{
+    "a" => "apple",
+    "b" => "bear",
+    "c" => "candy"
+}
 
-# Any
+for (Key -> Value : ExampleMap):
+    Print("{Value} in ExampleMap at key {Key}")
+```
 
-Any is the supertype of all types, meaning whatever behavior is defined for it is also defined for all the any subtypes.
-Verse has a special type, any, that is the supertype of all types (all other types are subtypes of any). Because of this, any supports very few operations, as all other types must be able to provide the same functionality that any provides.
-For example, if any were to define a comparison operation (which it doesn't), then all other types would also have to define a comparison operation (which they don't).
-There is very little that you can do with an any type. but it's good to be aware of this type as it may come up when writing code that produces an error.
-But there are ways that you can use any:
+This produces:  
+
+- “apple in ExampleMap at key a”  
+- “bear in ExampleMap at key b”  
+- “candy in ExampleMap at key c”  
+
+Sometimes you want to remove an entry from a map. Since maps are immutable, “removing” means creating a new map that excludes the given key. For example, here is a function that removes an element from a `[string]int` map:  
+
+```verse
+RemoveKeyFromMap(ExampleMap:[string]int, ElementToRemove:string):[string]int =
+    var NewMap:[string]int = map{}
+    for (Key -> Value : ExampleMap, Key <> ElementToRemove):
+        set NewMap = ConcatenateMaps(NewMap, map{Key => Value})
+    return NewMap
+```
+
+The key type of a map must belong to the class `comparable`, which guarantees that two keys can be checked for equality. All basic scalar types such as `int`, `float`, `rational`, `logic`, `char`, and `char32` are comparable, and so are compound types like arrays, maps, tuples, and `struct`s whose components are comparable. Classes and interfaces cannot be used as keys, since their instances do not provide a built-in notion of equality.  
+
+### Weak Maps
+
+There is also a type `weak_map`, which is a supertype of `map`. It behaves similarly to ordinary maps, but it deliberately restricts what you can do. You cannot ask for its length, you cannot iterate over its entries, and you cannot use `ConcatenateMaps`. These restrictions make `weak_map` lighter and in some contexts more efficient, but at the cost of flexibility.  
+
+A `weak_map` is declared with `weak_map(k,v)` and can be initialized from an ordinary `map{}`. Updating and accessing values works the same way:  
+
+```verse
+var MyWeakMap:weak_map(int,int) = map{}
+
+set MyWeakMap[0] = 1
+Value := MyWeakMap[0]         # succeeds with 1
+
+set MyWeakMap = map{0 => 2}   # reassignment still works
+```
+
+Because `weak_map` is a supertype of `map`, you can switch between the two when needed, but you lose the ability to count or iterate once you are working with a weak map.
+
+## Any
+
+The `any` type is the **supertype of all types**. Every type in the language is a subtype of `any`. Because of this, `any` itself supports very few operations: whatever functionality `any` provides must also be implemented by every other type. In practice, there is very little you can do directly with values of type `any`. Still, it is important to understand the type, because it sometimes arises when working with code that mixes different kinds of values, or when the type checker has no more precise type to assign.  
+
+One way `any` appears is when combining values that do not share a more specific supertype. For example:  
 
 ```verse
 Letters := enum:
     A
     B
     C
+
 letter := class:
     Value : char
     Main(Arg : int) : void =
@@ -471,16 +582,35 @@ letter := class:
             letter{Value := 'D'}
 ```
 
-In the code example above, X is given the type any, as that is the lowest supertype of both Letters and letter.
-More usefully, any can be used as the type for a parameter to a function that is ignored (but might be required as an argument for a method of an implemented interface).
-For example:
+In this example, `X` is assigned either a value of type `Letters` or of type `letter`. Since these two types are unrelated, the compiler assigns `X` the type `any`, which is their lowest common supertype.  
+
+A more useful role for `any` is as the type of a parameter that is required syntactically but not actually used. This pattern can arise when implementing interfaces that require a certain method signature.  
 
 ```verse
 FirstInt(X:int, :any) : int = X
 ```
 
-The second argument to FirstInt is ignored, and can be of any type, so it is given the any type. FirstInt can be more generally written using parametric types. For example:
+Here, the second parameter is ignored. Because it can be any value of any type, it is given the type `any`.  
+
+In more general code, the same idea can be expressed using **parametric types**, making the function flexible while still precise:  
 
 ```verse
 First(X:t, :any where t:type) : t = X
 ```
+
+This version works for any type `t`, returning a value of type `t` while discarding the unused argument of type `any`.  
+
+## Void
+
+The `void` type is the **empty type**. Unlike `any`, which contains all possible values, `void` contains none. It represents the absence of a value and is used in places where no result is returned.  
+
+Because `void` has no values, you can never construct or assign a value of type `void`. This makes it useful as a marker type in function signatures and control flow.  
+
+A function whose purpose is to perform an effect, rather than compute a value, has return type `void`.  
+
+```verse
+LogMessage(Msg:string) : void =
+    Print(Msg)
+```
+
+Here, `LogMessage` performs an action (printing) but does not return a result. The `void` return type makes that explicit.
