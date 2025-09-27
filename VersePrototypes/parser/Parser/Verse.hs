@@ -916,6 +916,8 @@ pBase =
   <|>
   (Exp.Fail <$) <$> pKeyword "fail" -- TODO: Is "fail" a reserved words?
   <|>
+  pcLet
+  <|>
   pChar
   <|>
   pNum
@@ -937,6 +939,21 @@ pcOption = lexeme (pKeyword "option") *> do
   body <- pcBraces (P.optionMaybe pExpr)
   end <- pos
   return $ wrapLoc beg (Exp.Option body) end
+
+pcLet :: Parser (L (Exp SimpleName))
+pcLet = bracketLoc go
+  where
+    go = lexeme (pKeyword "let") *> do
+      binder <- pParens pExpr
+      body   <- pBraces pcExpr
+      return $ Exp.Let binder body
+
+bracketLoc :: Parser a -> Parser (L a)
+bracketLoc p = do
+  beg <- pos
+  res <- p
+  end <- pos
+  return $ wrapLoc beg res end
 
 -- Call      := Base    {Space Postfix}
 pCall :: Parser (L (Exp SimpleName))

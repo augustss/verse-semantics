@@ -233,6 +233,11 @@ rewriteExp expr = for expr $ \case
   Parse.Option Nothing  -> pure $ Option Nothing
   Parse.Option (Just e) -> Option . Just <$> rewriteExp e
 
+  Parse.Let bndr body -> do
+    b  <- rewriteExp bndr
+    bd <- rewriteExp body
+    return $ Let b bd
+
   Parse.Inst (extract -> ExpSpecs a bs) e2 | isPredefined "check" a -> do
     let find_eff x | isPredefined "succeeds" x = Effect.Succeeds
                    | isPredefined "fails"    x = Effect.Fails
@@ -386,7 +391,6 @@ rewriteExp expr = for expr $ \case
   e@Parse.Module{}                -> notImplemented "rewriteExp" e
   e@Parse.PostfixCaret{}          -> notImplemented "rewriteExp" e
   e@Parse.PrefixCaret{}           -> notImplemented "rewriteExp" e
-  e@Parse.Option{}                -> notImplemented "rewriteExp" e
   e@Parse.PrefixMultiply{}        -> notImplemented "rewriteExp" e
   e@Parse.PrefixAmpersand{}       -> notImplemented "rewriteExp" e
   e@Parse.Return{}                -> notImplemented "rewriteExp" e

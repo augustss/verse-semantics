@@ -250,7 +250,7 @@ testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
 testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
-testeq("let1",pass,libparser=skip) { let(x:=1){x+2} } { 3 }
+testeq("let1",pass) { let(x:=1){x+2} } { 3 }
 # this test works, but gives an annoying warning
 #testeq("let2",pass) { let(x:=1){x+2}; x } { x }
 # shadowing doesn't really work, so this crashes

@@ -59,6 +59,7 @@ data Exp f a
   | Struct (f (Exp f a))
   | Class (Maybe (f (Exp f a))) (f (Exp f a))
   | Inst (f (Exp f a)) (f (Exp f a))
+  | Let  (f (Exp f a)) (f (Exp f a))   -- let(e){body} Note: not in VerseSpec 0.15
   | Enum [SimpleName]
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
