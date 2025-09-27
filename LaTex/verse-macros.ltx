@@ -300,6 +300,7 @@
 \newcommand{\pomENV}{\mathbf{PENV}}
 \newcommand{\pomempty}{\emptyset}
 \newcommand{\pomunion}{\cup}
+\newcommand{\pomelem}{\Yleft}
 \newcommand{\pomunions}{\mathit{UNION}}
 \newcommand{\pomcat}{\append}
 \newcommand{\pomcats}{\mathit{CONC}}
@@ -348,7 +349,8 @@
 \newcommand{\hideEs}{\mathbf{hide}^{*}}
 %% \HIDE(env, xs) and \HIDES(envs, xs) are the two-place macros
 
-\newcommand{\HIDEkw}{\ggg}
+% \newcommand{\HIDEkw}{\ggg}
+\newcommand{\HIDEkw}{\;\backslash\!\backslash\;}
 \newcommand{\HIDESkw}{\prescript{*\!}{}{\ggg}\,}
 \newcommand{\HIDE}[2]{#1 \HIDEkw #2}
 \newcommand{\HIDES}[2]{#1 \HIDESkw #2}

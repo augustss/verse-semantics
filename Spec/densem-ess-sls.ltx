@@ -17,8 +17,6 @@
 \begin{figure}
 $$
 \begin{array}{l}
-  \Cap
-  \\
   \multicolumn{1}{c}{\fbox{
   \begin{minipage}{10cm}
   $$\begin{array}{rcll}
@@ -33,8 +31,8 @@ $$
   \end{minipage}
  }} \\ \\
 
+\textbf{Axioms} \\
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{4}{l}{\textbf{Axioms}} \\
 \rulename{ax1} & \pomempty \pomcat S      & = & S \\
 \rulename{ax2} & S \pomcat \pomempty      & = & S \\
 \rulename{ax3} & (S \pomcat T) \pomcat R	 & = & S \pomcat (T \pomcat R) \\[1mm]
@@ -46,18 +44,31 @@ $$
 \rulename{ax9} & S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
 \end{array}
 \\
+\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms} \\
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
-  \multicolumn{3}{l}{\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms}} \\
   (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom{B} \\
   \pomempty \pombind h		& = & \pomempty \\
   \pomunit{a} \pombind h  	& = & h(a) \\
   (S \pomcat T) \pombind h      & = & (S \pombind h) \pomcat (T \pombind h) \\
   (S \pomunion T) \pombind h    & = & (S \pombind h) \pomunion (T \pombind h) \\
-  \\
-  \pommap & : & (A \rightarrow B) \rightarrow \pom{A} \rightarrow \pom{B} \\
-  \pommap(f,S) & = & S \pombind \lambda a.\, \pomunit{ f(a) } 
+%   \\
+%   \pommap & : & (A \rightarrow B) \rightarrow \pom{A} \rightarrow \pom{B} \\
+%  \pommap(f,S) & = & S \pombind \lambda a.\, \pomunit{ f(a) } 
 \end{array} \\
 \\
+\begin{minipage}{10cm}
+  \textbf{Pomset comprehensions}
+  \begin{itemize}
+  \item Built with $\pomcompL \ldots \vb \ldots, \ldots, \ldots \pomcompR$
+  \item Uses $a \pomelem S$ to mean ``$a$ is drawn from pomset $S$''
+  \item Example: $\pommap(f,S)  = \pomcompL f(a) \vb a \pomelem S \pomcompR $
+  \item Desugars to $(\pombind)$ and $\pomunit{\_}$ in the usual way
+  \item $\pommap(f,S)  \; = \; \pomcompL f(a) \vb a \pomelem S \pomcompR \; = \; S \pombind \lambda a.\, \pomunit{ f(a) }$
+  \end{itemize}
+\end{minipage}
+\\
+\\
+
 \text{\textbf{Theorems} \hspace{3mm} ``You can remove any sub-sequence''.}\\
 \begin{array}{lrcl}
   \rulename{T1} & (S \pomcat T) \pomunion T & = & S \pomcat T \\
@@ -110,13 +121,13 @@ $$
 \multicolumn{3}{l}{\text{\textbf{Alternative definitions of sequencing}}} \\
     S \pomseq T & = & S \pombind (\lambda \EV_1.\, T \pombind (\lambda \EV_2. \,
         \text{if}\,\EV_1 \cap \EV_2 = \{\} \, \text{then}\,  \pomempty \, \text{else} \, \pomunit{\EV_1 \cap \EV_2})) \\
-        & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T, \EV_1 \cap \EV_2 \not= \{\} \pomcompR \\[1mm]
+        & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 \pomelem S, \; \EV_2 \pomelem T, \; \EV_1 \cap \EV_2 \not= \{\} \pomcompR \\[1mm]
 
 \multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
 (\pomor) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
  \pomempty \pomor S & = & S \\
  S \pomor \pomempty & = & S \\
- S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 |<-| S, \EV_2 |<-| T \pomcompR \\[1mm]
+ S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 \pomelem S,\; \EV_2 \pomelem T \pomcompR \\[1mm]
 
 \multicolumn{3}{l}{\text{\textbf{Negation (or, complement)}}} \\
 \pomNOT & : & \pomENV \rightarrow \pomENV \\
@@ -184,7 +195,7 @@ $$
 
 % Application and type
 \rulename{sapp} & \semess{E}{u}{v}{|apply1N t_1 t_2|}
-& = &  \pomunit{\conBrack{u=v}} \pomseq \semess{E}{f}{g}{t_1} \pomseq \semess{E}{p}{q}{t_1}
+& = &  \pomunit{\conBrack{u=v}} \pomseq \semess{E}{f}{g}{t_1} \pomseq \semess{E}{p}{q}{t_2}
 \pomseq \semap{F}{|apply1N g q|}v  \\
 & & & \pomHIDE \{f,g,p,q\} \hfill f,g,p,q \not\in \freevars{t_1,t_2,u,v} \\[1mm]
 \rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \pomseq \semap{F}{|apply1N q u|}v
