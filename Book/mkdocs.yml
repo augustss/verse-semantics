@@ -38,20 +38,20 @@ extra_css:
 nav:
   - Home: index.md
   - Overview: 00_overview.md
-  - Built-in Types: 01_builtins.md
-  - Composite Types: 02_composites.md
-  - Functions: 03_functions.md
-  - Operators: 04_operators.md
-  - Expressions: 05_expressions.md
-  - Control Flow: 06_control.md
-  - Modules and Paths: 07_modules.md
-  - Failure: 08_failure.md
-  - Effects: 09_effects.md
-  - Concurrency: 10_concurrency.md
-  - Mutability: 11_mutability.md
-  - Type System: 12_types.md
-  - Persistable Types: 13_persistable.md
-  - Access Specifiers: 14_access.md
+  - Expressions: 01_expressions.md
+  - Built-in Types: 02_builtins.md
+  - Operators: 03_operators.md
+  - Functions: 04_functions.md
+  - Control Flow: 05_control.md
+  - Failure: 06_failure.md
+  - Type System: 07_types.md
+  - Composite Types: 08_composites.md
+  - Mutability: 09_mutability.md
+  - Effects: 10_effects.md
+  - Concurrency: 11_concurrency.md
+  - Modules and Paths: 12_modules.md
+  - Access Specifiers: 13_access.md
+  - Persistable Types: 14_persistable.md
   - Code Evolution: 15_evolution.md
   - Grammar: 16_grammar.md
   - "📚 Concept Index": concept_index.md
