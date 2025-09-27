@@ -1,32 +1,45 @@
-# A litte Verse
+# Verse Language Documentation
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+This documentation provides an in-depth look at the Verse programming language, its philosophy, and core concepts.
 
-## Commands
+## Philosophy
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+Verse is a *functional logic* programming language with three core principles:
 
-## Project layout
+- **It's just code** - Complex concepts are expressed as primitive Verse constructs
+- **Just one language** - Same constructs for compile-time and run-time
+- **Metaverse first** - Designed for a global simulation environment
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+## Documentation Sections
 
-```verse
-# Example Verse code
-using { /Fortnite.com/Devices }
+### Getting Started
 
-GameController := class<public>:
-    var Score:int = 0
+- [Language Overview](00_overview.md) - Introduction to Verse philosophy and features
 
-    UpdateScore(Points:int)<transacts>:void=
-        set Score = Score + Points
+### Core Language Features
 
-    IsWinning()<decides>:logic=
-        Score > 100
-```
+- [Built-in Data Types](01_builtins.md) - Integers, floats, rationals, logic, strings, and container types
+- [Composite Types](02_composites.md) - Classes, interfaces, structs, and enums
+- [Functions](03_functions.md) - Open-world vs closed-world functions, parameters, and return values
+- [Operators](04_operators.md) - Arithmetic, comparison, logical, and assignment operators with precedence
+- [Expressions](05_expressions.md) - Everything is an expression paradigm
+- [Control Flow and Structure](06_control.md) - If/else, loops, code blocks, and comments
+- [Modules and Paths](07_modules.md) - Code organization and the global namespace
 
+### Advanced Concepts
+
+- [Failure System](08_failure.md) - First-class failure, failable expressions, and speculative execution
+- [Effects](09_effects.md) - Effect families, specifiers, and capability declarations
+- [Concurrency](10_concurrency.md) - Structured concurrency with sync, race, rush, branch, and spawn
+- [Mutability](11_mutability.md) - Mutable variables, references, and state management
+
+### Type System and Evolution
+
+- [Types and Type System](12_types.md) - Types as functions and type checking
+- [Persistable Types](13_persistable.md) - Types that can be saved and loaded
+- [Access Specifiers](14_access.md) - Public, private, and protected visibility
+- [Code Evolution](15_evolution.md) - Versioning and backward compatibility
+
+### Language Reference
+
+- [Grammar Features](16_grammar.md) - Language grammar and syntax
