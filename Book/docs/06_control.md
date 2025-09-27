@@ -222,8 +222,6 @@ TryMultipleStrategies(Data:input_data)<decides>:output =
 
 The key to mastering control flow in Verse is understanding that it's not just about directing execution - it's about composing expressions that produce values. Every `if`, every `loop`, every block contributes to the overall computation. This expression-oriented mindset, combined with the failure-based decision making and the scoping rules of code blocks, creates a programming model that's both powerful and elegant.
 
-Comments serve as your guide through this landscape, documenting not just what your code does but why it does it. Well-placed comments transform complex control flow into understandable narratives, making your code accessible to others (including your future self).
-
 As you write more Verse code, you'll find that the boundaries between control flow, data flow, and program structure become fluid. A loop isn't just repetition - it's a value-producing expression that can filter, transform, and aggregate. An `if` isn't just a branch - it's a computation that chooses between possible results based on success and failure. A block isn't just a grouping - it's a scoped computation that produces a value while managing local state.
 
 This unified view of program structure, where everything is an expression and control flow seamlessly integrates with computation, is what makes Verse unique. By mastering these concepts - the thoughtful use of comments, the strategic structuring of code blocks, and the elegant orchestration of control flow - you'll be able to write Verse code that is not only correct and efficient but also clear and maintainable.

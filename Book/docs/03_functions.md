@@ -1,12 +1,10 @@
 # Functions
 
-Functions in Verse are reusable code blocks that perform actions and produce outputs based on inputs. Think of them as abstractions for behaviors, much like ordering food from a menu at a restaurant. When you order, you tell the waiter what you want from the menu, such as `OrderFood("Ramen")`. You don't need to know how the kitchen prepares your dish, but you expect to receive food after ordering. This abstraction is what makes functions powerful - you define the instructions once and reuse them in different contexts throughout your code.
+Functions are reusable code blocks that perform actions and produce outputs based on inputs. Think of them as abstractions for behaviors, much like ordering food from a menu at a restaurant. When you order, you tell the waiter what you want from the menu, such as `OrderFood("Ramen")`. You don't need to know how the kitchen prepares your dish, but you expect to receive food after ordering. This abstraction is what makes functions powerful - you define the instructions once and reuse them in different contexts throughout your code.
 
-Verse takes a unique approach to functions by supporting three programming paradigms simultaneously: functional programming with lambdas and immutable data structures, imperative programming with mutable variables and pointers, and logic programming where programs describe equations to solve. This multi-paradigm approach makes functions particularly versatile in Verse.
+Verse takes a unique approach to functions by supporting three programming paradigms simultaneously: functional programming with lambdas and immutable data structures, imperative programming with mutable variables and pointers, and logic programming where programs describe equations to solve. This multi-paradigm approach makes functions particularly versatile.
 
-## The Two Worlds of Functions
-
-One of Verse's most distinctive features is the separation between open-world and closed-world functions. This distinction fundamentally affects how functions behave both at compile-time and runtime.
+## Abstraction
 
 Consider this simple function:
 

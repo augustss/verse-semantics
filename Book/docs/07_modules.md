@@ -468,36 +468,6 @@ MyModule := module:
         (MyModule:)X + (local:)X  # Module X + parameter X
 ```
 
-## Best Practices
-
-### Module Organization
-
-1. **Single Responsibility**: Each module should have a clear, focused purpose
-2. **Hierarchical Structure**: Use nested modules for related functionality
-3. **Clear Naming**: Use descriptive names that indicate the module's purpose
-4. **Documentation**: Document public APIs clearly
-
-### Access Control
-
-1. **Minimal Public Surface**: Only make public what needs to be
-2. **Use Internal by Default**: Keep implementation details private
-3. **Protected for Inheritance**: Use protected for extensible classes
-4. **Consistent Access Patterns**: Be consistent within a module
-
-### Importing
-
-1. **Import What You Need**: Don't import entire module hierarchies unnecessarily
-2. **Order Matters**: Import base modules before submodules
-3. **Avoid Circular Dependencies**: Structure modules to prevent circular imports
-4. **Use Qualified Names When Unclear**: Disambiguate with full paths when needed
-
-### Versioning and Evolution
-
-1. **Plan for Change**: Design APIs with future evolution in mind
-2. **Maintain Compatibility**: Never break existing public interfaces
-3. **Deprecate Gracefully**: Mark old APIs as deprecated before removal
-4. **Version Documentation**: Keep clear records of API changes
-
 ## Common Patterns
 
 ### Factory Module Pattern
@@ -886,14 +856,3 @@ This combat module demonstrates:
 - Using public functions from other modules
 - Creating module-specific data structures
 - Interaction between different game systems
-
-## Naming Conventions
-
-Verse follows specific naming conventions that, while not enforced by the compiler, are strongly encouraged for consistency and readability:
-
-- **Module names**: Use `snake_case` (e.g., `game_systems`, `player_inventory`)
-- **Type names**: Use `snake_case` (e.g., `player_stats`, `item_data`)
-- **Value names**: Use `CamelCase` (e.g., `MaxHealth`, `PlayerScore`)
-- **Function names**: Use `CamelCase` (e.g., `CalculateDamage`, `GetPlayerStats`)
-
-Following these conventions makes your code consistent with Epic's standard library and easier for other Verse developers to understand.

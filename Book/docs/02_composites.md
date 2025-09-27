@@ -4,13 +4,9 @@ Composite types allow you to create custom data structures that model the entiti
 
 Verse provides four fundamental composite type constructors, each serving a distinct purpose in your type architecture. Classes provide object-oriented programming with inheritance and polymorphism, enabling you to model complex hierarchies of game entities. Interfaces define contracts that classes must fulfill, promoting loose coupling and enabling multiple inheritance of behavior specifications. Structs offer lightweight, value-oriented data containers perfect for simple data aggregation without the overhead of object-oriented features. Enums represent fixed sets of named values, ideal for modeling game states, item types, or any domain with a known set of alternatives.
 
-The choice between these composite types shapes not just how your data is structured, but how your entire program is organized and how different parts of your code interact. Understanding when to use each type and how they work together is crucial for building maintainable, efficient Verse applications.
-
 ## Classes
 
-Classes form the backbone of object-oriented programming in Verse. A class serves as a blueprint for creating objects that share common properties and behaviors. When you define a class, you're essentially creating a new type that bundles data (fields) with operations on that data (methods), encapsulating related functionality into a cohesive unit.
-
-### Basic Class Definition
+Classes form the backbone of object-oriented programming in Verse. A class serves as a blueprint for creating objects that share common properties and behaviors. When you define a class, you're creating a new type that bundles data (fields) with operations on that data (methods), encapsulating related functionality into a cohesive unit.
 
 The simplest form of a class groups related data together. Consider modeling a character in your game:
 
@@ -33,7 +29,7 @@ Hero := character{Name := "Aldric", Health := 100, Level := 5}
 Villager := character{Name := "Martha"}  # Uses default values for unspecified fields
 ```
 
-The archetype syntax uses named parameters, making the construction explicit and self-documenting. Any field with a default value can be omitted from the archetype, and the default will be used. Fields without defaults must be specified, ensuring objects are always fully initialized.
+The archetype syntax uses named parameters, making the construction explicit and self-documenting. Any field with a default value can be omitted from the archetype, and the default will be used. Fields without defaults must be specified, ensuring objects are always fully initialized. Fields can be passed to an archetype in any order.
 
 ### Methods and Behavior
 
@@ -139,6 +135,21 @@ turret := class(entity):
 
 The override mechanism ensures that the correct method implementation is called based on the actual type of the object, not the type of the variable holding it. This is the foundation of polymorphic behavior in object-oriented programming.
 
+### Constructor Functions
+
+Classes don't have traditional constructor methods like you might find in other object-oriented languages. Instead, Verse uses a more functional approach to object construction through direct field  initialization and the Make pattern for complex initialization logic.
+
+For classes requiring validation or complex initialization, Verse uses factory functions rather than constructor methods. These are typically named `Make`, are annotated `<constructor>` and return an instance of the class. The factory function can perform  validation, compute derived values, or fail if requirements aren't met:
+
+```verse
+  MakePlayer<constructor>(Name:string, Level:int)<decides>:player =
+      Level > 0
+      Level <= MaxLevel
+      player{Name := Name, Health := Level *100, Mana := Level* 50}
+```
+
+ For classes with mutable fields (marked with `var`), initialization sets the starting values that can change during   the object's lifetime. Immutable fields must be initialized during construction and cannot be modified afterward.  This distinction makes the construction phase critical for  establishing invariants that will hold throughout the object's existence.
+
 ### Access Specifiers
 
 Classes support fine-grained control over member visibility through access specifiers:
@@ -178,11 +189,168 @@ DefaultConfig := config{}
 
 This is particularly useful for configuration classes where reasonable defaults exist for all values.
 
+A concrete class `C` can be constructed by writing `C{}`, that is to say with the empty archetype.
+
+A concrete class may have non-concrete subclasses.
+
+### The Unique Specifier
+
+The `<unique>` specifier creates classes with reference semantics where each instance has a distinct identity. When a class is marked as `<unique>`, instances become comparable using the equality operators (= and <>), with equality based on object identity rather than field values.
+
+**Identity-Based Equality**
+
+Classes marked with `<unique>` compare by identity, not by value:
+
+```verse
+entity := class<unique>:
+   Name : string
+   Position : vector3
+
+E1 := entity{Name := "Guard", Position := vector3{X := 0.0, Y := 0.0, Z := 0.0}}
+E2 := entity{Name := "Guard", Position := vector3{X := 0.0, Y := 0.0, Z := 0.0}}
+E3 := E1
+
+E1 = E2  # Fails - different instances despite identical field values
+E1 = E3  # Succeeds - same instance
+```
+
+This specifier is ideal for:
+
+- Game Entities: Where each entity in the world must be distinguishable regardless of current state
+- Session Objects: Where identity matters more than current property values
+- Resource Handles: Where you need to track specific instances rather than equivalent values
+
+Without `<unique>`, class instances cannot be compared for equality at all—the language prevents meaningless
+comparisons. With `<unique>`, you gain the ability to use instances as map keys, store them in sets, and perform
+identity checks, essential for tracking specific objects throughout their lifetime.
+
+### The Abstract Specifier
+
+The `<abstract>` specifier marks classes that cannot be instantiated directly — they exist solely as base classes  for inheritance. When you declare a class with `<abstract>`, you're creating a template that defines structure and behavior for subclasses to inherit and implement.
+
+Abstract classes serve as architectural foundations in a type hierarchy. They define contracts through abstract methods that subclasses must implement, while potentially providing concrete methods and fields that subclasses inherit. This creates a powerful pattern for code reuse and polymorphic behavior.
+
+```verse
+  vehicle<abstract> := class:
+      Speed():float             # Abstract method
+      MaxPassengers:int = 1
+
+      # Concrete method all vehicles share
+      CanTransport(Count:int)<decides>:void =
+          Count <= MaxPassengers
+
+  car := class(vehicle):
+      Speed<override>():float = 60.0
+      MaxPassengers<override>:int = 4
+
+  bicycle := class(vehicle):
+      Speed<override>():float = 15.0
+```
+
+Abstract methods within abstract classes have no implementation — they're pure declarations that establish what subclasses must provide. An abstract method creates a contract: any non-abstract subclass must override all abstract methods or the code won't compile.
+
+### The Castable Specifier
+
+The `<castable>` specifier enables runtime type checking and safe downcasting for classes. When a class is marked with `<castable>`, you can use dynamic type tests and casts to determine if an object is an instance of that class or its subclasses at runtime.
+
+Without `<castable>`, Verse's type system operates purely at compile time. The `<castable>` specifier adds runtime type information, allowing code to inspect and react to actual object types during execution. This bridges the gap between static type safety and dynamic polymorphism.
+
+```verse
+  component<public> := class<abstract><unique><castable>:
+      Parent:entity
+
+  entity<public> := class<concrete><unique><transacts><castable>:
+      FindDescendantEntities(entity_type:castable_subtype(entity)):generator(entity_type)
+```
+
+The `castable_subtype` type constructor works with `<castable>` classes to enable type-safe filtered queries. When you  call `FindDescendantEntities(player)`, the function returns only entities that are actually player instances or  subclasses thereof, verified at runtime through the castable mechanism.
+
+Once a class is published with `<castable>`, this decision becomes permanent. You cannot add or remove the `<castable>` specifier after publication because doing so would break existing code that relies on runtime type checking. Code that performs casts would suddenly fail or behave incorrectly if the castable property changed.
+
+### The Final Specifier
+
+The `<final>` specifier prevents inheritance, creating a terminal point in a class hierarchy. When you mark a class  with `<final>`, no other class can inherit from it. For methods, `<final>` prevents overriding in subclasses, locking  the implementation at that level of the hierarchy.
+
+Classes marked with `<final>` serve as concrete implementations that cannot be extended. This is particularly important for persistable classes, which require `<final>` to ensure their structure remains stable for serialization:
+
+```verse
+  player_profile := class<final><persistable>:
+      Username:string = "Player"
+      Level:int = 1
+      Gold:int = 0
+
+  player_data := class<final><persistable>:
+      Version:int = 1
+      LastLogin:string = ""
+      Statistics:player_stats = player_stats{}
+```
+
+The `<final>` requirement for persistable classes prevents schema evolution problems. If subclasses could extend persistable classes, the serialization system would face ambiguity about which fields to persist and how to handle  polymorphic deserialization.
+
+For methods, `<final>` locks behavior at a specific point in the inheritance chain:
+
+```verse
+  base_entity := class:
+      GetName<virtual>():string = "Entity"
+
+  game_object := class(base_entity):
+      GetName<override><final>():string = "GameObject"
+      # Any subclass of game_object cannot override GetName
+```
+
+The related `<final_super>` specifier marks classes as terminal base classes — they can be inherited from but their subclasses cannot be further extended.  `<final_super_base>` marks a class as the ultimate root of a restricted inheritance tree. Classes with this   specifier can be inherited from, but their subclasses automatically become final — they cannot be further  extended. This creates a two-level inheritance limit starting from the base:
+
+```verse
+  component<native><public> := class<abstract><unique><castable><final_super_base>:
+      Parent:entity
+
+  # Can inherit from component (first level)
+
+  physics_component := class(component):  # implicitly final_super
+      Mass:float = 1.0
+
+ # Cannot inherit from physics_component - it's implicitly final
+
+# gravity_component := class(physics_component): # COMPILE ERROR
+```
+
+So, `<final_super>` marks a class that inherits from a `<final_super_base>` class, explicitly declaring it as the final inheritance point. While classes inheriting from `<final_super_base>` are implicitly final, using `<final_super>`  makes this finality explicit and self-documenting:
+
+```verse
+  # Explicitly marking as final_super (though implicitly final anyway)
+  name_component := class<final_super>(component):
+      Name:string = ""
+
+  copter_camera_component := class<final_super>(copter_camera_component_director_version):
+      # Terminal implementation
+```
+
+This pattern is particularly valuable in component architectures where you want a base component interface that  various concrete components implement, but don't want those implementations to spawn their own inheritance  subtrees. The base class defines the contract, immediate subclasses provide  implementations, and inheritance stops  there — clean, controlled, and predictable.
+
+This design enforces architectural discipline, preventing the "inheritance explosion" that can occur when every class becomes a potential base for further specialization. By limiting inheritance depth, these specifiers promote composition over deep inheritance, leading to more maintainable and understandable code structures.
+
+### The Persistable Specifier
+
+The `<persistable>` specifier marks types that can be saved and restored across game sessions, enabling permanent storage of player progress, achievements, and game state. This specifier transforms ephemeral gameplay into  lasting progression, creating the foundation for meaningful player investment.
+
+Persistence  works through module-scoped `weak_map(player, t)` variables, where `t` is any persistable type.  These special maps automatically synchronize with backend storage — when players join, their data loads; when they leave or data changes, it saves. The system handles all serialization, network transfer, and storage management transparently.
+
+```verse
+  player_inventory := class<final><persistable>:
+      Gold:int = 0
+      Items:[]string = array{}
+      UnlockedAreas:[]string = array{}
+
+  # This variable automatically persists across sessions
+
+  SavedInventories : weak_map(player, player_inventory) = map{}
+```
+
+The `<persistable>` specifier enforces strict structural requirements to guarantee data integrity across versions. Classes must be `<final>` because inheritance would complicate serialization schemas. They cannot contain `var`  fields, preserving immutability guarantees even in persistent storage. They cannot be `<unique>` since identity-based equality doesn't survive serialization. These constraints ensure that what you save today can be   reliably loaded tomorrow, next month, or next year.
+
 ## Interfaces
 
 Interfaces define contracts that classes can implement, specifying what methods a class must provide without dictating how those methods work. Unlike classes, interfaces contain no data and no implementation—they purely describe behavior that implementing classes must provide.
-
-### Basic Interface Definition
 
 An interface declares method signatures that implementing classes must fulfill:
 
@@ -263,8 +431,6 @@ A class implementing `boss` must provide methods from `boss`, `combatant`, `dama
 ## Structs
 
 Structs provide lightweight data containers without the object-oriented features of classes. They're value types optimized for simple data aggregation, making them perfect for mathematical types, data transfer objects, and any scenario where you need a simple bundle of related values without behavior.
-
-### Basic Struct Definition
 
 Structs group related data with minimal overhead:
 
@@ -351,8 +517,6 @@ Avoid structs when you need methods, inheritance, mutable fields, or complex ini
 ## Enums
 
 Enums define types with a fixed set of named values, perfect for representing states, types, or any concept with a known, finite set of alternatives. They make code more readable by replacing magic numbers with meaningful names and provide compile-time safety by restricting values to the defined set.
-
-### Basic Enum Definition
 
 An enum lists all possible values for a type:
 
@@ -665,13 +829,3 @@ Use interfaces to define capabilities rather than identities. An interface named
 Keep structs simple and focused on data. If you find yourself wanting to add methods or complex validation to a struct, consider using a class instead. Structs should remain pure data containers.
 
 Make enums intention-revealing. Each enum value should be self-explanatory, eliminating the need for comments or external documentation to understand what it represents.
-
-### Performance Considerations
-
-Classes use reference semantics, meaning variables hold references to objects rather than the objects themselves. This makes passing classes efficient but means multiple variables can reference the same object. Changes through one reference affect all references.
-
-Structs use value semantics, creating copies when assigned or passed to functions. This ensures isolation but can impact performance with large structs. Keep structs small and avoid deep nesting.
-
-Interfaces involve dynamic dispatch, adding a small runtime cost for method calls. This overhead is negligible for most game code but might matter in tight loops processing thousands of objects per frame.
-
-Enums compile to simple integer comparisons, making them extremely efficient. Use enums freely without performance concerns—they're as fast as integer constants but far more maintainable.

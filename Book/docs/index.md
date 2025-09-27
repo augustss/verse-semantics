@@ -43,3 +43,4 @@ Verse is a *functional logic* programming language with three core principles:
 ### Language Reference
 
 - [Grammar Features](16_grammar.md) - Language grammar and syntax
+- [Concept Index](concept_index.md) - Comprehensive index of all language concepts with links
