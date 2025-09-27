@@ -1,6 +1,6 @@
-# Verse Language Documentation Site
+# Verse Language Documentation
 
-Bits of a Verse documentation...
+Comprehensive documentation for the Verse programming language, built with MkDocs and deployable to GitHub Pages.
 
 ## Installation
 
@@ -69,22 +69,55 @@ mkdocs build
 The static site will be generated in the `site/` directory.
 
 
+## GitHub Pages Deployment
+
+This documentation can be automatically deployed to GitHub Pages:
+
+### Setup Instructions
+
+1. **Update Configuration**: Edit `mkdocs.yml` and replace `YOUR_USERNAME` with your GitHub username:
+   ```yaml
+   site_url: https://YOUR_USERNAME.github.io/verse-paper/
+   repo_url: https://github.com/YOUR_USERNAME/verse-paper
+   ```
+
+2. **Enable GitHub Pages**:
+   - Go to your repository Settings → Pages
+   - Under "Build and deployment", select Source: **GitHub Actions**
+
+3. **Push Changes**: The GitHub Action workflow will automatically deploy when you push to main/master.
+
+The site will be available at: `https://YOUR_USERNAME.github.io/verse-paper/`
+
 ## Project Structure
 
 ```
-Site/
+Book/
 ├── docs/                    # Documentation source files
-│   ├── index.md            # Home page
-│   ├── effects.md          # Effects system documentation
-│   ├── verse_reference.md  # Complete language reference
-│   ├── VerseLanguageDoc.md # Additional language docs
-│   ├── datatypes.md        # Data types reference
-│   └── mutability.md       # Mutability guide
+│   ├── index.md            # Documentation home
+│   ├── 00_overview.md      # Language overview
+│   ├── 01_builtins.md      # Built-in types
+│   ├── 02_composites.md    # Classes, structs, interfaces
+│   ├── 03_functions.md     # Functions
+│   ├── 04_operators.md     # Operators
+│   ├── 05_expressions.md   # Expression system
+│   ├── 06_control.md       # Control flow
+│   ├── 07_modules.md       # Modules and paths
+│   ├── 08_failure.md       # Failure system
+│   ├── 09_effects.md       # Effect system
+│   ├── 10_concurrency.md   # Concurrency
+│   ├── 11_mutability.md    # Mutability
+│   ├── 12_types.md         # Type system
+│   ├── 13_persistable.md   # Persistable types
+│   ├── 14_access.md        # Access specifiers
+│   ├── 15_evolution.md     # Code evolution
+│   └── 16_grammar.md       # Language grammar
 ├── libs/                    # Custom Pygments library
 │   └── pygments/
 │       └── lexers/
 │           └── verse.py    # Verse syntax highlighter
 ├── mkdocs.yml              # MkDocs configuration
+├── requirements.txt        # Python dependencies
 └── site/                   # Built documentation (generated)
 ```
 
