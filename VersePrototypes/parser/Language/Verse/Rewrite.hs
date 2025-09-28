@@ -157,6 +157,9 @@ rewriteExp expr = for expr $ \case
     rewriteOperator1 "prefix'?'" e
   PostfixQuery e ->
     rewriteOperator1 "postfix'?'" e
+  Parse.PostfixCaret e -> do
+    e' <- rewriteExp e
+    pure $ PostfixOp e' "^"
   Parse.List es ->
     List <$> traverse rewriteExp es
   Parse.Paren e -> do
@@ -351,7 +354,6 @@ rewriteExp expr = for expr $ \case
           return $ extract res
         -- TODO: see #86
         -- TODO: ifArchetypeName for the splice
-        -- implment this one
         (Parse.PrefixDotDot (extract -> Pat p), _) -> do
           nme <- rewritePat p
           let go = case nme of
@@ -360,7 +362,15 @@ rewriteExp expr = for expr $ \case
           r'  <- rewriteExp r
           return $ InfixColonEqual Public Val (go <$ l) r'
         (Parse.PrefixDotDot _, _) -> Splice <$> rewriteExp l
-        s -> notImplemented "rewriteEXXX" s
+
+        -- The general case. This has some special handling. The problem here is
+        -- that we need to recursively evaluate the lhs because the lhs node is
+        -- not immediately an Ident, we us the infixOp version of := this means
+        -- we drop the aperture and access qualifier
+        (_ , _) -> do
+          lhs <- rewriteExp l
+          rhs <- rewriteExp r
+          return $ InfixOp lhs ":=" rhs
 
   Parse.Lam e1 e2 -> do
     e1' <- rewriteExp e1
@@ -369,7 +379,10 @@ rewriteExp expr = for expr $ \case
   -- Try to fix Parse2 so that we can get rid of this
   Parse.ExpInfixColon (Parse.expToPat -> Just pat) e2 ->
     rewritePat $ Parse.InfixColon pat e2
-  -- TODO: not sure if this is needed?
+  Parse.ExpInfixColon e1 e2 -> do
+    l <- rewriteExp e1
+    r <- rewriteExp e2
+    return $ InfixOp l ":" r
   Parse.PrefixDotDot e ->
     Splice <$> rewriteExp e
   Pat p ->
@@ -389,7 +402,6 @@ rewriteExp expr = for expr $ \case
   e@Parse.InfixMultiplyEqual{}    -> notImplemented "rewriteExp" e
   e@Parse.InfixPlusEqual{}        -> notImplemented "rewriteExp" e
   e@Parse.Module{}                -> notImplemented "rewriteExp" e
-  e@Parse.PostfixCaret{}          -> notImplemented "rewriteExp" e
   e@Parse.PrefixCaret{}           -> notImplemented "rewriteExp" e
   e@Parse.PrefixMultiply{}        -> notImplemented "rewriteExp" e
   e@Parse.PrefixAmpersand{}       -> notImplemented "rewriteExp" e
@@ -415,7 +427,6 @@ rewriteExp expr = for expr $ \case
   e@Parse.Set{}                   -> notImplemented "rewriteExp" e
   e@(_ Parse.:.: _)               -> notImplemented "rewriteExp" e
   e@Parse.Do{}                    -> notImplemented "rewriteExp" e
-  e@Parse.ExpInfixColon{}         -> notImplemented "rewriteExp" e
   e@ExpSpecs{}                    -> notImplemented "rewriteExp" e
 
 -- Rewrite a pattern into the Rewrite.Exp language. Rewrite.Exp does not have
@@ -462,7 +473,6 @@ rewritePath = \ case
     Path.Path (extract label) $ pathIdents <&> \ (qualPath, ident) ->
       (rewritePath <$> qualPath, extract ident)
 
--- START: start adding more connectives
 -- | rewrite a definition form. These are terms like t0 := t1. The binding
 -- connective is assumed by passing the lhs (called 'pat') and the rhs to this
 -- function.

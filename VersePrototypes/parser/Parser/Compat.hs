@@ -53,8 +53,8 @@ expToSrcExpr = uncurryL expToSrcExpr'
 expToSrcExpr' :: Loc -> R.Exp L Ident -> Src.SrcExpr
 expToSrcExpr' l (e1 R.:=:  e2)    = Src.InfixOp (lexp e1) (inOp l "=")  (lexp e2)
 expToSrcExpr' l (e1 R.:|:  e2)    = Src.InfixOp (lexp e1) (inOp l "|")  (lexp e2)
-expToSrcExpr' _ (R.List es)       = Src.eSeq (map lexp es)
 expToSrcExpr' l (R.Where e1 e2)   = Src.InfixOp (lexp e1) (inOp l "where") (lexp e2)
+expToSrcExpr' _ (R.List es)       = Src.eSeq (map lexp es)
 expToSrcExpr' _ R.Fail            = Src.Fail
 expToSrcExpr' l (R.One e)         = Src.Macro1 (macro l "one") [] (lexp e)
 expToSrcExpr' _ (R.Let bndr body) = Src.Let (lexp bndr) (lexp body)
@@ -77,6 +77,8 @@ expToSrcExpr' l (R.Assume e)      = Src.Macro1 (macro l "assume") [] (lexp e)
 -- expToSrcExpr' _ (Alloc3 )      = XXX
 -- expToSrcExpr' QualName         = ???
 -- expToSrcExpr' Domain           = ???
+expToSrcExpr' l (R.InfixOp lhs op rhs)  = Src.InfixOp (lexp lhs) (inOp l op) (lexp rhs)
+expToSrcExpr' l (R.PostfixOp e op)      = Src.PostfixOp (lexp e) (postOp l op)
 expToSrcExpr' _ (R.IfThenElse e1 e2 e3) = Src.If3 (lexp e1) (lexp e2) (lexp e3)
 expToSrcExpr' _ (R.ForDo e1 e2)         = Src.For2 (lexp e1) (lexp e2)
 expToSrcExpr' _ (R.Block e)             = Src.Block (lexp e)
@@ -144,6 +146,9 @@ inOp l s = ident l s
 
 preOp :: Loc -> Ident -> Src.Ident
 preOp l s = ident l s
+
+postOp :: Loc -> Ident -> Src.Ident
+postOp l s = ident l s
 
 ident :: Loc -> Ident -> Src.Ident
 ident l i = strIdent l (f i)

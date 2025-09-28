@@ -80,8 +80,13 @@ data Exp f a
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
   | Lam (f (Exp f a)) !OC !Split.Effect (f (Exp f a))
+  -- ANF style ':=' form, unsure if needed
   | InfixColonEqual !Access !Quantifier (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
+    -- Prefix and infix operator application
+  | PrefixOp a (f (Exp f a))                -- op e
+  | PostfixOp (f (Exp f a)) a               -- e op
+  | InfixOp (f (Exp f a)) a (f (Exp f a))   -- e1 op e2
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
   | Name a
   | QualName (f (Exp f a)) {-# UNPACK #-} !SimpleName
