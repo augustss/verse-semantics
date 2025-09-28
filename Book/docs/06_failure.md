@@ -2,7 +2,7 @@
 
 Most programming languages treat control flow as a matter of true or false, yes or no, one or zero. They evaluate boolean conditions and branch accordingly, creating a world of binary decisions that often requires checking conditions twice - once to see if something is possible, and again to actually do it. Verse takes a radically different approach. Instead of asking "is this true?", Verse asks "does this succeed?"
 
-This distinction might seem subtle, but it fundamentally changes how programs are written and reasoned about. In Verse, failure isn't an error or an exception - it's a first-class concept that drives control flow. When an expression fails, it doesn't crash your program or throw an exception that needs to be caught. Instead, failure is a normal, expected outcome that your code handles gracefully through the structure of the language itself.
+This distinction might seem subtle, but it fundamentally changes how programs are written and reasoned about. Failure isn't an error or an exception - it's a first-class concept that drives control flow. When an expression fails, it doesn't crash your program or throw an exception that needs to be caught. Instead, failure is a normal, expected outcome that your code handles gracefully through the structure of the language itself.
 
 Consider the simple act of accessing an array element. In traditional languages, you might write:
 
@@ -27,7 +27,7 @@ The array access either succeeds and binds the value, or it fails and the code m
 
 A failable expression is one that can either succeed and produce a value, or fail and produce nothing. This isn't the same as returning null or an error code - when an expression fails, it literally produces no value at all. The computation stops at that point in that particular path of execution.
 
-Many operations in Verse are naturally failable. Array indexing fails when the index is out of bounds. Map lookups fail when the key doesn't exist. Comparisons fail when the values aren't equal. Division fails when dividing by zero. Even simple literals can be made to fail:
+Many operations are naturally failable. Array indexing fails when the index is out of bounds. Map lookups fail when the key doesn't exist. Comparisons fail when the values aren't equal. Division fails when dividing by zero. Even simple literals can be made to fail:
 
 ```verse
 42      # Always succeeds with value 42
@@ -50,7 +50,7 @@ This function doesn't just check conditions - it embodies them. If the age is in
 
 ## Failure Contexts: Where Magic Happens
 
-Not every part of a Verse program can execute failable expressions. They can only appear in failure contexts - places where the language knows how to handle both success and failure. Each failure context defines what happens when expressions within it fail.
+Not every part of a program can execute failable expressions. They can only appear in failure contexts - places where the language knows how to handle both success and failure. Each failure context defines what happens when expressions within it fail.
 
 The most common failure context is the condition of an `if` expression:
 
@@ -144,7 +144,7 @@ This function succeeds only if the player is alive, not stunned, and has either 
 
 ## Options and Failure: Two Sides of the Same Coin
 
-The option type and failure are intimately connected in Verse. An option either contains a value or is empty (represented by `false`). The query operator `?` converts between options and failure:
+The option type and failure are intimately connected. An option either contains a value or is empty (represented by `false`). The query operator `?` converts between options and failure:
 
 ```verse
 MaybeValue:?int = option{42}
@@ -166,7 +166,7 @@ This bidirectional conversion makes options and failure interchangeable, allowin
 
 ## Failure Patterns: Idioms and Techniques
 
-As you work with failure in Verse, certain patterns emerge that solve common problems elegantly.
+As you work with failure, certain patterns emerge that solve common problems elegantly.
 
 The validation chain pattern uses sequential failures to ensure all conditions are met:
 

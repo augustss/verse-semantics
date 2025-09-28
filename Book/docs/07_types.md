@@ -40,7 +40,7 @@ sports_car := class(car):  # sports_car is a subtype of car (and vehicle)
 
 This inheritance hierarchy means that a `sports_car` can be used anywhere a `car` or `vehicle` is expected, but not the reverse. The subtype inherits all fields and methods from its supertypes while potentially adding new ones or overriding existing ones.
 
-## Type Casting and Conversion
+## Casting and Conversion
 
 All type conversions must be explicit, a design choice that eliminates entire categories of bugs while making the programmer's intent clear. There's no implicit coercion between types - you must explicitly state how you want values to be converted.
 
@@ -86,11 +86,9 @@ PrintTwice(Value:t where t:subtype(any)):void =
 
 The constraint `t:subtype(any)` might seem redundant since all types are subtypes of `any`, but it makes the type parameter explicit and allows for more specific constraints in real code.
 
-## Where Clauses and Type Constraints
+## Where Clauses
 
 Where clauses are the mechanism for constraining type parameters in generic code. They appear after type parameters and specify requirements that types must satisfy to be valid arguments. This creates a powerful system for writing generic code that is both flexible and type-safe.
-
-### Basic Where Clause Syntax
 
 The basic syntax places the where clause after the parameter it constrains:
 
@@ -106,7 +104,7 @@ Transform(Input:t where t:subtype(comparable), t:subtype(printable)):t =
     Input
 ```
 
-### Multiple Type Parameters with Constraints
+### Type Parameters with Constraints
 
 Where clauses become more powerful when working with multiple type parameters:
 
@@ -124,7 +122,7 @@ SafeCast(Value:t1 where t1:subtype(t2), Target:type{t2} where t2:type):t2 =
     Value  # Safe because t1 is a subtype of t2
 ```
 
-### Complex Constraint Expressions
+### Complex Constraints
 
 Where clauses can express sophisticated relationships between types:
 
@@ -147,7 +145,7 @@ ProcessContainer(C:container_type where container_type:subtype([]element_type),
         Print("Element: {Element}")
 ```
 
-### Where Clauses in Class and Interface Definitions
+### Where in Class and Interface Definitions
 
 Classes and interfaces can also use where clauses to constrain their type parameters:
 
@@ -171,7 +169,7 @@ processor(input_type, output_type where input_type:type, output_type:type) := in
     Process(Input:input_type):output_type
 ```
 
-### Advanced Where Clause Patterns
+### Advanced Patterns
 
 Where clauses enable sophisticated generic programming patterns:
 
@@ -204,7 +202,7 @@ MapFunction(F:type{_(a):b}, Container:[]a where a:type, b:type):[]b =
         F(Element)
 ```
 
-### Type Inference with Where Clauses
+### Type Inference
 
 Verse's type inference works with where clauses to deduce type parameters:
 
@@ -222,7 +220,7 @@ AutoProcess(MyInts)  # t is inferred as int
 AutoProcess([]nat)(MyNaturals)  # Explicitly specify t as nat
 ```
 
-### Practical Applications of Where Clauses
+### Practical Applications
 
 Where clauses are essential for writing reusable, type-safe code:
 
@@ -263,7 +261,7 @@ builder(t where t:type) := class:
 
 Where clauses thus provide the foundation for Verse's generic programming capabilities, allowing you to write code that is both highly reusable and completely type-safe. They enable you to express precise requirements about types while maintaining the flexibility to work with any types that meet those requirements.
 
-## The Comparable Type and Equality
+## Comparable and Equality
 
 The `comparable` type represents a special subset of types that support equality comparison. Not all types can be compared for equality - this is a deliberate design choice that prevents meaningless comparisons and ensures that equality has well-defined semantics.
 
@@ -303,9 +301,9 @@ With the `unique` specifier, instances are only equal to themselves (identity eq
 
 The comparable type also constrains what can be used as map keys. Map keys must be comparable so the map can determine whether a key already exists. However, not all comparable types can be map keys - currently, `float`, `option`, and classes (even with `unique`) cannot be used as map keys. This restriction exists because these types either have special values (like `NaN` for floats) or reference semantics that complicate map implementation.
 
-## Type Hierarchies and Relationships
+## Type Hierarchies
 
-The type system forms a directed acyclic graph (DAG) rather than a simple tree. This means types can have multiple supertypes, though multiple inheritance is currently limited to interfaces. Understanding these relationships helps you design flexible, reusable code.
+The type system forms a graph rather than a simple tree. This means types can have multiple supertypes, though multiple inheritance is currently limited to interfaces. Understanding these relationships helps you design flexible, reusable code.
 
 At the top of the hierarchy, `any` serves as the universal supertype. Every type is a subtype of `any`, which means a value of any type can be assigned to a variable of type `any`. However, once a value is typed as `any`, you lose access to type-specific operations:
 
@@ -351,7 +349,41 @@ type function_type2 = type{_(X:int):any}
 # And returns more specific output (int vs any)
 ```
 
-## Practical Patterns and Techniques
+## Aliases and `type{}`
+
+Verse's type system includes several advanced features that enable sophisticated programming patterns. Type aliases allow you to give meaningful names to complex types:
+
+```verse
+type coordinate = tuple(float, float, float)
+type entity_map = [string]entity
+type update_handler = type{_(Delta:float):void}
+```
+
+These aliases improve code readability and make refactoring easier. They're particularly valuable for function types, which can become syntactically complex.
+
+The type construct provides runtime type information, enabling a form of reflection:
+
+```verse
+InspectType(Value:int):void =
+    T := type{Value}
+    # T now holds the type 'int'
+```
+
+This capability is useful for debugging and for writing generic code that needs to reason about types at runtime.
+
+Parametric types with multiple constraints allow precise specification of generic function requirements:
+
+```verse
+Merge(A:[]t, B:[]t where t:subtype(comparable))<decides>:[]t =
+    var Result:[]t = A
+    for (Element : B, not ArrayContains(Result, Element)):
+        set Result += array{Element}
+    Result
+```
+
+This function requires that the element type be comparable (so we can check for duplicates) while maintaining type safety throughout.
+
+## Practical Patterns
 
 Working effectively with Verse's type system requires understanding not just the rules but the patterns that emerge from them. One common pattern is using type guards to refine types within conditional branches:
 
@@ -394,78 +426,3 @@ player_enhancement := struct:
 ```
 
 The inheritance approach allows an `enhanced_player` to be used anywhere a `player` is expected, while the composition approach keeps the types separate but requires accessing the nested `BasePlayer` field.
-
-## Type Safety and Verification
-
-Verse's type system serves as the first line of defense against bugs. By encoding invariants in types and requiring explicit conversions, many errors are caught at compile time that would otherwise manifest as runtime failures or subtle bugs.
-
-The failable conversion functions exemplify this philosophy. Rather than silently truncating or wrapping values, numeric conversions can fail, forcing you to handle edge cases:
-
-```verse
-SafeDivide(Numerator:float, Denominator:float)<decides>:int =
-    Denominator <> 0.0
-    Result := Numerator / Denominator
-    Result <> NaN
-    Result <> Inf
-    Floor[Result]
-```
-
-This function makes all potential failure points explicit. The type system ensures that callers must handle the possibility of failure, either by propagating it or by providing alternative behavior.
-
-The distinction between mutable and immutable types adds another layer of safety. Immutable types like arrays and maps can be shared freely without worrying about unexpected modifications. When mutation is needed, the `var` keyword makes it explicit:
-
-```verse
-SharedData:[]int = array{1, 2, 3}
-
-ProcessA(Data:[]int):void =
-    # Can't modify Data here - it's immutable
-
-ProcessB(var Data:[]int):void =
-    set Data[0] = 99  # Can modify because Data is var
-```
-
-This design prevents a large class of bugs related to shared mutable state while still allowing controlled mutation when needed.
-
-## Advanced Type System Features
-
-Verse's type system includes several advanced features that enable sophisticated programming patterns. Type aliases allow you to give meaningful names to complex types:
-
-```verse
-type coordinate = tuple(float, float, float)
-type entity_map = [string]entity
-type update_handler = type{_(Delta:float):void}
-```
-
-These aliases improve code readability and make refactoring easier. They're particularly valuable for function types, which can become syntactically complex.
-
-The type construct provides runtime type information, enabling a form of reflection:
-
-```verse
-InspectType(Value:int):void =
-    T := type{Value}
-    # T now holds the type 'int'
-```
-
-This capability is useful for debugging and for writing generic code that needs to reason about types at runtime.
-
-Parametric types with multiple constraints allow precise specification of generic function requirements:
-
-```verse
-Merge(A:[]t, B:[]t where t:subtype(comparable))<decides>:[]t =
-    var Result:[]t = A
-    for (Element : B, not ArrayContains(Result, Element)):
-        set Result += array{Element}
-    Result
-```
-
-This function requires that the element type be comparable (so we can check for duplicates) while maintaining type safety throughout.
-
-## The Philosophy of Types
-
-Verse's approach to types reflects a careful balance between safety and expressiveness. Rather than viewing types as restrictions, Verse treats them as specifications that make programs more predictable and maintainable. The requirement for explicit conversions might seem verbose initially, but it eliminates entire categories of subtle bugs and makes code intentions clear.
-
-The type system also serves as documentation. When you see a function signature like `([]player)<decides>:?player`, you immediately know that it takes an array of players and might return a player or might return nothing. The types tell a story about what the function does and how it might fail.
-
-Moreover, the type system enables powerful compiler optimizations. Because the compiler knows the exact types of values and the relationships between them, it can generate efficient code while maintaining safety guarantees. The distinction between compile-time types (used for checking) and runtime types (used for dynamic behavior) allows Verse to provide both static safety and dynamic flexibility.
-
-As you work with Verse's type system, you'll find that it guides you toward correct, maintainable code. The types aren't fighting against you - they're helping you express your intent clearly and catching mistakes before they become bugs. This partnership between programmer and type system is at the heart of Verse's design philosophy, creating a language that's both powerful and predictable.

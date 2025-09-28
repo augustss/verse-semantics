@@ -1,10 +1,8 @@
 # Expressions
 
-Everything is an expression. This fundamental design principle sets the language apart from many traditional programming languages where statements and expressions are distinct concepts. Every piece of code you write produces a value, even constructs that might be purely side-effecting in other languages. This uniformity creates a powerful and consistent programming model where code can be composed and combined in ways that feel natural and predictable.
+Everything is an expression. This fundamental design principle sets the language apart from many traditional programming languages where statements and expressions are distinct concepts. Every piece of code you write produces a value, even constructs you might expect to be purely side-effecting. This creates a powerful and consistent programming model where code can be composed and combined in ways that feel natural and predictable.
 
-The expression-oriented nature reflects the language's functional logic heritage. Rather than thinking of programs as sequences of statements that modify state, the design encourages thinking about programs as compositions of expressions that compute values. Even operations that appear imperative, like variable assignments or loops, are actually expressions that return values and can be nested within other expressions.
-
-## Primary Expressions: The Building Blocks
+## Primary Expressions
 
 At the foundation of the expression system lie the primary expressions—the atomic units from which more complex expressions are built. These include literals, identifiers, parenthesized expressions, and the powerful tuple construct that provides lightweight data aggregation.
 

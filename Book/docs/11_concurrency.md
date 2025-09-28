@@ -10,7 +10,7 @@ The language achieves this through a combination of structured and unstructured 
 
 ### Immediate vs Async Expressions
 
-Every expression in Verse falls into one of two categories: immediate or async. Understanding this distinction is crucial for working with Verse's concurrency model.
+Every expression falls into one of two categories: immediate or async. Understanding this distinction is crucial for working with Verse's concurrency model.
 
 Immediate expressions evaluate with no delay, completing entirely within the current simulation update or frame. These include most basic operations you'd expect to happen instantly: arithmetic calculations, variable access, simple function calls, and data structure manipulation. When you write `X := 5 + 3`, the addition happens immediately, the assignment completes instantly, and execution moves to the next statement without any possibility of interruption.
 

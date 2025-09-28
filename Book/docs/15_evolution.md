@@ -18,14 +18,6 @@ This permanence extends beyond simple values to encompass the entire structure o
 
 The publication model distinguishes between two contexts: the live metaverse and islands. In the envisioned live metaverse, publishing an update that attempts to change an immutable variable's value has no effect—the variable already exists with its original value. However, in the current island-based implementation, new instances of an island will adopt the updated value, providing a practical migration path while maintaining conceptual consistency.
 
-## Evolution Through Versioning
-
-Verse's evolution strategy acknowledges that languages must grow and change to remain relevant, yet this growth must not break existing code. Since its first public release, Verse has continuously evolved, with most changes rolling out transparently to users. The language achieves this through a sophisticated versioning system that distinguishes between backward-compatible improvements and breaking changes.
-
-The stabilization to Version 1 on November 1, 2024, marked a significant milestone in Verse's maturation. This transition established a clear framework for how the language evolves: backward-compatible changes continue to roll out automatically with new releases of UEFN, while backward-incompatible changes are gated behind explicit version upgrades. This approach ensures that existing projects continue to function indefinitely at their original language version, even as the language itself advances.
-
-When developers open a V0 project in newer versions of UEFN, the system intelligently assesses compatibility. If the project compiles without deprecation warnings, the editor offers an upgrade path to V1, ensuring that the transition happens only when the code is ready. For projects that need more time to adapt, the ability to remain on older versions provides a safety net, though eventually upgrading may become necessary to upload new iterations of a project.
-
 ## The Architecture of Backward Compatibility
 
 Backward compatibility in Verse goes beyond simple syntactic preservation—it encompasses semantic guarantees about how code behaves. The language enforces these guarantees through multiple mechanisms that work together to create a robust compatibility framework.

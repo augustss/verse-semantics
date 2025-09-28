@@ -1,34 +1,22 @@
 # Modules
 
-Modules and paths are fundamental concepts in Verse that provide code organization, namespace management, and the ability to share and reuse code across projects. Think of modules as containers that group related functionality together, similar to packages in other programming languages, but with stronger guarantees about versioning and compatibility.
+Modules and paths are fundamental concepts for code organization, namespace management, and the ability to share and reuse code across projects. Think of modules as containers that group related functionality together, similar to packages in other programming languages, but with stronger guarantees about versioning and compatibility.
 
 In the context of game development, modules allow you to separate different aspects of your game logic into manageable, reusable pieces. For example, you might have one module for player inventory management, another for combat mechanics, and yet another for UI interactions. Each module encapsulates its own functionality while exposing only the necessary interfaces to other parts of your code.
 
 The module system in Verse is designed to support the vision of a persistent, shared Metaverse where code can be published once and used by anyone, anywhere, with confidence that it will continue to work even as the original author updates and improves it. This is achieved through strict backward compatibility rules and a global namespace system that ensures every piece of published code has a unique, permanent address.
 
-## What is a Module?
-
-A Verse module is fundamentally an atomic unit of code organization that serves multiple purposes in the language ecosystem. At its core, a module is:
-
-- **An atomic unit of code** that can be redistributed and depended upon. This means that when you create a module, you're creating a self-contained piece of functionality that others can use without needing to understand its internal implementation. The module acts as a black box, exposing only what you choose to make public.
-
-- **A way to organize related code definitions together**. Rather than having all your code in a single file or scattered across many files with no clear structure, modules let you group related functions, classes, constants, and other definitions in a logical manner. This organization makes your code easier to understand, maintain, and debug.
-
-- **A namespace that prevents naming conflicts**. In any large codebase, especially one that combines code from multiple authors, naming conflicts are inevitable. Two developers might both want to call their player class "Player" or their damage function "CalculateDamage". Modules solve this by providing separate namespaces - you can have `combat_module.CalculateDamage` and `magic_module.CalculateDamage` without any conflict.
-
-- **A versioned unit that can evolve while maintaining backward compatibility**. Once you publish a module, Verse ensures that any changes you make won't break existing code that depends on it. You can add new features, fix bugs, and improve performance, but you cannot remove public members or change their types in incompatible ways.
-
 Each module is intrinsically linked to the file system structure of your project. When you create a folder in your Verse project, that folder automatically becomes a module. The module's name is simply the folder's name, making the relationship between your file organization and your code organization completely transparent.
 
 All `.verse` files within the same folder are considered part of that module and share the same namespace. This means that if you have three files - `player.verse`, `inventory.verse`, and `equipment.verse` - all in a folder called `player_systems`, they all contribute to the `player_systems` module and can reference each other's definitions without any import statements. This automatic grouping makes it easy to split large modules across multiple files for better organization while maintaining the logical unity of the module.
 
-## Module Paths
+## Paths
 
-Module paths are the addressing system that makes Verse's vision of a shared, persistent Metaverse possible. Just as every website on the internet has a unique URL, every module in Verse has a unique path that identifies it globally. This path system is more than just a naming convention - it's a fundamental part of how Verse manages code distribution, versioning, and dependencies.
+Paths are the addressing system that makes Verse's vision of a shared, persistent Metaverse possible. Just as every website on the internet has a unique URL, every module in Verse has a unique path that identifies it globally. This path system is more than just a naming convention - it's a fundamental part of how Verse manages code distribution, versioning, and dependencies.
 
-### Understanding the Path System
+### Understanding  Paths
 
-The path system borrows conceptually from web domains but adapts them for the needs of a programming language. A module path starts with a forward slash `/` and typically includes a domain-like identifier followed by one or more path segments. This creates a hierarchical namespace that is both human-readable and globally unique.
+Paths borrow conceptually from web domains with adaptations for the needs of a programming language. A path starts with a forward slash `/` and typically includes a domain-like identifier followed by one or more path segments. This creates a hierarchical namespace that is both human-readable and globally unique.
 
 The format `/domain/path/to/module` serves several important purposes:
 
@@ -40,7 +28,7 @@ The format `/domain/path/to/module` serves several important purposes:
 
 - **Hierarchical organization**: The path structure naturally supports organizing related modules together. For example, all UI-related modules might live under `/YourGame.com/UI/`, making them easy to find and understand as a group.
 
-### Standard Module Paths
+### Standard  Paths
 
 Epic Games provides several standard modules that are commonly used in Verse development:
 
@@ -53,7 +41,7 @@ Epic Games provides several standard modules that are commonly used in Verse dev
 
 The use of "Temporary" in some paths indicates that these modules are provisional and may be reorganized in future versions of Verse. This naming convention helps set expectations about the stability of the API.
 
-### Custom Module Paths
+### Custom Paths
 
 When you create your own modules, they can exist at various levels of the path hierarchy:
 
@@ -65,6 +53,15 @@ When you create your own modules, they can exist at various levels of the path h
 The ability to include email-like identifiers (such as `pizlonator@fn.com`) allows individual developers to claim their own namespace without needing to own a domain. This democratizes the module system while still maintaining uniqueness guarantees.
 
 ## Creating Modules
+
+A module can contain:
+
+- Constants and variables
+- Functions
+- Classes, interfaces, and structs
+- Enums
+- Other module definitions
+- Type definitions
 
 ### File-Based Modules
 
@@ -115,49 +112,11 @@ module_folder := module:
                 # Class definition
 ```
 
-## Module Members
-
-A module can contain:
-
-- Constants and variables
-- Functions
-- Classes, interfaces, and structs
-- Enums
-- Other module definitions
-- Type definitions
-
-Example:
-
-```verse
-game_systems := module:
-    # Constants
-    MaxPlayers<public>:int = 100
-    DefaultHealth<public>:float = 100.0
-
-    # Variables
-    var<private> CurrentPlayers:int = 0
-
-    # Functions
-    CalculateDamage<public>(BaseDamage:float, Multiplier:float):float =
-        BaseDamage * Multiplier
-
-    # Classes
-    player_stats<public> := class:
-        Health:float = DefaultHealth
-        Score:int = 0
-
-    # Nested modules
-    inventory_system<public> := module:
-        item<public> := class:
-            Name:string = ""
-            Weight:float = 0.0
-```
-
 ## Importing Modules
 
 The import system in Verse is designed to be explicit and predictable. Unlike some languages that automatically import commonly used modules or search multiple locations for dependencies, Verse requires you to explicitly declare every external module you want to use. This explicitness helps prevent naming conflicts and makes dependencies clear.
 
-### The Using Statement
+### Using
 
 The `using` statement is the primary mechanism for importing modules into your Verse code. It appears at the top of your file, before any other code definitions, and makes the contents of the specified module available in your current scope.
 
@@ -172,7 +131,7 @@ using { /UnrealEngine.com/Temporary/Diagnostics }
 
 When you import a module, all its public members become available in your code. However, you still need to qualify them with the module name unless the names are unambiguous. This qualification requirement helps maintain code clarity and prevents accidental use of the wrong definition when multiple modules define similar names.
 
-### Understanding Import Resolution
+### Import Resolution
 
 When Verse encounters a `using` statement, it follows a specific resolution process:
 
@@ -255,32 +214,11 @@ DamageA := /GameA/Combat.CalculateDamage(10.0)  # OK: fully qualified
 DamageB := /GameB/Combat.CalculateDamage(10.0)  # OK: fully qualified
 ```
 
-### Qualified Names and Qualified Access
+### Qualified Names and  Access
 
 After importing, you can refer to module contents using qualified names. Verse provides two forms of qualification: standard dot notation for most cases, and special qualified access syntax for disambiguation.
 
-#### Standard Qualified Names
-
-The most common form uses dot notation to access module members:
-
-```verse
-using { game_systems }
-
-MyFunction():void =
-    # Direct access to public members
-    Damage := game_systems.CalculateDamage(50.0, 2.0)
-
-    # Access nested module members
-    NewItem := game_systems.inventory_system.item{Name := "Sword"}
-
-    # Alternatively, import the nested module directly
-    using { game_systems.inventory_system }
-    AnotherItem := item{Name := "Shield"}
-```
-
-#### Qualified Access Expression
-
-When you need to disambiguate between identifiers with the same name from different modules, or when you want to explicitly specify the scope of an identifier, Verse provides a qualified access expression using parentheses and a colon:
+When you need to disambiguate between identifiers with the same name from different modules, or when you want to explicitly specify the scope of an identifier, use a qualified access expression using parentheses and a colon:
 
 ```verse
 # Qualified access syntax: (qualifier:)identifier
@@ -338,50 +276,9 @@ outer_scope := module:
         OuterVal := (outer_scope:)Constant  # Gets 42
 ```
 
-## Access Specifiers and Visibility
-
-Module members have access specifiers that control their visibility:
-
-### Access Levels
-
-| Specifier | Visibility | Usage |
-|-----------|------------|-------|
-| `<public>` | Universally accessible | Members intended for external use |
-| `<internal>` | Only within the module (default) | Module-private implementation |
-| `<private>` | Only in immediate enclosing scope | Local to class/struct |
-| `<protected>` | Current class and subtypes | Inheritance hierarchies |
-| `<scoped>` | Current scope and enclosing scopes | Special use cases |
-
-Example:
-
-```verse
-my_module := module:
-    # Internal by default - not accessible outside module
-    InternalConstant:int = 10
-
-    # Public - accessible everywhere
-    PublicFunction<public>():void =
-        Print("Hello from module")
-
-    # Mixed access on variables
-    var<protected> ProtectedVar<public>:int = 5  # Read public, write protected
-
-    public_class<public> := class:
-        PublicField<public>:int = 0
-        PrivateField<private>:string = ""
-
-        PublicMethod<public>():void =
-            Print("Public method")
-
-        ProtectedMethod<protected>():void =
-            Print("Protected method")
-```
-
 ## Module-Scoped Variables
 
 Variables defined at module scope are global to any game instance where the variable is in scope.
-
-### Session-Scoped Variables
 
 Use `weak_map(session, t)` for variables that persist for the duration of a game session:
 
@@ -394,8 +291,6 @@ IncrementCounter():void =
     CurrentValue := if (Value := GlobalCounter[GetSession()]) then Value + 1 else 0
     if (set GlobalCounter[GetSession()] = CurrentValue) {}
 ```
-
-### Persistent Player Data
 
 Use `weak_map(player, t)` for data that persists across game sessions:
 
@@ -416,15 +311,9 @@ SavePlayerProgress(Player:player, NewData:player_data):void =
 
 ## Metaverse and Publishing
 
-### Publishing Modules
+When you publish a module to the Metaverse, the module path becomes globally accessible, its public members become part of the module's API, and from that point the module must maintain backward compatibility.
 
-When you publish a module to the Metaverse:
-
-1. The module path becomes globally accessible
-2. Public members become part of the module's API
-3. The module must maintain backward compatibility
-
-Example of publishing evolution:
+The following example of shows how evolution works:
 
 ```verse
 # Initial publication
@@ -443,15 +332,6 @@ Thing<public>:nat = 20  # nat is a subtype of int
 # Thing<public>:string = "hello"  # Would fail
 ```
 
-### Backward Compatibility Guarantees
-
-The Metaverse provides guarantees for published modules:
-
-- Public members will never stop existing
-- Types will never change in incompatible ways
-- Values can be updated by the publisher
-- New members can be added
-
 ## Local Qualifiers
 
 In V1, the `(local:)` qualifier can disambiguate identifiers within functions:
@@ -468,75 +348,7 @@ MyModule := module:
         (MyModule:)X + (local:)X  # Module X + parameter X
 ```
 
-## Common Patterns
-
-### Factory Module Pattern
-
-```verse
-entity_factory := module:
-    entity_base<public> := class<abstract>:
-        Name:string = ""
-        Health:float = 100.0
-
-    player_entity<public> := class(entity_base):
-        PlayerID:int = 0
-
-    npc_entity<public> := class(entity_base):
-        AILevel:int = 1
-
-    CreatePlayer<public>(ID:int, PlayerName:string):player_entity =
-        player_entity{PlayerID := ID, Name := PlayerName}
-
-    CreateNPC<public>(NPCName:string, Level:int):npc_entity =
-        npc_entity{Name := NPCName, AILevel := Level}
-```
-
-### Service Module Pattern
-
-```verse
-game_service := module:
-    # Private implementation
-    var<private> ServiceState:service_state = service_state{}
-
-    service_state := class:
-        IsRunning:logic = false
-        ConnectionCount:int = 0
-
-    # Public interface
-    Start<public>():void =
-        set ServiceState = service_state{IsRunning := true}
-
-    Stop<public>():void =
-        set ServiceState = service_state{IsRunning := false}
-
-    GetStatus<public>():string =
-        if (ServiceState.IsRunning?) then "Running" else "Stopped"
-```
-
-### Configuration Module Pattern
-
-```verse
-game_config := module:
-    # Configuration constants
-    MaxPlayers<public>:int = 100
-    DefaultSpawnDelay<public>:float = 3.0
-    EnablePvP<public>:logic = true
-
-    # Difficulty settings
-    difficulty<public> := module:
-        Easy<public>:int = 0
-        Normal<public>:int = 1
-        Hard<public>:int = 2
-
-        GetMultiplier<public>(Level:int):float =
-            case(Level):
-                Easy => 0.5
-                Normal => 1.0
-                Hard => 2.0
-                _ => 1.0
-```
-
-## Troubleshooting Common Module Issues
+## Troubleshooting
 
 When working with modules, you may encounter various issues. Understanding these common problems and their solutions will help you debug module-related errors more efficiently.
 
@@ -655,7 +467,7 @@ module_x := module:
         (module_x:)Value + (local:)Value  # Clear distinction
 ```
 
-## Detailed Example: Building a Game Module System
+## Detailed Example
 
 Let's walk through building a complete module system for a game, explaining each step and decision along the way.
 

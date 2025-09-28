@@ -1,6 +1,6 @@
 # Persistable Types
 
-Persistable types in Verse allow you to store data that persists beyond the current game session. This is essential for saving player progress, preferences, and other game state that should be maintained across multiple play sessions.
+Persistable types allow you to store data that persists beyond the current game session. This is essential for saving player progress, preferences, and other game state that should be maintained across multiple play sessions.
 
 Persistable data is stored using module-scoped `weak_map(player, t)` variables, where `t` is any persistable type. When a player joins a game, their previously saved data is automatically loaded into all module-scoped variables of type `weak_map(player, t)`.
 
@@ -151,35 +151,23 @@ AddExperience(Player : player, Amount : int) : void =
 
 ## Best Practices
 
-### 1. Schema Stability
-
+- **Schema Stability:**
 Design your persistable types carefully, as they cannot be easily changed after publication. Consider versioning strategies for future updates.
 
-### 2. Use Structs for Simple Data
+- **Use Structs for Simple Data:**
 
 For data that won't need inheritance or complex behavior, prefer persistable structs over classes.
 
-### 3. Handle Missing Data
-
+- **Handle Missing Data:**
 Always check if data exists for a player before accessing it, and provide appropriate defaults.
 
-### 4. Atomic Updates
-
+- **Atomic Updates:**
 When updating persistent data, create new instances rather than trying to modify existing ones (Verse uses immutable data structures).
 
-### 5. Consider Memory Usage
-
+- **Consider Memory Usage:**
 Persistent data is loaded for all players when they join, so be mindful of the amount of data stored per player.
 
-## Limitations and Considerations
-
-- **Publication Lock**: Once published, persistable structs cannot be modified
-- **No Variable Members**: Persistable classes cannot have var members
-- **Type Restrictions**: Only certain types can be made persistable
-- **Inheritance Limits**: Persistable classes must be final (no subclasses)
-- **Performance**: Large amounts of persistent data may impact game loading times
-
-## Example: Complete Player Profile System
+## Example: Player Profile System
 
 ```verse
 using { /Fortnite.com/Devices }
@@ -225,4 +213,4 @@ profile_manager := class(creative_device):
             set PlayerProfiles[Player] = DefaultProfile
 ```
 
-This comprehensive system demonstrates how to create and manage persistable player data in Verse, ensuring that player progress and achievements are maintained across game sessions.
+This demonstrates how to create and manage persistable player data, ensuring that player progress and achievements are maintained across game sessions.

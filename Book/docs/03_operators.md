@@ -1,30 +1,37 @@
-# Operators - Complete Reference
+# Operators
 
-## Overview
-
-Operators in Verse are special functions that perform actions on their operands. They provide concise syntax for common operations like arithmetic, comparison, logical operations, and assignment. Understanding operators is essential for writing effective Verse code, as they form the foundation of most expressions and control flow decisions.
-
-In Verse, operators follow strict precedence rules and have specific behaviors regarding failure and effects. Many operators are failable, meaning they can fail at runtime and must be used in appropriate failure contexts.
+Operators are special functions that perform actions on their operands. They provide concise syntax for common operations like arithmetic, comparison, logical operations, and assignment.
 
 ## Operator Formats
 
 Verse operators come in three formats based on their position relative to their operands:
 
 ### Prefix Operators
+
 Prefix operators appear before their single operand:
+
 - `not Expression` - Logical negation
+  
 - `-Value` - Numeric negation
+
 - `+Value` - Numeric positive (for alignment)
 
 ### Infix Operators
+
 Infix operators appear between their two operands:
+
 - `A + B` - Addition
+
 - `A * B` - Multiplication
+
 - `A = B` - Equality comparison
+
 - `A and B` - Logical AND
 
 ### Postfix Operators
+
 Postfix operators appear after their single operand:
+
 - `Value?` - Query operator for logic values
 
 ## Operator Precedence
@@ -42,29 +49,11 @@ From the Verse parser implementation, the precedence levels from highest to lowe
 | 9 | `*`, `/`, `%` | Multiplication, Division, Modulo | Infix | Left |
 | 8 | `+`, `-` (binary) | Addition, Subtraction | Infix | Left |
 | 7 | `<`, `<=`, `>`, `>=` | Relational comparison | Infix | Left |
-| 6 | `==`, `!=` | Equality comparison | Infix | Left |
 | 5 | `and` | Logical AND | Infix | Left |
 | 4 | `or` | Logical OR | Infix | Left |
 | 3 | `..` | Range | Infix | Left |
 | 2 | Lambda expressions | Function literals | Special | N/A |
 | 1 | `:=`, `=` | Assignment | Infix | Right |
-
-Note: The parser implementation shows that `==` and `!=` are used for equality comparison (not `=` and `<>` as in some documentation). The `=` operator is used for assignment alongside `:=`.
-
-### Grouping with Parentheses
-
-You can override the default precedence by using parentheses to group expressions:
-
-```verse
-# Without parentheses - multiplication first
-Result := 2 + 3 * 4  # Result is 14
-
-# With parentheses - addition first
-Result := (2 + 3) * 4  # Result is 20
-
-# Complex expression with grouping
-Damage := BaseDamage * (1.0 + BonusPercent / 100.0) - ArmorReduction
-```
 
 ## Arithmetic Operators
 
@@ -146,6 +135,7 @@ Combined := Array1 + Array2  # array{1, 2, 3, 4, 5, 6}
 #### Integer Division and Rationals
 
 Integer division with `/` is unique in Verse:
+
 - It's failable (can fail if dividing by zero)
 - It returns a `rational` type, not an `int`
 - You must use `Floor()` or `Ceil()` to convert to `int`
@@ -181,12 +171,8 @@ Comparison operators test relationships between values and are failable expressi
 
 | Operator | Meaning | Supported Types | Example |
 |----------|---------|-----------------|---------|
-| `==` | Equal to | All comparable types | `Name == "Player1"` |
-| `!=` | Not equal to | All comparable types | `State != idle` |
-| `=` | Equal to (alternative) | All comparable types | `Name = "Player1"` |
-| `<>` | Not equal to (alternative) | All comparable types | `State <> idle` |
-
-Note: The parser implementation supports both `==`/`!=` and `=`/`<>` for equality comparisons, though `==`/`!=` appear to be the primary operators in the parser code.
+| `=` | Equal to | All comparable types | `Name = "Player1"` |
+| `<>` | Not equal | All comparable types | `State <> idle` |
 
 ```verse
 # Numeric comparisons
@@ -211,6 +197,7 @@ if (Level >= 10 and Score > 1000):
 ### Comparable Types
 
 The following types support comparison operations:
+
 - Numeric types: `int`, `float`, `rational`
 - Boolean: `logic`
 - Text: `string`, `char`, `char32`
@@ -220,6 +207,7 @@ The following types support comparison operations:
 - Classes: Only with `=` and `<>` if they contain at least one `var` member
 
 Note: Comparisons between different types generally fail:
+
 ```verse
 0 = 0.0  # Fails: int vs float
 "5" = 5  # Fails: string vs int
@@ -343,6 +331,7 @@ else:
 ### Indexing Operator (`[]`)
 
 Used for multiple purposes in Verse:
+
 1. **Array/Map indexing** - Access elements in collections
 2. **Function calls** (Verse-style) - Call functions with bracket syntax
 3. **Computed member access** - Access object members dynamically
@@ -463,122 +452,4 @@ if (5.0 = 5.0): # OK
 
 ## Operator Overloading
 
-Verse does not support custom operator overloading. Operators have fixed meanings defined by the language. However, some operators work with multiple types through built-in polymorphism:
-
-- `+` works with numbers, strings, and arrays
-- `=` and `<>` work with all comparable types
-- `[]` works with arrays, maps, and strings
-
-## Best Practices
-
-### Use Parentheses for Clarity
-
-Even when not required by precedence, parentheses can improve readability:
-
-```verse
-# Less clear
-if (A = B and C = D or E = F):
-    DoSomething()
-
-# More clear
-if ((A = B and C = D) or E = F):
-    DoSomething()
-```
-
-### Handle Failable Operations
-
-Always handle failable operations appropriately:
-
-```verse
-# Good: Handle potential failure
-if (Result := MyArray[Index]):
-    ProcessElement(Result)
-else:
-    HandleMissingElement()
-
-# Bad: Assuming success without checking
-# Element := MyArray[Index]  # Could crash if index out of bounds
-```
-
-### Prefer Compound Assignment
-
-Use compound assignment operators for cleaner code:
-
-```verse
-# Prefer this:
-set Score += Points
-
-# Over this:
-set Score = Score + Points
-```
-
-### Be Explicit with Type Conversions
-
-Make type conversions explicit to avoid confusion:
-
-```verse
-# Clear intention
-FloatResult := IntValue * 1.0
-
-# Ambiguous intention
-# Result := IntValue * SomeFloat
-```
-
-## Common Pitfalls
-
-### Integer Division Returns Rational
-
-Remember that integer division doesn't return an integer:
-
-```verse
-# Wrong assumption
-# HalfValue:int = 10 / 2  # Error: returns rational, not int
-
-# Correct approach
-if (Ratio := 10 / 2):
-    HalfValue:int = Floor(Ratio)
-```
-
-### Assignment vs Comparison
-
-Be careful not to confuse `=` (comparison) with `:=` or `set =` (assignment):
-
-```verse
-# Comparison (failable)
-if (Score = 100):
-    Print("Perfect score!")
-
-# Assignment (not a comparison)
-Score := 100  # Initialization
-set Score = 100  # Update
-```
-
-### Short-Circuit Evaluation
-
-Remember that `or` short-circuits but `and` doesn't:
-
-```verse
-# Second function not called if first succeeds
-if (FastCheck() or SlowCheck()):
-    Process()
-
-# Both functions always evaluated
-if (Check1() and Check2()):
-    Process()
-```
-
-### Effects with `not`
-
-The `not` operator rolls back effects:
-
-```verse
-var Counter:int = 0
-
-# Counter is NOT incremented
-if (not (set Counter += 1)):
-    Print("Counter: {Counter}")  # Still 0
-
-# Counter IS incremented
-if (set Counter += 1):
-    Print("Counter: {Counter}")  # Now 1
-```
+Verse does not support custom operator overloading.
