@@ -208,9 +208,9 @@ testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ
 testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 
 # tim=skip: pointers
-testeq("TB6",pass, skip, tim=skip,libparser=skip) {(p^ : int) := 2}                      {p:=new[int][2]}
+testeq("TB6",pass, skip, tim=skip) {(p^ : int) := 2}                      {p:=new[int][2]}
 # tim=skip: pointers
-testeq("TB10",pass, skip, tim=skip,libparser=skip) {p^[](:int):int}                      {0}
+testeq("TB10",pass, skip, tim=skip) {p^[](:int):int}                      {0}
   # TB6,TB10: no pointers yet
 
 # These crash, so comment them out
