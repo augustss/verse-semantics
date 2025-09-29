@@ -189,6 +189,12 @@ rewriteExp expr = for expr $ \case
     (oc, eff) <- getLamSpecs specs
     e2' <- rewriteExp e2
     pure $ Lam e1' oc eff e2'
+  -- MaxVerse also uses "fn" instead of "function" sometimes
+  Parse.Inst (getMacroParensBraces "fn" -> Just (Just e1, specs)) e2 -> do
+    e1' <- rewriteExp e1
+    (oc, eff) <- getLamSpecs specs
+    e2' <- rewriteExp e2
+    pure $ Lam e1' oc eff e2'
   -- Ignore attributes for now
   Parse.Inst (getMacroParensBraces "module" -> Just (Nothing, _specs)) e2 ->
     Module <$> rewriteExp e2
