@@ -93,6 +93,7 @@ data Exp a
   | ForDo (L (Exp a)) (L (Exp a))
   | Forall (L a)
   | Lam (L (Exp a)) (L (Exp a))
+  | Let (L (Exp a)) (L (Exp a))     -- Let is not present in VerseSpec 0.15, but present in MaxVerse
   | If (L (Exp a))
   | IfElse (L (Exp a)) (L (Exp a))
   | IfThen (L (Exp a)) (L (Exp a))

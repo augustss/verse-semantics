@@ -141,15 +141,15 @@ testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)
 testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
 #  ...in patterns
 testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Splice4",pass,tim=skip,libparser=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Splice5",pass,tim=skip,libparser=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Splice5",pass,tim=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 testeq("Splice5a",pass,tim=skip,libparser=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 testeq("Splice6",pass,tim=skip,libparser=skip){ f( ..(a:[]int), b:string ) :=
                              { (Length[a], b) }
                       ; f[1,2,3,"foo"] } {(3, "foo") }
-testeq("Splice7",pass,libparser=skip){ f( a:int,b:int ) := a; f(3,4) }{3}
-testeq("Splice8",pass,tim=skip,libparser=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
-testeq("Splice9",pass,tim=skip,libparser=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
+testeq("Splice7",pass){ f( a:int,b:int ) := a; f(3,4) }{3}
+testeq("Splice8",pass,tim=skip, libparser=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
+testeq("Splice9",pass,tim=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
 
 #
 testeq("All1",pass) {all{:(1,2,3)}}                            {array{1,2,3}}
@@ -250,7 +250,7 @@ testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
 testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
-testeq("let1",pass,libparser=skip) { let(x:=1){x+2} } { 3 }
+testeq("let1",pass) { let(x:=1){x+2} } { 3 }
 # this test works, but gives an annoying warning
 #testeq("let2",pass) { let(x:=1){x+2}; x } { x }
 # shadowing doesn't really work, so this crashes

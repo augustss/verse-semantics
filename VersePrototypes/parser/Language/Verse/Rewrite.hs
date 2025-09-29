@@ -79,7 +79,7 @@ import Language.Verse.Exp qualified as Parse
 import Language.Verse.Pos (Pos (..))
 import Language.Verse.Rewrite.Exp
 
-import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error)
+import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error, (-))
 
 import Debug.Trace (trace)
 
@@ -157,6 +157,9 @@ rewriteExp expr = for expr $ \case
     rewriteOperator1 "prefix'?'" e
   PostfixQuery e ->
     rewriteOperator1 "postfix'?'" e
+  Parse.PostfixCaret e -> do
+    e' <- rewriteExp e
+    pure $ PostfixOp e' "^"
   Parse.List es ->
     List <$> traverse rewriteExp es
   Parse.Paren e -> do
@@ -232,6 +235,11 @@ rewriteExp expr = for expr $ \case
     All <$> rewriteExp e2
   Parse.Option Nothing  -> pure $ Option Nothing
   Parse.Option (Just e) -> Option . Just <$> rewriteExp e
+
+  Parse.Let bndr body -> do
+    b  <- rewriteExp bndr
+    bd <- rewriteExp body
+    return $ Let b bd
 
   Parse.Inst (extract -> ExpSpecs a bs) e2 | isPredefined "check" a -> do
     let find_eff x | isPredefined "succeeds" x = Effect.Succeeds
@@ -311,9 +319,10 @@ rewriteExp expr = for expr $ \case
     r@(extract -> Parse.Tuple{}) -> do
       r' <- rewriteExp r
       rewriteDef l r'
-  Parse.InfixColonEqual l r ->
-    case expToPat l of
-      Just p  -> rewrite r >>= rewriteDef p
+
+  Parse.InfixColonEqual (expToPat -> Just p) r -> rewrite r >>= rewriteDef p
+    -- case expToPat l of
+      -- Just p  -> rewrite r >>= rewriteDef p
       -- HACK: See #86: This matches (a,b,c) := (1,2,3) which shows up in the
       -- test cases in versetest. This case is a hack because according to
       -- verse-spec a Tuple should be a pattern. So the ast should be
@@ -331,6 +340,7 @@ rewriteExp expr = for expr $ \case
 
       -- more followup. I was tracing the rewrite of this expr '{i->x := 2; (i,
       -- x)}', we end up in this case due to the tuples that now include splicing.
+      {-
       Nothing -> case (extract l, extract r) of
         -- we expect ls to all be idents
         (Parse.Tuple ls, Parse.Tuple rs) -> do
@@ -346,7 +356,6 @@ rewriteExp expr = for expr $ \case
           return $ extract res
         -- TODO: see #86
         -- TODO: ifArchetypeName for the splice
-        -- implment this one
         (Parse.PrefixDotDot (extract -> Pat p), _) -> do
           nme <- rewritePat p
           let go = case nme of
@@ -355,7 +364,16 @@ rewriteExp expr = for expr $ \case
           r'  <- rewriteExp r
           return $ InfixColonEqual Public Val (go <$ l) r'
         (Parse.PrefixDotDot _, _) -> Splice <$> rewriteExp l
-        s -> notImplemented "rewriteEXXX" s
+      -}
+
+        -- The general case. This has some special handling. The problem here is
+        -- that we need to recursively evaluate the lhs because the lhs node is
+        -- not immediately an Ident, we us the infixOp version of := this means
+        -- we drop the aperture and access qualifier
+  Parse.InfixColonEqual l r -> trace "thth" $ do
+    lhs <- rewriteExp l
+    rhs <- rewriteExp r
+    return $ InfixOp lhs ":=" rhs
 
   Parse.Lam e1 e2 -> do
     e1' <- rewriteExp e1
@@ -364,7 +382,10 @@ rewriteExp expr = for expr $ \case
   -- Try to fix Parse2 so that we can get rid of this
   Parse.ExpInfixColon (Parse.expToPat -> Just pat) e2 ->
     rewritePat $ Parse.InfixColon pat e2
-  -- TODO: not sure if this is needed?
+  Parse.ExpInfixColon e1 e2 -> do
+    l <- rewriteExp e1
+    r <- rewriteExp e2
+    return $ InfixOp l ":" r
   Parse.PrefixDotDot e ->
     Splice <$> rewriteExp e
   Pat p ->
@@ -384,9 +405,7 @@ rewriteExp expr = for expr $ \case
   e@Parse.InfixMultiplyEqual{}    -> notImplemented "rewriteExp" e
   e@Parse.InfixPlusEqual{}        -> notImplemented "rewriteExp" e
   e@Parse.Module{}                -> notImplemented "rewriteExp" e
-  e@Parse.PostfixCaret{}          -> notImplemented "rewriteExp" e
   e@Parse.PrefixCaret{}           -> notImplemented "rewriteExp" e
-  e@Parse.Option{}                -> notImplemented "rewriteExp" e
   e@Parse.PrefixMultiply{}        -> notImplemented "rewriteExp" e
   e@Parse.PrefixAmpersand{}       -> notImplemented "rewriteExp" e
   e@Parse.Return{}                -> notImplemented "rewriteExp" e
@@ -411,7 +430,6 @@ rewriteExp expr = for expr $ \case
   e@Parse.Set{}                   -> notImplemented "rewriteExp" e
   e@(_ Parse.:.: _)               -> notImplemented "rewriteExp" e
   e@Parse.Do{}                    -> notImplemented "rewriteExp" e
-  e@Parse.ExpInfixColon{}         -> notImplemented "rewriteExp" e
   e@ExpSpecs{}                    -> notImplemented "rewriteExp" e
 
 -- Rewrite a pattern into the Rewrite.Exp language. Rewrite.Exp does not have
@@ -458,7 +476,6 @@ rewritePath = \ case
     Path.Path (extract label) $ pathIdents <&> \ (qualPath, ident) ->
       (rewritePath <$> qualPath, extract ident)
 
--- START: start adding more connectives
 -- | rewrite a definition form. These are terms like t0 := t1. The binding
 -- connective is assumed by passing the lhs (called 'pat') and the rhs to this
 -- function.
@@ -497,26 +514,44 @@ rewriteDef pat rhs = case extract pat of
       -- processing again until we just have singletons that is the pattern b
       -- and the tuple it should be bound to
 
+      -- explain the flip, we could have a mutually recursive function by why do
+      -- that when a bool flag will do
+
       splice_zip ls_ rs_ = go ls_ rs_
         where
           mk_binder a b = InfixColonEqual Public Val a b <$ rhs
 
+          -- TODO: Note about the splice unification
+          -- (a,..b, c) length 3
+          -- (1,2,3,4) length 4, so |left_overs| = 1, |splice| = 2
+
+          len_rs = length rs_
+          len_ls = length ls_
+
+          splice_amount = len_rs - len_ls + 1
+
           go [] [] = return []
-          go [(extract -> Parse.PatSplice i@(extract -> Parse.Name (Parse.IdentName x)))] ys = -- base
-            pure [mk_binder (Ident.Name x <$ i) (Tuple ys <$ rhs)]
-          go [i@(extract -> Parse.PatSplice{} )] ys = do -- base 2
-            res <- rewriteDef i (List ys <$ rhs)
-            return $ [res <$ i]
-          go xs@((extract -> Parse.PatSplice{}):_) ys  = -- flip case
-            go (reverse xs) (reverse ys)
-          go (x:xs)  (y:ys) = do                         -- something else
+          -- base case: we found a splice so take as much as needed and drop the
+          -- rest. Then continue
+          go ((extract -> Parse.PatSplice i@(extract -> Parse.Name (Parse.IdentName x))):xs) ys
+            = do
+              let splice = mk_binder (Ident.Name x <$ i) (Tuple (take splice_amount ys) <$ rhs)
+              (splice :) <$> go xs (drop splice_amount ys)
+          -- base 2: same as 1 but with a splice with not just an ident
+          go (i@(extract -> Parse.PatSplice{} ):xs) ys = do
+            let spliced_ys = take splice_amount ys
+            res <- rewriteDef i (List spliced_ys <$ rhs)
+            ((res <$ i) :) <$> go xs (drop splice_amount ys)
+          -- recursive case
+          go (x:xs)  (y:ys) = do
             res <- rewriteDef x y
-            rest <- splice_zip xs ys
+            rest <- go xs ys
             return $ (res <$ x) : rest
 
       -- TODO: remove this unsafe match
       (Tuple rhss) = extract rhs
-    List <$> splice_zip es rhss
+    res <- splice_zip es rhss
+    return $ List res
 
   InfixColon (extract -> stripSpecs -> (Invoke p e_domain, specs)) e_range -> do
     e_domain' <- rewriteExp e_domain
