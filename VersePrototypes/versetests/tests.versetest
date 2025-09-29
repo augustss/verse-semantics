@@ -44,9 +44,9 @@ testeq("Cmp9",pass) {3>2}                                 {3}
 testeq("Cmp10",pass) {3>=4}                                {:false}
 testeq("Cmp11",pass) {3>=3}                                {3}
 testeq("Cmp12",pass) {3>=2}                                {3}
-testeq("Cmp13",pass, libparser=skip) {3<>4}                                {3}
+testeq("Cmp13",pass) {3<>4}                                {3}
 testeq("Cmp14",pass) {3<>3}                                {:false}
-testeq("Cmp15",pass, libparser=skip) {3<>2}                                {3}
+testeq("Cmp15",pass) {3<>2}                                {3}
 testeq("Cmp16",pass) {3=4}                                 {:false}
 testeq("Cmp17",pass) {3=3}                                 {3}
 testeq("Cmp18",pass) {3=2}                                 {:false}

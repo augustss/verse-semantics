@@ -40,6 +40,7 @@ unitTests = testGroup "parser/test_data/all.verse"
   , sequences
   , tuples
   , options
+  , comparisons
   ]
 
 comments :: TestTree
@@ -135,5 +136,14 @@ options =
   -- FIXME: parse directly to Option
   [ passes' ("option{ 2 }"      , List [L (Loc (Pos {line = 1, column = 7, offset = 0}) (Pos {line = 1, column = 12, offset = 0})) (Option (Just (L (Loc (Pos {line = 1, column = 9, offset = 0}) (Pos {line = 1, column = 10, offset = 0})) (Int 2))))]
              )
+  ]
 
+
+comparisons :: TestTree
+comparisons =
+  let passes = prettyTest $ pcExpr
+  in testGroup "comparisons" $
+  [ passes ("3<>4", "(3 <> 4)")
+  , passes ("3<>3", "(3 <> 3)")
+  , passes ("3<>2", "(3 <> 2)")
   ]

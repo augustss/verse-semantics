@@ -121,7 +121,7 @@ rewriteExp expr = for expr $ \case
     pure $ List
       [ infixColonEqual Val x e1'
       , infixColonEqual Val y e2'
-      , not' $ unify (name x) (name y)
+      , (InfixOp (name x) "<>" (name y)) <$ e1'
       ]
   (Parse.:|:) e1 e2 ->
     (:|:) <$> rewriteExp e1 <*> rewriteExp e2
@@ -370,7 +370,7 @@ rewriteExp expr = for expr $ \case
         -- that we need to recursively evaluate the lhs because the lhs node is
         -- not immediately an Ident, we us the infixOp version of := this means
         -- we drop the aperture and access qualifier
-  Parse.InfixColonEqual l r -> trace "thth" $ do
+  Parse.InfixColonEqual l r -> do
     lhs <- rewriteExp l
     rhs <- rewriteExp r
     return $ InfixOp lhs ":=" rhs
