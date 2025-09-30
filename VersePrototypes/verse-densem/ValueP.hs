@@ -1,23 +1,25 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MonadComprehensions #-}
 module ValueP(
   Z,
   Ident, fresh, freshList,
   Value(..), FUN,
   pattern Tuple,
-  PartialFun, applyPF, fun,
+  PartialFun(..), applyPF, fun,
   numInt,
   allInts, allFUNs, allValues,
   allInts',
   funNegate, funInt, funGt, funLt,
   funAdd, funSub, funMul, funDiv,
   funXF,
+  funUnion, funConcat, tupConcat,
   allTuples, allTuplesLen, allTuplesLenV,
   tupleLen,
   ) where
 import Control.Monad
-import Data.List((\\), intercalate)
+import Data.List((\\), intercalate, nub)
 import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
 import PomSet
@@ -45,6 +47,7 @@ data Value
   | Fun FUN
  deriving ( Eq, Ord )
 
+-- Invariant: no overlapping domains among the partial functions
 type FUN = P PartialFun
 
 pattern Tuple :: [Value] -> Value
@@ -67,7 +70,7 @@ instance Show Value where
   show (Tuple vs) = "<" ++ intercalate "," (map show vs) ++ ">"
   show (Fun fn) = show fn
 
-data PartialFun = PF String (M.Map Value Value)
+data PartialFun = PF { pfName :: String, pfMap :: M.Map Value Value }
 -- deriving ( Eq, Ord )
 
 instance Eq PartialFun where
@@ -148,7 +151,8 @@ funXF = fun[funX12_3, funX0_1]
 allFUNs :: [FUN]
 allFUNs = [ fun[funNegate], fun[funInt], fun[funGt], fun[funLt], fun[funAdd], fun[funSub], fun[funMul], fun[funDiv],
             funXF
-          ]
+          ] ++
+          [ f | Fun f <- allTuples ]
 
 -- Integers and pairs of integers
 allValues :: [Value]
@@ -180,3 +184,35 @@ allTupleElems :: [Value]
 allTupleElems = --[Int 0, Int 1]
                 allInts
 -- TOO SLOW                ++ map Tuple (allTuplesLen' allInts 2)   -- all pairs on ints
+
+-- concatenate tuples represented as functions.
+tupConcat :: FUN -> FUN -> FUN
+tupConcat x y = uncanon [ appTup xs ys | xs <- ne $ canon x, ys <- ne $ canon y ]
+  where appTup :: [PartialFun] -> [PartialFun] -> [PartialFun]
+        appTup xs ys = xs ++ map (shiftPF (length xs)) ys
+        ne s | Set.isEmpty s = Set.singleton []
+             | otherwise = s
+
+shift :: Int -> FUN -> FUN
+shift o = fmap (shiftPF o)
+
+shiftPF :: Int -> PartialFun -> PartialFun
+shiftPF o (PFSing (Int i) x) = PFSing (Int (i+o)) x
+shiftPF _ _ = error "shiftPF: not a singleton tuple"
+
+domCheck :: String -> FUN -> FUN
+domCheck msg f =
+  let xs = concat . allLeaves . fmap (M.keys . pfMap) $ f
+  in  if xs == nub xs then f else error $ "domCheck: " ++ msg ++ ": " ++ show f
+
+-- The FUN invariant makes the mkSetUnsafe safe
+funDomain :: FUN -> Set.Set Value
+funDomain = Set.mkSetUnsafe . concat . allLeaves . fmap (M.keys . pfMap)
+
+funUnion :: FUN -> FUN -> FUN
+funUnion s t | Set.isEmpty (Set.intersect (funDomain s) (funDomain t)) = s `union` t
+             | otherwise = Empty
+
+funConcat :: FUN -> FUN -> FUN
+funConcat s t | Set.isEmpty (Set.intersect (funDomain s) (funDomain t)) = s +++ t
+              | otherwise = Empty

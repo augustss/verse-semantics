@@ -85,3 +85,12 @@ uncanon :: Ord a => Set [a] -> P a
 uncanon s | Set.isEmpty s = Empty
 uncanon s = Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
 
+-- Return all the leaves of a pomset
+allLeaves :: P a -> [a]
+allLeaves Empty = []
+allLeaves (Unit a) = [a]
+allLeaves (a :++ b) = allLeaves a ++ allLeaves b
+allLeaves (a :\/ b) = allLeaves a ++ allLeaves b
+
+mkPomSetList :: [a] -> P a
+mkPomSetList = foldr (+++) Empty . map unit

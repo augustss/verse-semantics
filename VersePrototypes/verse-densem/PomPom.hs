@@ -96,12 +96,28 @@ fOR xs d@Unit{}  t i x =
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
 fOR xs (a :\/ b) t i x =
+  (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
+  where fora = fOR xs a t u1 v1
+        forb = fOR xs b t u2 v2
+        (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
+        (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
+        sings = bigUnion [ i .= tu1 `utup` tu2 /\ x .= tv1 `utup` tv2 /\
+                           u1 .= tu1 /\ u2 .= tu2 /\ v1 .= tv1 /\ v2 .= tv2
+                         | tu1 <- allValuesOf u1 fora
+                         , tu2 <- allValuesOf u2 forb
+                         , tv1 <- allValuesOf v1 fora
+                         , tv2 <- allValuesOf v2 forb
+                         ]
+        utup (Fun g) (Fun h) = Fun (funUnion g h)
+        utup _ _ = undefined
+{-
   (unit ca *** fOR xs a t i x) `union`
   (unit cb *** fOR xs b t i x)
   `union` (unit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
 --  `union` (nOT (ab >>> xs) *** unit (i .= nil /\ x .= nil))
   where ca = coll (a >>> xs)
         cb = coll (b >>> xs)
+-}
 
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
@@ -117,7 +133,7 @@ fOR xs (a :++ b) t i x =
                          , tv1 <- allValuesOf v1 fora
                          , tv2 <- allValuesOf v2 forb
                          ]
-        app (Tuple as) (Tuple bs) = Tuple (as ++ bs)
+        app (Fun g) (Fun h) = Fun (tupConcat g h)
         app _ _ = undefined
 
 allValuesOf :: Ident -> P ENV -> [Value]
@@ -193,7 +209,16 @@ dE t@(ApplyD t0 t1)                 i x =
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> P ENV
-dF f a r = undefined
+dF f a r =
+  [ d
+  | fp <- mkPomSetList allFUNs
+  , h <- fp
+  , let d = f .= Fun fp /\ bigUnion [ a .= u /\ r .= v
+                                | u <- allValues  -- list
+                                , Just v <- [applyPF h u]
+                                ]
+  , d /= E.empty
+  ]
 {-
   uncanon $
   [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
@@ -217,7 +242,7 @@ valsOf :: [Ident] -> ENV -> [Value]
 valsOf is e = nub $ concatMap (extractVar e) is
 -}
 
-{-
+
 i=Ident noLoc "i"
 j=Ident noLoc "j"
 k=Ident noLoc "k"
@@ -246,16 +271,22 @@ t0=DefineE a (ApplyD (EPrim Gt) (Array [Lit (LInt 3), Variable x]) `Seq`
 t1=Variable a
 -}
 u=Ident noLoc "u"
+u1=Ident noLoc "u1"
+u2=Ident noLoc "u2"
 v=Ident noLoc "v"
+v1=Ident noLoc "v1"
+v2=Ident noLoc "v2"
 --t0=DefineIE x (k0 `Choice` k1)
 --t1=For2 t0 (Variable x)
 --t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
-t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
-t1=Variable i
+--t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
+--t0=DefineIE i (k0 `Choice` k1)
+t0=Unify (Variable x) k0 `Choice` Unify (Variable x) k1
+t1=Variable x
 tfor = For2 t0 t1
 tn=Variable n `Unify` k1
 tt = tn `Seq` tfor
--}
+
 
 {-
 ix :: [ ENV ] -> Int -> ENV
