@@ -71,7 +71,7 @@ $$
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Z + \Fun \\\
-  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A \emph{finite} sequence of partial functions} \\
+  Fun(|fs|) \in & \Fun & = & \pom{\semfcn}  & \text{A pomset of non-empty partial functions} \\
   &&&& \hspace{3mm} \text{with disjoint domains} \\
   \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value all identifiers} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
@@ -84,7 +84,8 @@ $$
   \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o|  \vb op[a_1,\mydots,a_n] \\
   & & \vb & |arr (a_0, xdots, a_n)| \vb |truth a|\\
   \text{Constraints} &  \EV & ::= & \conBrack{relop[a_1,\mydots,a_n]} \\
-  &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
+   &  & \vb & \conBrack{ \fpr{a}{b} \in h }  \hspace{10mm} \text{where}\; h \in \semfcn \\
+%   &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
   &  & \vb & \conEmpty \vb \conUniv \vb \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
   &  & \vb & \conCompl(\EV)  & \text{Complement} \\
   &  & \vb & \HIDE{\EV}{xs} & \text{Hiding} \\
@@ -104,10 +105,11 @@ $$
   \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
   \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \}
       \hspace{4mm} \text{...and similarly other $relops$} \\
-  \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}{n}}}
-  & = & \multicolumn{2}{@@{}l}
-           {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun[h_1,\mydots,h_n],
-                \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in h_i \}}\\[1mm]
+  \sembrack{ \fpr{a}{b} \in h } & = & \{ \rho \in \Env \vb \fpr{\rho(a)}{\rho(b)} \in h \} \\
+%   \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}{n}}}
+%   & = & \multicolumn{2}{@@{}l}
+%            {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun[h_1,\mydots,h_n],
+%                 \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in h_i \}}\\[1mm]
 \semapp{A}{|a|} & : & \Env \rightarrow \Val \\
 \semapp{A}{|x|}\rho & = & \rho(x) \\
 \semapp{A}{|k|}\rho & = & k \\
