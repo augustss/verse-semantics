@@ -2,78 +2,15 @@
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Pom where
-import Control.Applicative
-import Control.Monad
-import Epic.List
+--import Epic.List
 import qualified Data.List as L
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
 import qualified Set
 import Set(Set)
-import Debug.Trace
-
-default ()
-
-infixl 6 :\/
-infixl 8 :++
-
-data P a
-  = Empty
-  | Unit a
-  | P a :++ P a
-  | P a :\/ P a
-  deriving (Show)
-
---instance (Show a, Ord a) => Show (P a) where
---  showsPrec p s = showsPrec p (canon $ absorbEmpty s)
-
-instance (Ord a) => Eq (P a) where
-  x == y  =  compare x y == EQ
-
-instance (Ord a) => Ord (P a) where
-  compare x y = compare (canon x) (canon y)
-
-unit :: a -> P a
-unit a = Unit a
-
-none :: P a
-none = Empty
-
--- Smart constructor for :++
-infixl 8 +++
-(+++) :: P a -> P a -> P a
-Empty +++ y = y
-x +++ Empty = x
-x +++     y = x :++ y
-
--- Smart constructor for :\/
-infixl 6 `union`
-union :: P a -> P a -> P a
-union Empty y = y
-union x Empty = x
-union x     y = x :\/ y
-
-instance Functor P where
-  fmap f s = s >>= pure . f
-
-instance Applicative P where
-  pure = Unit
-  (<*>) = ap
-
-instance Monad P where
-  return          = pure
-  Empty     >>= _ = Empty
-  Unit x    >>= k = k x
-  (s :++ t) >>= k = (s >>= k) +++ (t >>= k)
-  (s :\/ t) >>= k = (s >>= k) `union` (t >>= k)
-
-instance Alternative P where
-  empty = Empty
-  (<|>) = union
-
-cONC :: [P a] -> P a
-cONC = foldr (+++) Empty
+import PomSet
+--import Debug.Trace
 
 --pfilter :: (a -> Bool) -> P a -> P a
 --pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
@@ -120,21 +57,6 @@ This is hard to implement
 uNION :: Set (P a) -> P a
 -}
 
-canon :: P a -> Set [a]
-canon Empty = Set.empty
-canon p = canon' p
-  where
-    canon' Empty = error "canon' : Empty"
-    canon' (Unit a) = Set.singleton [a]
-    canon' (s :\/ t) = canon' s `Set.union` canon' t
-    canon' (Unit a :++ s) = [ a : as | as <- canon' s ]
-    canon' ((s :\/ t) :++ r) = canon' (s :++ r) `Set.union` canon' (t :++ r)
-    canon' ((s :++ t) :++ r) = canon' (s :++ (t :++ r))
-
-uncanon :: Ord a => Set [a] -> P a
-uncanon s | Set.isEmpty s = Empty
-uncanon s = Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
-
 ------------------
 
 oNE :: [Ident] -> PENV -> PENV
@@ -173,7 +95,7 @@ fOR xs d@Unit{}  t i x =
 --fOR xs (a :\/ b) t i x = fOR xs a t i x +++ fOR xs b t i x
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
-fOR xs ab@(a :\/ b) t i x =
+fOR xs (a :\/ b) t i x =
   (unit ca *** fOR xs a t i x) `union`
   (unit cb *** fOR xs b t i x)
   `union` (unit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
@@ -195,7 +117,7 @@ fOR xs (a :++ b) t i x =
                          , tv1 <- allValuesOf v1 fora
                          , tv2 <- allValuesOf v2 forb
                          ]
-        app (Tuple xs) (Tuple ys) = Tuple (xs ++ ys)
+        app (Tuple as) (Tuple bs) = Tuple (as ++ bs)
         app _ _ = undefined
 
 allValuesOf :: Ident -> P ENV -> [Value]
@@ -229,14 +151,14 @@ dE (If3 t0 t1 t2)                   i x =
   (nOT (s0 >>> xs) *** dB t2 i x)
   where xs = bvs t0
         s0 = oNE xs (dC t0)
-dE t@(For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
+dE (For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
 dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
   dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
   (let
-    mkSeq :: Int -> Int -> [ENV]
-    mkSeq lo hi = [ x .= Int v /\ l .= Int lo /\ h .= Int hi | v <- [ lo .. hi ] ]
+    mkSequ :: Int -> Int -> [ENV]
+    mkSequ lo hi = [ x .= Int v /\ l .= Int lo /\ h .= Int hi | v <- [ lo .. hi ] ]
     allSeqs :: Set [ENV]
-    allSeqs = [ mkSeq start end
+    allSeqs = [ mkSequ start end
               | start <- Set.mkSetUnsafe allInts'
               , end   <- Set.mkSetUnsafe [ start .. numInt-1 ]
               ]
@@ -293,7 +215,7 @@ valsOf :: [Ident] -> ENV -> [Value]
 valsOf is e = nub $ concatMap (extractVar e) is
 -}
 
-
+{-
 i=Ident noLoc "i"
 j=Ident noLoc "j"
 k=Ident noLoc "k"
@@ -331,6 +253,7 @@ t1=Variable i
 tfor = For2 t0 t1
 tn=Variable n `Unify` k1
 tt = tn `Seq` tfor
+-}
 
 {-
 ix :: [ ENV ] -> Int -> ENV
