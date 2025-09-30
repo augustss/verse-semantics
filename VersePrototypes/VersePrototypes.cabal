@@ -201,6 +201,10 @@ library verse-densem
                       ValueS
                       Map
                       ENVDesugar
+                      PomSet
+                      PomPom
+                      ValueP
+                      ENVP
     build-depends:    verse-libs,
                       base,
                       containers,

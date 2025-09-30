@@ -79,6 +79,7 @@ canon p = canon' p
     canon' (Unit a :++ s) = [ a : as | as <- canon' s ]
     canon' ((s :\/ t) :++ r) = canon' (s :++ r) `Set.union` canon' (t :++ r)
     canon' ((s :++ t) :++ r) = canon' (s :++ (t :++ r))
+    canon' (Empty :++ _) = error "cannot happen"
 
 uncanon :: Ord a => Set [a] -> P a
 uncanon s | Set.isEmpty s = Empty
