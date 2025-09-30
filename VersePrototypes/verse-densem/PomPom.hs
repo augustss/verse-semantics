@@ -83,7 +83,7 @@ coll (Unit e)  = e
 fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
 fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
 fOR xs d@Unit{}  t i x =
-  (d *** unit sings *** dE t p q >>> (p:q:xs))
+  (d *** unit sings *** dB t p q >>> (p:q:xs))
   `union`
   (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
