@@ -81,10 +81,10 @@ $$
 \\
 \textbf{The constraint language}\\
 \begin{array}{l@@{\;\;}rc@@{\;\;}ll}
-  \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o|  \vb op[a_1,\mydots,a_n] \\
-  & & \vb & |arr (a_0, xdots, a_n)| \vb |truth a|\\
+  \text{Simple values}    & a & ::= & |v| \vb |x| \vb op[a_1,\mydots,a_n] \\
+%  & & \vb & |arr (a_0, xdots, a_n)| \vb |truth a|\\
   \text{Constraints} &  \EV & ::= & \conBrack{relop[a_1,\mydots,a_n]} \\
-   &  & \vb & \conBrack{ \fpr{a}{b} \in h }  \hspace{10mm} \text{where}\; h \in \semfcn \\
+   &  & \vb & \conBrack{ \fpr{x}{y} \in h }  \hspace{10mm} \text{where}\; h \in \semfcn \\
 %   &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
   &  & \vb & \conEmpty \vb \conUniv \vb \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
   &  & \vb & \conCompl(\EV)  & \text{Complement} \\
@@ -112,13 +112,13 @@ $$
 %                 \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in h_i \}}\\[1mm]
 \semapp{A}{|a|} & : & \Env \rightarrow \Val \\
 \semapp{A}{|x|}\rho & = & \rho(x) \\
-\semapp{A}{|k|}\rho & = & k \\
-\semapp{A}{|o|}\rho & = & \semap{O}{o} \\
+\semapp{A}{|v|}\rho & = & v \\
+%\semapp{A}{|o|}\rho & = & \semap{O}{o} \\
 \semapp{A}{|a_1 + a_2|}\rho & = & \semapp{A}{a_1}\rho + \semapp{A}{a_2}\rho
     \hspace{4mm} \text{...and similarly other $ops$} \\
-\semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
-\semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
-\semap{O}{|o|} & : & \Val \\
+% \semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
+% \semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
+% \semap{O}{|o|} & : & \Val \\
  \semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
 \end{array}\\
 \\[-1mm]
@@ -129,7 +129,7 @@ $$
 &  \semap{I}{|t|} & = & \text{the outer $\exists$-bound variables in |t|} \\[1mm]
 
 \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
-&  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
+&  \tupE [v_0,\mydots,v_n] & = & Fun \pomcompL \{ \fpr{i}{v_i} \} \vb i |<-| 0 \mycdots n \pomcompR \\[1mm]
 % \text{Extract result} & \extractE & : & \Ident \rightarrow \ENV \rightarrow \powerset{\Val, \ENV} \\
 % & \extractE(r,\EV) & = & \{ (v, \hideE(r, \EV'))
 %                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(r)=v \} \} \\[1mm]
