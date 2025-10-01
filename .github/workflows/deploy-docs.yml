@@ -42,7 +42,7 @@ jobs:
 
       - name: Install custom Verse syntax highlighter
         run: |
-          python install_verse_lexer.py
+          pip install -e .
         working-directory: ./Book
 
       - name: Build MkDocs site
