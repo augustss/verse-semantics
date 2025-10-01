@@ -83,7 +83,7 @@ $$
 \pomcanon( \pomunit{\EV} ) & = & \{ [ \EV ] \} \\
 \pomcanon( S \pomunion T ) & = & \pomcanon(S) \cup \pomcanon(T) \\
 \pomcanon( \pomempty \pomcat S ) & = & \pomcanon(S) \\
-\pomcanon( (S \pomunion T) \pomcat R ) & = & \pomcanon(S \pomcat R) \cup \pomcanon(S \pomcat R) \\
+\pomcanon( (S \pomunion T) \pomcat R ) & = & \pomcanon(S \pomcat R) \cup \pomcanon(T \pomcat R) \\
 \pomcanon( (S \pomcat T) \pomcat R ) & = & \pomcanon(S \pomcat (T \pomcat R)) \\
 \pomcanon( \pomunit{\EV} \pomcat S ) & = & \{ a:as \vb as \in \pomcanon(S) \} \\
 \end{array}
@@ -256,7 +256,7 @@ $$
                               & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
 
   \semFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
-\semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=\tupE []}}
+\semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
                    \hfill \text{(NB: |for1 fail| returns empty tuple)} \\[1mm]
 \semFOR{S \pomunion T}{xs}{u}{v}{t_1}
                    & = & \pomunit{\conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2}}
@@ -269,9 +269,9 @@ $$
     &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
     && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
 \semFOR{\pomunit{\EV}}{xs}{u}{v}{t_1}
-       &  = &  (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=\tupE[p],v=\tupE[q]}}
+       &  = &  (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
                   \pomseq \semess{B}{p}{q}{t_1}) \pomHIDE \{p,q,xs\}   \\
- &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=v=\tupE[]}}  \hspace{6mm}  p,q \not\in \freevars{t_1,u,v,xs} \\
+ &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=v=|emptytup|}}  \hspace{6mm}  p,q \not\in \freevars{t_1,u,v,xs} \\
 \end{array}
 \end{array}
 $$
@@ -311,7 +311,7 @@ $$
   &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
 &  \semFUN{\pomunit{\EV}}{xs}{pq}{hf}{t_1}
        &  = & \pomunit{\EV} \pomseq (\text{\bf Key part: Not done yet}) \\
- &&&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{h=f=Fun[]}} \\
+ &&&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\
 \end{array}
 \end{array}
 $$
