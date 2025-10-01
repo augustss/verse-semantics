@@ -107,9 +107,13 @@ fOR xs (a :\/ b) t i x =
                          , tu2 <- allValuesOf u2 forb
                          , tv1 <- allValuesOf v1 fora
                          , tv2 <- allValuesOf v2 forb
+                         , consistent tu1 tu2
+                         , consistent tv1 tv2
                          ]
         utup (Fun g) (Fun h) = Fun (funUnion g h)
         utup _ _ = undefined
+        consistent (Fun g) (Fun h) = Set.isEmpty (funDomain g `Set.intersect` funDomain h)
+        consistent _ _ = undefined
 {-
   (unit ca *** fOR xs a t i x) `union`
   (unit cb *** fOR xs b t i x)
@@ -206,6 +210,8 @@ dE t@(ApplyD t0 t1)                 i x =
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
+dE t@(Function Closed t0 _ t1) i x = fUN (bvs t0) (dE t0 p q) t1 p q i x
+  where (p, q) = fresh2 ("p", "q") [i, x] t
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> P ENV
@@ -281,7 +287,8 @@ v2=Ident noLoc "v2"
 --t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
 --t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
 --t0=DefineIE i (k0 `Choice` k1)
-t0=Unify (Variable x) k0 `Choice` Unify (Variable x) k1
+--t0=Unify (Variable x) k0 `Choice` Unify (Variable x) k1
+t0=DefineIE x $ ApplyD (Variable (Ident noLoc "operator'|||'")) (Array [k0, k1])
 t1=Variable x
 tfor = For2 t0 t1
 tn=Variable n `Unify` k1
@@ -368,3 +375,39 @@ den t = canon $
         dE (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"
+
+-------
+
+fUN :: [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
+fUN xs (s :\/ t) t1 p q h f =
+  (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
+  where funa = fUN xs s t1 p q h1 f1
+        funb = fUN xs t t1 p q h2 f2
+        (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
+        (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
+        sings = bigUnion [ i .= th1 `ufun` th2 /\ x .= tf1 `ufun` tf2 /\
+                           h1 .= th1 /\ h2 .= th2 /\ f1 .= tf1 /\ f2 .= tf2
+                         | th1 <- allValuesOf h1 funa
+                         , th2 <- allValuesOf h2 funb
+                         , tf1 <- allValuesOf f1 funa
+                         , tf2 <- allValuesOf f2 funb
+                         ]
+        ufun (Fun g) (Fun h) = Fun (funUnion g h)
+        ufun _ _ = undefined
+fUN xs (s :++ t) t1 p q h f =
+  (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
+  where funa = fUN xs s t1 p q h1 f1
+        funb = fUN xs t t1 p q h2 f2
+        (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
+        (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
+        sings = bigUnion [ i .= th1 `ufun` th2 /\ x .= tf1 `ufun` tf2 /\
+                           h1 .= th1 /\ h2 .= th2 /\ f1 .= tf1 /\ f2 .= tf2
+                         | th1 <- allValuesOf h1 funa
+                         , th2 <- allValuesOf h2 funb
+                         , tf1 <- allValuesOf f1 funa
+                         , tf2 <- allValuesOf f2 funb
+                         ]
+        ufun (Fun g) (Fun h) = Fun (funConcat g h)
+        ufun _ _ = undefined
+

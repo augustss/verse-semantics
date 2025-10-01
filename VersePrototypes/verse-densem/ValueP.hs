@@ -13,13 +13,15 @@ module ValueP(
   allInts',
   funNegate, funInt, funGt, funLt,
   funAdd, funSub, funMul, funDiv,
+  funEmpty,
   funXF,
+  funDomain,
   funUnion, funConcat, tupConcat,
   allTuples, allTuplesLen, allTuplesLenV,
   tupleLen,
   ) where
 import Control.Monad
-import Data.List((\\), intercalate, nub)
+import Data.List((\\), intercalate)
 import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
 import PomSet
@@ -141,6 +143,9 @@ funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int ((i*j) `mod` numInt))
 funDiv :: PartialFun
 funDiv = PF "div" $ M.fromList [(Tuple [Int i, Int j], Int (i`div`j)) | i <- allInts'', j <- allInts'', j /= 0 ]
 
+funEmpty :: PartialFun
+funEmpty = PF "empty" M.empty
+
 funX12_3 :: PartialFun
 funX12_3 = PF "x12_3" $ M.fromList [(Int 1, Int 3), (Int 2, Int 3)]
 funX0_1 :: PartialFun
@@ -193,17 +198,21 @@ tupConcat x y = uncanon [ appTup xs ys | xs <- ne $ canon x, ys <- ne $ canon y 
         ne s | Set.isEmpty s = Set.singleton []
              | otherwise = s
 
+{-
 shift :: Int -> FUN -> FUN
 shift o = fmap (shiftPF o)
+-}
 
 shiftPF :: Int -> PartialFun -> PartialFun
 shiftPF o (PFSing (Int i) x) = PFSing (Int (i+o)) x
 shiftPF _ _ = error "shiftPF: not a singleton tuple"
 
+{-
 domCheck :: String -> FUN -> FUN
 domCheck msg f =
   let xs = concat . allLeaves . fmap (M.keys . pfMap) $ f
   in  if xs == nub xs then f else error $ "domCheck: " ++ msg ++ ": " ++ show f
+-}
 
 -- The FUN invariant makes the mkSetUnsafe safe
 funDomain :: FUN -> Set.Set Value
