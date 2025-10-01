@@ -1,12 +1,12 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Pom where
+module PomPom where
 --import Epic.List
 import qualified Data.List as L
 import FrontEnd.Expr hiding(Tuple)
-import ValueS
-import ENVS
+import ValueP
+import ENVP as E
 import qualified Set
 import Set(Set)
 import PomSet
@@ -24,11 +24,11 @@ import PomSet
 type PENV = P ENV
      -- Invariants of PENV
      --     (I1) Empty only at the root
-     --     (I2) No (Unit ENVS.empty) anywhere
+     --     (I2) No (Unit E.empty) anywhere
 
 mkUnit :: ENV -> PENV
 -- Establish (I2)
-mkUnit d | d == ENVS.empty = Empty
+mkUnit d | d == E.empty = Empty
          | otherwise       = Unit d
 
 -- Sequencing
@@ -75,7 +75,7 @@ sing :: Value -> Value
 sing x = Tuple [x]
 
 coll :: P ENV -> ENV
-coll Empty     = ENVS.empty
+coll Empty     = E.empty
 coll (a :\/ b) = coll a \/ coll b
 coll (a :++ b) = coll a \/ coll b
 coll (Unit e)  = e
@@ -96,12 +96,28 @@ fOR xs d@Unit{}  t i x =
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
 fOR xs (a :\/ b) t i x =
+  (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
+  where fora = fOR xs a t u1 v1
+        forb = fOR xs b t u2 v2
+        (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
+        (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
+        sings = bigUnion [ i .= tu1 `utup` tu2 /\ x .= tv1 `utup` tv2 /\
+                           u1 .= tu1 /\ u2 .= tu2 /\ v1 .= tv1 /\ v2 .= tv2
+                         | tu1 <- allValuesOf u1 fora
+                         , tu2 <- allValuesOf u2 forb
+                         , tv1 <- allValuesOf v1 fora
+                         , tv2 <- allValuesOf v2 forb
+                         ]
+        utup (Fun g) (Fun h) = Fun (funUnion g h)
+        utup _ _ = undefined
+{-
   (unit ca *** fOR xs a t i x) `union`
   (unit cb *** fOR xs b t i x)
   `union` (unit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
 --  `union` (nOT (ab >>> xs) *** unit (i .= nil /\ x .= nil))
   where ca = coll (a >>> xs)
         cb = coll (b >>> xs)
+-}
 
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
@@ -117,7 +133,7 @@ fOR xs (a :++ b) t i x =
                          , tv1 <- allValuesOf v1 fora
                          , tv2 <- allValuesOf v2 forb
                          ]
-        app (Tuple as) (Tuple bs) = Tuple (as ++ bs)
+        app (Fun g) (Fun h) = Fun (tupConcat g h)
         app _ _ = undefined
 
 allValuesOf :: Ident -> P ENV -> [Value]
@@ -194,6 +210,16 @@ dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> P ENV
 dF f a r =
+  [ d
+  | fp <- mkPomSetList allFUNs
+  , h <- fp
+  , let d = f .= Fun fp /\ bigUnion [ a .= u /\ r .= v
+                                | u <- allValues  -- list
+                                , Just v <- [applyPF h u]
+                                ]
+  , d /= E.empty
+  ]
+{-
   uncanon $
   [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
                               | u <- allValues  -- list
@@ -208,14 +234,15 @@ dF f a r =
     ]
   | tt@(Tuple vs) <- Set.mkSetUnsafe allTuples -- set
   ]
-
+-}
+  
 {-
 -- A hack to avoid iterating over so many values
 valsOf :: [Ident] -> ENV -> [Value]
 valsOf is e = nub $ concatMap (extractVar e) is
 -}
 
-{-
+
 i=Ident noLoc "i"
 j=Ident noLoc "j"
 k=Ident noLoc "k"
@@ -244,21 +271,27 @@ t0=DefineE a (ApplyD (EPrim Gt) (Array [Lit (LInt 3), Variable x]) `Seq`
 t1=Variable a
 -}
 u=Ident noLoc "u"
+u1=Ident noLoc "u1"
+u2=Ident noLoc "u2"
 v=Ident noLoc "v"
+v1=Ident noLoc "v1"
+v2=Ident noLoc "v2"
 --t0=DefineIE x (k0 `Choice` k1)
 --t1=For2 t0 (Variable x)
 --t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
-t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
-t1=Variable i
+--t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
+--t0=DefineIE i (k0 `Choice` k1)
+t0=Unify (Variable x) k0 `Choice` Unify (Variable x) k1
+t1=Variable x
 tfor = For2 t0 t1
 tn=Variable n `Unify` k1
 tt = tn `Seq` tfor
--}
+
 
 {-
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
-        | otherwise = ENVS.empty
+        | otherwise = E.empty
 
 conc :: [Value] -> Value
 conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
@@ -271,14 +304,14 @@ dC :: SrcEssential -> P ENV
 dC e = dE e i x >>> [i,x]  where (i, x) = fresh2 ("i", "x") [] e
 
 dP :: PrimOp -> FUN
-dP Neg = [funNegate]
-dP IsInt = [funInt]
-dP Gt = [funGt]
-dP Lt = [funLt]
-dP Add = [funAdd]
-dP Sub = [funSub]
-dP Mul = [funMul]
-dP Div = [funDiv]
+dP Neg = fun[funNegate]
+dP IsInt = fun[funInt]
+dP Gt = fun[funGt]
+dP Lt = fun[funLt]
+dP Add = fun[funAdd]
+dP Sub = fun[funSub]
+dP Mul = fun[funMul]
+dP Div = fun[funDiv]
 dP p = error $ "dP undefined " ++ show p
 
 {-
@@ -296,7 +329,7 @@ squashTail = revDropWhile (== empty)
 
 {-
 squash :: P ENV -> P ENV
-squash = fmap (filter (/= ENVS.empty))
+squash = fmap (filter (/= E.empty))
 
   
 outerUnion :: P ENV -> P ENV -> P ENV

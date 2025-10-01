@@ -58,12 +58,20 @@ $$
 \\
 \begin{minipage}{10cm}
   \textbf{Pomset comprehensions}
+  $$\begin{array}{rcl}
+    \mathit{comp} & ::= & \pomcompL e \vb qual_1, \ldots, qual_n \pomcompR \\
+    qual & ::= & e \pomelem P \vb a \in S \vb a |<-| xs \\
+    & \vb & e  \hspace{10mm} \text{Guard}
+   \end{array}$$
   \begin{itemize}
-  \item Built with $\pomcompL \ldots \vb \ldots, \ldots, \ldots \pomcompR$
   \item Uses $a \pomelem S$ to mean ``$a$ is drawn from pomset $S$''
   \item Example: $\pommap(f,S)  = \pomcompL f(a) \vb a \pomelem S \pomcompR $
   \item Desugars to $(\pombind)$ and $\pomunit{\_}$ in the usual way
-  \item $\pommap(f,S)  \; = \; \pomcompL f(a) \vb a \pomelem S \pomcompR \; = \; S \pombind \lambda a.\, \pomunit{ f(a) }$
+    \begin{itemize}
+      \item e.g. $\pommap(f,S)  \; = \; \pomcompL f(a) \vb a \pomelem S \pomcompR \; = \; S \pombind \lambda a.\, \pomunit{ f(a) }$
+    \end{itemize}
+  \item $a \in S$ means $a \pomelem \pomfromset(S)$, where $\pomfromset :: \powerset{A} \rightarrow \pom{A}$
+  \item $a |<-| xs$ means $a \pomelem \pomfromlist(xs)$, where $\pomfromlist :: \seq{A} \rightarrow \pom{A}$
   \end{itemize}
 \end{minipage}
 \\
@@ -223,8 +231,12 @@ $$
 & \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N f x|}r & : & \pomENV \\
 & \semap{F}{|apply1N f x|}r  & = &
-    \pomunions \{ \ \pomcats [ \; \conBrack{\conFun{x}{r}{f}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
-      \; \}
+\pomcompL \EV \begin{array}[t]{@@{}l@@{\,}l}
+  \vb & Fun(F) \in \Val, \; h \pomelem F  \\
+  \; ,   & \EV = \conBrack{ f = Fun(F) } \cap \conBrack{ \fpr{x}{r} \in h }, \EV \not= \emptyset \pomcompR
+  \end{array}
+%    \pomunions \{ \ \pomcats [ \; \conBrack{\conFun{x}{r}{f}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
+%      \; \}
 \end{array} \\
 \\
 
@@ -241,7 +253,12 @@ $$
   \pomFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
   \pomFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
                    \hfill \text{(|for1 fail| returns empty tuple)}\\[1mm]
-  \pomFOR{S \pomunion T}{xs}{u}{v}{t_1 } & = & \pomFOR{S}{xs}{u}{v}{t_1} \pomunion \pomFOR{T}{xs}{u}{v}{t_1} \\[1mm]
+%   \pomFOR{S \pomunion T}{xs}{u}{v}{t_1 } & = & \pomFOR{S}{xs}{u}{v}{t_1} \pomunion \pomFOR{T}{xs}{u}{v}{t_1} \\[1mm]
+  \pomFOR{S \pomunion T}{xs}{u}{v}{t_1}
+                   & = & \pomunit{\conBrack{u=u_1 \pomunion u_2, v=v_1 \pomunion v_2}}
+                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
+&&  \pomseq \pomFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \pomFOR{T}{xs}{u_2}{v_2}{t_1} \\
+&& \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
   \pomFOR{S \pomcat T}{xs}{u}{v}{t_1}
                    & = & \pomunit{\conBrack{u=u_1 \oplus u_2, v=v_1 \oplus v_2}}
                    \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
@@ -250,7 +267,7 @@ $$
   \pomFOR{\pomunit{\EV}}{xs}{u}{v}{t_1}
        &  = &
                 (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
-                  \pomseq \semess{E}{p}{q}{t_1}) \pomHIDE \{p,q,xs\}   \\
+                  \pomseq \semess{B}{p}{q}{t_1}) \pomHIDE \{p,q,xs\}   \\
  &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=v=|emptytup|}}  \hspace{6mm}  p,q \not\in \freevars{t_1,u,v,xs} \\
 \end{array}
 \end{array}
@@ -276,7 +293,14 @@ $$
 
 &  \pomFUN{\_}{xs}{pq}{hf}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\[1mm]
 &  \pomFUN{\pomempty}{xs}{pq}{hf}{t_1} & = & \pomunit{\conBrack{h=f=Fun[]}} \\[1mm]
-&  \pomFUN{S \pomunion T}{xs}{pq}{hf}{t_1 } & = & \pomFUN{S}{xs}{pq}{hf}{t_1} \pomunion \pomFUN{T}{xs}{pq}{hf}{t_1} \\[1mm]
+% &  \pomFUN{S \pomunion T}{xs}{pq}{hf}{t_1 } & = & \pomFUN{S}{xs}{pq}{hf}{t_1} \pomunion \pomFUN{T}{xs}{pq}{hf}{t_1} \\[1mm]
+
+&  \pomFUN{S \pomunion T}{xs}{pq}{hf}{t_1}
+                   & = & \pomunit{\conBrack{h=h_1 \pomunion h_2, f=f_1 \pomunion f_2}}
+                   \hspace{3mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
+&&&  \pomseq \pomFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \pomFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
+&&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
+
 &  \pomFUN{S \pomcat T}{xs}{pq}{hf}{t_1}
                    & = & \pomunit{\conBrack{h=h_1 \funplus h_2, f=f_1 \funplus f_2}}
                    \hspace{3mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\

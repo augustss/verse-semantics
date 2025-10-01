@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Main(main) where
+import Control.Applicative((<|>))
 
 import FrontEnd.CopyHook
 import FrontEnd.Desugar as FrontEnd ( desugar, runD, addPrelude, sDesugarExpr )
@@ -41,6 +42,7 @@ import SExpC(srcExprToExp)
 -- Tim densem
 import qualified TimE (den)
 import qualified Pom (den)
+import qualified PomPom (den)
 import ENVDesugar (envDesugar)
 
 import Epic.Print hiding ( (<>) )
@@ -207,8 +209,7 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     }
     deriving (Show)
 
-data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS   -- denotational semantic functions
-
+data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS | PPM_DS   -- denotational semantic functions
 instance Show TestRunner where
   -- INFO: Ideally these should correspond to their respective commands in the
   -- repl just without the ':' prefix, i.e., dls-densem here is :dls-densem in
@@ -220,7 +221,15 @@ instance Show TestRunner where
   show SLS_DS = "sls"
   show ELS_DS = "els"
   show POM_DS = "pom"
+  show PPM_DS = "ppo"
 
+instance Read TestRunner where
+  readsPrec _ s =    [(Tim_DS, r) | ("tim", r) <- lex s]
+                  ++ [(DLS_DS, r) | ("dls", r) <- lex s]
+                  ++ [(SLS_DS, r) | ("sls", r) <- lex s]
+                  ++ [(ELS_DS, r) | ("els", r) <- lex s]
+                  ++ [(POM_DS, r) | ("pom", r) <- lex s]
+                  ++ [(PPM_DS, r) | ("ppo", r) <- lex s]
 
 data TestType =
   TPass | TFail | TLoop                -- Expected behaviour
@@ -431,10 +440,12 @@ evalExpr flags test e = (r1,length (trace tr),tr)
 
 -- Eval using a semantic function.
 evalDenSem :: TestFlags -> Test -> SrcExpr -> IO (NormResult, Int, Expr)
-evalDenSem _flags test e = do
+evalDenSem flags test e = do
   res <- LitStr <$> f e
   return (NormOK, 0, res)
   where
+    runner = forceSem flags <|> dfltRunner
+    dfltRunner = testRunner $ testInfo test
     flgs = FrontEnd.defaultFlags{ fReportError = ErrNone }
     err  = error "runD: exception in evalDenSem"
     go   = runD flgs err . getEssential flgs
@@ -446,10 +457,11 @@ evalDenSem _flags test e = do
     -- because each semantic function returns a different type we convert to
     -- show to normalize the result
     f :: SrcExpr -> IO String
-    f = case testRunner $ testInfo test of
+    f = case runner of
           Nothing     -> error $ "evalExpr: Expected densem type, got Nothing with test: " ++ show test
           Just Tim_DS -> fmap (showASCII . TimE.den . envDesugar) . go
           Just POM_DS -> fmap (showASCII . Pom.den . envDesugar) . go
+          Just PPM_DS -> fmap (showASCII . PomPom.den . envDesugar) . go
           Just DLS_DS -> go >=> fmap showASCII . edenSem . edenSemDS . srcExprToExp
           Just SLS_DS -> error "SLS densem not implemented yet. Sorry!"
           Just ELS_DS -> go >=> denSemDesugar >=> fmap showASCII . denSem
@@ -807,6 +819,7 @@ pTestRunner = choice
     , string "dls" *> pure DLS_DS
     , string "els" *> pure ELS_DS
     , string "pom" *> pure POM_DS
+    , string "ppo" *> pure PPM_DS
     ] <* pOp ","
 
 pTestStatus :: P TestStatus
@@ -1099,6 +1112,7 @@ data TestFlags = TestFlags
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , allAsIter      :: !Bool                -- encode all as iter
   , dsUniform      :: !Bool
+  , forceSem       :: !(Maybe TestRunner)  -- use this den-sem
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -1253,12 +1267,16 @@ testFlags
                           OA.help "use the given prelude for verification tests"
 
        ; allAsIter <- OA.switch $
-                      OA.long "all-as-iter" <>
-                      OA.help "encode all with iter"
+                        OA.long "all-as-iter" <>
+                        OA.help "encode all with iter"
 
        ; dsUniform <- OA.switch $
-                      OA.long "ds-uniform" <>
-                      OA.help "use uniform desugaring"
+                        OA.long "ds-uniform" <>
+                        OA.help "use uniform desugaring"
+
+       ; forceSem  <- OA.optional $ OA.option OA.auto $
+                        OA.long "force-sem" <>
+                        OA.help "force use of a particular semantics"
 
        ; fileNames <- OA.many $
                       OA.argument OA.str (OA.metavar "FILES...")
