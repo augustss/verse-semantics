@@ -258,9 +258,22 @@ rewriteExp expr = for expr $ \case
     x <- freshIdent $ loc expr
     e' <- rewriteExp e2
     pure $ IfThenElse (infixColonEqual Val x e') (Truth (Name <$> x) <$ x) (Tuple [] <$ expr)
+  -- special case in maxverse matches on \x . \y . {body}.
+  -- In verse: function(x:int)(y:int){body}
+  -- for this case
+  Parse.Inst (extract
+             -> Parse.ParenInvoke
+               (getMacroParensBraces "function" -> (Just (Just lhs0, specs)))
+               lhs1) e2 -> do
+    lhs_outer  <- rewriteExp  lhs0
+    (oc, eff)  <- getLamSpecs specs
+    lhs_inner  <- rewriteExp  lhs1
+    e2'  <- rewriteExp e2
+    let lam_inner = Lam lhs_outer oc eff (Lam lhs_inner oc eff e2' <$ e2)
+    pure $ lam_inner
   Parse.Inst e1 e2 ->
     Inst <$> rewriteExp e1 <*> rewriteExp e2
-  Parse.Enum _attributes xs -> -- Ignore attributes
+  Parse.Enum _attributes xs ->           -- Ignore attributes
     pure $ Enum (map (extract . snd) xs) -- Ignore attributes
   If e -> do
     e' <- rewriteExp e

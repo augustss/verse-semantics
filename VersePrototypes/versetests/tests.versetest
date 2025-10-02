@@ -162,7 +162,7 @@ testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
 testeq("Fun2",pass){(x:any => y:any => x+2*y)[2][3]}      {8}
 testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
 testeq("Fun4",pass){function(x:int){x+1}[2]}              {3}
-testeq("Fun5",pass, libparser=skip){function(x:int)(y:int){x+2*y}[2][3]}  {8}
+testeq("Fun5",pass){function(x:int)(y:int){x+2*y}[2][3]}  {8}
 # Function argument matching
 
 testeq("Fun6",pass) {one{ pair := (1, function(n:int){pair[0]})
