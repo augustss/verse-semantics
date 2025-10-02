@@ -144,7 +144,7 @@ testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,
 testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
 testeq("Splice5",pass,tim=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 testeq("Splice5a",pass,tim=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice6",pass,tim=skip, libparser=skip){ f( ..(a:[]int), b:string ) :=
+testeq("Splice6",pass,tim=skip){ f( ..(a:[]int), b:string ) :=
                              { (Length[a], b) }
                       ; f[1,2,3,"foo"] } {(3, "foo") }
 testeq("Splice7",pass){ f( a:int,b:int ) := a; f(3,4) }{3}

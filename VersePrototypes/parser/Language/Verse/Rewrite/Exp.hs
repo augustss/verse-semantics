@@ -79,6 +79,7 @@ data Exp f a
   | Float {-# UNPACK #-} !Double
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
+  | Str    (f Text)             -- simple strings, interpolation not yet supported
   | Lam (f (Exp f a)) !OC !Split.Effect (f (Exp f a))
   -- ANF style ':=' form, unsure if needed
   | InfixColonEqual !Access !Quantifier (f a) (f (Exp f a))
