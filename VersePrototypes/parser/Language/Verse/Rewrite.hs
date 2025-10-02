@@ -327,55 +327,10 @@ rewriteExp expr = for expr $ \case
       rewriteDef l r'
 
   Parse.InfixColonEqual (expToPat -> Just p) r -> rewrite r >>= rewriteDef p
-    -- case expToPat l of
-      -- Just p  -> rewrite r >>= rewriteDef p
-      -- HACK: See #86: This matches (a,b,c) := (1,2,3) which shows up in the
-      -- test cases in versetest. This case is a hack because according to
-      -- verse-spec a Tuple should be a pattern. So the ast should be
-      -- ((InfixColonEqual (Tuple ...) (Tuple ...)). But that would mean adding
-      -- 'Tuple' to Parser.Exp.Pat and then modifying the parser to accomodate
-      -- that pattern. Instead of doing that (the real fix) we use this case for
-      -- the time being.
-
-      -- Followup: this is implementing the same mechanims as the expToPat just
-      -- badly by not defining the Pat. So expToPat defines the pats allowable
-      -- on the lhs. Well here I didn't properly define the tuple pat so
-      -- expToPat returns an Nothing. Meaning that its not a legal pat but then
-      -- I catch this special case with tuples. So this case should really be
-      -- the body of this case in expToPat.
-
-      -- more followup. I was tracing the rewrite of this expr '{i->x := 2; (i,
-      -- x)}', we end up in this case due to the tuples that now include splicing.
-      {-
-      Nothing -> case (extract l, extract r) of
-        -- we expect ls to all be idents
-        (Parse.Tuple ls, Parse.Tuple rs) -> do
-          -- START: Its wrong here. expToPat should be catching the tuple
-          let -- get_idents (Parse.Pat (Parse.Name (Parse.IdentName n))) = n
-              binders :: [L (Parse.Exp SimpleName)]
-              binders = ls
-              inner :: [L (Parse.Exp SimpleName)]
-              inner = zipWith (\a b -> mkL (loc expr) $ Parse.InfixColonEqual a b) binders rs
-              new :: L (Parse.Exp SimpleName)
-              new = mkL (loc expr) $ Parse.List inner
-          res <- rewrite new
-          return $ extract res
-        -- TODO: see #86
-        -- TODO: ifArchetypeName for the splice
-        (Parse.PrefixDotDot (extract -> Pat p), _) -> do
-          nme <- rewritePat p
-          let go = case nme of
-                Name n -> n
-                _      -> error "prefixDotDot not before ident"
-          r'  <- rewriteExp r
-          return $ InfixColonEqual Public Val (go <$ l) r'
-        (Parse.PrefixDotDot _, _) -> Splice <$> rewriteExp l
-      -}
-
-        -- The general case. This has some special handling. The problem here is
-        -- that we need to recursively evaluate the lhs because the lhs node is
-        -- not immediately an Ident, we us the infixOp version of := this means
-        -- we drop the aperture and access qualifier
+  -- The general case. This has some special handling. The problem here is
+  -- that we need to recursively evaluate the lhs because the lhs node is
+  -- not immediately an Ident, we us the infixOp version of := this means
+  -- we drop the aperture and access qualifier
   Parse.InfixColonEqual l r -> do
     lhs <- rewriteExp l
     rhs <- rewriteExp r
@@ -494,11 +449,9 @@ rewriteDef
   -> m (Exp L Ident)
 rewriteDef pat rhs = case extract pat of
   (stripSpecs -> (Parse.Name (Parse.IdentName x), specs)) -> do
-    let x' = Ident.Name x <$ pat
+    let x' = (Name $ Ident.Name x) <$ pat
     access <- getDefSpecs specs
-    pure $
-      InfixColonEqual access Val x' $
-      ifArchetypeName x' rhs rhs
+    pure $ InfixOp x' ":=" rhs
   InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x) specs) e -> do
     let x' = Ident.Name x <$ i
     access <- getDefSpecs specs
@@ -509,6 +462,10 @@ rewriteDef pat rhs = case extract pat of
     let x' = Ident.Name x <$ pat
     pure $ InfixColonEqual Public Var x' rhs
   Parse.PatSplice ss -> rewriteDef ss rhs
+
+  -- TODO:
+  -- - remove ifArchetypeName its not used in Compat
+
   Parse.PatTuple es -> do
     let
       -- TODO: Better note
@@ -546,7 +503,7 @@ rewriteDef pat rhs = case extract pat of
           -- base 2: same as 1 but with a splice with not just an ident
           go (i@(extract -> Parse.PatSplice{} ):xs) ys = do
             let spliced_ys = take splice_amount ys
-            res <- rewriteDef i (List spliced_ys <$ rhs)
+            res <- rewriteDef i (Tuple spliced_ys <$ rhs)
             ((res <$ i) :) <$> go xs (drop splice_amount ys)
           -- recursive case
           go (x:xs)  (y:ys) = do
@@ -556,9 +513,7 @@ rewriteDef pat rhs = case extract pat of
 
       -- TODO: remove this unsafe match
       (Tuple rhss) = extract rhs
-    res <- splice_zip es rhss
-    return $ List res
-
+    List <$> splice_zip es rhss
   InfixColon (extract -> stripSpecs -> (Invoke p e_domain, specs)) e_range -> do
     e_domain' <- rewriteExp e_domain
     (oc, eff) <- getLamSpecs specs
