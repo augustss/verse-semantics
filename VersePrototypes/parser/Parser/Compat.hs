@@ -173,5 +173,5 @@ refImplEffToSrcEff Fails    = Src.effFails
 refImplEffToSrcEff Succeeds = Src.effSucceeds
 refImplEffToSrcEff Decides  = Src.effDecides
 
-locToSrcLoc :: Loc -> Src.Loc
-locToSrcLoc (Loc (Pos l c _o) _endPos) = Src.mkLoc "?" l c -- ? becomes the file name
+locToSrcLoc :: String -> Loc -> Src.Loc
+locToSrcLoc file (Loc (Pos l c _o) _endPos) = Src.mkLoc file l c

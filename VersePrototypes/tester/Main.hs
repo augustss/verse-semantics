@@ -884,39 +884,42 @@ This work in tracked in issue #66.
 -- Read the test file, and parse it
 readTests' :: FilePath -> IO [Test]
 readTests' fn = do
-  tests <- V.parseDie pTestFile' fn <$> B.readFile fn
+  tests <- V.parseDie (pTestFile' fn) fn <$> B.readFile fn
   skips <- parseSkipped' (fn ++ ".skip")
   pure $ tests `skipping` skips
 
 -- Parse a file of tests
-pTestFile' :: V.Parser [Test]
-pTestFile' = V.skip *> V.many pTest' <* V.eof
+pTestFile' :: FilePath -> V.Parser [Test]
+pTestFile' file = V.skip *> V.many (pTest' file) <* V.eof
 
 -- Parse a test
-pTest' :: V.Parser Test
-pTest' = V.skip *> (pTestEq' OA.<|> pTestVerify' OA.<|> pTimTest' OA.<|> pTestDenSem') <* V.skip
+pTest' :: FilePath -> V.Parser Test
+pTest' file = V.skip *> (pTestEq' file
+                         OA.<|> pTestVerify' file
+                         OA.<|> pTimTest'
+                         OA.<|> pTestDenSem' file) <* V.skip
 
 -- Parse an expression evaluation equality test
-pTestEq' :: V.Parser Test
-pTestEq' =
+pTestEq' :: FilePath -> V.Parser Test
+pTestEq' file =
   V.lexeme (V.pKeyword "testeq") *> do
     let pdExpr = PC.toSrcExpr <$> V.pcExpr
-    tId <- V.lexeme $ V.pParens pTestInfo'
+    tId <- V.lexeme $ V.pParens (pTestInfo' file)
     let go = if (testLibParserSkip tId)
           then do
             -- consume the rest of the test
             _ <- V.lexeme $ V.pcBraces pdExpr
-            _ <- V.lexeme $ V.pBraces pdExpr
+            _ <- V.lexeme $ V.pBraces  pdExpr
             pure $ dummy_eq_test (testName tId)
           else TestEvalEq tId <$> (V.lexeme $ V.pcBraces pdExpr) <*> V.lexeme (V.pBraces pdExpr)
     go
 
 
 -- Parse an expression verification test
-pTestVerify' :: V.Parser Test
-pTestVerify' =
+pTestVerify' :: FilePath -> V.Parser Test
+pTestVerify' file =
   V.pKeyword "verify" *> do
-    tId <- V.lexeme $ V.pParens pTestInfo'
+    tId <- V.lexeme $ V.pParens (pTestInfo' file)
     let go = if (testLibParserSkip tId)
           then do
                _ <- V.lexeme $ V.pcBraces (fmap PC.toSrcExpr V.pcExpr <* V.optionMaybe V.pSemi)
@@ -924,7 +927,7 @@ pTestVerify' =
           else V.lexeme $ V.pcBraces (fmap PC.toSrcExpr V.pcExpr <* V.optionMaybe V.pSemi)
     src <- go
     locEnd <- V.getLoc
-    pure $ TestVerify (tId { testLocEnd        = PC.locToSrcLoc locEnd
+    pure $ TestVerify (tId { testLocEnd        = PC.locToSrcLoc file locEnd
                            , testLibParserSkip = True
                            }) src
 
@@ -936,19 +939,18 @@ pTimTest' =
     let ti = timTestInfo $ PC.mkSrcIdent tag
     pure $ TestVerify ti $ PC.toSrcExpr src
 
-pTestDenSem' :: V.Parser Test
-pTestDenSem' =
+pTestDenSem' :: FilePath -> V.Parser Test
+pTestDenSem' file =
     V.pKeyword "testds" *> do
-    tId <- V.lexeme $ V.pParens pTestInfo'
+    tId <- V.lexeme $ V.pParens (pTestInfo' file)
     let pAnyString = (Src.Lit . LStr) <$> do
           _ <- V.match '"'
           V.lexeme $ V.manyTill (V.anySingleBut '"') (V.match '"')
         ds_expr    = V.lexeme $ V.pBraces (PC.toSrcExpr <$> V.pcExpr)
     TestDenSem tId <$> ds_expr <*> V.pBraces pAnyString
 
-
-pTestInfo' :: V.Parser TestInfo
-pTestInfo' = do
+pTestInfo' :: FilePath -> V.Parser TestInfo
+pTestInfo' file = do
   locB  <- V.getLoc
   let pComma = V.lexeme V.pComma
   mname <- V.optionMaybe (V.pStringLit <* V.lexeme V.pComma)
@@ -959,8 +961,8 @@ pTestInfo' = do
   psr   <- V.try pParserSkip' OA.<|> pure False
   locE  <- V.getLoc
   pure (TestInfo { testMName    = fmap (T.unpack . unLoc) mname
-                 , testLocStart = PC.locToSrcLoc locB
-                 , testLocEnd   = PC.locToSrcLoc locE
+                 , testLocStart = PC.locToSrcLoc file locB
+                 , testLocEnd   = PC.locToSrcLoc file locE
                  , testType     = typ
                  , testRunner   = rnner
                  , testStatus   = stat
