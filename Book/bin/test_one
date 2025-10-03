@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+
+const { execSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+// Path to the Verse parser executable
+const VERSE_PARSER = path.resolve(__dirname, '../Tsx/verse');
+
+// Get the .verse file path from command line arguments
+const verseFile = process.argv[2];
+
+if (!verseFile) {
+  console.error('Usage: test_one <path-to-verse-file>');
+  process.exit(1);
+}
+
+// Check if the verse file exists
+if (!fs.existsSync(verseFile)) {
+  console.error(`Error: File not found: ${verseFile}`);
+  process.exit(1);
+}
+
+// Check if the parser exists
+if (!fs.existsSync(VERSE_PARSER)) {
+  console.error(`Error: Verse parser not found at: ${VERSE_PARSER}`);
+  process.exit(1);
+}
+
+try {
+  // Run the parser on the verse file
+  const output = execSync(`"${VERSE_PARSER}" "${verseFile}"`, {
+    encoding: 'utf-8',
+    stdio: 'inherit'
+  });
+} catch (error) {
+  console.error(`Parser failed with exit code: ${error.status}`);
+  process.exit(error.status || 1);
+}

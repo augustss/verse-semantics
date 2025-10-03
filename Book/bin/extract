@@ -1,0 +1,187 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+function printUsage() {
+  console.log('Usage: extract <markdown-file> -t <target-directory>');
+  console.log('');
+  console.log('Extracts Verse code snippets from a Markdown file.');
+  console.log('Creates a subdirectory named after the input file in the target directory.');
+  process.exit(1);
+}
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+
+  if (args.length < 3) {
+    printUsage();
+  }
+
+  const markdownFile = args[0];
+  const targetIndex = args.indexOf('-t');
+
+  if (targetIndex === -1 || targetIndex === args.length - 1) {
+    console.error('Error: -t option requires a target directory');
+    printUsage();
+  }
+
+  const targetDir = args[targetIndex + 1];
+
+  return { markdownFile, targetDir };
+}
+
+function extractPrependComment(lines, verseBlockStart) {
+  // Look backwards from verseBlockStart to find <!--verse comment
+  let commentLines = [];
+  let i = verseBlockStart - 1;
+
+  // Skip empty lines
+  while (i >= 0 && lines[i].trim() === '') {
+    i--;
+  }
+
+  // Check if we found a closing -->
+  if (i >= 0 && lines[i].trim() === '-->') {
+    i--;
+    // Collect lines until we find <!--verse
+    while (i >= 0) {
+      const line = lines[i];
+      if (line.trim().startsWith('<!--verse')) {
+        // Found the opening, extract content after <!--verse
+        const firstLine = line.substring(line.indexOf('<!--verse') + 9).trim();
+        if (firstLine) {
+          commentLines.unshift(firstLine);
+        }
+        break;
+      }
+      commentLines.unshift(line);
+      i--;
+    }
+  }
+
+  return commentLines;
+}
+
+function extractAppendComment(lines, verseBlockEnd) {
+  // Look forward from verseBlockEnd to find <!--verse comment
+  let commentLines = [];
+  let i = verseBlockEnd + 1;
+
+  // Skip empty lines
+  while (i < lines.length && lines[i].trim() === '') {
+    i++;
+  }
+
+  // Check if we found an opening <!--verse
+  if (i < lines.length && lines[i].trim().startsWith('<!--verse')) {
+    // Extract content after <!--verse on the same line
+    const firstLine = lines[i].substring(lines[i].indexOf('<!--verse') + 9).trim();
+    if (firstLine && firstLine !== '') {
+      commentLines.push(firstLine);
+    }
+    i++;
+
+    // Collect lines until we find -->
+    while (i < lines.length) {
+      const line = lines[i];
+      if (line.trim() === '-->') {
+        break;
+      }
+      commentLines.push(line);
+      i++;
+    }
+  }
+
+  return commentLines;
+}
+
+function extractVerseSnippets(markdownContent) {
+  const snippets = [];
+  const lines = markdownContent.split('\n');
+  let inVerseBlock = false;
+  let currentSnippet = [];
+  let snippetCount = 0;
+  let verseBlockStart = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim().startsWith('```verse')) {
+      inVerseBlock = true;
+      verseBlockStart = i;
+      currentSnippet = [];
+    } else if (inVerseBlock && line.trim().startsWith('```')) {
+      inVerseBlock = false;
+
+      // Look for prepend comment before the ```verse block
+      const prependLines = extractPrependComment(lines, verseBlockStart);
+
+      // Look for append comment after the closing ```
+      const appendLines = extractAppendComment(lines, i);
+
+      // Combine: prepend + snippet + append
+      const fullContent = [
+        ...prependLines,
+        ...currentSnippet,
+        ...appendLines
+      ].join('\n');
+
+      snippets.push({
+        number: ++snippetCount,
+        content: fullContent
+      });
+    } else if (inVerseBlock) {
+      currentSnippet.push(line);
+    }
+  }
+
+  return snippets;
+}
+
+function main() {
+  const { markdownFile, targetDir } = parseArgs();
+
+  // Check if markdown file exists
+  if (!fs.existsSync(markdownFile)) {
+    console.error(`Error: File '${markdownFile}' not found`);
+    process.exit(1);
+  }
+
+  // Read markdown file
+  const markdownContent = fs.readFileSync(markdownFile, 'utf-8');
+
+  // Extract snippets
+  const snippets = extractVerseSnippets(markdownContent);
+
+  if (snippets.length === 0) {
+    console.log('No Verse code snippets found');
+    return;
+  }
+
+  // Create target directory if it doesn't exist
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  // Create subdirectory based on markdown filename (without extension)
+  const basename = path.basename(markdownFile, path.extname(markdownFile));
+  const outputDir = path.join(targetDir, basename);
+
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  // Write snippets to files
+  snippets.forEach(snippet => {
+    // Pad single-digit numbers with leading zero
+    const paddedNumber = snippet.number.toString().padStart(2, '0');
+    const filename = path.join(outputDir, `${paddedNumber}.verse`);
+    fs.writeFileSync(filename, snippet.content);
+    console.log(`Created: ${filename}`);
+  });
+
+  console.log(`\nExtracted ${snippets.length} snippet(s) from ${markdownFile}`);
+}
+
+main();

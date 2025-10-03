@@ -47,23 +47,36 @@ For experienced programmers coming from other languages, the [Failure System](08
 
 In Verse, there are no statements—everything is an expression that produces a value. This creates a highly composable system where any piece of code can be used anywhere a value is expected.
 
+<!--verse
+Condition := false
+Array := array{}
+-->
 ```verse
 # Even control flow produces values
 Result := if Condition then "yes" else "no"
 
 # Loops are expressions
-Sum := for (X : Array) { Total + X }
+Multiply := for (X : Array) { X * 42 }
 ```
 
 **Failure as Control Flow**
 
 Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), and this failure propagates naturally through the program.
 
+<!--verse
+Main():void= {
+  Data:="hi"
+  ValidateInput(x:string)<decides>:void= {}
+  ProcessData(x:string):void= {}
+-->
 ```verse
 # The ? operator converts failure to control flow
 ValidateInput(Data)?  # Proceeds only if validation succeeds
 ProcessData(Data)
 ```
+<!--verse
+}
+-->
 
 **Strong Static Typing with Inference**
 
@@ -72,23 +85,38 @@ Verse features a powerful type system that catches errors at compile time while 
 ```verse
 X := 42                    # Type inferred as int
 Name := "Verse"            # Type inferred as string
-Point := struct{X:=1, Y:=2} # Structured data
+point := struct{X:=1, Y:=2} # Structured data
 ```
 
 **Effect Tracking**
 
 The language tracks side effects through its effect system, making it clear what a function can do beyond computing its return value.
 
+<!--verse
+x := class {
+  GetCurrentValue():int=1
+-->
 ```verse
 PureCompute()<computes>:int = 2 + 2           # No side effects
 ReadState()<reads>:int = GetCurrentValue()     # Can read memory
 UpdateGame()<transacts>:void = set Score += 10 # Full transactional effects
 ```
+<!--verse
+}
+-->
 
 **Built-in Concurrency**
 
 Concurrency is a first-class feature with structured concurrency primitives that make concurrent programming safe and predictable.
 
+<!--verse
+TaskA():void={}
+TaskB():void={}
+TaskC():void={}
+FastPath():void={}
+SlowButReliablePath():void={}
+Main():void= {
+-->
 ```verse
 # Run tasks concurrently and wait for all
 sync:
@@ -101,17 +129,27 @@ race:
     FastPath()
     SlowButReliablePath()
 ```
+<!--verse
+}
+-->
 
 **Speculative Execution**
 
 Verse can speculatively execute code and roll back changes if the execution fails, enabling powerful patterns for validation and error handling.
 
+<!--verse
+TryComplexOperation()<decides>:void={}
+Main():void={
+-->
 ```verse
 if (TryComplexOperation()):
     # Changes are committed
 else:
     # Changes are rolled back automatically
 ```
+<!--verse
+}
+-->
 
 Welcome to Verse—a language built not just for today's games, but for tomorrow's metaverse.
 

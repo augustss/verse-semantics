@@ -35,7 +35,6 @@ cabal.project.local~
 tmp
 \#*
 .#*
-bin/
 .DS_Store
 Machine/.DS_Store
 Machine/src/.DS_Store
