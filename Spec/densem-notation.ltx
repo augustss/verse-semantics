@@ -70,8 +70,8 @@ $$
 
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
-  v \in & \Value & = & \Z + \Fun \\\
-  Fun(|fs|) \in & \Fun & = & \pom{\semfcn}  & \text{A pomset of non-empty partial functions} \\
+  v \in & \Value & = & \Int(\Z) + \Fun(\pomFUN) \\\
+  & \pomFUN & = & \pom{\semfcn}  & \text{A pomset of non-empty partial functions} \\
   &&&& \hspace{3mm} \text{with disjoint domains} \\
   \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value all identifiers} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
@@ -81,16 +81,17 @@ $$
 \\
 \textbf{The constraint language}\\
 \begin{array}{l@@{\;\;}rc@@{\;\;}ll}
-  \text{Simple values}    & a & ::= & |k| \vb |x| \vb |o|  \vb op[a_1,\mydots,a_n] \\
-  & & \vb & |arr (a_0, xdots, a_n)| \vb |truth a|\\
+  \text{Simple values}    & a & ::= & |v| \vb |x| \vb op[a_1,\mydots,a_n] \vb |arr (a_0, xdots, a_n)| \\
+% \vb |truth a|\\
   \text{Constraints} &  \EV & ::= & \conBrack{relop[a_1,\mydots,a_n]} \\
-   &  & \vb & \conBrack{ \fpr{a}{b} \in h }  \hspace{10mm} \text{where}\; h \in \semfcn \\
+   &  & \vb & \conBrack{ \fpr{x}{y} \in h }  \hspace{10mm} \text{where}\; h \in \semfcn \\
 %   &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
   &  & \vb & \conEmpty \vb \conUniv \vb \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
   &  & \vb & \conCompl(\EV)  & \text{Complement} \\
   &  & \vb & \HIDE{\EV}{xs} & \text{Hiding} \\
   \text{Relational ops} &  relop & ::= & = \vb < \vb \leq \vb \geq \vb > \\
   \text{Value ops} & op & ::= & + \vb - \vb * \vb / \\
+    & & & \funcat \vb \tupcat \vb \fununion \\
 \end{array}\\
 \\[-1mm]
 \textbf{Interpretation of simple values and constraints}\\
@@ -105,21 +106,34 @@ $$
   \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
   \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \}
       \hspace{4mm} \text{...and similarly other $relops$} \\
-  \sembrack{ \fpr{a}{b} \in h } & = & \{ \rho \in \Env \vb \fpr{\rho(a)}{\rho(b)} \in h \} \\
-%   \sembrack{\conBrack{\conFun{a_a}{a_r}{a_f}{i}{n}}}
-%   & = & \multicolumn{2}{@@{}l}
-%            {\{ \rho \in \Env \vb \semapp{A}{a_f}{\rho} = Fun[h_1,\mydots,h_n],
-%                 \fpr{\semapp{A}{a_a}\rho}{\semapp{A}{a_r}\rho} \in h_i \}}\\[1mm]
-\semapp{A}{|a|} & : & \Env \rightarrow \Val \\
+  \sembrack{ \fpr{a}{b} \in h } & = & \{ \rho \in \Env \vb \fpr{\rho(a)}{\rho(b)} \in h \}
+\end{array} \\
+\\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\semapp{A}{|a|} & : & \parfun{\Env}{\Val} \\
 \semapp{A}{|x|}\rho & = & \rho(x) \\
-\semapp{A}{|k|}\rho & = & k \\
-\semapp{A}{|o|}\rho & = & \semap{O}{o} \\
-\semapp{A}{|a_1 + a_2|}\rho & = & \semapp{A}{a_1}\rho + \semapp{A}{a_2}\rho
-    \hspace{4mm} \text{...and similarly other $ops$} \\
-\semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
-\semapp{A}{|arr (a_0, xdots, a_n)|}\rho & = & \tupE [ \semapp{A}{a_0}\rho, \mydots, \semapp{A}{a_n}\rho ] \\[1mm]
-\semap{O}{|o|} & : & \Val \\
- \semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
+\semapp{A}{|v|}\rho & = & v \\
+%\semapp{A}{|o|}\rho & = & \semap{O}{o} \\
+\semapp{A}{|a_1 + a_2|}\rho & = & \Int(r_1 + r_2)
+  & \text{if $\Int(r_1)= \semapp{A}{a_1}\rho$ and
+     $\Int(r_2) = \semapp{A}{a_2}\rho$ } \\
+
+% \semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
+\semapp{A}{|a_1| \fununion |a_2|}\rho & = & \Fun(r_1 \pomunion r_2)
+    &\text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
+                      $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
+\semapp{A}{|a_1| \funcat |a_2|}\rho & = & \Fun(r_1 \pomcat r_2)
+    & \text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
+                      $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
+\semapp{A}{|a_1| \tupcat |a_2|}\rho & = & \Fun(\pomtupcat(r_1,r_2))
+    & \text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
+                      $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
+\semapp{A}{|emptytup|}\rho & = & \Fun( \pomempty) \\
+\semapp{A}{|arr (a_0, xdots, a_n)|}\rho
+  & = & \multicolumn{2}{@@{}l}{\Fun ( \; \pomunit{ \{ \fpr{0}{\semapp{A}{a_0}\rho} \}} \pomcat \ldots \pomcat
+            \pomunit{ \{ \fpr{n}{\semapp{A}{a_n}\rho} \}} \; )} \\
+% \semap{O}{|o|} & : & \Val \\
+% \semap{O}{|<=|} & = & \mul\Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
 \end{array}\\
 \\[-1mm]
 \textbf{Semantic functions} \\
@@ -128,11 +142,9 @@ $$
 \text{Binders of block} & \semap{I}{|t|} & : & \powerset{\Ident} \\
 &  \semap{I}{|t|} & = & \text{the outer $\exists$-bound variables in |t|} \\[1mm]
 
-\text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
-&  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i \in 0 \mycdots n ] \\[1mm]
-% \text{Extract result} & \extractE & : & \Ident \rightarrow \ENV \rightarrow \powerset{\Val, \ENV} \\
-% & \extractE(r,\EV) & = & \{ (v, \hideE(r, \EV'))
-%                      \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(r)=v \} \} \\[1mm]
+% \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
+% &  \tupE [v_0,\mydots,v_n] & = & \Fun \pomcompL \{ \fpr{i}{v_i} \} \vb i |<-| 0 \mycdots n \pomcompR
+%   \hspace{1cm} \text{So $\tupE [] = \Fun(\pomempty)$}
 \end{array} \\
 
 \end{array}
