@@ -183,10 +183,12 @@ One of Verse's distinctive features is that control flow constructs are expressi
 The if-then-else construct is an expression that evaluates to one of two values based on a condition:
 
 <!--
+ComputeA():int=1
+ComputeB():int=1
 F(X:int,Condition:logic):void={
 -->
 ```verse
-Result := if X > 0 then "positive" else "negative"
+Result := if (X > 0) then "positive" else "negative"
 Value := if (Condition=true) then ComputeA() else ComputeB()
 ```
 <!--
@@ -195,9 +197,10 @@ Value := if (Condition=true) then ComputeA() else ComputeB()
 
 The else clause can be omitted, though this affects the type of the expression. Verse supports multiple syntactic forms for if-expressions, including parenthesized conditions and indented bodies:
 
+<!--NoCompile-->
 ```verse
 # Standard form
-if Condition then Value1 else Value2
+if (Condition) then Value1 else Value2
 
 # Parenthesized condition
 if (ComplexCondition()) then Value1 else Value2
@@ -229,6 +232,7 @@ for (Item : Collection) { Process(Item) }
 An extended form provides access to both index and item:
 
 <!--verse
+Print(S:string):void={}
 Process(i:int):void={}
 F(Collection:[]int):void={
 -->
@@ -249,14 +253,14 @@ Loop expressions provide indefinite iteration, continuing until explicitly termi
 
 <!--verse
 GetNext():int=1
-Done(i:int)<decides>:void={}
+Done(i:int)<computes><decides>:void={}
 Process(i:int):void={}
 F():void={
 -->
 ```verse
 loop {
     Value := GetNext()
-    if Done(Value) then break
+    if (Done[Value]) then break
     Process(Value)
 }
 ```
@@ -264,23 +268,7 @@ loop {
 }
 -->
 
-The loop construct can use indented syntax for clarity:
-
-<!--verse
-UpdateState():void={}
-CheckConditions():void={}
-PerformAction():void={}
-F():void={
--->
-```verse
-loop:
-    UpdateState()
-    CheckConditions()
-    PerformAction()
-```
-<!--verse
-}
--->
+The loop construct can use indented syntax for clarity.
 
 ### Case Expressions: Pattern-Based Selection
 
@@ -293,13 +281,12 @@ color := enum:
     Green
     Other
 F(Color:color): void={
-}
 -->
 ```verse
 Description := case(Color) {
-    Red => "Danger",
-    Yellow => "Warning",
-    Green => "Safe",
+    color.Red => "Danger",
+    color.Yellow => "Warning",
+    color.Green => "Safe",
     _ => "Unknown"
 }
 ```
@@ -344,7 +331,7 @@ F():void={
 -->
 ```verse
 X := 42           # Immutable binding
-Y := Y * 2        # Binding to computed value
+Y := X * 2        # Binding to computed value
 Z := W := 10      # Right-associative chaining
 ```
 <!--verse
@@ -374,11 +361,11 @@ set Total *= Factor   # Equivalent to: set Total = Total * Factor
 The range operator (`..`) creates ranges for iteration and bounds checking:
 
 <!--verse
-End():int=10
+End()<computes>:int=10
 F():void= 
-    for (I : 1..10):
-        for (J : I..(I+10)):
-            for (K: J..End()) {}
+    for (I := 1..10):
+        for (J := I..(I+10)):
+            for (K:= J..End()) {}
 
 <#
 -->
@@ -391,60 +378,47 @@ for (I : 0..Count) { Process(I) }
 #>
 -->
 
+<!-- No true
 Ranges are expressions that produce values, allowing them to be stored and passed around:
 
-<!--verse
-F():void={
--->
 ```verse
 ValidRange := 0..100
-if Value in ValidRange then Accept() else Reject()
+if (Value) in ValidRange then Accept() else Reject()
 ```
-<!--verse
-}
 -->
 
 ### Logical Operations
 
 Logical operators combine boolean values with short-circuit evaluation. Verse uses keyword operators (`and`, `or`, `not`) rather than symbols, improving readability:
 
-<!--verse
-F():void=
--->
+<!--NoCompile-->
 ```verse
-if X > 0 and Y > 0 then ProcessQuadrant1()
-Result := Validated or UseDefault()
-if not IsReady() then Wait()
+if (X > 0 and Y > 0) then ProcessQuadrant1()
+Result := logic{Validated or UseDefault[]}
+if (not IsReady[]) then Wait()
 ```
-<!--verse
-}
--->
 
 The precedence ensures that `and` binds tighter than `or`, matching mathematical logic conventions:
 
-<!--verse
-F():void={
--->
+<!--NoCompile-->
 ```verse
 # Evaluates as: (A and B) or (C and D)
-Condition := logic{A and B or C and D}
+Condition := logic{ExpA and ExpB or ExpC and ExpD}
 ```
-<!--verse
-}
--->
 
 ### Comparison Operations
 
 Comparison operators produce boolean values and can be chained for range checking:
 
 <!--verse
-F():void={
+InRange():void={}
+F(Value:int, X:int, Minimum:int, Maximum:int, A:int, B:int):void={
 -->
 ```verse
-if 0 <= Value <= 100 then InRange()
-IsValid := X > Minimum and X < Maximum
-Same := A == B
-Different := X != Y
+if (0 <= Value <= 100) then InRange()
+IsValid := logic{X > Minimum and X < Maximum}
+Same := logic{A == B}
+Different := logic{X != Y}
 ```
 <!--verse
 }
@@ -461,12 +435,10 @@ F():void={
 A:=1
 B:=2
 C:=3
-PageSize:= 4
 -->
 ```verse
 Result := A + B * C      # Multiplication first
 Average := (A + B) / 2   # Parentheses override precedence
-Remainder := Result % PageSize
 ```
 <!--verse
 }
@@ -496,10 +468,10 @@ While Verse emphasizes immutability, practical programming often requires mutati
 
 <!--verse
 c := class { var Field:int = 0 }
-F( Value:int, Index:int, Key:string, MappedValue:string)<transacts>:int={
+F( Element:int, Value:int, Index:int, Key:string, MappedValue:string)<transacts><decides>:int={
 var Obj:c = c{}
 var Arr:[]int = array{1}
-var Map:[string]string = { "hi" => "hp" }
+var Map:[string]string = map{ "hi" => "hp" }
  var X :int=0
 -->
 ```verse
@@ -526,7 +498,7 @@ set Game.Players[CurrentPlayer].Inventory.Items[Slot] = NewItem
 Compound expressions, delimited by braces, group multiple expressions into a single expression. The value of a compound expression is the value of its last sub-expression:
 
 <!--verse
-ComputeIntermediate():void={}
+ComputeIntermediate():int=3
 CalculateAdjustement(o:int):int=3
 F():void={
 -->
@@ -543,9 +515,7 @@ Result := {
 
 Compound expressions create new scopes for variables, allowing local bindings that don't affect the enclosing scope:
 
-<!--verse
-F():void={
--->
+<!--NoCompile-->
 ```verse
 {
     X := 10    # Local to this block
@@ -553,9 +523,6 @@ F():void={
     X + Y
 }              # X and Y no longer accessible
 ```
-<!--verse
-}
--->
 
 Expressions within a compound can be separated by semicolons, commas, or newlines, though mixing separators is discouraged in newer versions of Verse:
 
@@ -602,27 +569,19 @@ Colors := array:
 }
 -->
 
+<!-- Not supported
 ## Type Expressions: Computing with Types
 
 Verse's `type{}` construct represents one of its most sophisticated features—the ability to compute with types themselves. This construct takes an expression and produces its type as a value:
 
-<!--verse
-F():void={
--->
 ```verse
 MyType := type{GetValue()}          # Type of function call
 ElementType := type{array[0]}       # Type of array element
 ResultType := type{a + b}           # Type of expression result
 ```
-<!--verse
-}
--->
 
 Type expressions enable generic programming patterns without traditional template syntax. This is particularly powerful with function types, where you can capture complex signatures including effects:
 
-<!--verse
-F():void={
--->
 ```verse
 ValidatorType := type{_(:int)<decides> : void}
 Validator : ValidatorType = CheckValue
@@ -630,56 +589,32 @@ Validator : ValidatorType = CheckValue
 ProcessorType := type{_(:string)<transacts> : int}
 Processor : ProcessorType = ProcessData
 ```
-<!--verse
-}
--->
 
 The underscore in function type expressions represents a placeholder for the function name, focusing on the signature rather than the identity.
+-->
 
 ## Expression Composition: The Power of Uniformity
 
 The true power of Verse's expression system emerges when different expression types are composed. Since everything is an expression, components can be combined in ways that would be impossible or awkward in statement-oriented languages:
 
-<!--verse
-ValidatePosition(I:int)<decides>:int=1
-Filter(i:int):int=1
-
-F(IsHardMode:logic, NeedFiltering:logic, Data:int):void={
-layer := player{
-    Health := if IsHardMode then 50 else 100,
-    Position := point{
-        X := for (I : 0..10) { if ValidPosition(I) then break I },
-        Y := 0
-    }
-}
-
-Result := Process(
-    if NeedsFiltering then Filter(Data) else Data,
-    2 # NOT SUPPORTED    Transform(X => X * 2)
-)
-
-# Lambda with complex body
-#Operation := X => {
-#    Validated := Verify(X)
-#    Transformed := Transform(Validated)
-#    Finalize(Transformed)
-#}
-}
-<#
+<!-- TODO:  
+   Check that this is correct.  (Besides the use of lambdas that we will support some day)
 -->
+
+<!--NoCompile-->
 ```verse
 # Control flow in initialization
 Player := player{
-    Health := if IsHardMode then 50 else 100,
+    Health := if (IsHardMode) then 50 else 100,
     Position := point{
-        X := for (I : 0..10) { if ValidPosition(I) then break I },
+        X := for (I := 0..10) { if (ValidPosition(I)) then return I },
         Y := 0
     }
 }
 
 # Nested expressions in function calls
 Result := Process(
-    if NeedsFiltering then Filter(Data) else Data,
+    if (NeedsFiltering) then Filter(Data) else Data,
     Transform(X => X * 2)
 )
 
@@ -690,15 +625,11 @@ Operation := X => {
     Finalize(Transformed)
 }
 ```
-<!--verse
-#>
--->
+
+<!-- TODO : this don't seem to work
 
 This composability extends to the type system, where type expressions can be embedded within other constructs:
 
-<!--verse
-F():void={
--->
 ```verse
 # Array of computed type
 Handlers : []type{_(:event)<decides>:void} = [H1, H2, H3]
@@ -706,6 +637,5 @@ Handlers : []type{_(:event)<decides>:void} = [H1, H2, H3]
 # Map with computed value type
 Cache : [string]type{ComputeValue()} = map{}
 ```
-<!--verse
-}
+
 -->
