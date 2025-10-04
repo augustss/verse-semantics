@@ -486,18 +486,21 @@ rewriteDef pat rhs = case extract pat of
   -- - remove ifArchetypeName its not used in Compat
 
   Parse.PatTuple es -> do
-    let
-      -- TODO: Better note
-      -- we know that the lhs is <= the cardinality of the rhs but also we must
-      -- be able to match things like (a,..b,c) := (1,2,3,4,5) and yield a := 1;
-      -- b:= (2,3,4); c:= 5 this means we scan from left to right when we have
-      -- an Ident like 'a', we assign it to the rhs corresponding element. When
-      -- we have a pattern like b, we pause, reverse the ls and the rs and start
-      -- processing again until we just have singletons that is the pattern b
-      -- and the tuple it should be bound to
+    rhss <- case extract rhs of
+        Tuple x -> pure x
+        _       -> wrong
+          $ NotImplemented "Attempt to match Tuple pattern on lhs to something other than a tuple on the rhs"
 
-      -- explain the flip, we could have a mutually recursive function by why do
-      -- that when a bool flag will do
+
+    let
+      -- TODO: Better note, to describe how the splice match happens and what
+      -- its rewritten to.  we know that the lhs is <= the cardinality of the
+      -- rhs but also we must be able to match things like (a,..b,c) :=
+      -- (1,2,3,4,5) and yield a := 1; b:= (2,3,4); c:= 5 this means we scan
+      -- from left to right when we have an Ident like 'a', we assign it to the
+      -- rhs corresponding element. When we have a pattern like b, we pause,
+      -- reverse the ls and the rs and start processing again until we just have
+      -- singletons that is the pattern b and the tuple it should be bound to
 
       splice_zip ls_ rs_ = go ls_ rs_
         where
@@ -530,8 +533,6 @@ rewriteDef pat rhs = case extract pat of
             rest <- go xs ys
             return $ (res <$ x) : rest
 
-      -- TODO: remove this unsafe match
-      (Tuple rhss) = extract rhs
     List <$> splice_zip es rhss
   InfixColon (extract -> stripSpecs -> (Invoke p e_domain, specs)) e_range -> do
     e_domain' <- rewriteExp e_domain

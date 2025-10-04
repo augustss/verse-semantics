@@ -17,8 +17,6 @@ import FrontEnd.Flags( Flags(..), defaultFlags )
 import FrontEnd.ToCore
 import FrontEnd.Prelude( findPrelude )
 
--- TODO: See #66: For now we live with two parsers.
-import qualified FrontEnd.Parse as FP
 import qualified Parser.Verse   as LP
 --import FrontEnd.Error
 
@@ -316,7 +314,6 @@ flagTable =
   -- is at feature parity to FrontEnd.Parser. The default parser is
   -- FrontEnd.Parse. Use ':set use-lib-parser' to enable verse-parser
   -- interactively at the repl.
-  ,("use-lib-parser", (fUseLibParser, \ b s -> s{fUseLibParser=b}))
 --  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
 --  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
 --  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
@@ -339,8 +336,7 @@ cRead afn s = do
       s' = s{ cs_lastFile = Just fn }
   tryIt (\_exc -> pure s') (updateLastExpr s') $ do
     file <- readFile fn
-    let prog | fUseLibParser $ cs_flags s = LP.parseToSrcExpr fn (B.pack file)
-             | otherwise                  = FP.parseDie       FP.pFile fn file
+    let prog = LP.parseToSrcExpr fn (B.pack file)
     when (prog == prog) $
       putStrLn "OK"
     pure prog
@@ -350,9 +346,7 @@ cParseLine :: CmdRunner CState
 cParseLine line' s
   = tryIt (\_exc -> pure s) (updateLastExpr s) $ do
     let !line = substitute (cs_variables s) line'
-        !use_lib_parser = fUseLibParser $ cs_flags s
-        !prog | use_lib_parser = LP.parseToSrcExpr "<interactive>" (B.pack line)
-              | otherwise      = FP.parseDie FP.pFile "<interactive>" line
+        !prog = LP.parseToSrcExpr "<interactive>" (B.pack line)
     pure prog
 
 variableSigil :: Char
@@ -551,7 +545,7 @@ cPomDensem
        ; let res = Pom.den e_ds
        ; let den_sem = addHeader "Pom Den-sem" $ text $ show res
        ; displayDoc den_sem
-{-       
+{-
        ; let resU = Pom.denU e_ds
        ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
        ; displayDoc den_semU

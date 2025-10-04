@@ -1350,12 +1350,6 @@ pRBrace =  match '}'
 pComma :: Parser (L String)
 pComma =  match ','
 
-pAmpersand :: Parser (L String)
-pAmpersand = match '&'
-
-pDollar :: Parser (L String)
-pDollar = match '$'
-
 pDot :: Parser (L String)
 pDot =  P.try (match '.' <* P.notFollowedBy (match '.' <|> match ' ' <|> match '\t' <|> pEnding))
 
