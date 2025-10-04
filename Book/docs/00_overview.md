@@ -48,45 +48,54 @@ For experienced programmers coming from other languages, the [Failure System](08
 In Verse, there are no statements—everything is an expression that produces a value. This creates a highly composable system where any piece of code can be used anywhere a value is expected.
 
 <!--verse
-Condition := false
-Array := array{}
+Condition()<decides> := {}
+Main() :void = { Array := array{1}
 -->
 ```verse
 # Even control flow produces values
-Result := if Condition then "yes" else "no"
+Result := if (Condition[]) then "yes" else "no"
 
 # Loops are expressions
 Multiply := for (X : Array) { X * 42 }
 ```
+<!--verse
+} 
+-->
 
 **Failure as Control Flow**
 
 Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), and this failure propagates naturally through the program.
 
 <!--verse
-Main():void= {
+ValidateInput(x:string)<decides>:void= {}
+ProcessData(x:string):void= {}
+  
+x := class {
   Data:="hi"
-  ValidateInput(x:string)<decides>:void= {}
-  ProcessData(x:string):void= {}
+  M()<decides>:={
 -->
 ```verse
-# The ? operator converts failure to control flow
-ValidateInput(Data)?  # Proceeds only if validation succeeds
+ValidateInput[Data] # Proceeds only if validation succeeds
 ProcessData(Data)
 ```
 <!--verse
-}
+} }
 -->
 
 **Strong Static Typing with Inference**
 
 Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference.
 
+<!--verse
+M():={
+-->
 ```verse
 X := 42                    # Type inferred as int
 Name := "Verse"            # Type inferred as string
-point := struct{X:=1, Y:=2} # Structured data
 ```
+<!--verse
+}
+-->
 
 **Effect Tracking**
 
@@ -94,7 +103,8 @@ The language tracks side effects through its effect system, making it clear what
 
 <!--verse
 x := class {
-  GetCurrentValue():int=1
+  GetCurrentValue()<reads>:int=1
+  var Score:int=0
 -->
 ```verse
 PureCompute()<computes>:int = 2 + 2           # No side effects
@@ -110,12 +120,12 @@ UpdateGame()<transacts>:void = set Score += 10 # Full transactional effects
 Concurrency is a first-class feature with structured concurrency primitives that make concurrent programming safe and predictable.
 
 <!--verse
-TaskA():void={}
-TaskB():void={}
+TaskA()<suspends>:void={}
+TaskB()<suspends>:void={}
 TaskC():void={}
-FastPath():void={}
-SlowButReliablePath():void={}
-Main():void= {
+FastPath()<suspends>:void={}
+SlowButReliablePath()<suspends>:void={}
+Main()<suspends>:void= {
 -->
 ```verse
 # Run tasks concurrently and wait for all
@@ -139,10 +149,10 @@ Verse can speculatively execute code and roll back changes if the execution fail
 
 <!--verse
 TryComplexOperation()<decides>:void={}
-Main():void={
+M():={
 -->
 ```verse
-if (TryComplexOperation()):
+if (TryComplexOperation[]):
     # Changes are committed
 else:
     # Changes are rolled back automatically
@@ -158,13 +168,11 @@ Welcome to Verse—a language built not just for today's games, but for tomorrow
 Let's explore Verse through a comprehensive example that demonstrates its key features. We'll build an inventory management system for a game, showing how Verse's unique features come together to create robust, maintainable code.
 
 ```verse
-# Module declaration - code organization starts here
-using { /Fortnite.com/Devices }
-using { /Verse.org/Simulation }
-using { /UnrealEngine.com/Temporary/Diagnostics }
+# Module declaration - start by importing utility functions
+using { /Verse.org/VerseCLR }
 
 # Define item rarity as an enumeration - showing Verse's type system
-item_rarity := enum:
+item_rarity := enum<persistable>:
     common
     uncommon
     rare
@@ -179,12 +187,12 @@ item_stats := struct<persistable>:
     Value:int = 0
 
 # Class for game items - object-oriented features with functional constraints
-game_item := class<unique><persistable>:
+game_item := class<final><persistable>:
     Name:string
     Rarity:item_rarity = item_rarity.common
     Stats:item_stats = item_stats{}
     StackSize:int = 1
-
+    
     # Method with decides effect - can fail
     GetRarityMultiplier()<decides>:float =
         case(Rarity):
@@ -192,12 +200,11 @@ game_item := class<unique><persistable>:
             item_rarity.uncommon => 1.5
             item_rarity.rare => 2.0
             item_rarity.epic => 3.0
-            item_rarity.legendary => 5.0
-            _ => false  # Fails for unknown rarity
-
+            _ => false  # Fails if the item is legenday
+    
     # Computed property using closed-world function
-    GetEffectiveValue() :=
-        Floor(Stats.Value * GetRarityMultiplier[])
+    GetEffectiveValue()<transacts><decides> :int=
+        Floor[Stats.Value * GetRarityMultiplier[]]
 
 # Inventory system with state management and effects
 inventory_system := class:
@@ -213,7 +220,7 @@ inventory_system := class:
 
         # This check might fail, rolling back any changes
         NewWeight <= MaxWeight
-
+        
         # Only executes if weight check passes
         set Items += array{NewItem}
         Print("Added {NewItem.Name} to inventory")
@@ -222,37 +229,36 @@ inventory_system := class:
     RemoveItem(ItemName:string)<transacts><decides>:game_item =
         var RemovedItem:?game_item = false
         var NewItems:[]game_item = array{}
-
+        
         for (Item : Items):
             if (Item.Name = ItemName, not RemovedItem?):
                 set RemovedItem = option{Item}
             else:
                 set NewItems += array{Item}
-
         set Items = NewItems
         RemovedItem?  # Fails if item not found
 
     # Purchase with complex failure logic and rollback
     PurchaseItem(ShopItem:game_item)<transacts><decides>:void =
         # Multiple failure points - any failure rolls back all changes
-        Price := ShopItem.GetEffectiveValue()
+        Price := ShopItem.GetEffectiveValue[]
         Price <= Gold  # Fails if not enough gold
-
+        
         # Tentatively deduct gold
         set Gold = Gold - Price
-
+        
         # Try to add item - might fail due to weight
-        AddItem(ShopItem)
-
+        AddItem[ShopItem]
+        
         # All succeeded - changes are committed
         Print("Purchased {ShopItem.Name} for {Price} gold")
 
     # Higher-order function with type parameters and where clauses
-    FilterItems(Predicate:type{_(game_item)<decides>:void}):[]game_item =
+    FilterItems(Predicate:type{_(:game_item)<decides>:void} ) :[]game_item =
         for (Item : Items, Predicate[Item]):
             Item
 
-    GetTotalWeight():float =
+    GetTotalWeight()<transacts>:float =
         var Total:float = 0.0
         for (Item : Items):
             set Total += Item.Stats.Weight
@@ -260,27 +266,26 @@ inventory_system := class:
 
 # Player class using composition
 player_character<public> := class:
-    Name:string
+    Name<public>:string
     var Level:int = 1
     var Experience:int = 0
     var Inventory:inventory_system = inventory_system{}
-
-    # Lambda expression and function as value
-    LevelUpThreshold := (L:int):int => L * 100
+    
+    LevelUpThreshold := 100
 
     GainExperience(Amount:int)<transacts>:void =
         set Experience += Amount
-
+        
         # Automatic level up check with failure handling
         loop:
-            RequiredXP := LevelUpThreshold(Level)
+            RequiredXP := LevelUpThreshold * Level
             if (Experience >= RequiredXP):
                 set Experience -= RequiredXP
                 set Level += 1
                 Print("{Name} leveled up to {Level}!")
             else:
                 break
-
+    
     # Method showing qualified access
     EquipStarterGear()<transacts><decides>:void =
         StarterSword := game_item{
@@ -288,37 +293,36 @@ player_character<public> := class:
             Rarity := item_rarity.common
             Stats := item_stats{Damage := 10.0, Weight := 5.0, Value := 50}
         }
-
         # These might fail if inventory is full
-        Inventory.AddItem(StarterSword)
+        Inventory.AddItem[StarterSword]
 
 # Example usage demonstrating control flow and failure handling
 RunExample<public>()<suspends>:void =
     # Create a player (can't fail)
     Hero := player_character{Name := "Verse Hero"}
-
+    
     # Try to equip starter gear (might fail)
     if (Hero.EquipStarterGear[]):
         Print("Hero equipped with starter gear")
-
+    
     # Demonstrate transactional behavior
     ExpensiveItem := game_item{
         Name := "Golden Crown"
         Rarity := item_rarity.epic
         Stats := item_stats{Value := 2000, Weight := 90.0}  # Very heavy!
     }
-
+    
     # This might fail due to weight or insufficient gold
     if (Hero.Inventory.PurchaseItem[ExpensiveItem]):
         Print("Purchase successful!")
     else:
         Print("Purchase failed - gold remains at {Hero.Inventory.Gold}")
-
+    
     # Use higher-order functions
     RareItems := Hero.Inventory.FilterItems((I:game_item)<decides>:void =>
         I.Rarity = item_rarity.rare or I.Rarity = item_rarity.legendary)
-
-    Print("Found {RareItems.Length} rare or legendary items")
+    
+    Print("Found {RareItems.Length} rare items")
 ```
 
 This example showcases nearly every major feature of Verse in a practical context. Let's explore what makes this code uniquely Verse:
