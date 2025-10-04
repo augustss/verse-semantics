@@ -96,6 +96,23 @@ function extractAppendComment(lines, verseBlockEnd) {
   return commentLines;
 }
 
+function shouldSkipSnippet(lines, verseBlockStart) {
+  // Look backwards from verseBlockStart to check for <!--NoCompile-->
+  let i = verseBlockStart - 1;
+
+  // Skip empty lines
+  while (i >= 0 && lines[i].trim() === '') {
+    i--;
+  }
+
+  // Check if we found <!--NoCompile-->
+  if (i >= 0 && lines[i].trim() === '<!--NoCompile-->') {
+    return true;
+  }
+
+  return false;
+}
+
 function extractVerseSnippets(markdownContent) {
   const snippets = [];
   const lines = markdownContent.split('\n');
@@ -113,6 +130,11 @@ function extractVerseSnippets(markdownContent) {
       currentSnippet = [];
     } else if (inVerseBlock && line.trim().startsWith('```')) {
       inVerseBlock = false;
+
+      // Skip this snippet if it has <!--NoCompile--> marker
+      if (shouldSkipSnippet(lines, verseBlockStart)) {
+        continue;
+      }
 
       // Look for prepend comment before the ```verse block
       const prependLines = extractPrependComment(lines, verseBlockStart);

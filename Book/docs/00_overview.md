@@ -325,6 +325,14 @@ RunExample<public>()<suspends>:void =
     Print("Found {RareItems.Length} rare items")
 ```
 
+<!--
+TODO: the above has a lambda ... that does not work yet.
+
+The above has some superfluous <transacts> due to <no_rollback>, in some cases they could be just <computes>.  Apparently an Old VM pathology
+
+Also methods that have an empty return type have weird behavior in some cases. Easily fixed by typing them.
+
+-->
 This example showcases nearly every major feature of Verse in a practical context. Let's explore what makes this code uniquely Verse:
 
 **Type System and Data Modeling**
