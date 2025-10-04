@@ -22,14 +22,13 @@ import Control.Monad.Supply
 import Control.Monad.Wrong
 
 import Data.Bool
-import Data.ByteString qualified as ByteString
+import Data.Semigroup ((<>))
 import Data.ByteString.Internal (c2w)
 import Data.Foldable (foldlM)
 import Data.Function
 import Data.Functor
 import Data.Functor.Apply
 import Data.Maybe (maybe)
-import Data.Text.Encoding qualified as Text
 import Data.Traversable
 import Data.Tuple
 import Data.List
@@ -41,7 +40,7 @@ import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Loc (L (..), Loc (..), liftL1, liftL2, loc, mkL)
+import Language.Verse.Loc (L (..), Loc (..), liftL1, loc)
 import Language.Verse.Path (Path)
 import Language.Verse.Path qualified as Path
 import Language.Verse.SimpleName
@@ -59,9 +58,11 @@ import Language.Verse.Exp
   , pattern (:*:)
   , pattern (:/:)
   , pattern (:->:)
+  , pattern (:&:)
   , pattern PrefixBracket
   , pattern PrefixQuery
   , pattern PostfixQuery
+  , pattern PostfixDollar
   , pattern If
   , pattern IfThen
   , pattern IfElse
@@ -76,12 +77,9 @@ import Language.Verse.Exp
   , expToPat
   )
 import Language.Verse.Exp qualified as Parse
-import Language.Verse.Pos (Pos (..))
 import Language.Verse.Rewrite.Exp
 
 import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error, (-))
-
-import Debug.Trace (trace)
 
 -- TODO: in general this module needs:
 -- - a bunch of cleanup. Many cases can be handled recursively rather than directly
@@ -151,12 +149,27 @@ rewriteExp expr = for expr $ \case
     rewriteOperator2 "operator'/'" e1 e2
   e1 :->: e2 ->
     rewriteOperator2 "operator'->'" e1 e2
+  e1 :&: e2 -> do
+    e1' <- rewriteExp e1
+    e2' <- rewriteExp e2
+    return $ InfixOp e1' "&" e2'
+
   PrefixBracket _s e ->
     rewriteOperator1 "prefix'[]'" e
   PrefixQuery e ->
     rewriteOperator1 "prefix'?'" e
   PostfixQuery e ->
     rewriteOperator1 "postfix'?'" e
+  -- special case: FrontEnd.Expr uses a postfix '$' to indicate a primop. In
+  -- this rewrite pass we catch this case and rewrite the ident to something
+  -- FrontEnd.Desugar expects.
+  PostfixDollar (extract ->
+                   Pat (Parse.Name (Parse.IdentName prim))) ->
+    pure $ Name $ Ident.Name $ prim <> "$"
+  -- general case, although this should never be hit
+  PostfixDollar e -> do
+    e' <- rewriteExp e
+    pure $ PostfixOp e' "$"
   Parse.PostfixCaret e -> do
     e' <- rewriteExp e
     pure $ PostfixOp e' "^"
@@ -456,7 +469,7 @@ rewriteDef
 rewriteDef pat rhs = case extract pat of
   (stripSpecs -> (Parse.Name (Parse.IdentName x), specs)) -> do
     let x' = (Name $ Ident.Name x) <$ pat
-    access <- getDefSpecs specs
+    _access <- getDefSpecs specs -- drop the aperture
     pure $ InfixOp x' ":=" rhs
   InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x) specs) e -> do
     let x' = Ident.Name x <$ i
@@ -705,12 +718,6 @@ parenInvokeM e1 e2 = do
 
 freshIdent :: MonadSupply Label m => Loc -> m (L Ident)
 freshIdent lc = L lc . Ident.Label <$> supply
-
-unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-unify = liftL2 (:=:)
-
-not' :: Functor f => f (Exp f a) -> f (Exp f a)
-not' = liftL1 Not
 
 check :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
 check = liftL1 . Check

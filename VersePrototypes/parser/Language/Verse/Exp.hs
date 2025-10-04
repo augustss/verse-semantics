@@ -68,6 +68,7 @@ data Exp a
   | L (Exp a) :->: L (Exp a)
   | L (Exp a) :/: L (Exp a)
   | L (Exp a) :>=: L (Exp a)
+  | L (Exp a) :&:  L (Exp a)
   | All (L (Exp a))
   | And (L (Exp a)) (L (Exp a))
   | Array [L (Exp a)]
@@ -116,6 +117,7 @@ data Exp a
   | Pat (Pat a)
   | PostfixCaret (L (Exp a))
   | PostfixQuery (L (Exp a))
+  | PostfixDollar (L (Exp a))
   | PrefixBracket [L (Exp a)] (L (Exp a))
   | PrefixCaret (L (Exp a))
   | PrefixMinus (L (Exp a))

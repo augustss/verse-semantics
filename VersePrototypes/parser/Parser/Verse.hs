@@ -111,6 +111,7 @@ import Language.Verse.Exp ( Exp
                           , pattern (:-:)
                           , pattern (:*:)
                           , pattern (:/:)
+                          , pattern (:&:)
                           )
 import Language.Verse.Exp qualified as Exp
 import Language.Verse.Exp ( pattern (:->:) )
@@ -972,6 +973,9 @@ pPostfix base = pSpace *>
                     , \ a -> liftL2 Exp.ParenInvoke a  <$ pKeyword "at" <* pSpace <*> (pKeyBlock <|> pFun)
                     , \ a -> (Exp.PostfixCaret <$> duplicate a) <$ match '^'
                     , \ a -> (Exp.PostfixQuery <$> duplicate a) <$ match '?'
+                    -- postfix dollar is a primop in FrontEnd.Expr
+                    -- so we extend the parser here to handle that case
+                    , \ a -> (Exp.PostfixDollar <$> duplicate a) <$ match '$'
                     , \ a -> (\ p1 b p2 -> Exp.BracketInvoke <$> duplicate a <.> duplicate (mkList b) <. p1 <. p2) <$> pLBracket <*> pList <*> pRBracket
                     , \ a -> liftL2 (:.:) a <$ pScanKey <* pDot <*> pQualIdent
                     ]
@@ -1054,9 +1058,10 @@ pAnd =
 
 -- Or        := And     { Space ("or"  Key             ) Scan  Or      }
 pOr :: Parser (L (Exp SimpleName))
-pOr =
-  doBinary pAnd pOr [(pKeyword "or", Exp.Or)]
+pOr = doBinary pAnd pOr [(pKeyword "or", Exp.Or)]
 
+pInfixAmpersand :: Parser (L (Exp SimpleName))
+pInfixAmpersand = doBinary pOr pInfixAmpersand [(string "&", (:&:))]
 
 -- Def       := (Or | (In | Var) Space (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !':='))
 --              { &In Def
@@ -1087,7 +1092,7 @@ pDef' qE =
                        )
    )
     <|>
-    pOr) -- No need for P.try, if we are here then it must match
+    pInfixAmpersand) -- No need for P.try, if we are here then it must match
   <* pSpace >>= (\ e -> repeatChoiceNoTry e [ \ e1 -> P.lookAhead (pIn Nothing) *> pDef' (Just e1)
                                             , \ e1 -> liftL2 Exp.InfixColonEqual e1 <$ string ":=" <* pSpace <*> (pBraceInd <|> pDef)
                                             , \ e1 -> liftL2 Exp.Where e1 <$ pKeyword "where" <* pSpace <*> (pKeyBlock <|> pDefs)
@@ -1344,6 +1349,12 @@ pRBrace =  match '}'
 
 pComma :: Parser (L String)
 pComma =  match ','
+
+pAmpersand :: Parser (L String)
+pAmpersand = match '&'
+
+pDollar :: Parser (L String)
+pDollar = match '$'
 
 pDot :: Parser (L String)
 pDot =  P.try (match '.' <* P.notFollowedBy (match '.' <|> match ' ' <|> match '\t' <|> pEnding))
