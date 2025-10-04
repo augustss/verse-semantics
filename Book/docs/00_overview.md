@@ -373,6 +373,9 @@ Verse has a set of naming conventions that make code readable and predictable. W
 
 Verse uses PascalCase (CamelCase starting with uppercase) for most identifiers:
 
+<!--verse
+PlayerDatabase(id:int)<decides>:player_character=player_character{Name:="", Level:=1}
+-->
 ```verse
 # Variables and constants use PascalCase
 PlayerHealth:int = 100
@@ -383,7 +386,7 @@ IsGameActive:logic = true
 CalculateDamage(Base:float, Multiplier:float):float =
     Base * Multiplier
 
-GetPlayerName(Id:int):string =
+GetPlayerName(Id:int)<decides>:string =
     PlayerDatabase[Id].Name
 
 # Classes and structs use snake_case
@@ -410,8 +413,8 @@ Generic type parameters typically use single lowercase letters or short descript
 Find(Array:[]t, Target:t where t:subtype(comparable)):?int
 
 # Descriptive names for complex relationships
-Transform(Input:input_type, Processor:type{_(input_type):output_type}
-          where input_type:type, output_type:type):output_type
+Transform(Input:input_t, Processor:type{_(:input_t):output_t}
+          where input_t:type, output_t:type):?output_t
 ```
 
 Module names follow the snake_case pattern, while paths use a hierarchical structure with forward slashes and PascalCase for path segments:
@@ -432,7 +435,7 @@ Class and struct fields use PascalCase, and methods follow the same PascalCase c
 ```verse
 player := class:
     Name:string          # PascalCase for fields
-    Health:float
+    var Health:float= 0.0
     MaxHealth:float
     CurrentLevel:int
 
@@ -441,7 +444,7 @@ player := class:
         set Health = Max(0.0, Health - Amount)
 
     IsAlive():logic =
-        Health > 0.0
+        logic{Health > 0.0}
 ```
 
 ## Code Formatting
@@ -450,8 +453,18 @@ Verse code follows consistent formatting patterns that emphasize readability:
 
 Verse uses 4-space indentation for code blocks. The colon introduces a block, with subsequent lines indented:
 
+<!--verse
+DoSomething() :={}
+DoSomethingElse() := {}
+Inventory := array{1}
+ProcessItem(i:int):={}
+UpdateDisplay():={}
+ImplementationHere():={}
+Condition()<decides>:={}
+F():= {
+-->
 ```verse
-if (Condition):
+if (Condition[]):
     DoSomething()
     DoSomethingElse()
 
@@ -466,9 +479,13 @@ class_definition := class:
     Method():void =
         ImplementationHere()
 ```
+<!--verse
+}
+-->
 
 Complex expressions benefit from clear formatting that shows structure:
 
+<!--NoCompile-->
 ```verse
 # Multi-line conditionals
 Result := if (Player.Health > 50):
@@ -484,7 +501,7 @@ FinalDamage :=
     LevelMultiplier *
     (1.0 + BonusPercentage / 100.0)
 
-# Pattern matching with aligned arrows
+# Pattern matching with aligned cases
 DamageMultiplier := case(Rarity):
     common => 1.0
     uncommon => 1.5
@@ -495,9 +512,10 @@ DamageMultiplier := case(Rarity):
 
 Functions follow a consistent pattern with effects and return types clearly specified:
 
+<!--NoCompile-->
 ```verse
 # Simple pure function
-Add(X:int, Y:int):int = X + Y
+Add(X:int, Y:int)<computes>:int = X + Y
 
 # Function with effects
 ProcessTransaction(Amount:int)<transacts><decides>:void =
@@ -523,18 +541,21 @@ Comments are the programmer's way of leaving notes in the code, explaining not j
 
 Verse offers several styles of comments to suit different documentation needs. The simplest is the single-line comment, which begins with `#` and continues to the end of the line:
 
+<!--NoCompile-->
 ```verse
 CalculateDamage := 100 * 1.5  # Apply critical hit multiplier
 ```
 
 When you need to document something within a line of code without breaking it up, inline block comments provide the perfect solution. These are enclosed between `<#` and `#>`:
 
+<!--NoCompile-->
 ```verse
 Result := BaseValue <# original amount #> * Multiplier <# scaling factor #> + Bonus
 ```
 
 For more extensive documentation, multi-line block comments span across multiple lines, making them ideal for explaining complex algorithms or providing detailed context:
 
+<!--NoCompile-->
 ```verse
 <# This function implements the quadratic damage falloff formula
    used throughout the game. The falloff ensures that damage
@@ -544,8 +565,9 @@ CalculateFalloffDamage(Distance:float, MaxDamage:float):float =
     # Implementation here
 ```
 
-One of Verse's more elegant features is nested block comments, which allow you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
+One of Verse's elegant features is nested block comments, which allow you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
 
+<!--NoCompile-->
 ```verse
 <# Temporarily disabled for testing
    OriginalFunction()  <# This had a bug #>
@@ -555,6 +577,7 @@ One of Verse's more elegant features is nested block comments, which allow you t
 
 Verse also supports indented comments, a unique feature that begins with `<#>` on its own line. Everything indented by four spaces on subsequent lines becomes part of the comment:
 
+<!--NoCompile-->
 ```verse
 <#>
     This entire block is a comment because it's indented.
@@ -569,6 +592,7 @@ Verse offers flexible syntax to accommodate different programming styles and sit
 
 **Braced Style:** The braced style uses curly braces to delimit blocks, familiar to programmers from C-family languages:
 
+<!--NoCompile-->
 ```verse
 Result := if (Score > 90) {
     "excellent"
@@ -582,6 +606,7 @@ Result := if (Score > 90) {
 **Indented Style:**
 The indented style uses colons and indentation to define structure, similar to Python:
 
+<!--NoCompile-->
 ```verse
 Result := if (Score > 90):
     "excellent"
@@ -594,6 +619,7 @@ else:
 **Inline Style:**
 For simple expressions, the inline style keeps everything on one line:
 
+<!--NoCompile-->
 ```verse
 Result := if (Score > 90) then "excellent" else if (Score > 70) then "good" else "needs improvement"
 ```
@@ -601,6 +627,7 @@ Result := if (Score > 90) then "excellent" else if (Score > 70) then "good" else
 **Dotted Style:**
 The dotted style uses a period to introduce the expression:
 
+<!--NoCompile-->
 ```verse
 Result := if (Score > 90). "excellent" else. "needs improvement"
 ```
@@ -608,6 +635,7 @@ Result := if (Score > 90). "excellent" else. "needs improvement"
 **Mixed Styles:**
 You can even mix styles when it makes sense. The colon-based indented form is particularly useful for the condition while keeping the branches inline:
 
+<!--NoCompile-->
 ```verse
 Result := if:
     ComplexCondition() and
