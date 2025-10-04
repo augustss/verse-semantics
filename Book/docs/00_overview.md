@@ -48,7 +48,7 @@ For experienced programmers coming from other languages, the [Failure System](08
 In Verse, there are no statements—everything is an expression that produces a value. This creates a highly composable system where any piece of code can be used anywhere a value is expected.
 
 <!--verse
-Condition()<decides> := {}
+Condition()<computes><decides> :void= {}
 Main() :void = { Array := array{1}
 -->
 ```verse
@@ -67,10 +67,9 @@ Multiply := for (X : Array) { X * 42 }
 Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), and this failure propagates naturally through the program.
 
 <!--verse
-ValidateInput(x:string)<decides>:void= {}
-ProcessData(x:string):void= {}
-  
-x := class {
+ValidateInput(x:string)<computes><decides>:void= {}
+ProcessData(x:string)<computes>:void= {}
+myclass := class {
   Data:="hi"
   M()<decides>:={
 -->
@@ -148,8 +147,8 @@ race:
 Verse can speculatively execute code and roll back changes if the execution fails, enabling powerful patterns for validation and error handling.
 
 <!--verse
-TryComplexOperation()<decides>:void={}
-M():={
+TryComplexOperation()<computes><decides>:void={}
+M():void={
 -->
 ```verse
 if (TryComplexOperation[]):
@@ -461,16 +460,7 @@ Verse code follows consistent formatting patterns that emphasize readability:
 
 Verse uses 4-space indentation for code blocks. The colon introduces a block, with subsequent lines indented:
 
-<!--verse
-DoSomething() :={}
-DoSomethingElse() := {}
-Inventory := array{1}
-ProcessItem(i:int):={}
-UpdateDisplay():={}
-ImplementationHere():={}
-Condition()<decides>:={}
-F():= {
--->
+<!--NoCompile-->
 ```verse
 if (Condition[]):
     DoSomething()
@@ -487,9 +477,6 @@ class_definition := class:
     Method():void =
         ImplementationHere()
 ```
-<!--verse
-}
--->
 
 Complex expressions benefit from clear formatting that shows structure:
 

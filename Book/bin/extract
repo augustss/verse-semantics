@@ -32,7 +32,7 @@ function parseArgs() {
 }
 
 function extractPrependComment(lines, verseBlockStart) {
-  // Look backwards from verseBlockStart to find <!--verse comment
+  // Look backwards from verseBlockStart to find <!--verse or <!-- comment
   let commentLines = [];
   let i = verseBlockStart - 1;
 
@@ -44,15 +44,20 @@ function extractPrependComment(lines, verseBlockStart) {
   // Check if we found a closing -->
   if (i >= 0 && lines[i].trim() === '-->') {
     i--;
-    // Collect lines until we find <!--verse
+    // Collect lines until we find <!--verse or <!--
     while (i >= 0) {
       const line = lines[i];
-      if (line.trim().startsWith('<!--verse')) {
-        // Found the opening, extract content after <!--verse
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('<!--verse')) {
+        // Found <!--verse, extract content after it
         const firstLine = line.substring(line.indexOf('<!--verse') + 9).trim();
         if (firstLine) {
           commentLines.unshift(firstLine);
         }
+        break;
+      } else if (trimmed === '<!--') {
+        // Found plain <!--, don't include the marker itself
         break;
       }
       commentLines.unshift(line);
@@ -64,7 +69,7 @@ function extractPrependComment(lines, verseBlockStart) {
 }
 
 function extractAppendComment(lines, verseBlockEnd) {
-  // Look forward from verseBlockEnd to find <!--verse comment
+  // Look forward from verseBlockEnd to find <!--verse or <!-- comment
   let commentLines = [];
   let i = verseBlockEnd + 1;
 
@@ -73,23 +78,40 @@ function extractAppendComment(lines, verseBlockEnd) {
     i++;
   }
 
-  // Check if we found an opening <!--verse
-  if (i < lines.length && lines[i].trim().startsWith('<!--verse')) {
-    // Extract content after <!--verse on the same line
-    const firstLine = lines[i].substring(lines[i].indexOf('<!--verse') + 9).trim();
-    if (firstLine && firstLine !== '') {
-      commentLines.push(firstLine);
-    }
-    i++;
+  // Check if we found an opening <!--verse or <!--
+  if (i < lines.length) {
+    const trimmed = lines[i].trim();
 
-    // Collect lines until we find -->
-    while (i < lines.length) {
-      const line = lines[i];
-      if (line.trim() === '-->') {
-        break;
+    if (trimmed.startsWith('<!--verse')) {
+      // Extract content after <!--verse on the same line
+      const firstLine = lines[i].substring(lines[i].indexOf('<!--verse') + 9).trim();
+      if (firstLine && firstLine !== '') {
+        commentLines.push(firstLine);
       }
-      commentLines.push(line);
       i++;
+
+      // Collect lines until we find -->
+      while (i < lines.length) {
+        const line = lines[i];
+        if (line.trim() === '-->') {
+          break;
+        }
+        commentLines.push(line);
+        i++;
+      }
+    } else if (trimmed === '<!--') {
+      // Found plain <!--
+      i++;
+
+      // Collect lines until we find -->
+      while (i < lines.length) {
+        const line = lines[i];
+        if (line.trim() === '-->') {
+          break;
+        }
+        commentLines.push(line);
+        i++;
+      }
     }
   }
 
