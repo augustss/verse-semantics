@@ -48,17 +48,21 @@ toSrcExpr = expToSrcExpr . desugar
 
 expToSrcExpr :: L (R.Exp L Ident) -> Src.SrcExpr
 expToSrcExpr = uncurryL expToSrcExpr'
+-- expToSrcExpr' l (R.All e)         = trace (show e) $ Src.Macro1 (macro l "all") [] (lexp e)
 
 -- | adapter that translates the Parser.Language.Verse to SrcExpr
 expToSrcExpr' :: Loc -> R.Exp L Ident -> Src.SrcExpr
 expToSrcExpr' l (e1 R.:=:  e2)    = Src.InfixOp (lexp e1) (inOp l "=")  (lexp e2)
 expToSrcExpr' l (e1 R.:|:  e2)    = Src.InfixOp (lexp e1) (inOp l "|")  (lexp e2)
+expToSrcExpr' l (e1 R.:|||:  e2)  = Src.InfixOp (lexp e1) (inOp l "|||")  (lexp e2)
 expToSrcExpr' l (R.Where e1 e2)   = Src.InfixOp (lexp e1) (inOp l "where") (lexp e2)
 expToSrcExpr' _ (R.List es)       = Src.eSeq (map lexp es)
 expToSrcExpr' _ R.Fail            = Src.Fail
 expToSrcExpr' l (R.One e)         = Src.Macro1 (macro l "one") [] (lexp e)
 expToSrcExpr' _ (R.Let bndr body) = Src.Let (lexp bndr) (lexp body)
-expToSrcExpr' l (R.All e)         = Src.Macro1 (macro l "all") [] (lexp e)
+-- Notice that we convert all to For1 here. This is to make tests in densempom
+-- work, specifically all8 and friends. This is tracked in issue #99.
+expToSrcExpr' _ (R.All e)         = Src.For1 (lexp e)
 expToSrcExpr' _ (R.Option e)      = Src.Option (lexp <$> e)
 expToSrcExpr' l (R.Not e)         = Src.PrefixOp (preOp l "not") (lexp e)
 expToSrcExpr' l (R.Verify e)      = Src.Macro1 (macro l "verify") [] (lexp e)

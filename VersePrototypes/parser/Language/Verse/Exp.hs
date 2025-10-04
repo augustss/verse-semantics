@@ -57,6 +57,7 @@ data Exp a
   = L (Exp a) :=: L (Exp a)
   | L (Exp a) :<>: L (Exp a)
   | L (Exp a) :|: L (Exp a)
+  | L (Exp a) :|||: L (Exp a)
   | L (Exp a) :.: L (IdentExp a)
   | L (Exp a) :..: L (Exp a)
   | L (Exp a) :<: L (Exp a)
@@ -214,6 +215,7 @@ instance ( Pretty a
     e1 :=: e2 -> pretty e1 <+> equals <+> pretty e2
     e1 :<>: e2 -> parens (pretty e1 <+> "<>" <+> pretty e2)
     e1 :|: e2 -> parens (pretty e1 <+> pipe <+> pretty e2)
+    e1 :|||: e2 -> parens (pretty e1 <+> (pipe <> pipe <> pipe) <+> pretty e2)
     e :.: x -> pretty e <+> dot <> pretty x
     e :..: x -> pretty e <> ".." <> pretty x
     e :<: x -> parens (pretty e <+> "<" <+> pretty x)

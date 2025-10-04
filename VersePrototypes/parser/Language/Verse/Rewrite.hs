@@ -123,6 +123,8 @@ rewriteExp expr = for expr $ \case
       ]
   (Parse.:|:) e1 e2 ->
     (:|:) <$> rewriteExp e1 <*> rewriteExp e2
+  (Parse.:|||:) e1 e2 ->
+    (:|||:) <$> rewriteExp e1 <*> rewriteExp e2
   (Parse.:.:) e (extract -> Parse.IdentName x) ->
     rewriteExp e <&> (:.: x)
   e1 :..: e2 ->
@@ -657,6 +659,8 @@ getLamSpecs
   => [L (Parse.Exp SimpleName)]
   -> m (OC, Split.Effect)
 getLamSpecs = wrap $ \ case
+  ((_, z), y@(extract -> IdentName "invariant")) ->
+    pure (Just $ C <$ y, z)
   ((Nothing, z), y@(extract -> IdentName "open")) ->
     pure (Just $ O <$ y, z)
   ((Just x, _), y@(extract -> IdentName "open")) ->

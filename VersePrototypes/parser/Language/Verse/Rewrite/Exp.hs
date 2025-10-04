@@ -44,6 +44,7 @@ data Exp f a
   = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :.: {-# UNPACK #-} !SimpleName
   | f (Exp f a) :|: f (Exp f a)
+  | f (Exp f a) :|||: f (Exp f a)
   | List [f (Exp f a)]
   | f (Exp f a) `Where` f (Exp f a)
   | Fail

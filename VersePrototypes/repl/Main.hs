@@ -310,10 +310,6 @@ flagTable =
   [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
   ,("trace-eval",  (fTraceEval,    \ b s -> s{fTraceEval=b}))
   ,("ds-uniform",  (fDsUniform,    \ b s -> s{fDsUniform=b}))
-  -- TODO: See #66: The repl is equipped with two parsers until the verse-parser
-  -- is at feature parity to FrontEnd.Parser. The default parser is
-  -- FrontEnd.Parse. Use ':set use-lib-parser' to enable verse-parser
-  -- interactively at the repl.
 --  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
 --  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
 --  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))

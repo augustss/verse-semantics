@@ -107,6 +107,7 @@ import Language.Verse.Exp ( Exp
                           , pattern (:>:)
                           , pattern (:>=:)
                           , pattern (:|:)
+                          , pattern (:|||:)
                           , pattern (:+:)
                           , pattern (:-:)
                           , pattern (:*:)
@@ -1018,7 +1019,9 @@ pTo =
 -- Choose    := To      [ Space ('|'                   ) Scan  Choose  ]
 pChoose :: Parser (L (Exp SimpleName))
 pChoose =
-  doBinary pTo pChoose [(match '|', (:|:))]
+  doBinary pTo pChoose [ (string "|||", (:|||:))
+                       , (match '|', (:|:))
+                       ]
 
 -- Greater   := Choose  [ Space ('>'  | ">="           ) Scan  Greater ]
 pGreater :: Parser (L (Exp SimpleName))

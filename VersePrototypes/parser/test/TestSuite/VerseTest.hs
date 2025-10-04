@@ -62,6 +62,7 @@ sequences :: TestTree
 sequences =
   let passes  = makeTest pcExpr
       bPasses = makeTest $ lexeme (pcBraces pcExpr)
+      passes' = prettyTest pcExpr
   in testGroup "sequences" $
   [ passes ("1;2" -- Test that 'l;r' is sequence
            , List [ L (Loc (Pos {line = 1, column = 1, offset = 0}) (Pos {line = 1, column = 2, offset = 0})) (Int 1)
@@ -111,6 +112,10 @@ sequences =
            )
 
   , passes (" 3 ", Int 3)
+  , passes' ("1|2;3|4",    "(1 | 2)\n(3 | 4)")
+  , passes' ("1|2; 3|||4", "(1 | 2)\n(3 ||| 4)")
+  , passes' ("1|||2; 3|4", "(1 ||| 2)\n(3 | 4)")
+  , passes' ("1|||2",      "(1 ||| 2)")
   ]
 
 tuples :: TestTree

@@ -822,6 +822,8 @@ pTestRunner = V.choice
     , V.pKeyword "sls" *> pure SLS_DS
     , V.pKeyword "dls" *> pure DLS_DS
     , V.pKeyword "els" *> pure ELS_DS
+    , V.pKeyword "pom" *> pure POM_DS
+    , V.pKeyword "ppo" *> pure PPM_DS
     ] <* V.pComma
 
 
