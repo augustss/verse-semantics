@@ -44,7 +44,7 @@ if (IsPlayerReady[])
 For simple operations, the single-line dot format keeps code concise:
 
 <!--verse
-HasPowerUp()<decides>:void={}
+HasPowerUp()<computes><decides>:void={}
 ApplyBoost():void={}
 IncrementCounter():void={}
 F():void={
@@ -77,12 +77,12 @@ The `if` expression is perhaps the most fundamental control flow construct, but 
 
 <!--verse
 player:=class{
-   CanJump()<decides>:void={}
+   CanJump()<computes<decides>:void={}
    Jump():void={}
-   GetEquippedWeapon()<decides>:weapon=weapon{}
+   GetEquippedWeapon()<computes><decides>:weapon=weapon{}
    Idle():void={}
 }   
-weapon:=class{
+weapon:=class<computes>{
    Fire():void={}
 }
 ConsumeAmmo():void={}
@@ -128,7 +128,7 @@ Verse provides several constructs for repetition, each suited to different scena
 UpdatePlayerPositions():void={}
 CheckCollisions():void={}
 RenderFrame():void={}
-GameOver()<decides>:void={}
+GameOver()<computes><decides>:void={}
 -->
 ```verse
 GameLoop():void =
@@ -146,6 +146,7 @@ The `break` expression exits the loop entirely.
 The `for` expression iterates over collections or ranges, providing a more structured approach to repetition:
 
 <!--verse
+using { /Verse.org/VerseCLR }
 player:=struct{ Name:string }
 GetScore(P:player):int=0
 -->
@@ -154,7 +155,7 @@ CalculateTotalScore(Players:[]player):int =
     var Total:int = 0
     for (Player : Players):
         PlayerScore := GetScore(Player)
-        Total := Total + PlayerScore
+        set Total += PlayerScore
 
         # Can also get the index
     for (Index -> Player : Players):
@@ -167,7 +168,7 @@ Verse's `for` expression is particularly powerful when combined with failure con
 
 <!--verse
 player:=struct{ Name:string }
-GetScore(P:player):int=0
+GetScore(P:player)<computes>:int=0
 -->
 ```verse
 GetHighScorers(Players:[]player):[]player =
@@ -180,21 +181,21 @@ GetHighScorers(Players:[]player):[]player =
 The `defer` expression ensures that code runs just before exiting the current scope, regardless of how the scope is exited. This makes it perfect for cleanup operations:
 
 <!--verse
-OpenFile(P:string):?int=0
-CloseFile(P:int):void={}
-ReadFile(P:int):?string=0
-ProcessContents(P:string)<decides>:void={}
-SaveResults()<decides>:void={}
+OpenFile(P:string)<computes>:?int=false
+CloseFile(P:int)<computes>:void={}
+ReadFile(P:int)<computes>:?string=false
+ProcessContents(P:string)<computes><decides>:void={}
+SaveResults()<computes><decides>:void={}
 -->
 ```verse
-ProcessFile(FileName:string)<decides>:void =
+ProcessFile(FileName:string)<transacts><decides>:void =
     File := OpenFile(FileName)?
     defer:
         CloseFile(File)  # Always runs, even if we fail below
 
     Contents := ReadFile(File)?
-    ProcessContents(Contents)?
-    SaveResults()?
+    ProcessContents[Contents]
+    SaveResults[]
 ```
 
 The deferred code executes in reverse order of definition when multiple `defer` expressions exist in the same scope, ensuring proper cleanup of nested resources.
@@ -208,7 +209,7 @@ OptimizedCalculation():float =
     profile("Complex Math"):
         var Result:float = 0.0
         for (I := 1..1000000):
-            Result := Result + Sin(Float(I)) * Cos(Float(I))
+            set Result += Sin(I*1.0) * Cos(I*1.0)
         Result
 ```
 
@@ -228,16 +229,17 @@ The interplay between control flow, code blocks, and scoping creates opportuniti
 
 <!--verse
 item := struct{}
-ProcessItems(I:item)<decides>:string=""
+result := struct<allocates>{}
+ProcessItems(I:item)<allocates><decides>:result=result{}
 -->
 ```verse
-ProcessBatch(Items:[]item)<decides>:[]result =
+ProcessBatch(Items:[]item)<transacts><decides>:[]result =
     block:
         var Results:[]result = array{}
         var FailureCount:int = 0
 
         for (Item : Items):
-            if (Result := ProcessItem[Item]):
+            if (Result := ProcessItems[Item]):
                 set Results = Results + array{Result}
             else:
                 set FailureCount = FailureCount + 1

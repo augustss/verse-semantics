@@ -329,7 +329,7 @@ Character literals can also be written using numeric escape sequences:
 F():void={
 -->
 ```verse
-E :char = 0o145                     # ok; same as 'e'
+E :char = 0o65                      # ok; same as 'e'
 F :char32 = 0u00E9                  # ok; same as 'é'
 ```
 <!--verse

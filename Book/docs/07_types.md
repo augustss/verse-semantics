@@ -1,6 +1,6 @@
 # Types
 
-Every value has a type, and understanding the type system is fundamental to mastering the language. Types aren't merely labels or constraints - they form a rich hierarchy that governs how values flow through your program, what operations are permitted, and how the compiler reasons about your code. The type system combines static verification with practical flexibility, catching errors at compile time while still allowing sophisticated patterns of code reuse and abstraction.
+Every value has a type, and understanding the type system is fundamental to mastering any language. Types aren't merely labels - they form a rich hierarchy that governs how values flow through your program, what operations are permitted, and how the compiler reasons about your code. The type system combines static verification with practical flexibility, catching errors at compile time while still allowing sophisticated patterns of code reuse and abstraction.
 
 At the apex of this hierarchy sits `any`, the universal supertype from which all other types descend. At the opposite extreme lies `void`, the empty type that contains no values at all. Between these extremes exists a carefully designed lattice of types, each with its own capabilities and constraints. This structure isn't arbitrary - it reflects deep principles about computation, abstraction, and the relationships between different kinds of data.
 
@@ -8,8 +8,9 @@ At the apex of this hierarchy sits `any`, the universal supertype from which all
 
 Subtyping is the foundation of the type hierarchy. When we say that type A is a subtype of type B, we mean that every value of type A can be used wherever a value of type B is expected. This relationship creates a natural ordering among types, from the most specific to the most general.
 
-Consider the relationship between `nat` (natural numbers) and `int` (integers). Every natural number is an integer, but not every integer is a natural number. Therefore, `nat` is a subtype of `int`. This means you can pass a `nat` to any function expecting an `int`, but not vice versa:
+Consider the relationship between `nat` (natural numbers; not a valid type in Verse but handy for our examples) and `int` (integers). Every natural number is an integer, but not every integer is a natural number. Therefore, `nat` is a subtype of `int`. This means you can pass a `nat` to any function expecting an `int`, but not vice versa:
 
+<!--NoCompile-->
 ```verse
 ProcessInteger(X:int):void = Print("Integer: {X}")
 ProcessNatural(X:nat):void = Print("Natural: {X}")
@@ -21,9 +22,9 @@ ProcessInteger(MyNat)  # Works - nat is a subtype of int
 ProcessNatural(MyInt)  # Error - int is not a subtype of nat
 ```
 
-The subtyping relationship extends to composite types in sophisticated ways. Arrays and tuples follow covariant subtyping rules for their elements. This means that `[]nat` is a subtype of `[]int` because `nat` is a subtype of `int`. Similarly, `tuple(nat, nat)` is a subtype of `tuple(int, int)`. This covariance allows collections of more specific types to be used where collections of more general types are expected.
+The subtyping relationship extends to composite types in sophisticated ways. Arrays and tuples follow covariant subtyping rules for their elements. This means that `[]nat` would be a subtype of `[]int` if `nat` was a subtype of `int`. Similarly, `tuple(nat, nat)` would be a subtype of `tuple(int, int)`. This covariance allows collections of more specific types to be used where collections of more general types are expected.
 
-Maps exhibit more complex subtyping behavior. A map type `[K1]V1` is a subtype of `[K2]V2` when K2 is a subtype of K1 (contravariant in keys) and V1 is a subtype of V2 (covariant in values). The contravariance in keys might seem counterintuitive at first, but it ensures type safety: if you can look up values using a more general key type, you must be able to handle more specific key types as well.
+Maps exhibit more complex subtyping behavior. A map type `[K1]V1` is a subtype of `[K2]V2` when `K2` is a subtype of `K1` (contravariant in keys) and `V1` is a subtype of `V2` (covariant in values). The contravariance in keys might seem counterintuitive at first, but it ensures type safety: if you can look up values using a more general key type, you must be able to handle more specific key types as well.
 
 Classes and interfaces introduce nominal subtyping through inheritance. When a class inherits from another class or implements an interface, it explicitly declares a subtyping relationship:
 
@@ -43,22 +44,33 @@ This inheritance hierarchy means that a `sports_car` can be used anywhere a `car
 ## Casting and Conversion
 
 All type conversions must be explicit, a design choice that eliminates entire categories of bugs while making the programmer's intent clear. There's no implicit coercion between types - you must explicitly state how you want values to be converted.
-
 Converting between numeric types illustrates this principle clearly. To convert an integer to a float, you multiply by 1.0:
 
+<!--verse
+F():void={
+-->
 ```verse
 MyInt:int = 42
 MyFloat:float = MyInt * 1.0  # Explicit conversion to float
 ```
+<!--verse
+}
+-->
 
 The reverse conversion, from float to integer, requires choosing a rounding strategy:
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 MyFloat:float = 3.7
 Option1:int = Floor[MyFloat]  # Results in 3
 Option2:int = Ceil[MyFloat]   # Results in 4
 Option3:int = Round[MyFloat]  # Results in 4 (rounds to nearest)
 ```
+<!--verse
+}
+-->
 
 These conversion functions are failable - they have the `<decides>` effect and will fail if passed non-finite values like `NaN` or `Inf`. This forces you to handle edge cases explicitly:
 
@@ -78,20 +90,24 @@ Message:string = "Your score: {Score}"  # Implicit ToString() call
 
 Type casting becomes particularly interesting with parametric types. When you have a generic function, you can constrain type parameters to ensure certain operations are available:
 
+<!--verse
+using { /Verse.org/VerseCLR }
+-->
 ```verse
 PrintTwice(Value:t where t:subtype(any)):void =
     Representation:string = ToString(Value)
     Print("{Representation} {Representation}")
 ```
 
-The constraint `t:subtype(any)` might seem redundant since all types are subtypes of `any`, but it makes the type parameter explicit and allows for more specific constraints in real code.
+The constraint `t:subtype(any)` might seem redundant since all types are subtypes of `any` (inface the above would behave identifcally if one had written `t:type`), but it makes the type parameter explicit and allows for more specific constraints in real code.
 
 ## Where Clauses
 
 Where clauses are the mechanism for constraining type parameters in generic code. They appear after type parameters and specify requirements that types must satisfy to be valid arguments. This creates a powerful system for writing generic code that is both flexible and type-safe.
 
-The basic syntax places the where clause after the parameter it constrains:
-
+<!--verse
+using { /Verse.org/VerseCLR }
+-->
 ```verse
 # Simple subtype constraint
 Process(Value:t where t:subtype(comparable)):void =
@@ -103,8 +119,6 @@ Transform(Input:t where t:subtype(comparable), t:subtype(printable)):t =
     Print("Processing: {Input}")
     Input
 ```
-
-### Type Parameters with Constraints
 
 Where clauses become more powerful when working with multiple type parameters:
 
@@ -126,6 +140,9 @@ SafeCast(Value:t1 where t1:subtype(t2), Target:type{t2} where t2:type):t2 =
 
 Where clauses can express sophisticated relationships between types:
 
+<!--verse
+using { /Verse.org/VerseCLR }
+-->
 ```verse
 # Constraint that ensures compatible types for an operation
 Merge(Container1:[]t, Container2:[]t where t:subtype(comparable)):[]t =
@@ -145,10 +162,13 @@ ProcessContainer(C:container_type where container_type:subtype([]element_type),
         Print("Element: {Element}")
 ```
 
-### Where in Class and Interface Definitions
+### Where in Classes
 
 Classes and interfaces can also use where clauses to constrain their type parameters:
 
+<!--verse
+Process(I:int where int:type, out:type):out 
+-->
 ```verse
 # Generic container with constrained element type
 sorted_list(t where t:subtype(comparable)) := class:
@@ -269,6 +289,7 @@ A type is comparable if its values can be meaningfully tested for equality. The 
 
 The equality operators `=` and `<>` are defined in terms of the comparable type:
 
+<!--NoCompile-->
 ```verse
 operator'='(X:t, Y:comparable where t:subtype(comparable))<decides>:t
 operator'<>'(X:t, Y:comparable where t:subtype(comparable))<decides>:t
@@ -276,6 +297,7 @@ operator'<>'(X:t, Y:comparable where t:subtype(comparable))<decides>:t
 
 This signature reveals something subtle: both operands must be of the same type (or at least share a common subtype of comparable). This prevents nonsensical comparisons while allowing flexibility within type hierarchies:
 
+<!--NoCompile-->
 ```verse
 0 = 0        # Succeeds - both are int
 0.0 = 0.0    # Succeeds - both are float
@@ -284,6 +306,20 @@ This signature reveals something subtle: both operands must be of the same type 
 
 Classes require special handling for comparability. By default, class instances are not comparable because there's no universal way to define equality for user-defined types. However, you can make a class comparable using the `unique` specifier:
 
+<!--verse
+entity := class<unique>:
+    ID:int
+    Name:string
+
+F()<decides>:void={
+Player1 := entity{ID := 1, Name := "Alice"}
+Player2 := entity{ID := 1, Name := "Alice"}
+Player3 := Player1
+
+Player1 = Player2  # Fails - different instances
+Player1 = Player3  # Succeeds - same instance
+}<#
+-->
 ```verse
 entity := class<unique>:
     ID:int
@@ -296,6 +332,9 @@ Player3 := Player1
 Player1 = Player2  # Fails - different instances
 Player1 = Player3  # Succeeds - same instance
 ```
+<!--verse
+#>
+-->
 
 With the `unique` specifier, instances are only equal to themselves (identity equality), not to other instances with the same field values (structural equality). This provides a clear, predictable semantics for class equality.
 
@@ -307,6 +346,16 @@ The type system forms a graph rather than a simple tree. This means types can ha
 
 At the top of the hierarchy, `any` serves as the universal supertype. Every type is a subtype of `any`, which means a value of any type can be assigned to a variable of type `any`. However, once a value is typed as `any`, you lose access to type-specific operations:
 
+<!--verse
+using { /Verse.org/VerseCLR }
+ProcessValue(Value:any):void =
+    # Can't do much with Value here - it could be anything
+    Print("Got a value")  # About all we can do
+F():void={
+MyInt:int = 42
+ProcessValue(MyInt)  # Works, but loses type information
+}<#
+-->
 ```verse
 ProcessValue(Value:any):void =
     # Can't do much with Value here - it could be anything
@@ -315,14 +364,18 @@ ProcessValue(Value:any):void =
 MyInt:int = 42
 ProcessValue(MyInt)  # Works, but loses type information
 ```
+<!--verse
+#>
+-->
 
 The `void` type occupies the opposite position - it's the empty type with no values. Functions with `void` return type don't produce a value (though they actually return `false` for consistency). The `void` type is useful for marking functions that exist for their side effects:
 
+<!--NoCompile-->
 ```verse
 LogEvent(Event:string):void =
     WriteToFile(Event)
     UpdateCounter()
-    # No explicit return needed
+    # No explicit return needed, ignored if provided
 ```
 
 Between these extremes, types form natural groupings. The numeric types (`int`, `float`, `rational`) share common arithmetic operations but don't form a single hierarchy - they're siblings rather than ancestors and descendants. The container types (arrays, maps, tuples, options) each have their own subtyping rules based on their element types.

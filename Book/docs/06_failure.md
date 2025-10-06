@@ -79,8 +79,8 @@ Functions marked with `<decides>` create a failure context for their entire body
 
 <!--verse
 item:=struct{}
-IsWeapon(i:item)<decides>:void={}
-Damage(i:item)<decides>:int=0
+IsWeapon(i:item)<computes><decides>:void={}
+GetDamage(i:item)<computes><decides>:int=0
 -->
 ```verse
 FindBestWeapon(Inventory:[]item)<decides>:item =
@@ -101,6 +101,9 @@ The function body is a failure context, allowing failable expressions throughout
 
 One of Verse's most powerful features is speculative execution within failure contexts. When you execute code in a failure context, changes to variables are provisional - they only become permanent if the entire context succeeds.
 
+<!-- TODO MUTABLE PARAMETERS ARE NOT YET IMPLMENTED -->
+
+<!--NoCompile-->
 ```verse
 AttemptPurchase(var PlayerGold:int, Cost:int)<transacts><decides>:void =
     set PlayerGold = PlayerGold - Cost  # Provisional change
@@ -161,7 +164,7 @@ This function succeeds only if the player is alive, not stunned, and has either 
 The option type and failure are intimately connected. An option either contains a value or is empty (represented by `false`). The query operator `?` converts between options and failure:
 
 <!--verse
-F()<decides>:void={
+F()<computes><decides>:void={
 -->
 ```verse
 MaybeValue:?int = option{42}
@@ -177,7 +180,7 @@ Other := Empty?  # Fails
 The `option{}` constructor works in reverse, converting failure to an empty option:
 
 <!--verse
-RiskyComputation()<decides>:int=1
+RiskyComputation()<computes><decides>:int=1
 F():void={
 -->
 ```verse
