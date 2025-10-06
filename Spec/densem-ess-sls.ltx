@@ -310,7 +310,7 @@ $$
   &&&  \pomseq \semFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \semFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
   &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
 &  \semFUN{\pomunit{\EV}}{xs}{pq}{hf}{t_1}
-       &  = & \pomunit{\EV} \pomseq (\text{\bf Key part: Not done yet}) \\
+       &  = & (\pomunit{\EV} \pomseq (\text{\bf Key part: Not done yet}))  \pomHIDE \{p,q,xs\} \\
  &&&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\
 \end{array}
 \end{array}

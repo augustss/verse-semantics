@@ -84,14 +84,16 @@ $$
   \text{Simple values}    & a & ::= & |v| \vb |x| \vb op[a_1,\mydots,a_n] \vb |arr (a_0, xdots, a_n)| \\
 % \vb |truth a|\\
   \text{Constraints} &  \EV & ::= & \conBrack{relop[a_1,\mydots,a_n]} \\
-   &  & \vb & \conBrack{ \fpr{x}{y} \in h }  \hspace{10mm} \text{where}\; h \in \semfcn \\
+   &  & \vb & \conBrack{ \fpr{x}{y} \in h }  & \text{where}\; h \in \semfcn \\
 %   &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
-  &  & \vb & \conEmpty \vb \conUniv \vb \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
+  &  & \vb & \conEmpty \vb \conUniv \\
+  &  & \vb & \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
   &  & \vb & \conCompl(\EV)  & \text{Complement} \\
   &  & \vb & \HIDE{\EV}{xs} & \text{Hiding} \\
   \text{Relational ops} &  relop & ::= & = \vb < \vb \leq \vb \geq \vb > \\
   \text{Value ops} & op & ::= & + \vb - \vb * \vb / \\
-    & & & \funcat \vb \tupcat \vb \fununion \\
+  & & \vb & \funcat \vb \tupcat  & \text{Function and tuple concatenation resp.} \\
+  & & \vb & \fununion & \text{Function/tuple union} \\
 \end{array}\\
 \\[-1mm]
 \textbf{Interpretation of simple values and constraints}\\
