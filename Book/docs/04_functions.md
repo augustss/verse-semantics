@@ -22,6 +22,11 @@ CalculateBonus(BaseSalary:int, ?Multiplier:float, ?YearsOfService:int = 1):float
 
 When calling this function, named arguments can appear in any order after the positional arguments:
 
+<!--verse
+CalculateBonus(BaseSalary:int, ?Multiplier:float, ?YearsOfService:int = 1):float =
+    BaseSalary * Multiplier * (1.0 + YearsOfService * 0.1)
+F():void=
+-->
 ```verse
 CalculateBonus(50000, ?Multiplier := 1.5, ?YearsOfService := 3)
 CalculateBonus(50000, ?YearsOfService := 5, ?Multiplier := 2.0)  # Order doesn't matter

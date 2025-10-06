@@ -174,6 +174,7 @@ Comparison operators test relationships between values and are failable expressi
 | `=` | Equal to | All comparable types | `Name = "Player1"` |
 | `<>` | Not equal | All comparable types | `State <> idle` |
 
+<!--NoCompile-->
 ```verse
 # Numeric comparisons
 if (Score > HighScore):
@@ -208,10 +209,16 @@ The following types support comparison operations:
 
 Note: Comparisons between different types generally fail:
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 0 = 0.0  # Fails: int vs float
 "5" = 5  # Fails: string vs int
 ```
+<!--verse
+}
+-->
 
 ## Logical Operators
 
@@ -221,6 +228,9 @@ Logical operators work with failable expressions and control the flow of success
 
 The query operator checks if a `logic` value is `true`:
 
+<!--verse
+F():void={
+-->
 ```verse
 var IsReady:logic = true
 
@@ -231,11 +241,17 @@ if (IsReady?):
 if (IsReady = true):
     StartGame()
 ```
+<!--verse
+}
+-->
 
 ### Not Operator
 
 The `not` operator negates the success or failure of an expression:
 
+<!--verse
+F():void={
+-->
 ```verse
 if (not IsGameOver?):
     ContinuePlaying()
@@ -246,11 +262,15 @@ if (not (set X = 5)):
     # X is still 0 here, even though the assignment "tried" to happen
     Print("X is {X}")  # Prints "X is 0"
 ```
+<!--verse
+}
+-->
 
 ### And Operator
 
 The `and` operator succeeds only if both operands succeed:
 
+<!--NoCompile-->
 ```verse
 if (HasKey? and DoorUnlocked?):
     EnterRoom()
@@ -264,6 +284,7 @@ if (Player.Level > 5 and Player.HasItem("Sword")):
 
 The `or` operator succeeds if at least one operand succeeds:
 
+<!--NoCompile-->
 ```verse
 if (HasKeyCard? or HasMasterKey?):
     OpenDoor()
@@ -288,6 +309,7 @@ if (QuickCheck() or ExpensiveCheck()):
 
 The `:=` operator initializes constants and variables:
 
+<!--NoCompile-->
 ```verse
 # Constant initialization (immutable)
 MaxHealth:int = 100
@@ -305,6 +327,9 @@ AutoTyped := 42  # Inferred as int
 
 The `set =` operator updates variable values:
 
+<!--verse
+F():void={
+-->
 ```verse
 var Points:int = 0
 set Points = 100
@@ -312,11 +337,17 @@ set Points = 100
 var Position:vector3 = vector3{X := 0.0, Y := 0.0, Z := 0.0}
 set Position = vector3{X := 10.0, Y := 20.0, Z := 0.0}
 ```
+<!--verse
+}
+-->
 
 ### Assignment in Failure Context
 
 Assignment can be used in failure contexts, making it failable:
 
+<!--verse
+F():void={
+-->
 ```verse
 var MyArray:[]int = array{1, 2, 3}
 if (set MyArray[10] = 5):
@@ -325,6 +356,9 @@ if (set MyArray[10] = 5):
 else:
     Print("Assignment failed")
 ```
+<!--verse
+}
+-->
 
 ## Special Operators
 
@@ -336,6 +370,9 @@ Used for multiple purposes in Verse:
 2. **Function calls** (Verse-style) - Call functions with bracket syntax
 3. **Computed member access** - Access object members dynamically
 
+<!--verse
+F():void={
+-->
 ```verse
 # Array indexing (failable)
 MyArray := array{10, 20, 30}
@@ -356,11 +393,15 @@ if (FirstChar := Name[0]):
 Result := MyFunction[Arg1, Arg2]  # Alternative to MyFunction(Arg1, Arg2)
 EmptyCall := MyFunction[]  # Call with no arguments
 ```
+<!--verse
+}
+-->
 
 ### Member Access Operator (`.`)
 
 Accesses fields and methods of objects:
 
+<!--NoCompile-->
 ```verse
 Player.Health
 Player.GetName()
@@ -377,6 +418,9 @@ LongExpression := MyObject.
 
 Creates ranges for iteration:
 
+<!--verse
+F():void={
+-->
 ```verse
 # Inclusive range
 for (I := 0..4):
@@ -385,38 +429,56 @@ for (I := 0..4):
 # In array slicing context
 AllElements := 0..MyArray.Length-1
 ```
+<!--verse
+}
+-->
 
 ### Object Construction Operator (`{}`)
 
 Used to construct objects when placed after an identifier:
 
+<!--verse
+point:=struct{X:int, Y:int}
+player_data:=struct{Name:string,Level:int,Health:float}
+game_config:=struct{MaxPlayers:int,EnablePvP:logic}
+F():void={
+-->
 ```verse
 # Object construction with type name
-Point := Point{x := 10, y := 20}
+Point := point{X:= 10, Y:= 20}
 
 # Fields can be separated by commas or newlines
-Player := PlayerData{
+Player := player_data {
     Name := "Hero"
     Level := 5
     Health := 100.0
 }
 
 # Trailing commas are allowed
-Config := GameConfig{
+Config := game_config{
     MaxPlayers := 100,
     EnablePvP := true,
 }
 ```
+<!--verse
+}
+-->
 
 ### Tuple Access Operator (`()`)
 
 When used with a single argument after an expression, accesses tuple elements:
 
+<!--verse
+F():void={
+-->
 ```verse
 MyTuple := (10, 20, 30)
 FirstElement := MyTuple(0)  # Access first element
 SecondElement := MyTuple(1)  # Access second element
 ```
+<!--verse
+}
+-->
 
 ## Type Conversion and Operators
 
@@ -424,6 +486,9 @@ SecondElement := MyTuple(1)  # Access second element
 
 Verse has limited implicit type conversion. Most conversions must be explicit:
 
+<!--verse
+F():void={
+-->
 ```verse
 # No implicit int to float conversion
 MyInt:int = 42
@@ -435,11 +500,17 @@ Score:int = 100
 # Message:string = "Score: " + Score  # Error!
 Message:string = "Score: {Score}"  # OK: string interpolation
 ```
+<!--verse
+}
+-->
 
 ### Mixed Type Operations
 
 When operators work with mixed types, specific rules apply:
 
+<!--verse
+F():void={
+-->
 ```verse
 # int * float -> float
 Result := 5 * 2.0  # Result is 10.0 (float)
@@ -449,6 +520,9 @@ if (5 = 5):     # OK
 if (5.0 = 5.0): # OK
 # if (5 = 5.0):   # Error: different types
 ```
+<!--verse
+}
+-->
 
 ## Operator Overloading
 

@@ -13,7 +13,7 @@ CalculateReward(PlayerLevel:int):int =
     if (PlayerLevel > 10):
         BonusMultiplier := 2.0  # Only exists within this if block
         BaseReward := 100
-        Floor(BaseReward * BonusMultiplier)
+        Floor[BaseReward * BonusMultiplier]
     else:
         50  # Different branch, different scope
     # BonusMultiplier doesn't exist here
@@ -21,8 +21,9 @@ CalculateReward(PlayerLevel:int):int =
 
 Verse provides three equivalent formats for writing code blocks, each suited to different situations. The spaced format is the most common, using a colon to introduce the block and indentation to show structure:
 
+<!--NoCompile-->
 ```verse
-if (IsPlayerReady()):
+if (IsPlayerReady[]):
     StartMatch()
     InitializeScoreboard()
     BeginCountdown()
@@ -30,8 +31,9 @@ if (IsPlayerReady()):
 
 The multi-line braced format offers familiarity for programmers coming from C-style languages:
 
+<!--NoCompile-->
 ```verse
-if (IsPlayerReady())
+if (IsPlayerReady[])
 {
     StartMatch()
     InitializeScoreboard()
@@ -41,12 +43,22 @@ if (IsPlayerReady())
 
 For simple operations, the single-line dot format keeps code concise:
 
+<!--verse
+HasPowerUp()<decides>:void={}
+ApplyBoost():void={}
+IncrementCounter():void={}
+F():void={
+-->
 ```verse
-if (HasPowerup()). ApplyBoost(); IncrementCounter()
+if (HasPowerup[]). ApplyBoost(); IncrementCounter()
 ```
+<!--verse
+}
+-->
 
 Since everything is an expression, blocks themselves have values. The value of a block is the value of the last expression executed within it. This design enables elegant patterns where complex computations can be encapsulated in blocks that seamlessly integrate with surrounding code:
 
+<!--NoCompile-->
 ```verse
 FinalScore := block:
     BaseScore := CalculateBaseScore()
@@ -63,6 +75,20 @@ Control flow expressions are how you shape the behavior of your program, making 
 
 The `if` expression is perhaps the most fundamental control flow construct, but in Verse it works differently than in most languages. Instead of evaluating boolean conditions, `if` uses success and failure to drive decisions. When an expression in the condition succeeds, the corresponding branch executes:
 
+<!--verse
+player:=class{
+   CanJump()<decides>:void={}
+   Jump():void={}
+   GetEquippedWeapon()<decides>:weapon=weapon{}
+   Idle():void={}
+}   
+weapon:=class{
+   Fire():void={}
+}
+ConsumeAmmo():void={}
+PlayJumpSound():void={}
+
+-->
 ```verse
 HandlePlayerAction(Player:player, Action:string):void =
     if (Action = "jump", Player.CanJump[]):
@@ -98,6 +124,12 @@ The `case` expression excels when you have discrete values to match against, mak
 
 Verse provides several constructs for repetition, each suited to different scenarios. The `loop` expression creates an infinite loop that continues until explicitly broken:
 
+<!--verse
+UpdatePlayerPositions():void={}
+CheckCollisions():void={}
+RenderFrame():void={}
+GameOver()<decides>:void={}
+-->
 ```verse
 GameLoop():void =
     loop:
@@ -107,15 +139,16 @@ GameLoop():void =
 
         if (GameOver[]):
             break
-
-        if (Paused[]):
-            continue  # Skip to next iteration
 ```
 
-The `break` expression exits the loop entirely, while `continue` skips the remaining code in the current iteration and starts the next one. These controls give you fine-grained authority over loop execution.
+The `break` expression exits the loop entirely.
 
 The `for` expression iterates over collections or ranges, providing a more structured approach to repetition:
 
+<!--verse
+player:=struct{ Name:string }
+GetScore(P:player):int=0
+-->
 ```verse
 CalculateTotalScore(Players:[]player):int =
     var Total:int = 0
@@ -132,6 +165,10 @@ CalculateTotalScore(Players:[]player):int =
 
 Verse's `for` expression is particularly powerful when combined with failure contexts, as it can naturally filter elements:
 
+<!--verse
+player:=struct{ Name:string }
+GetScore(P:player):int=0
+-->
 ```verse
 GetHighScorers(Players:[]player):[]player =
     for (Player : Players, Score := GetScore(Player), Score > 1000):
@@ -142,6 +179,13 @@ GetHighScorers(Players:[]player):[]player =
 
 The `defer` expression ensures that code runs just before exiting the current scope, regardless of how the scope is exited. This makes it perfect for cleanup operations:
 
+<!--verse
+OpenFile(P:string):?int=0
+CloseFile(P:int):void={}
+ReadFile(P:int):?string=0
+ProcessContents(P:string)<decides>:void={}
+SaveResults()<decides>:void={}
+-->
 ```verse
 ProcessFile(FileName:string)<decides>:void =
     File := OpenFile(FileName)?
@@ -172,6 +216,7 @@ The profile expression wraps around the code you want to measure, logging the ex
 
 Profile expressions pass through their results transparently, meaning you can wrap them around any expression without changing the program's behavior:
 
+<!--NoCompile-->
 ```verse
 PlayerDamage := profile("Damage Calculation"):
     BaseDamage * GetMultiplier() * GetCriticalBonus()
@@ -181,6 +226,10 @@ PlayerDamage := profile("Damage Calculation"):
 
 The interplay between control flow, code blocks, and scoping creates opportunities for sophisticated programming patterns. One powerful pattern is using blocks to create temporary computation contexts:
 
+<!--verse
+item := struct{}
+ProcessItems(I:item)<decides>:string=""
+-->
 ```verse
 ProcessBatch(Items:[]item)<decides>:[]result =
     block:
@@ -202,6 +251,7 @@ This pattern encapsulates complex logic with multiple mutable variables while pr
 
 Another sophisticated technique involves combining control flow with failure to create elegant error handling:
 
+<!--NoCompile-->
 ```verse
 TryMultipleStrategies(Data:input_data)<decides>:output =
     # Try strategies in order of preference

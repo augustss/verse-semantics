@@ -10,6 +10,9 @@ The `int` type represents integer, non-fractional values. An `int` can contain a
 
 You can include `int` values within your code as literals.
 
+<!--verse
+F():void={
+-->
 ```verse
 A :int= -42                                 # civilian size
 B := 42424242424242424242424242424242424242424242424242 # scary 
@@ -22,57 +25,77 @@ var Coins :int= 225                        # The player currently has 225 coins
 var Arrows :int= 3                         # The player currently has 3 arrows
 var TotalPurchases :int= 0                 # Track total purchases
 ```
+<!--verse
+}
+-->
 
 You can use the four basic math operations with integers: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
 
+<!--verse
+F(MyInt:int,MyHugeInt:int):void={
+-->
 ```verse
 var C :int= (-MyInt + MyHugeInt - 2) * 3   # arithmetic
 set C += 1                                 # like saying, set C = C + 1
 set C *= 2                                 # like saying, set C = C * 2
 ```
+<!--verse
+}
+-->
 
 For integers, the operator `/` is failable, and the result is a `rational` type if it succeeds.
-
-The following code uses integer division to determine how many arrows the player can buy with their coins:
-
-```verse
-if (NumberOfQuiversYouCanBuy := Floor(Coins / CoinsPerQuiver)):
-    NumberOfArrowsYouCanBuy :int= NumberOfQuiversYouCanBuy * ArrowsPerQuiver
-```
 
 ## Rationals
 
 `rational` represents the result of **integer division**. Unlike `int` or `float`, you cannot write a `rational` literal directly. Instead, rationals arise only as intermediate results when dividing integers with the `/` operator.  
 Because rational numbers are not meant to be used as general-purpose values, their role is intentionally limited. They serve as an intermediate type that can be rounded to an integer when needed.  
 
+<!--verse
+F():void={
+-->
 ```verse
 X := 7 / 3    # type of X is rational
 ```
+<!--verse
+}
+-->
 
 Here, `X` is not an `int` and not a `float`. It is a `rational`, representing the exact ratio `7 ÷ 3`.  
 
 Since rationals are mainly useful for rounding, two functions consume them:  
 
-- `Floor()` — rounds a rational down to the nearest integer.  
-- `Ceil()` — rounds a rational up to the nearest integer.  
+- `Floor[]` — rounds a rational down to the nearest integer.  
+- `Ceil[]` — rounds a rational up to the nearest integer.  
 
+<!--verse
+F():void={
+-->
 ```verse
-Quotient1 :int = Floor(7 / 3)   # Quotient1 = 2
-Quotient2 :int = Ceil(7 / 3)    # Quotient2 = 3
+Quotient1 :int = Floor[7 / 3]   # Quotient1 = 2
+Quotient2 :int = Ceil[7 / 3]    # Quotient2 = 3
 ```
+<!--verse
+}
+-->
 
 These functions are the only way to convert a `rational` to an `int` directly.  
 
 Rationals are often used in game logic to determine how many items a player can afford or carry when resources are limited.  
 
+<!--verse
+F():void={
+-->
 ```verse
 Coins :int = 225
 CoinsPerQuiver :int = 100
 ArrowsPerQuiver :int = 15
 
-if (NumberOfQuivers := Floor(Coins / CoinsPerQuiver)):
+if (NumberOfQuivers := Floor[Coins / CoinsPerQuiver]):
     TotalArrows :int = NumberOfQuivers * ArrowsPerQuiver
 ```
+<!--verse
+}
+-->
 
 Here, the rational `Coins / CoinsPerQuiver` represents the exact division of coins into quivers. Applying `Floor` converts it into the number of whole quivers the player can actually buy.  
 
@@ -93,6 +116,9 @@ The implementation for float differs from the IEEE standard in the following way
 
 You can include predefined float values within your code as float literals. A float literal is a floating point number in your code:
 
+<!--verse
+F()<transacts><decides>:void={
+-->
 ```verse
 A:float = 1.0
 B := 2.14
@@ -104,17 +130,26 @@ set C -= 3.14
 C = 0.0               # succeeds
 C = 0                 # compile error; 0 is not a `float` literal
 ```
+<!--verse
+}
+-->
 
 You can use the four basic math operations with floats: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
 
 There are also combined operators for doing the basic math operations (addition, subtraction, multiplication, and division), and updating the value of a variable. These combined operators are the same as assigning the result to the first operand of the math operation.
 
+<!--verse
+F()<transacts>:void={
+-->
 ```verse
 var CurrentHealth : float = 100.0
 set CurrentHealth /= 2.0    # Halves the value of CurrentHealth
 set CurrentHealth += 10.0   # Adds 10 to CurrentHealth
 set CurrentHealth *= 1.5    # Multiplies CurrentHealth by 1.5
 ```
+<!--verse
+}
+-->
 
 To convert an `int` to a `float`, multiply it by `1.0`: `MyFloat := MyInt * 1.0`.
 
@@ -122,6 +157,9 @@ To convert an `int` to a `float`, multiply it by `1.0`: `MyFloat := MyInt * 1.0`
 
 The `logic` type represents the Boolean values `true` and `false`.
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 A:logic = true
 B := false
@@ -133,6 +171,9 @@ B?                # fails
 true?             # succeeds
 false?            # fails
 ```
+<!--verse
+}
+-->
 
 The `logic` type only supports query operations and comparison operations.
 
@@ -142,20 +183,34 @@ For comparison operations, use the failable operator `=` to test if two logic va
 
 Many programming languages find it idiomatic to use a type like `logic` to signal the success or failure of an operation. In Verse, it's considered idiomatic to prefer using the `<decides>` effect instead of `logic` for that purpose, whenever possible. The conditional only executes the `then` branch if the guard succeeds:
 
+<!--verse
+ShowTargetLockedIcon():void={}
+F(TargetLocked:?int):void={
+-->
 ```verse
  if (TargetLocked?):
     ShowTargetLockedIcon()
 ```
+<!--verse
+}
+-->
 
 To convert an expression that has the `<decides>` effect to `true` on success or `false` on failure, use
 `logic{ exp }`:
 
+<!--verse
+GetRandom(:int,:float):float=0.0
+F(Frequency:float):void={
+-->
 ```verse
 GotIt := logic{GetRandomInt(0, Frequency) <> 0}   # if success
 GotIt?                                            # then this succeeds
 GotIt = false                                     # and this fails
 not GotIt?                                        # and this fails too
 ```
+<!--verse
+}
+-->
 
 ## Characters and Strings
 
@@ -163,10 +218,16 @@ Text is represented in terms of characters and strings.
 
 A `char` is a single **UTF-8 code unit** (not a full Unicode code point). A string is therefore an array of characters, written as `[]char`. For convenience, the type alias `string` is provided for `[]char`:  
 
+<!--verse
+F():void={
+-->
 ```verse
 MyName :string = "Joseph"
 MyAlterEgo := "José"
 ```
+<!--verse
+}
+-->
 
 UTF-8 is used as the character encoding scheme. Each UTF-8 code unit is one byte. A Unicode code point may require between one and four code units. Code points with lower values use fewer bytes, while higher values require more.  
 
@@ -180,37 +241,67 @@ Thus, strings are sequences of code units, not necessarily sequences of Unicode 
 
 Because strings are arrays of `char`, you can index into them with `[]`. Indexing has the `<decides>` effect: it succeeds when the index is valid and fails otherwise.  
 
+<!--verse
+F(MyName:string):void={
+-->
 ```verse
 TheLetterJ := MyName[0]     # succeeds
 TheLetterJ = 'J'            # succeeds
 MyName[100]                 # fails
 ```
+<!--verse
+}
+-->
 
 The length of a string is the number of UTF-8 code units it contains, accessed via `.Length`. Note that this is **not the same as the number of Unicode characters**:  
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 "José".Length = 5           # succeeds; 5 UTF-8 code units
 "Jose".Length = 4           # succeeds; 4 UTF-8 code units
 ```
+<!--verse
+}
+-->
 
 Because `string` is just `[]char`, strings declared as `var` can be mutated:  
 
+<!--verse
+F():void={
+-->
 ```verse
 var OuterSpaceFriend :string = "Glorblex"
 set OuterSpaceFriend[0] = 'F'
 ```
+<!--verse
+}
+-->
 
 Strings can be concatenated using the `+` operator:  
 
+<!--verse
+F():void={
+-->
 ```verse
 MyAttemptAtFormatting := "My name is " + MyName + " but my alter ego is " + MyAlterEgo + "."
 ```
+<!--verse
+}
+-->
 
 Verse also supports string interpolation for more readable formatting:  
 
+<!--verse
+F():void={
+-->
 ```verse
 Formatting := "My name is {MyName} but my alter ego is {MyAlterEgo}."
 ```
+<!--verse
+}
+-->
 
 Interpolation works for any value that has a `ToString()` function in scope.  
 
@@ -219,19 +310,31 @@ Literal characters in Verse are written with single quotes. The type depends on 
 - `'e'` has type `char`,  
 - `'é'` has type `char32`.  
 
+<!--verse
+F():void={
+-->
 ```verse
 A :char = 'e'                       # ok
 B :char32 = 'é'                     # ok
 C :char = 'é'                       # error: type of 'é' is char32
 D :char32 = 'e'                     # error: type of 'e' is char
 ```
+<!--verse
+}
+-->
 
 Character literals can also be written using numeric escape sequences:  
 
+<!--verse
+F():void={
+-->
 ```verse
 E :char = 0o145                     # ok; same as 'e'
 F :char32 = 0u00E9                  # ok; same as 'é'
 ```
+<!--verse
+}
+-->
 
 - `char` represents a single UTF-8 code unit (one byte, `0oXX`).  
 - `char32` represents a full Unicode code point (`0uXXXX`).  
@@ -240,22 +343,26 @@ Unlike some languages, Verse does not allow implicit conversion between characte
 
 Strings can be compared using the failable operators `=` (equality) and `<>` (inequality). Comparison is done by code point, and is case sensitive.  
 
-```verse
-WinningPlayerName :string = "Player One"
-Announcement :string = "...And the winner is: " + WinningPlayerName + "!"
-```
+Interpolation is  shorter thatn string concatenation:
 
-Interpolation provides a shorter equivalent:  
-
+<!--verse
+F():void={
+-->
 ```verse
 WinningPlayerName :string = "Player One"
 Announcement :string = "...And the winner is: {WinningPlayerName}!"
 ```
+<!--verse
+}
+-->
 
 Equality depends on exact code unit sequences, not visual appearance. Unicode allows multiple encodings for the same abstract character. For example, `"é"` may appear as the single code point `{0u00E9}`, or as the two-code-point sequence `"e"` (`{0u0065}`) plus a combining accent (`{0u0301}`). These two strings look the same, but they are not equal in Verse.  
 
 Checking whether a player has selected the correct item:  
 
+<!--verse
+F()<transacts>:void={
+-->
 ```verse
 ExpectedItemInternalName :string = "RedPotion"
 SelectedItemInternalName :string = "BluePotion"
@@ -264,9 +371,15 @@ if (SelectedItemInternalName = ExpectedItemInternalName):
     return true 
 return false
 ```
+<!--verse
+}
+-->
 
 Padding a timer with leading zeros:  
 
+<!--verse
+F()<transacts>:void={
+-->
 ```verse
 SecondsLeft :int = 30
 SecondsString :string = SecondsLeft   # convert int to string
@@ -279,6 +392,9 @@ else if (SecondsString.Length < 2):
 else:
     set Combined += SecondsString
 ```
+<!--verse
+}
+-->
 
 Certain characters have special meaning inside strings and must be escaped:  
 
@@ -291,25 +407,44 @@ An optional is an immutable container that either holds one value of type `t` or
 
 You can create a non-empty optional with `option{...}`, which wraps a value into an optional. For example:
 
+<!--verse
+F():void={
+-->
 ```verse
 A:?int = option{42}    # an optional containing the integer 42
 ```
+<!--verse
+}
+-->
 
 If you want to represent “no value,” you use the special constant `false`. This is how Verse spells the empty optional:
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 var B:?int = false     # this optional has no element
 B = false              # still empty
 ```
+<!--verse
+}
+-->
 
 To extract the element of an optional, you write `?` after the optional expression. This produces a `<decides>` expression that succeeds if the optional has an element and fails otherwise. For example:
 
+<!--verse
+F(A:?int)<decides>:void={
+-->
 ```verse
 S := A? + 2            # succeeds with 44 because A contains 42
 ```
+<!--verse
+}
+-->
 
 If `A` had been `false`, then the attempt to use `A?` would fail and so would the whole computation. A failing case makes this clearer:
 
+<!--NoCompile-->
 ```verse
 T := B? + 1            # fails, because B is false and has no element
 ```
@@ -318,6 +453,7 @@ This shows how Verse integrates optionals tightly with the effect system: the pr
 
 The `option{...}` form also works in the opposite direction. When you have a computation with the `<decides>` effect, wrapping it in `option{...}` converts it to an optional. On success you get a non-empty optional; on failure you get `false`:
 
+<!--NoCompile-->
 ```verse
 MaybeAFloat := option{GetAFloatOrFail[]}
 ```
@@ -326,16 +462,34 @@ This symmetry is important. The `?` operator unwraps an optional into a `<decide
 
 Although an optional value itself is immutable, you can keep one in a variable and change which optional the variable points to. The keyword `set` is used for this:
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 var C:?int = false
 set C = option{2}      # C now refers to an optional containing 2
 C? = 2                 # succeeds, since C is not empty
 ```
+<!--verse
+}
+-->
 
 This ability is useful whenever you want to track success or failure over time, such as gradually computing a result and updating the variable only when you succeed.
 
 A common use case is searching for something that may or may not be there. Imagine a function `Find` that looks through an array of integers and returns the index of the element you want. If the element exists, the function returns `option{index}`; if not, it returns `false`. The caller can then safely decide what to do:
 
+<!--verse
+Find[N:[]int, X:int]:?int =
+    for {I := 0..N.Length} do
+        if N[I] = X then return option{I}
+    return false
+
+F()<decides>:void=
+    var Numbers:[]int = array{10, 20, 30}
+    Idx:?int = Find[Numbers, 20]    # succeeds with option{1}
+    Y := Idx?                       # succeeds with 1
+<#
+-->
 ```verse
 var Numbers:[]int = array{10, 20, 30}
 
@@ -347,6 +501,9 @@ Find[N:[]int, X:int]:?int =
 Idx:?int = Find[Numbers, 20]    # succeeds with option{1}
 Y := Idx?                       # succeeds with 1
 ```
+<!--verse
+#>
+-->
 
 Here the optional signals the possibility of failure directly in the type. The `?` operator makes it easy to use the result in an expression, while `option{...}` allows you to turn conditional computations back into optionals. The effect is that the idea of “maybe a value, maybe not” becomes a first-class part of the language, rather than an afterthought, and programmers are encouraged to handle the absence of values in a disciplined way.
 
@@ -381,10 +538,10 @@ The elements of a tuple are accessed using a zero-based index operator written w
 Another feature of tuples is *expansion* (or *splatting*). When a tuple is passed to a function as a single argument, its elements are automatically expanded as if the function had been called with each element separately. For example:
 
 ```verse
-F(Arg1 : int, Arg2 : string) : void =
+F(Arg1:int, Arg2:string):void =
     Print("{Arg1}, {Arg2}")
 
-G() : void =
+G():void =
     MyTuple := (1, "two")
     F(MyTuple)   # expands to F(1, "two")
 ```
@@ -401,12 +558,18 @@ Although arrays themselves are immutable, variables declared with `var` can be r
 
 Arrays are useful whenever you want to store multiple values of the same type, such as a list of players in a game: `Players : []player = array{Player1, Player2}`. Access is by index, for example `Players[0]` is the first player. Since indexing is failable, it is often combined with `if` expressions or iteration. For instance, the following code safely prints out every element of an array:  
 
+<!--verse
+F():void={
+-->
 ```verse
 ExampleArray : []int = array{10, 20, 30, 40, 50}
 for (Index := 0..ExampleArray.Length - 1):
     if (Element := ExampleArray[Index]):
         Print("{Element} in ExampleArray at index {Index}")
 ```
+<!--verse
+}
+-->
 
 which produces  
 
@@ -420,17 +583,26 @@ which produces
 
 Because arrays are values, “changing” them always means replacing the old array with a new one. With `var` this feels natural, since variables can be reassigned. For example, you can concatenate arrays and then update an element:  
 
+<!--verse
+F():void={
+-->
 ```verse
 Array1 : []int = array{10, 11, 12}
 var Array2 : []int = array{20, 21, 22}
 set Array2 = Array1 + Array2 + array{30, 31}
 if (set Array2[1] = 77) {}
 ```
+<!--verse
+}
+-->
 
 After this code runs, iterating through `Array2` prints `10, 77, 12, 20, 21, 22, 30, 31`.
 
 Arrays can also be nested to form multi-dimensional structures, similar to rows and columns of a table. For example, the following creates a two-dimensional 4×3 array of integers:
 
+<!--verse
+F():void={
+-->
 ```verse
 var Counter : int = 0
 Example : [][]int =
@@ -438,6 +610,9 @@ Example : [][]int =
         for (Column := 0..2):
             set Counter += 1
 ```
+<!--verse
+}
+-->
 
 This array can be visualized as  
 
@@ -450,12 +625,18 @@ Row 3: 10 11 12
 
 and is accessed with two indices: `Example[0][0]` is `1`, `Example[0][1]` is `2`, and `Example[1][0]` is `4`. You can loop through all rows and columns with nested iteration. Arrays in Verse are not restricted to rectangular shapes: each row can have a different length, producing a jagged structure. For example,  
 
+<!--verse
+F():void={
+-->
 ```verse
 Example : [][]int =
     for (Row := 0..3):
         for (Column := 0..Row):
             Row * Column
 ```
+<!--verse
+}
+-->
 
 produces a triangular array with rows of increasing length: row 0 has none, row 1 has a single `0`, row 2 has `0, 2, 4`, and row 3 has `0, 3, 6, 9`.
 
@@ -469,6 +650,9 @@ A map is an immutable associative container that stores zero or more key–value
 
 Maps are useful whenever you want to store data that is naturally indexed by something other than an integer position. For example, you might want to store the weights of different objects keyed by their names:  
 
+<!--verse
+F():void={
+-->
 ```verse
 Empty := map{}
 
@@ -478,16 +662,28 @@ var Weights:[string]float = map{
     "galaxy" => 500000000000.0
 }
 ```
+<!--verse
+}
+-->
 
 Looking up a value in a map uses square brackets. The expression succeeds if the key is present and fails if it is not. Lookups are designed to be fast, with amortized *O(1)* time complexity:  
 
+<!--verse
+F(Weights:[string]float)<decides>:void={
+-->
 ```verse
 0.00001 < Weights["ant"]    # succeeds, since "ant" is a key
 Weights["car"]              # fails, since "car" is not a key
 ```
+<!--verse
+}
+-->
 
 If you want to update a map stored in a variable, you use `set`. This works both for adding a new key–value pair and for changing the value of an existing key. If you try to modify a key that is not present, the operation fails:  
 
+<!--verse
+F()<transacts>:void={
+-->
 ```verse
 var Friendliness:[string]int = map{"peach" => 1000}
 
@@ -495,15 +691,27 @@ set Friendliness["pelican"] = 17     # add a new key
 set Friendliness["peach"] += 2000    # update an existing key
 set Friendliness["tomato"] += 1000   # fails; "tomato" is not in the map
 ```
+<!--verse
+}
+-->
 
 Every map also carries its size, accessible as the `Length` field:  
 
+<!--verse
+F(Friendliness:[string]int)<decides>:void={
+-->
 ```verse
 Friendliness.Length = 2              # the map has 2 entries
 ```
+<!--verse
+}
+-->
 
 When constructing a map with duplicate keys, only the last value is kept. This is because a map enforces uniqueness of keys, so earlier entries are silently overwritten:  
 
+<!--verse
+F():void={
+-->
 ```verse
 WordCount:[string]int = map{
     "apple" => 0,
@@ -512,9 +720,15 @@ WordCount:[string]int = map{
 }
 # WordCount contains only {"apple" => 2}
 ```
+<!--verse
+}
+-->
 
 Maps can also be iterated over, letting you traverse all key–value pairs in the order they were inserted:  
 
+<!--verse
+F():void={
+-->
 ```verse
 ExampleMap:[string]string = map{
     "a" => "apple",
@@ -525,6 +739,9 @@ ExampleMap:[string]string = map{
 for (Key -> Value : ExampleMap):
     Print("{Value} in ExampleMap at key {Key}")
 ```
+<!--verse
+}
+-->
 
 This produces:  
 
@@ -550,6 +767,9 @@ There is also a type `weak_map`, which is a supertype of `map`. It behaves simil
 
 A `weak_map` is declared with `weak_map(k,v)` and can be initialized from an ordinary `map{}`. Updating and accessing values works the same way:  
 
+<!--verse
+F():void={
+-->
 ```verse
 var MyWeakMap:weak_map(int,int) = map{}
 
@@ -558,6 +778,9 @@ Value := MyWeakMap[0]         # succeeds with 1
 
 set MyWeakMap = map{0 => 2}   # reassignment still works
 ```
+<!--verse
+}
+-->
 
 Because `weak_map` is a supertype of `map`, you can switch between the two when needed, but you lose the ability to count or iterate once you are working with a weak map.
 
@@ -608,6 +831,9 @@ Because `void` has no values, you can never construct or assign a value of type 
 
 A function whose purpose is to perform an effect, rather than compute a value, has return type `void`.  
 
+<!--verse
+Print(string):void={}
+-->
 ```verse
 LogMessage(Msg:string) : void =
     Print(Msg)

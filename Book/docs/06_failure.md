@@ -6,6 +6,7 @@ This distinction might seem subtle, but it fundamentally changes how programs ar
 
 Consider the simple act of accessing an array element. In traditional languages, you might write:
 
+<!--NoCompile-->
 ```verse
 # Traditional approach (not Verse)
 # if (index < array.length) {
@@ -16,6 +17,7 @@ Consider the simple act of accessing an array element. In traditional languages,
 
 This approach checks validity separately from access, creating opportunities for bugs if the check and access become separated or if the array changes between them. In Verse, validation and access are unified:
 
+<!--NoCompile-->
 ```verse
 if (Value := MyArray[Index]):
     Process(Value)
@@ -29,6 +31,7 @@ A failable expression is one that can either succeed and produce a value, or fai
 
 Many operations are naturally failable. Array indexing fails when the index is out of bounds. Map lookups fail when the key doesn't exist. Comparisons fail when the values aren't equal. Division fails when dividing by zero. Even simple literals can be made to fail:
 
+<!--NoCompile-->
 ```verse
 42      # Always succeeds with value 42
 false?  # Always fails - the query of false
@@ -54,6 +57,7 @@ Not every part of a program can execute failable expressions. They can only appe
 
 The most common failure context is the condition of an `if` expression:
 
+<!--NoCompile-->
 ```verse
 if (Player := GetPlayerByName[Name], Score := GetPlayerScore[Player], Score > 100):
     Print("High scorer: {Name} with {Score} points!")
@@ -63,6 +67,7 @@ This `if` condition contains three potentially failable expressions. All must su
 
 The `for` expression creates a failure context for each iteration:
 
+<!--NoCompile-->
 ```verse
 for (Item : Inventory, IsWeapon[Item], Damage := GetDamage[Item], Damage > 50):
     Print("Powerful weapon: {Item} with {Damage} damage")
@@ -72,6 +77,11 @@ Each iteration attempts the failable expressions. If they all succeed, the body 
 
 Functions marked with `<decides>` create a failure context for their entire body:
 
+<!--verse
+item:=struct{}
+IsWeapon(i:item)<decides>:void={}
+Damage(i:item)<decides>:int=0
+-->
 ```verse
 FindBestWeapon(Inventory:[]item)<decides>:item =
     var BestWeapon:?item = false
@@ -102,12 +112,13 @@ If the player doesn't have enough gold, the subtraction is rolled back automatic
 
 The `<transacts>` effect is required for any function that might be called in a failure context and modifies state. This makes the transactional behavior explicit in the function signature:
 
+<!--NoCompile-->
 ```verse
 ComplexTransaction(var State:game_state)<transacts><decides>:void =
     ModifyHealth(State.Player)         # All these operations
     UpdateInventory(State.Inventory)   # are provisional
     ChargeResources(State.Resources)   # until all succeed
-    ValidateFinalState(State)         # If this fails, everything rolls back
+    ValidateFinalState[State]         # If this fails, everything rolls back
 ```
 
 This approach makes complex state updates safe and predictable. Either everything succeeds and all changes are committed, or something fails and nothing changes.
@@ -118,6 +129,7 @@ Verse provides logical operators that work with failure, creating a rich algebra
 
 The `not` operator inverts success and failure:
 
+<!--NoCompile-->
 ```verse
 if (not (Enemy := GetNearestEnemy[])):
     Print("Coast is clear!")  # Executes when GetNearestEnemy fails
@@ -125,6 +137,7 @@ if (not (Enemy := GetNearestEnemy[])):
 
 The `or` operator provides alternatives:
 
+<!--NoCompile-->
 ```verse
 Weapon := PrimaryWeapon[] or SecondaryWeapon[] or DefaultWeapon
 ```
@@ -133,6 +146,7 @@ This tries each option in order, stopping at the first success. It's not evaluat
 
 You can combine these operators to create sophisticated control flow:
 
+<!--NoCompile-->
 ```verse
 ValidatePlayer(Player:player)<decides>:void =
     IsAlive[Player]
@@ -146,6 +160,9 @@ This function succeeds only if the player is alive, not stunned, and has either 
 
 The option type and failure are intimately connected. An option either contains a value or is empty (represented by `false`). The query operator `?` converts between options and failure:
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 MaybeValue:?int = option{42}
 Value := MaybeValue?  # Succeeds with 42
@@ -153,14 +170,24 @@ Value := MaybeValue?  # Succeeds with 42
 Empty:?int = false
 Other := Empty?  # Fails
 ```
+<!--verse
+}
+-->
 
 The `option{}` constructor works in reverse, converting failure to an empty option:
 
+<!--verse
+RiskyComputation()<decides>:int=1
+F():void={
+-->
 ```verse
 Result := option{RiskyComputation[]}
 # Result is option{value} if computation succeeds
 # Result is false if computation fails
 ```
+<!--verse
+}
+-->
 
 This bidirectional conversion makes options and failure interchangeable, allowing you to choose the most appropriate representation for your specific use case.
 
@@ -170,6 +197,7 @@ As you work with failure, certain patterns emerge that solve common problems ele
 
 The validation chain pattern uses sequential failures to ensure all conditions are met:
 
+<!--NoCompile-->
 ```verse
 ProcessAction(Action:action)<decides>:void =
     Player := GetActingPlayer[Action]
@@ -184,6 +212,7 @@ Each line must succeed for execution to continue. This creates self-documenting 
 
 The first-success pattern tries alternatives until one works:
 
+<!--NoCompile-->
 ```verse
 FindPath(Start:location, End:location)<decides>:path =
     DirectPath[Start, End] or
@@ -195,6 +224,7 @@ This naturally expresses trying simple solutions before complex ones.
 
 The filtering pattern uses failure to select items:
 
+<!--NoCompile-->
 ```verse
 GetEliteEnemies(Enemies:[]enemy):[]enemy =
     for (Enemy : Enemies, Level := GetLevel[Enemy], Level >= 10):
@@ -205,6 +235,7 @@ Only enemies that have a level and whose level is at least 10 are included in th
 
 The transaction pattern groups related changes:
 
+<!--NoCompile-->
 ```verse
 TradeItems(var PlayerA:player, var PlayerB:player, ItemA:item, ItemB:item)<transacts><decides>:void =
     RemoveItem(PlayerA, ItemA)
@@ -232,12 +263,13 @@ Verse tames this power by making failure contexts explicit and limiting backtrac
 
 Consider a simple logic puzzle solver:
 
+<!--NoCompile-->
 ```verse
 SolvePuzzle(Constraints:[]constraint)<decides>:solution =
     var State:solution = InitialState()
     for (Constraint : Constraints):
         ApplyConstraint(State, Constraint)
-    ValidateSolution(State)
+    ValidateSolution[State]
     State
 ```
 
