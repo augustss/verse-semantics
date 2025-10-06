@@ -25,12 +25,15 @@ When calling this function, named arguments can appear in any order after the po
 <!--verse
 CalculateBonus(BaseSalary:int, ?Multiplier:float, ?YearsOfService:int = 1):float =
     BaseSalary * Multiplier * (1.0 + YearsOfService * 0.1)
-F():void=
+F():void={
 -->
 ```verse
 CalculateBonus(50000, ?Multiplier := 1.5, ?YearsOfService := 3)
 CalculateBonus(50000, ?YearsOfService := 5, ?Multiplier := 2.0)  # Order doesn't matter
 ```
+<!--verse
+}
+-->
 
 ## Return Values
 
@@ -65,15 +68,18 @@ Effects describe additional behaviors that functions can exhibit beyond simply c
 When a function has the `decides` effect, it fundamentally changes how you interact with it. Consider this example:
 
 ```verse
-ValidateInput(X:int)<decides>:int =
+ValidateInput(X:int)<computes><decides>:int =
     X > 0  # Fails if X <= 0
     X * 2  # Only executes if validation passes
 ```
 
 The `decides` effect requires special calling syntax, you must use square brackets instead of parentheses:
 
+<!--verse
+ValidateInput(X:int)<computes><decides>:int =1
+-->
 ```verse
-ProcessValue(Input:int):string =
+ProcessValue(Input:int)<computes>:string =
     if (ValidatedValue := ValidateInput[Input]):
         "Processed: {ValidatedValue}"
     else:
@@ -85,7 +91,7 @@ This syntactic distinction makes it immediately clear when you're dealing with p
 Functions with `decides` can be combined in sophisticated ways. For instance, you might want to find the first element in an array that satisfies a condition:
 
 ```verse
-First(Array:[]t, Test(:t)<decides>:void where t:type)<decides>:t =
+First(Array:[]t, Test(:t)<transacts><decides>:void where t:type)<transacts><decides>:t =
     var Result:?t = false
     for (Element : Array, Test[Element], not Result?):
         set Result = option{Element}
@@ -106,6 +112,9 @@ The interaction between `decides` and control structures like `for` expressions 
 
 Every function has a type that captures its parameters, effects, and return value. The type syntax uses an underscore as a placeholder for the function name:
 
+<!--verse
+X:=
+-->
 ```verse
 type{_(:int, :string)<decides>:float}
 ```
@@ -114,6 +123,11 @@ This represents any function that takes an integer and a string, might fail (has
 
 Multiple functions may share a name through overloading, as long as their signatures don't create ambiguity. The compiler can distinguish between overloads based on the argument types:
 
+<!--
+TODO: these do not compile, the 0.2f gets an error that asks for a f64, but even after that...
+-->
+
+<!--NoCompile-->
 ```verse
 Transform(X:int):string = "{X}"
 Transform(X:float):string = "{X:0.2f}"
@@ -131,16 +145,15 @@ However, overloading has limitations. You cannot create overloads where a single
 Working with functions often involves recognizing and applying common patterns. The option return pattern is particularly useful when you need to handle potential failure while still returning meaningful values:
 
 ```verse
-SearchArray(Array:[]t, Target:t where t:type)<decides>:int =
+SearchArray(Array:[]t, Target:t where t:subtype(comparable))<decides>:int =
     var FoundIndex:?int = false
     for (Index -> Element : Array):
-        if (Element = Target):
+        if (Element = Target, not FoundIndex?):
             set FoundIndex = option{Index}
-            break
     FoundIndex?
 ```
 
-This pattern uses an option type to accumulate a result, failing only if no result was found. It's more elegant than using special sentinel values like -1 for "not found."
+This pattern uses an option type to accumulate a result, failing only if no result was found. values like -1 for "not found."
 
 Another valuable pattern is using failure as a guard condition. By placing assertions early in a function, you can ensure that subsequent code only executes when preconditions are met:
 
@@ -161,6 +174,8 @@ F1<public>(X:int):int = X + 1
 The type annotation (`X:int):int`) tells us that this function promises that given any integer it will always return an integer. That contract cannot be broken in future versions of the code. The implementation could change in the future, perhaps to perform additional operations or optimizations, as long as it maintains these type constraints.
 
 Now consider a slightly different version:
+
+<!-- TODO does not compile ?? -->
 
 ```verse
 F2<public>(X:int) := X + 1

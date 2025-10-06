@@ -51,7 +51,7 @@ For integers, the operator `/` is failable, and the result is a `rational` type 
 Because rational numbers are not meant to be used as general-purpose values, their role is intentionally limited. They serve as an intermediate type that can be rounded to an integer when needed.  
 
 <!--verse
-F():void={
+F()<decides>:void={
 -->
 ```verse
 X := 7 / 3    # type of X is rational
@@ -68,11 +68,11 @@ Since rationals are mainly useful for rounding, two functions consume them:
 - `Ceil[]` — rounds a rational up to the nearest integer.  
 
 <!--verse
-F():void={
+F()<decides>:void={
 -->
 ```verse
-Quotient1 :int = Floor[7 / 3]   # Quotient1 = 2
-Quotient2 :int = Ceil[7 / 3]    # Quotient2 = 3
+Quotient1 :int = Floor(7 / 3)   # Quotient1 = 2
+Quotient2 :int = Ceil(7 / 3)    # Quotient2 = 3
 ```
 <!--verse
 }
@@ -83,14 +83,14 @@ These functions are the only way to convert a `rational` to an `int` directly.
 Rationals are often used in game logic to determine how many items a player can afford or carry when resources are limited.  
 
 <!--verse
-F():void={
+F()<decides>:void={
 -->
 ```verse
 Coins :int = 225
 CoinsPerQuiver :int = 100
 ArrowsPerQuiver :int = 15
 
-if (NumberOfQuivers := Floor[Coins / CoinsPerQuiver]):
+if (NumberOfQuivers := Floor(Coins / CoinsPerQuiver)):
     TotalArrows :int = NumberOfQuivers * ArrowsPerQuiver
 ```
 <!--verse
@@ -199,8 +199,8 @@ To convert an expression that has the `<decides>` effect to `true` on success or
 `logic{ exp }`:
 
 <!--verse
-GetRandom(:int,:float):float=0.0
-F(Frequency:float):void={
+using{ /Verse.org/Random }
+F(Frequency:int)<decides>:void={
 -->
 ```verse
 GotIt := logic{GetRandomInt(0, Frequency) <> 0}   # if success
@@ -269,7 +269,7 @@ F()<decides>:void={
 Because `string` is just `[]char`, strings declared as `var` can be mutated:  
 
 <!--verse
-F():void={
+F()<decides>:void={
 -->
 ```verse
 var OuterSpaceFriend :string = "Glorblex"
@@ -282,7 +282,7 @@ set OuterSpaceFriend[0] = 'F'
 Strings can be concatenated using the `+` operator:  
 
 <!--verse
-F():void={
+F(MyName:string,MyAlterEgo:string):void={
 -->
 ```verse
 MyAttemptAtFormatting := "My name is " + MyName + " but my alter ego is " + MyAlterEgo + "."
@@ -294,7 +294,7 @@ MyAttemptAtFormatting := "My name is " + MyName + " but my alter ego is " + MyAl
 Verse also supports string interpolation for more readable formatting:  
 
 <!--verse
-F():void={
+F(MyName:string,MyAlterEgo:string):void={
 -->
 ```verse
 Formatting := "My name is {MyName} but my alter ego is {MyAlterEgo}."
@@ -316,8 +316,8 @@ F():void={
 ```verse
 A :char = 'e'                       # ok
 B :char32 = 'é'                     # ok
-C :char = 'é'                       # error: type of 'é' is char32
-D :char32 = 'e'                     # error: type of 'e' is char
+# C :char = 'é'                       # error: type of 'é' is char32
+# D :char32 = 'e'                     # error: type of 'e' is char
 ```
 <!--verse
 }
@@ -361,7 +361,7 @@ Equality depends on exact code unit sequences, not visual appearance. Unicode al
 Checking whether a player has selected the correct item:  
 
 <!--verse
-F()<transacts>:void={
+F()<transacts>:logic={
 -->
 ```verse
 ExpectedItemInternalName :string = "RedPotion"
@@ -479,9 +479,9 @@ This ability is useful whenever you want to track success or failure over time, 
 A common use case is searching for something that may or may not be there. Imagine a function `Find` that looks through an array of integers and returns the index of the element you want. If the element exists, the function returns `option{index}`; if not, it returns `false`. The caller can then safely decide what to do:
 
 <!--verse
-Find[N:[]int, X:int]:?int =
+Find(N:[]int, X:int):?int =
     for {I := 0..N.Length} do
-        if N[I] = X then return option{I}
+        if (N[I] = X) then return option{I}
     return false
 
 F()<decides>:void=
@@ -515,18 +515,23 @@ The term *tuple* is a back formation from *quadruple*, *quintuple*, *sextuple*, 
 
 A tuple literal is written by enclosing a comma-separated list of expressions in parentheses. For example:
 
+<!--NoCompile-->
 ```verse
 (1, 2, 3)
 ```
 
 The order of elements matters, so `(3, 2, 1)` is a completely different value. Since tuples allow mixed types, you might write:
 
+<!--NoCompile-->
 ```verse
 (1, 2.0, "three")
 ```
 
 Tuples can also nest inside each other:
 
+<!--verse
+X:tuple(int,tuple(int,float,string),string)=
+-->
 ```verse
 (1, (10, 20.0, "thirty"), "three")
 ```
@@ -559,6 +564,7 @@ Although arrays themselves are immutable, variables declared with `var` can be r
 Arrays are useful whenever you want to store multiple values of the same type, such as a list of players in a game: `Players : []player = array{Player1, Player2}`. Access is by index, for example `Players[0]` is the first player. Since indexing is failable, it is often combined with `if` expressions or iteration. For instance, the following code safely prints out every element of an array:  
 
 <!--verse
+using { /Verse.org/VerseCLR }
 F():void={
 -->
 ```verse
@@ -682,7 +688,7 @@ Weights["car"]              # fails, since "car" is not a key
 If you want to update a map stored in a variable, you use `set`. This works both for adding a new key–value pair and for changing the value of an existing key. If you try to modify a key that is not present, the operation fails:  
 
 <!--verse
-F()<transacts>:void={
+F()<decides><transacts>:void={
 -->
 ```verse
 var Friendliness:[string]int = map{"peach" => 1000}
@@ -727,6 +733,7 @@ WordCount:[string]int = map{
 Maps can also be iterated over, letting you traverse all key–value pairs in the order they were inserted:  
 
 <!--verse
+using { /Verse.org/VerseCLR }
 F():void={
 -->
 ```verse
@@ -768,7 +775,7 @@ There is also a type `weak_map`, which is a supertype of `map`. It behaves simil
 A `weak_map` is declared with `weak_map(k,v)` and can be initialized from an ordinary `map{}`. Updating and accessing values works the same way:  
 
 <!--verse
-F():void={
+F()<decides>:void={
 -->
 ```verse
 var MyWeakMap:weak_map(int,int) = map{}
@@ -799,9 +806,9 @@ Letters := enum:
 letter := class:
     Value : char
     Main(Arg : int) : void =
-        X := if (Arg > 0)
+        X := if (Arg > 0) then:
             Letters.A
-        else
+        else:
             letter{Value := 'D'}
 ```
 
@@ -832,7 +839,7 @@ Because `void` has no values, you can never construct or assign a value of type 
 A function whose purpose is to perform an effect, rather than compute a value, has return type `void`.  
 
 <!--verse
-Print(string):void={}
+Print(:string):void={}
 -->
 ```verse
 LogMessage(Msg:string) : void =

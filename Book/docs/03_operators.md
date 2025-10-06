@@ -69,16 +69,19 @@ Arithmetic operators perform mathematical operations on numeric values. They wor
 | `/` | Division | `int` (failable), `float` | Integer division returns `rational` |
 | `%` | Modulo | `int`, `float` | Remainder after division |
 
+<!--verse
+R():void={
+-->
 ```verse
 # Basic arithmetic
-Sum := 10 + 20           # 30
-Difference := 50 - 15     # 35
-Product := 6 * 7          # 42
-Quotient := 20.0 / 4.0    # 5.0
+Sum := 10 + 20      # 30
+Diff := 50 - 15     # 35
+Prod := 6 * 7       # 42
+Quot := 20.0 / 4.0  # 5.0
 
 # Unary operators
-Negative := -42           # -42
-Positive := +42           # 42 (for alignment)
+Negative := -42     # -42
+Positive := +42     # 42 (for alignment)
 
 # Integer division (failable, returns rational)
 if (Result := 10 / 3):
@@ -88,6 +91,9 @@ if (Result := 10 / 3):
 IntValue:int = 42
 FloatValue:float = IntValue * 1.0  # Converts to 42.0
 ```
+<!--verse
+}
+-->
 
 ### Compound Assignment Operators
 
@@ -100,6 +106,9 @@ Compound assignment operators combine an arithmetic operation with assignment:
 | `set *=` | `set X = X * Y` | `int`, `float` |
 | `set /=` | `set X = X / Y` | `float` only |
 
+<!--verse
+F():void={
+-->
 ```verse
 var Score:int = 100
 set Score += 50    # Score is now 150
@@ -113,6 +122,9 @@ set Health /= 2.0  # Health is now 50.0
 # var IntValue:int = 10
 # set IntValue /= 2  # Compile error!
 ```
+<!--verse
+}
+-->
 
 ### Special Behaviors
 
@@ -120,6 +132,9 @@ set Health /= 2.0  # Health is now 50.0
 
 The `+` operator concatenates strings and arrays:
 
+<!--verse
+F():void={
+-->
 ```verse
 # String concatenation
 Greeting := "Hello, " + "World!"  # "Hello, World!"
@@ -131,6 +146,9 @@ Array1 := array{1, 2, 3}
 Array2 := array{4, 5, 6}
 Combined := Array1 + Array2  # array{1, 2, 3, 4, 5, 6}
 ```
+<!--verse
+}
+-->
 
 #### Integer Division and Rationals
 
@@ -140,6 +158,10 @@ Integer division with `/` is unique in Verse:
 - It returns a `rational` type, not an `int`
 - You must use `Floor()` or `Ceil()` to convert to `int`
 
+<!--verse
+using { /Verse.org/VerseCLR }
+F():void={
+-->
 ```verse
 # Integer division workflow
 if (Ratio := 7 / 2):
@@ -153,6 +175,9 @@ if (Result := 10 / 0):
 else:
     Print("Division by zero detected")
 ```
+<!--verse
+}
+-->
 
 ## Comparison Operators
 
@@ -229,6 +254,7 @@ Logical operators work with failable expressions and control the flow of success
 The query operator checks if a `logic` value is `true`:
 
 <!--verse
+StartGame():void={}
 F():void={
 -->
 ```verse
@@ -250,7 +276,8 @@ if (IsReady = true):
 The `not` operator negates the success or failure of an expression:
 
 <!--verse
-F():void={
+using { /Verse.org/VerseCLR }
+F(IsGameOver:?int):void={
 -->
 ```verse
 if (not IsGameOver?):
@@ -258,7 +285,7 @@ if (not IsGameOver?):
 
 # Effects are not committed with not
 var X:int = 0
-if (not (set X = 5)):
+if (not (set X = 5, IsGameOver?)):
     # X is still 0 here, even though the assignment "tried" to happen
     Print("X is {X}")  # Prints "X is 0"
 ```
@@ -328,6 +355,7 @@ AutoTyped := 42  # Inferred as int
 The `set =` operator updates variable values:
 
 <!--verse
+vector3:=struct{X:float, Y:float, Z:float}
 F():void={
 -->
 ```verse
@@ -346,6 +374,7 @@ set Position = vector3{X := 10.0, Y := 20.0, Z := 0.0}
 Assignment can be used in failure contexts, making it failable:
 
 <!--verse
+using {/Verse.org/VerseCLR}
 F():void={
 -->
 ```verse
@@ -371,7 +400,9 @@ Used for multiple purposes in Verse:
 3. **Computed member access** - Access object members dynamically
 
 <!--verse
-F():void={
+MyFunction1(X:int, Y:int)<decides>:void={}
+MyFunction2(?X:int=0, ?Y:int=0)<decides>:void={}
+F(Arg1:int,Arg2:int)<decides>:void={
 -->
 ```verse
 # Array indexing (failable)
@@ -389,9 +420,10 @@ Name:string = "Verse"
 if (FirstChar := Name[0]):
     Print("First character: {FirstChar}")  # Prints 'V'
 
-# Function call with brackets (Verse-style)
-Result := MyFunction[Arg1, Arg2]  # Alternative to MyFunction(Arg1, Arg2)
-EmptyCall := MyFunction[]  # Call with no arguments
+# Function call that can fail
+Result := MyFunction1[Arg1, Arg2]          # Can fail
+Result := MyFunction2[?X:=Arg1, ?Y:=Arg2]  # Named arguments
+EmptyCall := MyFunction2[]                 # and optional values
 ```
 <!--verse
 }
@@ -419,15 +451,13 @@ LongExpression := MyObject.
 Creates ranges for iteration:
 
 <!--verse
+using { /Verse.org/VerseCLR }
 F():void={
 -->
 ```verse
 # Inclusive range
 for (I := 0..4):
     Print("{I}")  # Prints 0, 1, 2, 3, 4
-
-# In array slicing context
-AllElements := 0..MyArray.Length-1
 ```
 <!--verse
 }
@@ -454,10 +484,10 @@ Player := player_data {
     Health := 100.0
 }
 
-# Trailing commas are allowed
+# Trailing commas are not allowed
 Config := game_config{
     MaxPlayers := 100,
-    EnablePvP := true,
+    EnablePvP := true # ,  -- not allowed
 }
 ```
 <!--verse
