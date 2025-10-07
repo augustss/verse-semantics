@@ -45,12 +45,16 @@ vadd :: Val -> Val -> Val
 vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
 vadd _ _ = undefined
 
+vneg :: Val -> Val
+vneg (VInt x) = VInt ((-x) `mod` maxVInt)
+
 --------------------
 
 ---- Primitive functions
 
 dO :: Op -> W
 dO Oint = vFcn $ mkFcn [ (x, x) | x <- allIntsL ]
+dO Oneg = vFcn $ mkFcn [ (x, vneg x) | x <- allIntsL ]
 dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allIntsL, y <- allIntsL, x > y ]
 -- add is a single function, not many as in the doc.
 dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allIntsL, y <- allIntsL]
@@ -225,7 +229,7 @@ extendEnv rho i w = Env $ M.insert i w $ unEnv rho
 -- Initial environment
 rho0 :: Env
 rho0 = fromListEnv $
-  [ (n, dO o) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
+  [ (n, dO o) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd), ("neg", Oneg) ] ] ++
   [ ("succ", mkVFcn msucc), ("pred", mkVFcn mpred) ] ++
   [ ("false", mkVFcn emptym) ]
 

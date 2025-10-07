@@ -42,7 +42,7 @@ data Exp
   | Exi Ident
   deriving (Eq, Ord, Data)
 
-data Op = Oint | Ogt | Oadd | Oany
+data Op = Oint | Ogt | Oadd | Oany | Oneg
   deriving (Eq, Ord, Show, Data, Enum, Bounded)
 
 data OC = Open | Closed

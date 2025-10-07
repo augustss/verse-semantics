@@ -7,19 +7,21 @@ module ValueP(
   Ident, fresh, freshList,
   Value(..), FUN,
   pattern Tuple,
-  PartialFun(..), applyPF, fun,
+  PartialFun(..), applyPF, fun, domPF, mkPFSet, mkPFList,
   numInt,
-  allInts, allFUNs, allValues,
+  allInts, allPFs, allFUNs, allValues, allValuesSet,
   allInts',
   funNegate, funInt, funGt, funLt,
   funAdd, funSub, funMul, funDiv,
+  funEmpty,
   funXF,
+  funDomain,
   funUnion, funConcat, tupConcat,
   allTuples, allTuplesLen, allTuplesLenV,
   tupleLen,
   ) where
 import Control.Monad
-import Data.List((\\), intercalate, nub)
+import Data.List((\\), intercalate)
 import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
 import PomSet
@@ -71,7 +73,7 @@ instance Show Value where
   show (Fun fn) = show fn
 
 data PartialFun = PF { pfName :: String, pfMap :: M.Map Value Value }
--- deriving ( Eq, Ord )
+-- deriving ( Show )
 
 instance Eq PartialFun where
   PF f1 _ == PF f2 _  =  f1 == f2
@@ -88,6 +90,9 @@ instance Show PartialFun where
 
 applyPF :: PartialFun -> Value -> Maybe Value
 applyPF (PF _ m) a = M.lookup a m
+
+domPF :: PartialFun -> Set.Set Value
+domPF (PF _ m) = Set.mkSetUnsafe $ M.keys m
 
 -- Single point mapping
 pattern PFSing :: Value -> Value -> PartialFun
@@ -141,12 +146,54 @@ funMul = PF "mul" $ M.fromList [(Tuple [Int i, Int j], Int ((i*j) `mod` numInt))
 funDiv :: PartialFun
 funDiv = PF "div" $ M.fromList [(Tuple [Int i, Int j], Int (i`div`j)) | i <- allInts'', j <- allInts'', j /= 0 ]
 
+funSucc :: PartialFun
+funSucc = PF "succ" $ M.fromList [(Int i, Int ((i+1) `mod` numInt)) | i <- allInts'']
+
+funPred :: PartialFun
+funPred = PF "pred" $ M.fromList [(Int i, Int ((i-1) `mod` numInt)) | i <- allInts'']
+
+funNegSucc :: PartialFun
+funNegSucc = PF "negsucc" $ M.fromList [(Int i, Int ((-i+1) `mod` numInt)) | i <- allInts'']
+
+funEmpty :: PartialFun
+funEmpty = PF "empty" M.empty
+
 funX12_3 :: PartialFun
 funX12_3 = PF "x12_3" $ M.fromList [(Int 1, Int 3), (Int 2, Int 3)]
 funX0_1 :: PartialFun
 funX0_1  = PF "x0_1"  $ M.fromList [(Int 0, Int 1)]
 funXF :: FUN
 funXF = fun[funX12_3, funX0_1]
+
+allPFs' :: [PartialFun]
+allPFs' =
+         [funNegate, funInt, funGt, funLt, funAdd, funSub, funMul, funDiv
+         ,funSucc, funPred, funNegSucc]
+         ++
+         [ PF (show x ++ "->" ++ show y) $ M.fromList [(x, y)]
+         | x <- allInts, y <- allInts ]
+         ++
+         [ PF ("K" ++ show y) $ M.fromList [(x, y) | x <- allInts]
+         | y <- allInts ]
+
+allPFs' :: [PartialFun]
+allPFs' = allPFs'
+         ++
+         [ mkPFList [(Int 0, Int 0), (Int 1, Int 0), (Int 2, Int 0)]
+         ]
+
+mkPFSet :: Set.Set (Value, Value) -> PartialFun
+mkPFSet = mkPFList . Set.toList
+
+-- Try to find a named function
+mkPFList :: [(Value, Value)] -> PartialFun
+mkPFList pairs =
+  let m = M.fromList pairs
+      thePF = PF { pfName = showPairs pairs, pfMap = m }
+  in  head $ filter (\ pf -> pfMap pf == m) allPFs' ++ [thePF]
+
+showPairs :: [(Value, Value)] -> String
+showPairs xys = "{" ++ intercalate "," (map (\ (x,y) -> show x ++ "->" ++ show y) xys) ++ "}"
 
 allFUNs :: [FUN]
 allFUNs = [ fun[funNegate], fun[funInt], fun[funGt], fun[funLt], fun[funAdd], fun[funSub], fun[funMul], fun[funDiv],
@@ -157,6 +204,9 @@ allFUNs = [ fun[funNegate], fun[funInt], fun[funGt], fun[funLt], fun[funAdd], fu
 -- Integers and pairs of integers
 allValues :: [Value]
 allValues = allInts ++ map Tuple (allTuplesLen 2)
+
+allValuesSet :: Set.Set Value
+allValuesSet = Set.mkSetUnsafe allValues
 
 maxTuples :: Int
 maxTuples = 2
@@ -193,17 +243,21 @@ tupConcat x y = uncanon [ appTup xs ys | xs <- ne $ canon x, ys <- ne $ canon y 
         ne s | Set.isEmpty s = Set.singleton []
              | otherwise = s
 
+{-
 shift :: Int -> FUN -> FUN
 shift o = fmap (shiftPF o)
+-}
 
 shiftPF :: Int -> PartialFun -> PartialFun
 shiftPF o (PFSing (Int i) x) = PFSing (Int (i+o)) x
 shiftPF _ _ = error "shiftPF: not a singleton tuple"
 
+{-
 domCheck :: String -> FUN -> FUN
 domCheck msg f =
   let xs = concat . allLeaves . fmap (M.keys . pfMap) $ f
   in  if xs == nub xs then f else error $ "domCheck: " ++ msg ++ ": " ++ show f
+-}
 
 -- The FUN invariant makes the mkSetUnsafe safe
 funDomain :: FUN -> Set.Set Value
