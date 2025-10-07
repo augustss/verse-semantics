@@ -83,20 +83,22 @@ SafeConvert(Value:float)<decides>:int =
 
 String conversions follow similar principles. The `ToString()` function converts various types to their string representations, while string interpolation provides a convenient syntax for embedding values in strings:
 
+<!--verse
+F():void={
+-->
 ```verse
 Score:int = 1500
 Message:string = "Your score: {Score}"  # Implicit ToString() call
 ```
+<!--verse
+}
+-->
 
 Type casting becomes particularly interesting with parametric types. When you have a generic function, you can constrain type parameters to ensure certain operations are available:
 
-<!--verse
-using { /Verse.org/VerseCLR }
--->
+<!--NoCompile-->
 ```verse
-PrintTwice(Value:t where t:subtype(any)):void =
-    Representation:string = ToString(Value)
-    Print("{Representation} {Representation}")
+DoIt(Value:t where t:subtype(any)):void =
 ```
 
 The constraint `t:subtype(any)` might seem redundant since all types are subtypes of `any` (inface the above would behave identifcally if one had written `t:type`), but it makes the type parameter explicit and allows for more specific constraints in real code.
@@ -113,7 +115,12 @@ using { /Verse.org/VerseCLR }
 Process(Value:t where t:subtype(comparable)):void =
     if (Value = Value):  # We know t supports equality
         Print("Value equals itself")
+```
 
+Using the same type in multiple constraints is not yet supported, when implemented, it will allow to write code such as:
+
+<!--NoCompile-->
+```verse
 # Multiple constraints on the same type
 Transform(Input:t where t:subtype(comparable), t:subtype(printable)):t =
     Print("Processing: {Input}")
@@ -130,19 +137,10 @@ Combine(A:t1, B:t2 where t1:type, t2:type):tuple(t1, t2) =
 # Related constraints
 Convert(From:t1, Converter:type{_(t1):t2} where t1:type, t2:type):t2 =
     Converter(From)
-
-# Constraints that reference other type parameters
-SafeCast(Value:t1 where t1:subtype(t2), Target:type{t2} where t2:type):t2 =
-    Value  # Safe because t1 is a subtype of t2
 ```
-
-### Complex Constraints
 
 Where clauses can express sophisticated relationships between types:
 
-<!--verse
-using { /Verse.org/VerseCLR }
--->
 ```verse
 # Constraint that ensures compatible types for an operation
 Merge(Container1:[]t, Container2:[]t where t:subtype(comparable)):[]t =
@@ -152,77 +150,19 @@ Merge(Container1:[]t, Container2:[]t where t:subtype(comparable)):[]t =
     Result
 
 # Function type constraints
-ApplyTwice(F:type{_(t):t}, Value:t where t:type):t =
+ApplyTwice(F:type{_(:t):t}, Value:t where t:type):t =
     F(F(Value))
-
-# Nested type constraints
-ProcessContainer(C:container_type where container_type:subtype([]element_type),
-                element_type:subtype(comparable)):void =
-    for (Element : C):
-        Print("Element: {Element}")
 ```
-
-### Where in Classes
-
-Classes and interfaces can also use where clauses to constrain their type parameters:
-
-<!--verse
-Process(I:int where int:type, out:type):out 
--->
-```verse
-# Generic container with constrained element type
-sorted_list(t where t:subtype(comparable)) := class:
-    Elements:[]t = array{}
-
-    Add(NewElement:t):void =
-        # Can use comparison because t is comparable
-        InsertSorted(NewElement)
-
-    InsertSorted(Element:t):void =
-        var Index:int = 0
-        for (E : Elements, E < Element):
-            set Index = Index + 1
-        set Elements = InsertAt(Elements, Index, Element)
-
-# Interface with type constraints
-processor(input_type, output_type where input_type:type, output_type:type) := interface:
-    Process(Input:input_type):output_type
-```
-
-### Advanced Patterns
 
 Where clauses enable sophisticated generic programming patterns:
 
 ```verse
-# Constraint unions (either-or constraints)
-FlexiblePrint(Value:t where t:subtype(printable) or t:subtype(stringifiable)):void =
-    if (t:subtype(printable)):
-        Print(Value)
-    else:
-        Print(ToString(Value))
-
-# Recursive constraints
-TreeNode(t where t:subtype(comparable)) := class:
-    Value:t
-    Left:?TreeNode(t) = false
-    Right:?TreeNode(t) = false
-
-    Insert(NewValue:t):void =
-        if (NewValue < Value):
-            if (L := Left?):
-                L.Insert(NewValue)
-            else:
-                set Left = option{TreeNode(t){Value := NewValue}}
-        else:
-            # Similar for right side
-
-# Higher-kinded type constraints
 MapFunction(F:type{_(a):b}, Container:[]a where a:type, b:type):[]b =
     for (Element : Container):
         F(Element)
 ```
 
-### Type Inference
+<!--  THIS DON'T WORK  ... sadly
 
 Verse's type inference works with where clauses to deduce type parameters:
 
@@ -280,6 +220,8 @@ builder(t where t:type) := class:
 ```
 
 Where clauses thus provide the foundation for Verse's generic programming capabilities, allowing you to write code that is both highly reusable and completely type-safe. They enable you to express precise requirements about types while maintaining the flexibility to work with any types that meet those requirements.
+
+-->
 
 ## Comparable and Equality
 
@@ -380,7 +322,7 @@ LogEvent(Event:string):void =
 
 Between these extremes, types form natural groupings. The numeric types (`int`, `float`, `rational`) share common arithmetic operations but don't form a single hierarchy - they're siblings rather than ancestors and descendants. The container types (arrays, maps, tuples, options) each have their own subtyping rules based on their element types.
 
-Understanding variance is crucial for working with generic containers. Arrays and options are covariant in their element type - if A is a subtype of B, then `[]A` is a subtype of `[]B` and `?A` is a subtype of `?B`. This allows natural code like:
+Understanding variance is crucial for working with generic containers. Arrays and options are covariant in their element type - if A is a subtype of B, then `[]A` is a subtype of `[]B` and `?A` is a subtype of `?B`. This allows natural code like (assuming that Verse had a `nat` type):
 
 ```verse
 ProcessNumbers(Numbers:[]int):void =
@@ -394,8 +336,8 @@ ProcessNumbers(NaturalNumbers)  # Works due to covariance
 Functions exhibit more complex variance. They're contravariant in their parameter types and covariant in their return types. A function type `(T1)->R1` is a subtype of `(T2)->R2` if T2 is a subtype of T1 (contravariance) and R1 is a subtype of R2 (covariance). This ensures that function subtyping preserves type safety:
 
 ```verse
-type function_type1 = type{_(X:any):int}
-type function_type2 = type{_(X:int):any}
+function_type1 := type{_(:any):int}
+function_type2 := type{_(:int):any}
 
 # function_type1 is a subtype of function_type2
 # It accepts more general input (any vs int)
@@ -406,13 +348,18 @@ type function_type2 = type{_(X:int):any}
 
 Verse's type system includes several advanced features that enable sophisticated programming patterns. Type aliases allow you to give meaningful names to complex types:
 
+<!--verse
+entity:=struct{}
+-->
 ```verse
-type coordinate = tuple(float, float, float)
-type entity_map = [string]entity
-type update_handler = type{_(Delta:float):void}
+coordinate := tuple(float, float, float)
+entity_map := [string]entity
+update_handler := type{_(:float):void}
 ```
 
 These aliases improve code readability and make refactoring easier. They're particularly valuable for function types, which can become syntactically complex.
+
+<!-- TODO NOT IMPLEMENTED YET
 
 The type construct provides runtime type information, enabling a form of reflection:
 
@@ -423,9 +370,13 @@ InspectType(Value:int):void =
 ```
 
 This capability is useful for debugging and for writing generic code that needs to reason about types at runtime.
+-->
 
-Parametric types with multiple constraints allow precise specification of generic function requirements:
+Parametric types with multiple constraints allow specification of generic function requirements:
 
+<!--verse
+ArrayContains(A:[]t, B:t where t:subtype(comparable))<transacts><decides>:[]t = false
+-->
 ```verse
 Merge(A:[]t, B:[]t where t:subtype(comparable))<decides>:[]t =
     var Result:[]t = A
@@ -436,19 +387,7 @@ Merge(A:[]t, B:[]t where t:subtype(comparable))<decides>:[]t =
 
 This function requires that the element type be comparable (so we can check for duplicates) while maintaining type safety throughout.
 
-## Practical Patterns
-
-Working effectively with Verse's type system requires understanding not just the rules but the patterns that emerge from them. One common pattern is using type guards to refine types within conditional branches:
-
-```verse
-ProcessMixed(Value:any)<decides>:void =
-    if (IntValue := int[Value]):
-        # Value is known to be int here
-        Print("Integer: {IntValue * 2}")
-    else if (StringValue := string[Value]):
-        # Value is known to be string here
-        Print("String length: {StringValue.Length}")
-```
+<!-- Nah, don't dream
 
 Another powerful pattern involves using parametric types with constraints to write generic but type-safe code:
 
@@ -465,7 +404,13 @@ FindMax(Values:[]t where t:subtype(comparable))<decides>:t =
 
 This function works for any array of comparable values while maintaining full type safety. The constraint ensures that the greater-than operator is available, and the return type matches the element type of the input array.
 
+-->
+
 When designing class hierarchies, consider carefully whether to use inheritance or composition. Inheritance creates tight coupling but allows polymorphism, while composition provides flexibility but requires explicit delegation:
+
+<!--verse
+player := class{}
+-->
 
 ```verse
 # Inheritance approach

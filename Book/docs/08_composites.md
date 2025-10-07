@@ -24,6 +24,13 @@ This class definition establishes several important concepts. Fields without the
 
 Creating instances of a class involves specifying values for its fields through an archetype expression:
 
+<!--verse
+character := class:
+    Name : string
+    var Health : int = 100
+    var Level : int = 1
+    MaxHealth : int = 100
+-->
 ```verse
 Hero := character{Name := "Aldric", Health := 100, Level := 5}
 Villager := character{Name := "Martha"}  # Uses default values for unspecified fields
@@ -40,7 +47,7 @@ character := class:
     Name : string
     var Health : int = 100
     var Level : int = 1
-    MaxHealth : int = 100
+    var MaxHealth : int = 100
 
     TakeDamage(Amount : int) : void =
         set Health = Max(0, Health - Amount)
@@ -48,7 +55,7 @@ character := class:
     Heal(Amount : int) : void =
         set Health = Min(MaxHealth, Health + Amount)
 
-    IsAlive() : logic = Health > 0
+    IsAlive()<decides>:void= Health > 0
 
     LevelUp() : void =
         set Level += 1
@@ -62,6 +69,9 @@ Methods have access to all fields of the class and can modify mutable fields. Th
 
 Within class methods, `Self` refers to the specific instance the method was called on. While you can access fields directly by name, `Self` becomes necessary when you need to pass the entire object to another function:
 
+<!--verse
+using { /Verse.org/VerseCLR }
+-->
 ```verse
 character := class:
     Name : string
@@ -81,6 +91,9 @@ LogCharacterAction(Character : character, Action : string) : void =
 
 Classes support single inheritance, allowing you to create specialized versions of existing classes. This creates an "is-a" relationship where the subclass is a more specific type of the superclass:
 
+<!--verse
+vector3:=struct{}
+-->
 ```verse
 entity := class:
     var Position : vector3 = vector3{}
@@ -112,6 +125,13 @@ Inheritance creates a type hierarchy where a `player` is also a `character`, and
 
 Subclasses can override methods defined in their superclasses to provide specialized behavior:
 
+<!--verse
+character:=class:
+    IsAlive()<decides><transacts>:void={}
+MoveToward(:?character)<transacts>:void={}
+Patrol()<transacts>:void={}
+ScanForTargets()<transacts>:void={}
+-->
 ```verse
 entity := class:
     OnUpdate<public>() : void = {}  # Default no-op implementation
@@ -119,17 +139,18 @@ entity := class:
 enemy := class(entity):
     var Target : ?character = false
 
-    OnUpdate<public><override>() : void =
+    OnUpdate<override>()<transacts> : void =
         if (Target?.IsAlive[]):
             MoveToward(Target)
         else:
             Patrol()
 
 turret := class(entity):
-    var Rotation : float = 0.0
+    var Rotation:int= 0.
 
-    OnUpdate<public><override>() : void =
-        set Rotation = Mod(Rotation + 1.0, 360.0)
+    OnUpdate<override>()<transacts>: void =
+        if (V:= Mod[Rotation, 360]):
+            set Rotation = V
         ScanForTargets()
 ```
 
@@ -137,7 +158,11 @@ The override mechanism ensures that the correct method implementation is called 
 
 ### Constructor Functions
 
-Classes don't have traditional constructor methods like you might find in other object-oriented languages. Instead, Verse uses a more functional approach to object construction through direct field  initialization and the Make pattern for complex initialization logic.
+Classes don't have traditional constructor methods like you might find in other object-oriented languages. Instead, Verse uses a more functional approach to object construction through direct field  initialization.
+
+<!--nd the Make pattern for complex initialization logic.-->
+
+<!-- THAT DON'T WORK  sadly
 
 For classes requiring validation or complex initialization, Verse uses factory functions rather than constructor methods. These are typically named `Make`, are annotated `<constructor>` and return an instance of the class. The factory function can perform  validation, compute derived values, or fail if requirements aren't met:
 
@@ -146,6 +171,15 @@ For classes requiring validation or complex initialization, Verse uses factory f
       Level > 0
       Level <= MaxLevel
       player{Name := Name, Health := Level *100, Mana := Level* 50}
+```
+-->
+
+<!--verse
+player:=class<allocates>{Name :string, var Health : int, Mana :int}
+-->
+```verse
+  MakePlayer<constructor>(Name:string, Level:int)<allocates>:=
+       player{Name := Name, Health := Level *100, Mana := Level* 50}
 ```
 
  For classes with mutable fields (marked with `var`), initialization sets the starting values that can change during   the object's lifetime. Immutable fields must be initialized during construction and cannot be modified afterward.  This distinction makes the construction phase critical for  establishing invariants that will hold throughout the object's existence.
@@ -177,6 +211,7 @@ Access specifiers apply to both fields and methods, controlling who can read fie
 
 The `<concrete>` specifier enforces that all fields have default values, allowing construction with an empty archetype:
 
+<!--NoCompile-->
 ```verse
 config := class<concrete>:
     MaxPlayers : int = 8
@@ -201,6 +236,21 @@ The `<unique>` specifier creates classes with reference semantics where each ins
 
 Classes marked with `<unique>` compare by identity, not by value:
 
+<!--verse
+vector3:=struct{X:float,Y:float,Z:float}
+entity := class<unique>:
+   Name : string
+   Position : vector3
+F()<decides>:void={
+E1 := entity{Name := "Guard", Position := vector3{X := 0.0, Y := 0.0, Z := 0.0}}
+E2 := entity{Name := "Guard", Position := vector3{X := 0.0, Y := 0.0, Z := 0.0}}
+E3 := E1
+
+E1 = E2  # Fails - different instances despite identical field values
+E1 = E3  # Succeeds - same instance
+}
+<#
+-->
 ```verse
 entity := class<unique>:
    Name : string
@@ -213,6 +263,9 @@ E3 := E1
 E1 = E2  # Fails - different instances despite identical field values
 E1 = E3  # Succeeds - same instance
 ```
+<!--verse
+#>
+-->
 
 This specifier is ideal for:
 
@@ -231,7 +284,7 @@ The `<abstract>` specifier marks classes that cannot be instantiated directly �
 Abstract classes serve as architectural foundations in a type hierarchy. They define contracts through abstract methods that subclasses must implement, while potentially providing concrete methods and fields that subclasses inherit. This creates a powerful pattern for code reuse and polymorphic behavior.
 
 ```verse
-  vehicle<abstract> := class:
+  vehicle := class<abstract>:
       Speed():float             # Abstract method
       MaxPassengers:int = 1
 
@@ -255,9 +308,10 @@ The `<castable>` specifier enables runtime type checking and safe downcasting fo
 
 Without `<castable>`, Verse's type system operates purely at compile time. The `<castable>` specifier adds runtime type information, allowing code to inspect and react to actual object types during execution. This bridges the gap between static type safety and dynamic polymorphism.
 
+<!--NoCompile-->
 ```verse
   component<public> := class<abstract><unique><castable>:
-      Parent:entity
+      Parent<public>:entity
 
   entity<public> := class<concrete><unique><transacts><castable>:
       FindDescendantEntities(entity_type:castable_subtype(entity)):generator(entity_type)
@@ -273,6 +327,9 @@ The `<final>` specifier prevents inheritance, creating a terminal point in a cla
 
 Classes marked with `<final>` serve as concrete implementations that cannot be extended. This is particularly important for persistable classes, which require `<final>` to ensure their structure remains stable for serialization:
 
+<!--verse
+player_stats:=struct<persistable>{}
+-->
 ```verse
   player_profile := class<final><persistable>:
       Username:string = "Player"
@@ -291,7 +348,7 @@ For methods, `<final>` locks behavior at a specific point in the inheritance cha
 
 ```verse
   base_entity := class:
-      GetName<virtual>():string = "Entity"
+      GetName():string = "Entity"
 
   game_object := class(base_entity):
       GetName<override><final>():string = "GameObject"
@@ -300,13 +357,15 @@ For methods, `<final>` locks behavior at a specific point in the inheritance cha
 
 The related `<final_super>` specifier marks classes as terminal base classes — they can be inherited from but their subclasses cannot be further extended.  `<final_super_base>` marks a class as the ultimate root of a restricted inheritance tree. Classes with this   specifier can be inherited from, but their subclasses automatically become final — they cannot be further  extended. This creates a two-level inheritance limit starting from the base:
 
+<!-- TODO  DOES NOT WORK -->
+
 ```verse
-  component<native><public> := class<abstract><unique><castable><final_super_base>:
+component<native><public> := class<abstract><unique><castable><final_super_base>:
       Parent:entity
 
   # Can inherit from component (first level)
 
-  physics_component := class(component):  # implicitly final_super
+physics_component := class(component):  # implicitly final_super
       Mass:float = 1.0
 
  # Cannot inherit from physics_component - it's implicitly final
@@ -314,7 +373,10 @@ The related `<final_super>` specifier marks classes as terminal base classes —
 # gravity_component := class(physics_component): # COMPILE ERROR
 ```
 
-So, `<final_super>` marks a class that inherits from a `<final_super_base>` class, explicitly declaring it as the final inheritance point. While classes inheriting from `<final_super_base>` are implicitly final, using `<final_super>`  makes this finality explicit and self-documenting:
+So, `<final_super>` marks a class that inherits from a `<final_super_base>` class, explicitly declaring it as the final inheritance point. While classes inheriting from `<final_super_base>` are implicitly final, using `<final_super>`  makes this finality explicit and self-documenting.
+<!-- :
+
+TODO REVISIT
 
 ```verse
   # Explicitly marking as final_super (though implicitly final anyway)
@@ -324,6 +386,7 @@ So, `<final_super>` marks a class that inherits from a `<final_super_base>` clas
   copter_camera_component := class<final_super>(copter_camera_component_director_version):
       # Terminal implementation
 ```
+-->
 
 This pattern is particularly valuable in component architectures where you want a base component interface that  various concrete components implement, but don't want those implementations to spawn their own inheritance  subtrees. The base class defines the contract, immediate subclasses provide  implementations, and inheritance stops  there — clean, controlled, and predictable.
 
@@ -335,6 +398,9 @@ The `<persistable>` specifier marks types that can be saved and restored across 
 
 Persistence  works through module-scoped `weak_map(player, t)` variables, where `t` is any persistable type.  These special maps automatically synchronize with backend storage — when players join, their data loads; when they leave or data changes, it saves. The system handles all serialization, network transfer, and storage management transparently.
 
+<!--verse
+player:=string
+-->
 ```verse
   player_inventory := class<final><persistable>:
       Gold:int = 0
@@ -371,6 +437,10 @@ These interfaces establish contracts without any implementation details. Any cla
 
 Classes implement interfaces by inheriting from them and providing concrete implementations of all required methods:
 
+<!--verse
+damageable:=interface{}
+healable:=interface{}
+-->
 ```verse
 character := class(damageable, healable):
     var Health : int = 100
@@ -381,12 +451,8 @@ character := class(damageable, healable):
 
     GetHealth():int = Health
 
-    IsAlive():logic = Health > 0
-
     Heal(Amount:int):void =
         set Health = Min(MaxHealth, Health + Amount)
-
-    GetMaxHealth():int = MaxHealth
 ```
 
 A class can implement multiple interfaces, effectively achieving multiple inheritance of behavior contracts. This provides more flexibility than single class inheritance while maintaining type safety.
@@ -395,6 +461,7 @@ A class can implement multiple interfaces, effectively achieving multiple inheri
 
 Interfaces enable programming to abstractions rather than concrete implementations:
 
+<!--NoCompile-->
 ```verse
 # Function works with any damageable object
 ApplyDamageOverTime(Target:damageable, DamagePerSecond:int, Duration:float)<suspends>:void =
@@ -416,6 +483,7 @@ This approach creates loose coupling between different parts of your code. The `
 
 Interfaces can extend other interfaces, creating hierarchies of contracts:
 
+<!--NoCompile-->
 ```verse
 combatant := interface(damageable, healable):
     Attack(Target:damageable):void
@@ -434,6 +502,11 @@ Structs provide lightweight data containers without the object-oriented features
 
 Structs group related data with minimal overhead:
 
+<!--verse
+damage_type:= enum:
+    Physical
+character := struct{}
+-->
 ```verse
 vector2 := struct:
     X : float = 0.0
@@ -458,6 +531,7 @@ All struct fields are public and immutable by default. Structs cannot have metho
 
 Creating struct instances uses the same archetype syntax as classes:
 
+<!--NoCompile-->
 ```verse
 Origin := vector2{}  # Uses defaults: (0.0, 0.0)
 PlayerPos := vector2{X := 100.0, Y := 250.0}
@@ -474,6 +548,7 @@ Since structs are value types, assigning a struct to a variable creates a copy o
 
 Structs with all comparable fields support equality comparison:
 
+<!--NoCompile-->
 ```verse
 vector3i := struct:
     X : int = 0
@@ -496,6 +571,7 @@ Comparison happens field by field, succeeding only if all corresponding fields a
 
 Structs can be marked as persistable for use with Verse's persistence system:
 
+<!--NoCompile-->
 ```verse
 player_stats := struct<persistable>:
     HighScore : int = 0
@@ -547,6 +623,13 @@ Each value in the enum becomes a named constant of that enum type. The compiler 
 
 Enums provide type-safe alternatives to error-prone string or integer constants:
 
+<!--verse
+dgame_state := enum:
+    MainMenu
+    Playing
+    Paused
+    GameOver
+-->
 ```verse
 var CurrentState : game_state = game_state.MainMenu
 
@@ -599,6 +682,7 @@ Closed enums are the default and work best for fixed sets like days of the week 
 
 Enum values support equality comparison:
 
+<!--NoCompile-->
 ```verse
 CurrentWeapon := weapon_type.Sword
 if (CurrentWeapon = weapon_type.Sword):
@@ -626,185 +710,6 @@ save_data := struct<persistable>:
 ```
 
 Persistable enums maintain value compatibility across game updates, though open enums can have new values added.
-
-## Combining Composite Types
-
-The real power of Verse's type system emerges when you combine different composite types to model complex game systems. Each type serves its purpose while working together to create a cohesive architecture.
-
-### Classes with Interfaces
-
-Classes implementing interfaces create flexible, extensible systems:
-
-```verse
-# Define behavior contracts
-interactive := interface:
-    Interact(Player:character):void
-    CanInteract(Player:character):logic
-    GetInteractionPrompt():string
-
-# Implement in various classes
-door := class(entity, interactive):
-    var IsLocked : logic = false
-    RequiredKey : string = ""
-
-    Interact(Player:character):void =
-        if (not IsLocked):
-            Open()
-        else if (Player.HasItem(RequiredKey)):
-            Unlock()
-            Open()
-
-    CanInteract(Player:character):logic =
-        not IsOpen
-
-    GetInteractionPrompt():string =
-        if (IsLocked) then "Locked" else "Open Door"
-
-chest := class(entity, interactive):
-    var Contents : []item = array{}
-    var IsOpened : logic = false
-
-    Interact(Player:character):void =
-        if (not IsOpened):
-            set IsOpened = true
-            for (Item : Contents):
-                Player.AddItem(Item)
-
-    CanInteract(Player:character):logic =
-        not IsOpened
-
-    GetInteractionPrompt():string =
-        "Open Chest"
-```
-
-### Structs in Classes
-
-Structs serve as value types within classes:
-
-```verse
-transform := struct:
-    Position : vector3 = vector3{}
-    Rotation : rotation = rotation{}
-    Scale : vector3 = vector3{X := 1.0, Y := 1.0, Z := 1.0}
-
-game_object := class:
-    var Transform : transform = transform{}
-    Model : string = ""
-
-    MoveTo(NewPosition : vector3) : void =
-        set Transform = transform:
-            Position := NewPosition
-            Rotation := Transform.Rotation
-            Scale := Transform.Scale
-
-    Rotate(Degrees : float) : void =
-        # Create new transform with updated rotation
-        NewRotation := rotation{Yaw := Degrees}
-        set Transform = transform:
-            Position := Transform.Position
-            Rotation := NewRotation
-            Scale := Transform.Scale
-```
-
-### Enums for Type Safety
-
-Enums make state management and type categorization explicit:
-
-```verse
-ability_type := enum:
-    Instant
-    Channeled
-    Passive
-    Toggle
-
-ability := class<abstract>:
-    Name : string
-    Type : ability_type
-    Cooldown : float = 0.0
-
-    Cast<abstract>(Caster:character, Target:?character):void
-
-fireball := class(ability):
-    Name<override> : string = "Fireball"
-    Type<override> : ability_type = ability_type.Instant
-    Cooldown<override> : float = 5.0
-    Damage : int = 50
-
-    Cast<override>(Caster:character, Target:?character):void =
-        if (TargetChar := Target?):
-            TargetChar.TakeDamage(Damage)
-            PlayFireballEffect(Caster, TargetChar)
-```
-
-### Complex Game Systems
-
-Combining all composite types creates rich, maintainable game architectures:
-
-```verse
-# Core types and interfaces
-faction := enum:
-    Neutral
-    Alliance
-    Horde
-
-targetable := interface:
-    GetPosition():vector3
-    GetFaction():faction
-    IsTargetable():logic
-
-# Base entity with transform
-entity := class:
-    var Transform : transform = transform{}
-    var IsActive : logic = true
-
-    GetPosition():vector3 = Transform.Position
-
-# Combat unit combining everything
-unit := class(entity, targetable, damageable):
-    Name : string
-    Faction : faction = faction.Neutral
-    var Health : int = 100
-    MaxHealth : int = 100
-    var Target : ?targetable = false
-
-    GetFaction():faction = Faction
-    IsTargetable():logic = IsActive and IsAlive()
-
-    TakeDamage(Amount:int):void =
-        set Health = Max(0, Health - Amount)
-        if (Health = 0):
-            OnDeath()
-
-    GetHealth():int = Health
-    IsAlive():logic = Health > 0
-
-    OnDeath():void =
-        set IsActive = false
-        set Target = false
-
-# Specialized unit types
-soldier := class(unit):
-    Weapon : weapon_type = weapon_type.Sword
-    Armor : int = 10
-
-    TakeDamage<override>(Amount:int):void =
-        ReducedDamage := Max(0, Amount - Armor)
-        super.TakeDamage(ReducedDamage)
-
-# Game manager using all types
-combat_manager := class:
-    var Units : []unit = array{}
-    var CombatState : game_state = game_state.Playing
-
-    FindTargets(Attacker:unit, Range:float):[]targetable =
-        var Targets : []targetable = array{}
-        for (PotentialTarget : Units):
-            if (PotentialTarget.GetFaction() <> Attacker.GetFaction()):
-                if (Distance(Attacker.GetPosition(), PotentialTarget.GetPosition()) <= Range):
-                    if (PotentialTarget.IsTargetable()):
-                        set Targets = Targets + array{PotentialTarget}
-        Targets
-```
 
 ## Best Practices
 
