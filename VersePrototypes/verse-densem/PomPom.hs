@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-name-shadowing -Wno-missing-signatures #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module PomPom where
@@ -10,7 +10,7 @@ import ENVP as E
 import qualified Set
 import Set(Set)
 import PomSet
---import Debug.Trace
+import Debug.Trace
 
 --pfilter :: (a -> Bool) -> P a -> P a
 --pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
@@ -153,8 +153,8 @@ dE (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
 dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
 dE (Variable v) i x | isSrcUnderscore v = unit $ i .=. x
                     | otherwise         = unit $ i .=. x /\ x .=. v
-dE (DefineE y t)                    i x = unit (x .=. y) *** dE t i x
-dE (DefineIE y t)                   i x = unit (i .=. y) *** dE t i x
+dE (DefineE y t)                    i x = unit (x .=. y) *** dE t i x      -- y := t
+dE (DefineIE y t)                   i x = unit (i .=. y) *** dE t i x      -- y ~> _ := t
 dE (DefineV y)                      i x = unit $ i .=. x /\ x .=. y
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x +++ dB t1 i x
@@ -210,7 +210,7 @@ dE t@(ApplyD t0 t1)                 i x =
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
-dE t@(Function Closed t0 _ t1) i x = fUN (bvs t0) (dE t0 p q) t1 p q i x
+dE t@(Function aprt t0 _ t1) i x = fUN aprt (bvs t0) (dE t0 p q) t1 p q i x
   where (p, q) = fresh2 ("p", "q") [i, x] t
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
@@ -241,13 +241,6 @@ dF f a r =
   | tt@(Tuple vs) <- Set.mkSetUnsafe allTuples -- set
   ]
 -}
-  
-{-
--- A hack to avoid iterating over so many values
-valsOf :: [Ident] -> ENV -> [Value]
-valsOf is e = nub $ concatMap (extractVar e) is
--}
-
 
 i=Ident noLoc "i"
 j=Ident noLoc "j"
@@ -282,18 +275,24 @@ u2=Ident noLoc "u2"
 v=Ident noLoc "v"
 v1=Ident noLoc "v1"
 v2=Ident noLoc "v2"
---t0=DefineIE x (k0 `Choice` k1)
+--t0=DefineE x (k0 `Choice` k1)
 --t1=For2 t0 (Variable x)
---t0=DefineIE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
---t0=DefineIE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
---t0=DefineIE i (k0 `Choice` k1)
+--t0=DefineE x (ApplyD (EPrim DotDot) (Array [k1, Variable n]))
+--t0=DefineE i (If3 (Variable n `Unify` k0) (Variable a `Unify` k1) (Variable a `Unify` k2))
+--t0=DefineE i (k0 `Choice` k1)
 --t0=Unify (Variable x) k0 `Choice` Unify (Variable x) k1
-t0=DefineIE x $ ApplyD (Variable (Ident noLoc "operator'|||'")) (Array [k0, k1])
-t1=Variable x
+t0=DefineE a $ ApplyD (Variable (Ident noLoc "operator'|||'")) (Array [k0, k1])
+t0c=DefineE a $ k0 `Choice` k1
+t1=Variable a
 tfor = For2 t0 t1
 tn=Variable n `Unify` k1
 tt = tn `Seq` tfor
-
+ft0=DefineE a k0
+ft0a=DefineE a tint
+tint=Range (EPrim IsInt)
+tneg=Range (EPrim Neg)
+tadd x y = ApplyD (EPrim Add) (Array [x, y])
+tlt  x y = ApplyD (EPrim Lt)  (Array [x, y])
 
 {-
 ix :: [ ENV ] -> Int -> ENV
@@ -378,15 +377,15 @@ den t = canon $
 
 -------
 
-fUN :: [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
-fUN _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
-fUN xs (s :\/ t) t1 p q h f =
+fUN :: Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
+fUN apt xs (s :\/ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN xs s t1 p q h1 f1
-        funb = fUN xs t t1 p q h2 f2
+  where funa = fUN apt xs s t1 p q h1 f1
+        funb = fUN apt xs t t1 p q h2 f2
         (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
         (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
-        sings = bigUnion [ i .= th1 `ufun` th2 /\ x .= tf1 `ufun` tf2 /\
+        sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
                            h1 .= th1 /\ h2 .= th2 /\ f1 .= tf1 /\ f2 .= tf2
                          | th1 <- allValuesOf h1 funa
                          , th2 <- allValuesOf h2 funb
@@ -395,13 +394,13 @@ fUN xs (s :\/ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funUnion g h)
         ufun _ _ = undefined
-fUN xs (s :++ t) t1 p q h f =
+fUN apt xs (s :++ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN xs s t1 p q h1 f1
-        funb = fUN xs t t1 p q h2 f2
+  where funa = fUN apt xs s t1 p q h1 f1
+        funb = fUN apt xs t t1 p q h2 f2
         (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
         (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
-        sings = bigUnion [ i .= th1 `ufun` th2 /\ x .= tf1 `ufun` tf2 /\
+        sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
                            h1 .= th1 /\ h2 .= th2 /\ f1 .= tf1 /\ f2 .= tf2
                          | th1 <- allValuesOf h1 funa
                          , th2 <- allValuesOf h2 funb
@@ -410,4 +409,67 @@ fUN xs (s :++ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funConcat g h)
         ufun _ _ = undefined
+fUN apt xs d@(Unit dd) t1 p q h f =
+  (d *** unit sings >>> (p:q:xs))
+--  `union`
+--  (nOT (d >>> xs) *** unit (h .= Fun Empty /\ f .= Fun Empty))
+  where
+    sings :: ENV
+    sings =
+      bigUnion [ h .= Fun (Unit hh) /\ f .= Fun (Unit ff) /\ ee
+               | hh <- allPFs
+--               , trace ("hh=" ++ show hh) True
+               , let poss :: Set (Value, Set (Value, Value, ENV))
+                     poss = [ (pv, ves)
+                            | pv <- allValuesSet
+                            , let qvs = valsOf q (dd /\ p .= pv)  -- possible values for q
+                            , qv <- qvs                           -- try the q values
+                            , let ves =
+                                    case applyPF hh qv of
+                                      Nothing -> Set.empty
+                                      Just r -> 
+--                                        trace ("(qv,r,envss)=" ++ show (qv,r, singSeq (dE t1 x y *** Unit (x .= r)))) $
+                                        -- Possible range environments for this p=pv
+                                        let
+                                          et0 = Unit (dd /\ p .= pv /\ q .= qv) >>> [p, q]
+                                          et1 = dE t1 x y
+                                          res = Unit (x .= r)
+                                          yrs :: Set ENV
+                                          yrs = singSeq (et0 *** et1 *** res)
+                                        in
+{-
+                                            trace ("dd="++show dd) $
+                                            trace ("pv="++show pv++", qv="++show qv++", r="++show r) $
+                                            trace ("et0="++show et0++", et1=" ++ show et1 ++ ", res=" ++ show res ++ ", yrs=" ++ show yrs) $
+                                            trace ("et0***et1=" ++ show (et0***et1)) $
+-}
+                                            [ (yv, qv, (x:y:p:q:xs) `hides` r)
+                                            | yr <- yrs
+                                            , yv <- allValuesSet
+                                            , let r = yr /\ y .= yv
+                                            , r /= empty
+                                            ]
+                            ]
+               
+--               , trace ("poss=" ++ show poss) True
+               , let
+                   sets :: [ [ (Value, Value, Value, ENV) ] ]
+                   sets = traverse (\ (x, yes) -> [ (x, y, q, e) | (y, q, e) <- Set.toList yes ])
+                                   (Set.toList poss)
+                   sets' :: [ (PartialFun, Set Value, ENV) ]
+                   sets' = [ (mkPFList $ zip xs ys, Set.mkSet qs, bigIntersect es)
+                           | xyeqs <- sets
+                           , let (xs, ys, qs, es) = L.unzip4 xyeqs ]
+--               , trace ("sets'=" ++ show sets') True
+               , (ff, qs, ee) <- sets'
+               , apt /= Closed || domPF hh == qs
+               ]
+    (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) t1
 
+-- Extract all possible values of a variable.
+-- Unlike extractVar this doesn't fail, but it is slower.
+valsOf :: Ident -> ENV -> Set Value
+valsOf i d = [ x | x <- allValuesSet, empty /= (d /\ i .= x) ]
+
+singSeq :: P a -> Set a
+singSeq p = [ a | [a] <- canon p ]

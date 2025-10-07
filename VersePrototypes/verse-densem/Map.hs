@@ -42,7 +42,7 @@ isSubmapOf = M.isSubmapOf
 import qualified Prelude
 
 newtype Map a b = Map [(a, b)]
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 empty :: Map a b
 empty = Map []

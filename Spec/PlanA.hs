@@ -14,6 +14,7 @@ import SetX
 import Debug.Trace
 
 import ExpSugar
+import Examples
 
 type VAL = SetX Val
 
@@ -195,7 +196,7 @@ dM' (Fun q e1 e2)      g  rho  = [
         , forAll {-allInts-} allWs $ \ x ->
             forAll rhos $ \ rho' ->
               let d1 = dM' e1 x rho' in
-              trace ("try f=" ++ show f ++ ", x=" ++ show x ++ ", d1=" ++ show d1 ++ ", g=" ++ show g) $
+--              trace ("try f=" ++ show f ++ ", x=" ++ show x ++ ", d1=" ++ show d1 ++ ", g=" ++ show g) $
               notFail d1 `implies`
                 (flip all d1 $ \ xs1 ->
                   forAll xs1 $ \ x1 ->
@@ -249,6 +250,7 @@ dene e = dD e emptyEnv
 ---- Can't trim M[e1|e2]
 ---- Get rid of trim?
 
+{-
 t1or2 :: Exp
 t1or2 = 1 :||| 2
 f1,f2,f3,f4 :: Exp
@@ -258,10 +260,16 @@ f1 = fun_c ("x":=t1or2)       (1:|  2)   -- [{F[{},{1↦2,2↦2}], F[{1↦1},{2�
 f2 = fun_c ("x":=t1or2)       (1:|||2)   -- [{F[{1↦1,2↦1}], F[{1↦1,2↦2}], F[{1↦2,2↦1}], F[{1↦2,2↦2}]}]
 f3 = fun_c ("x":=t1or2)("x"===(1:|  2))  -- [{F[{1↦1},{2↦2}]}]
 f4 = fun_c ("x":=t1or2)("x"===(1:|||2))  -- [{F[{1↦1,2↦2}]}]
+-}
+
+expfun :: Exp
+expfun = Fun Closed (Def "x" (Colon (Var "succ"))) (Var "x")
+
+expf, exph :: Exp
+exph = Def2 "h" "f" expfun `Seq` Var "h"
+expf = Def2 "h" "f" expfun `Seq` Var "f"
 
 main :: IO ()
 main = do
   --mapM_ (print . dene) [f1,f2,f3,f4]
-  print $ dene $ fun_c (fun_c 0 1) 2
-
-
+  mapM_ print $ [(h, r) | h <- allFcnsL, let r = dM expfun (VFcn [h]) emptyEnv, not (all isEmpty r) ]

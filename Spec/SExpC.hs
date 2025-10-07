@@ -14,6 +14,7 @@ getPrim s =
     "operator'+'"  -> Just (Oadd, 2)
     "operator'>'"  -> Just (Ogt,  2)
     "int"          -> Just (Oint, 1)
+    "neg"          -> Just (Oneg, 1)
 --    "any"          -> Just (Oany, 1)
     _              -> Nothing
 
