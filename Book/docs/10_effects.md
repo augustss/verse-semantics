@@ -12,6 +12,7 @@ Effects represent observable interactions between your code and the world around
 
 Consider this simple function that greets a player:
 
+<!--NoCompile-->
 ```verse
 GreetPlayer()<writes>:void =
     set CurrentGreeting = "Hello, adventurer!"
@@ -84,6 +85,7 @@ This means the function has `dictates`, `reads`, `writes`, `allocates` and `succ
 
 Annotating a function only affects the bits in that specifier's family. For example, a function with `<reads>` and `<predicts>`:
 
+<!--NoCompile-->
 ```verse
 CheckPlayerStatus()<reads><predicts>:string = ...
 ```
@@ -100,6 +102,18 @@ Specifying `<reads><predicts>` clears the `writes` and `allocates` bits, clears 
 
 The cardinality family deals with whether functions return values successfully. Every function either succeeds (returning its declared type) or fails (producing no value). Most functions always succeed — they're deterministic transformations that always produce output. But functions marked with `<decides>` can fail, turning failure into a control flow mechanism.
 
+<!--verse
+ValidateHealth(Health:float)<decides>:void =
+    Health > 0.0      # Fails if health is zero or negative
+    Health <= 100.0   # Fails if health exceeds maximum
+StartCombat():void={}
+player:=struct{Health:float}
+F(Player:player):void={
+if (ValidateHealth(Player.Health)):
+    # Health is valid, continue processing
+    StartCombat()
+}<#
+-->
 ```verse
 ValidateHealth(Health:float)<decides>:void =
     Health > 0.0      # Fails if health is zero or negative
@@ -110,6 +124,9 @@ if (ValidateHealth(Player.Health)):
     # Health is valid, continue processing
     StartCombat()
 ```
+<!--verse
+#>
+-->
 
 The beauty of the decides effect is that it unifies validation with control flow. You don't check conditions and then act on them — the check itself drives the program's path.
 
@@ -143,6 +160,12 @@ GetPlayerStatus(P:player)<reads>:string =
 
 The `<writes>` effect permits modification of mutable state. Functions with this effect can use `set` to update variables and mutable fields. Note that `<writes>` usually requires `<reads>` as well, since modification often involves reading the current value first. The `reads` effect is needed due to a planned feature: live variables.
 
+<!--verse
+player := class:
+    Name:string
+    var Health:float = 100.0
+    var Score:int = 0
+-->
 ```verse
 HealPlayer(P:player, Amount:float)<writes><reads>:void =
     NewHealth := P.Health + Amount
@@ -151,6 +174,10 @@ HealPlayer(P:player, Amount:float)<writes><reads>:void =
 
 The `<allocates>` effect indicates functions that create observably unique values — either objects marked `<unique>` or values containing mutable fields. Each call to such a function returns a distinct value, even if the inputs are identical.
 
+<!--verse
+vector3:=struct{}
+GenerateID():int=0
+-->
 ```verse
 game_entity := class<unique>:
     ID:int
@@ -166,6 +193,7 @@ The `<transacts>` specifier combines `<reads>`, `<writes>`, and `<allocates>`, p
 
 The suspension family contains a single effect: `<suspends>`. Functions with this effect can pause their execution and resume later, potentially across multiple game frames. This is essential for operations that take time: animations, cooldowns, waiting for player input, or any multi-frame behavior.
 
+<!--NoCompile-->
 ```verse
 PlayVictorySequence()<suspends>:void =
     PlayAnimation(VictoryDance)
@@ -181,6 +209,7 @@ The `suspends` effect is viral — any function that calls a suspending function
 
 The prediction family determines where code runs in a client-server architecture. By default, functions have the `dictates` effect, meaning they run authoritatively on the server. The `<predicts>` specifier allows functions to run predictively on clients for responsiveness, with the server later validating and potentially correcting the results.
 
+<!--NoCompile-->
 ```verse
 HandleJumpInput()<predicts>:void =
     # Runs immediately on the client for responsiveness
@@ -205,11 +234,15 @@ The `if` expression hides the `fails` effect when used for control flow. If a fa
 
 ```verse
 SafeDivide(A:float, B:float)<computes>:float =
-    if (B = 0.0) then 0.0 else A / B  # Division might fail, but if catches it
+    if (V:= A / B)  then V else 0.0
 ```
 
 The `spawn` expression hides the `suspends` effect, allowing immediate functions to start asynchronous operations that continue independently:
 
+<!--verse
+GetNextTrack():int=0
+PlayTrack(:int):void={}
+-->
 ```verse
 StartBackgroundMusic():void =  # Note: no <suspends>
     spawn:
@@ -220,8 +253,11 @@ StartBackgroundMusic():void =  # Note: no <suspends>
 
 The `option` expression converts failure into an optional value, transforming the `fails` effect into a regular value that can be handled without `<decides>`:
 
+<!--verse
+item:=struct{}
+-->
 ```verse
-TryGetItem(Index:int):?item =
+TryGetItem(Items:[]item, Index:int):?item =
     option{Items[Index]}  # Array access might fail, option catches it
 ```
 
@@ -252,11 +288,16 @@ Effects are part of your API contract. Once published, removing effects is a bac
 
 Remember that over-specifying effects is allowed and sometimes beneficial. A function marked `<reads>` can be implemented as pure `<computes>` internally. This provides flexibility for future changes without breaking existing callers.
 
+<!--verse
+weapon:=struct{Type:weapon_type,Dammage:int}
+weapon_type:=enum:
+    Sword
+-->
 ```verse
 # API promises it might read state
 GetDefaultWeapon<public><reads>():weapon =
     # But current implementation is pure
-    weapon{Type := WeaponType.Sword, Damage := 10}
+    weapon{Type := weapon_type.Sword, Damage := 10}
 ```
 
 Effect over-specification can future-proof APIs and avoid breaking changes later. For example, marking a currently pure function as `<reads>` allows you to add state observation in the future without breaking compatibility.

@@ -8,24 +8,27 @@ The distinction between immutable and mutable data in Verse goes deeper than jus
 
 In Verse's pure fragment, computation happens without side effects. Values are created but never modified. Functions transform inputs into outputs without changing anything along the way. This isn't a limitation — it's a powerful foundation that makes code predictable and composable.
 
+<!--NoCompile-->
 ```verse
 # Immutable values and structures
-Point := struct<computes>:
+point := struct<computes>:
     X:float = 0.0
     Y:float = 0.0
 
-Origin := Point{}
-UnitX := Point{X := 1.0}
-UnitY := Point{Y := 1.0}
+Origin := point{}
+UnitX := point{X := 1.0}
+UnitY := point{Y := 1.0}
 
 # These values are eternal - Origin will always be (0, 0)
-Distance(P1:Point, P2:Point)<computes>:float =
+Distance(P1:point, P2:point)<reads>:float =
     DX := P2.X - P1.X
     DY := P2.Y - P1.Y
     Sqrt(DX * DX + DY * DY)
 ```
 
 In this pure world, equality means structural equality — two values are equal if they have the same shape and content. For primitive types and structs, this happens automatically. For classes, which have identity beyond their content, equality requires more careful consideration.
+
+<!-- TODO DOES NOT COMPILE -->
 
 ```verse
 # Recursive data structures using classes
@@ -57,17 +60,14 @@ Pure computation forms the backbone of functional programming in Verse. It's pre
 
 Mutation enters through two keywords: `var` and `set`. The `var` annotation declares that a variable can be reassigned. The `set` keyword performs that reassignment. Together, they provide controlled mutation with clear visibility.
 
+<!--NoCompile-->
 ```verse
 # Immutable variable - cannot be reassigned
 Score:int = 100
-# Score = 200  # ERROR: Cannot assign to non-var variable
 
-# Mutable variable - can be reassigned
-var Health:float = 100.0
+# Mutable variable - can be reassigned 
+var Health:float = 100.0       # type annotation is required
 set Health = 75.0  # Allowed
-
-# Type annotation is required for var
-var Shield:float = 50.0  # Must specify type
 ```
 
 Every use of `var` and `set` has implications for effects. Reading from a `var` variable requires the `<reads>` effect. Using `set` requires both `<reads>` and `<writes>` effects. This isn't bureaucracy — it's transparency. The effects make mutation visible in function signatures, so callers know when functions might observe or modify state.
@@ -99,6 +99,12 @@ set Stats2.Inventory = Stats2.Inventory + array{"Sword"}  # OK
 
 When you assign one struct variable to another, Verse performs a deep copy. The two variables become independent, each with their own copy of the data. Changes to one don't affect the other.
 
+<!--verse
+player_stats := struct<computes>:
+    Level:int = 1
+    Position:Point = Point{}
+    Inventory:[]string = array{}
+-->
 ```verse
 var Original:player_stats = player_stats{Level := 5}
 var Copy:player_stats = Original
@@ -113,6 +119,20 @@ This deep-copy semantics extends to all value types: structs, arrays, maps, and 
 
 Classes behave differently. They have reference semantics — when you assign a class instance, you're sharing a reference to the same object, not creating a copy. The `var` annotation on a class variable only affects whether that variable can be reassigned to reference a different object. It doesn't affect the mutability of the object's fields.
 
+<!--verse
+game_character := class:
+    Name:string = "Hero"
+    var Health:float = 100.0  # This field is always mutable
+    MaxHealth:float = 100.0   # This field is always immutable
+
+Player1:game_character = game_character{}
+set Player1.Health = 50.0  # OK: Health field is mutable
+
+var Player2:game_character = Player1  # Same object
+set Player2 = game_character{Name := "Villain"}  # OK: Can reassign
+set Player2.Health = 75.0  # OK: Modifies the new object
+<#
+-->
 ```verse
 game_character := class:
     Name:string = "Hero"
@@ -121,7 +141,7 @@ game_character := class:
 
 # Immutable variable, but mutable fields can still change
 Player1:game_character = game_character{}
-# Player1 = game_character{}  # ERROR: Cannot reassign non-var variable
+# set Player1 = game_character{}  # ERROR: Cannot reassign non-var variable
 set Player1.Health = 50.0  # OK: Health field is mutable
 
 # Mutable variable allows reassignment
@@ -132,12 +152,18 @@ set Player2.Health = 75.0  # OK: Modifies the new object
 # Player1 and the original Player2 reference were the same object
 # After reassignment, Player2 references a different object
 ```
+<!--verse
+#>
+-->
 
 The key insight: for classes, field mutability is determined at class definition time, not at variable declaration time. A `var` field is always mutable, regardless of how you access it. A non-`var` field is always immutable, even if accessed through a `var` variable.
 
+<!--verse
+point:=struct{X:float}
+-->
 ```verse
 container := class:
-    ImmutableData:Point = Point{}  # Always immutable
+    ImmutableData:point= point{}  # Always immutable
     var MutableData:int = 0  # Always mutable
 
 # Even through an immutable variable, mutable fields can change
@@ -150,6 +176,23 @@ set Box.MutableData = 42  # Allowed
 
 The `<unique>` specifier gives classes identity-based equality. Without it, classes can't be compared for equality at all (you'd need to write custom comparison methods). With it, equality means identity — two references are equal only if they refer to the exact same object.
 
+<!--verse
+using { /Verse.org/VerseCLR }
+unique_item := class<unique>:
+    var Count:int = 0
+
+F():void={
+Item1:unique_item = unique_item{}
+Item2:unique_item = Item1  # Same object
+Item3:unique_item = unique_item{}  # Different object
+
+if (Item1 = Item2):
+    Print("Same object")  # This prints
+
+if (Item1 = Item3):
+    Print("Same object")  
+}<#
+-->
 ```verse
 unique_item := class<unique>:
     var Count:int = 0
@@ -164,6 +207,9 @@ if (Item1 = Item2):
 if (Item1 = Item3):
     Print("Same object")  # This doesn't print - different objects
 ```
+<!--verse
+#>
+-->
 
 This identity-based equality is crucial for game objects that need distinct identities even when their data is identical. Two monsters might have the same stats, but they're still different monsters.
 
@@ -173,15 +219,15 @@ The distinction between struct and class mutability has profound implications fo
 
 ```verse
 # Struct: Each player has their own copy of stats
-player_save := struct<computes><persistable>:
+player := struct<computes><persistable>:
     Name:string = "Player"
     Level:int = 1
     Gold:int = 0
 
 # Modifying one player's save doesn't affect others
-var Save1:player_save = player_save{Name := "Alice"}
-var Save2:player_save = Save1  # Deep copy
-set Save2.Name = "Bob"  # Only affects Save2
+var Save1:player= player{Name := "Alice"}
+var Save2:player= Save1  # Deep copy
+set Save2.Name= "Bob"  # Only affects Save2
 
 # Class: Shared game state
 game_world := class:

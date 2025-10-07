@@ -145,6 +145,7 @@ This resolution process happens at compile time, meaning that all imports must b
 
 For modules within your own project, you have flexibility in how you reference them:
 
+<!--NoCompile-->
 ```verse
 # Absolute import from your project root
 using { /MyGameProject/Systems/Combat }
@@ -315,6 +316,7 @@ When you publish a module to the Metaverse, the module path becomes globally acc
 
 The following example of shows how evolution works:
 
+<!--NoCompile-->
 ```verse
 # Initial publication
 Thing<public>:int = 666
@@ -360,24 +362,24 @@ When working with modules, you may encounter various issues. Understanding these
 
 1. **Incorrect path**: Double-check the module path in your `using` statement. Remember that paths are case-sensitive.
 
-   ```verse
+```verse
    # Wrong: different case
    using { /verse.org/random }  # Error: module not found
 
    # Correct: proper case
    using { /Verse.org/Random }  # Works
-   ```
+```
 
 2. **Missing parent module import**: When importing nested modules, ensure the parent is imported first.
 
-   ```verse
+```verse
    # Wrong: child before parent
    using { inventory }  # Error if inventory is nested
 
    # Correct: parent first
    using { game_systems }
    using { inventory }
-   ```
+ ```
 
 3. **File location mismatch**: Ensure your file structure matches your module structure. If you have a folder named `player_systems`, all files in that folder are part of the `player_systems` module.
 
@@ -389,7 +391,7 @@ When working with modules, you may encounter various issues. Understanding these
 
 1. **Missing access specifier**: Members without the `<public>` specifier are internal by default.
 
-   ```verse
+ ```verse
    # In module_a
    SecretValue:int = 42  # Internal by default
    PublicValue<public>:int = 100  # Explicitly public
@@ -398,11 +400,11 @@ When working with modules, you may encounter various issues. Understanding these
    using { module_a }
    X := module_a.SecretValue  # Error: not accessible
    Y := module_a.PublicValue  # Works
-   ```
+ ```
 
 2. **Protected or private members**: These are not accessible outside their defining scope.
 
-   ```verse
+ ```verse
    # In a class
    class_a := class:
        PrivateField<private>:int = 10
@@ -413,7 +415,7 @@ When working with modules, you may encounter various issues. Understanding these
    Obj := class_a{}
    X := Obj.PrivateField  # Error: private
    Y := Obj.PublicField   # Works
-   ```
+ ```
 
 ### Circular Dependency Errors
 

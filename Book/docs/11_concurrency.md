@@ -28,6 +28,9 @@ Async expressions naturally align with this update cycle. When an async expressi
 
 The `suspends` effect marks functions that can perform async operations, serving as the gateway between immediate and async execution contexts. When you mark a function with `<suspends>`, you're declaring that this function might take time to complete and needs the ability to pause and resume its execution.
 
+<!--verse
+using {/Verse.org/VerseCLR}
+-->
 ```verse
 # Function marked with suspends can use async expressions
 MyAsyncFunction()<suspends>:void =
@@ -54,6 +57,13 @@ This approach mirrors how we think about sequential code. Just as a block of seq
 
 The `sync` expression embodies the simplest concurrent pattern: doing multiple things at once and waiting for all of them to finish. When you have independent operations that can benefit from parallel execution, `sync` provides a clean way to express this parallelism while maintaining deterministic behavior.
 
+<!--verse
+using{/Verse.org/VerseCLR}
+AsyncOperation1()<suspends>:void={}
+AsyncOperation2()<suspends>:void={}
+AsyncOperation3()<suspends>:void={}
+F():void={
+-->
 ```verse
 # All expressions start simultaneously and must all complete
 Results := sync:
@@ -64,6 +74,9 @@ Results := sync:
 # Results is a tuple containing (value1, value2, value3)
 Print("All operations complete with results: {Results}")
 ```
+<!--verse
+}
+-->
 
 Inside a `sync` block, all subexpressions begin execution at essentially the same moment. The sync expression then waits patiently for every single subexpression to complete, regardless of how long each takes individually. If one operation finishes in milliseconds while another takes several seconds, sync continues waiting until that last operation completes. Only then does execution continue past the sync block.
 
@@ -71,6 +84,31 @@ The beauty of sync lies in its predictability. You always get results from all s
 
 Consider a more sophisticated example that demonstrates sync's composability:
 
+<!--verse
+LoadTexture():void={}
+ApplyTexture():void={}
+LoadSound()<suspends>:void={}
+PlaySound()<suspends>:void={}
+LoadModel():void={}
+ProcessData(:int,:int,:int):void={}
+FetchDataA():int={}
+FetchDataB():int={}
+FetchDataC():int={}
+F():void={
+sync:
+    block:  # Task 1 - sequential operations
+        LoadTexture()
+        ApplyTexture()
+    block:  # Task 2 - parallel to task 1
+        LoadSound()
+        PlaySound()
+    LoadModel()  # Task 3 - parallel to tasks 1 and 2
+ProcessData(sync:
+    FetchDataA()
+    FetchDataB()
+    FetchDataC())
+}<#
+-->
 ```verse
 # Nested blocks for complex operations
 sync:
@@ -88,11 +126,20 @@ ProcessData(sync:
     FetchDataB()
     FetchDataC())
 ```
+<!--verse
+#>
+-->
 
 ### The race Expression
 
 Where `sync` embodies cooperation, `race` represents competition. The race expression starts multiple async operations simultaneously, but only cares about the first one to cross the finish line. As soon as one subexpression completes, race immediately cancels all the others and continues with the winner's result. This winner-takes-all semantics makes race perfect for timeout patterns, fallback mechanisms, and any situation where you want the fastest possible response.
 
+<!--verse
+SlowOperation():int=0
+FastOperation()   :int=0
+MediumOperation()   :int=0
+F():void={
+-->
 ```verse
 # First to complete wins, others are canceled
 Winner := race:
@@ -102,6 +149,9 @@ Winner := race:
 
 Print("Winner result: {Winner}")  # Prints FastOperation's result
 ```
+<!--verse
+}
+-->
 
 The power of race becomes apparent when you consider real game scenarios. Imagine querying multiple servers for data, where you want to use whichever responds first. Or implementing a player action with a timeout, where either the player completes the action or time runs out. Race elegantly expresses these patterns without complex state management or manual cancellation logic.
 
@@ -109,8 +159,14 @@ Cancellation in race is immediate and thorough. The moment a winner emerges, all
 
 The type system handles race elegantly too. Since only one subexpression's result will be returned, the result type of a race is the most specific common supertype of all the subexpressions. This ensures type safety while maintaining flexibility in what kinds of operations you can race against each other.
 
-A particularly elegant pattern involves adding identifiers to determine which subexpression won:
+A pattern involves adding identifiers to determine which subexpression won:
 
+<!--verse
+SlowOperation():int=0
+FastOperation()   :int=0
+MediumOperation()   :int=0
+F():void={
+-->
 ```verse
 # Adding identifiers to determine which expression won
 WinnerID := race:
@@ -130,11 +186,21 @@ case(WinnerID):
     2 => Print("Fast operation won as expected")
     _ => Print("Impossible!")
 ```
+<!--verse
+}
+-->
 
 ### The rush Expression
 
 The `rush` expression occupies a unique middle ground between `sync` and `race`. Like race, it completes as soon as the first subexpression finishes. Unlike race, it doesn't cancel the losers. This creates an interesting pattern where you can start multiple operations, proceed as soon as one provides a result, while allowing the others to continue their work in the background.
 
+<!--verse
+using{/Verse.org/VerseCLR}
+LongBackgroundTask():int=0
+QuickCheck()   :int=0
+MediumTask()   :int=0
+F():void={
+-->
 ```verse
 # First to complete allows continuation, others keep running
 FirstResult := rush:
@@ -145,6 +211,9 @@ FirstResult := rush:
 Print("First result: {FirstResult}")
 # LongBackgroundTask and MediumTask are still running!
 ```
+<!--verse
+}
+-->
 
 Rush shines in scenarios where you want to be responsive while still completing all operations eventually. Consider preloading game assets: you might start loading multiple levels simultaneously, begin gameplay as soon as the current level loads, while continuing to cache the other levels in the background. Or think about achievement checking, where you want to notify the player as soon as one achievement unlocks while continuing to check for others.
 
@@ -156,6 +225,13 @@ There's an important technical restriction to be aware of: rush cannot be used d
 
 The `branch` expression represents fire-and-forget concurrency within a structured context. When you encounter a branch, it immediately starts executing its body as a background task and then, without any pause or hesitation, continues with the next expression. There's no waiting, no result collection, just a task spinning off to do its work while the main flow proceeds unimpeded.
 
+<!--verse
+using{/Verse.org/VerseCLR}
+AsyncOperation1()<suspends>:int=0
+ImmediateOperation()   :int=0
+AsyncOperation2() <suspends>  :int=0
+F():void={
+-->
 ```verse
 branch:
     # This block runs independently
@@ -167,6 +243,9 @@ branch:
 Print("Branch started, continuing main flow")
 # Branch block is still running in background
 ```
+<!--verse
+}
+-->
 
 Branch excels at handling side effects that shouldn't interrupt the main game flow. Think about logging player actions to analytics, triggering particle effects that play out over time, or starting background music that fades in gradually. These operations need to happen, but there's no reason to make the player wait for them to complete. Branch lets you express this "start it and move on" pattern directly.
 
@@ -180,11 +259,19 @@ Like rush, branch faces restrictions with iteration expressions. You cannot use 
 
 While structured concurrency handles most concurrent programming needs elegantly, sometimes you need to break free from the hierarchical task structure. The `spawn` expression is Verse's single concession to unstructured concurrency, allowing you to start an async operation that lives independently of its creating scope. Think of spawn as an emergency escape hatch—powerful when needed, but not your first choice for typical concurrent patterns.
 
+<!--verse
+using{/Verse.org/VerseCLR}
+LongRunningTask()   :int=0
+F():void={
+-->
 ```verse
 # Can be used in ANY context (async or immediate)
 spawn{LongRunningTask()}
 Print("Spawned task continues even after this scope exits")
 ```
+<!--verse
+}
+-->
 
 What makes spawn unique is its ability to work anywhere. Unlike all the structured concurrency expressions that require an async context, spawn works in immediate functions, class constructors, module initialization—anywhere you can write code. This universality comes with responsibility. The task you spawn becomes a free agent, continuing its work regardless of what happens to the code that created it. There's no automatic cleanup, no parent-child relationship, just an independent task pursuing its goal.
 
@@ -206,8 +293,6 @@ Cancellation cascades through the task hierarchy. When a parent task is canceled
 
 ## Timing Functions
 
-### Sleep Function
-
 The fundamental timing function that suspends execution for a specified duration:
 
 ```verse
@@ -216,16 +301,30 @@ Sleep(1.0)
 
 # Suspend for one frame (smallest possible delay)
 Sleep(0.0)
-
+```
+<!--verse
+ProcessFrame():void={}
+F():void={
+-->
+```verse
 # Common patterns
 LoopWithDelay()<suspends>:void =
     loop:
         ProcessFrame()
         Sleep(0.033)  # ~30 FPS
 ```
+<!--verse
+}
+-->
 
-### Timing Patterns
+Timing Patterns are:
 
+<!--verse
+DoAction():void={}
+UpdateLogic:void={}
+Lerp(:float,:float,:float):int=0
+SetPosition(:int):void={}
+-->
 ```verse
 # Delayed action
 PerformDelayedAction()<suspends>:void =
@@ -239,7 +338,7 @@ PeriodicUpdate()<suspends>:void =
         Sleep(1.0)  # Update every second
 
 # Animation timing
-AnimateMovement()<suspends>:void =
+AnimateMovement(Start:float,End:float)<suspends>:void =
     for (T : 0.0..1.0):
         SetPosition(Lerp(Start, End, T))
         Sleep(0.0)  # One frame
@@ -247,10 +346,11 @@ AnimateMovement()<suspends>:void =
 
 ## Common Patterns and Best Practices
 
-### Timeout Pattern
-
 Implement operations with timeouts using `race`:
 
+<!--verse
+ActualOperation():void={}
+-->
 ```verse
 PerformWithTimeout()<suspends>:logic =
     race:
@@ -262,10 +362,15 @@ PerformWithTimeout()<suspends>:logic =
             false  # Timeout
 ```
 
-### Parallel Initialization
-
 Initialize multiple systems concurrently:
 
+<!--verse
+using{/Verse.org/VerseCLR}
+LoadAssets():void={}
+ConnectToServer():void={}
+InitializeUI():void={}
+PrepareAudio():void={}
+-->
 ```verse
 InitializeGame()<suspends>:void =
     sync:
@@ -276,10 +381,13 @@ InitializeGame()<suspends>:void =
     Print("Game ready!")
 ```
 
-### Background Processing
-
 Start background tasks that don't block gameplay:
 
+<!--verse
+MonitorPlayerStats():void={}
+UpdateLeaderboards():void={}
+ProcessAchievements():void={}
+-->
 ```verse
 StartBackgroundSystems()<suspends>:void =
     branch:
@@ -291,10 +399,12 @@ StartBackgroundSystems()<suspends>:void =
     # Main game continues while background tasks run
 ```
 
-### Staggered Spawning
-
 Spawn entities with delays:
 
+<!--verse
+enemy_class := class:
+    Spawn():void={}
+-->
 ```verse
 SpawnWave(Enemies:[]enemy_class)<suspends>:void =
     for (Enemy : Enemies):
@@ -302,10 +412,12 @@ SpawnWave(Enemies:[]enemy_class)<suspends>:void =
         Sleep(0.5)  # Half second between spawns
 ```
 
-### Concurrent Animations
-
 Animate multiple objects simultaneously:
 
+<!--verse
+platform:=class:
+    Animate():void={}
+-->
 ```verse
 AnimateAllPlatforms(Platforms:[]platform)<suspends>:void =
     sync:
@@ -320,6 +432,12 @@ AnimateAllPlatforms(Platforms:[]platform)<suspends>:void =
 
 Failures in concurrent expressions propagate differently:
 
+<!--verse
+OperationThatSucceeds():void={}
+OperationThatFails():void={}
+AnotherOperation():void={}
+F()<suspends>:void={
+-->
 ```verse
 # In sync: all expressions complete, then failure propagates
 sync:
@@ -333,9 +451,17 @@ race:
     OperationThatFails()   # If this wins, race fails
     OperationThatSucceeds() # If this wins, race succeeds
 ```
+<!--verse
+}
+-->
 
 ### Defensive Patterns
 
+<!--verse
+using{/Verse.org/VerseCLR}
+RiskyOperation():void={}
+HandleFailure():void={}
+-->
 ```verse
 # Safe concurrent operation with fallback
 SafeConcurrentOp()<suspends>:void =
@@ -358,6 +484,11 @@ SafeConcurrentOp()<suspends>:void =
 
 Balance between too many small tasks and too few large tasks:
 
+<!--verse
+ProcessItem(:int):void={}
+ProcessItemBatch(:[]int):void={}
+F()<suspends>:void={
+-->
 ```verse
 # Too fine-grained (overhead)
 sync:
@@ -370,11 +501,15 @@ sync:
     ProcessItemBatch(Items[100..199])
     ProcessItemBatch(Items[200..299])
 ```
+<!--verse
+}
+-->
 
 ### Resource Management
 
 Be mindful of long-running tasks:
 
+<!--NoCompile-->
 ```verse
 # Potential resource leak
 rush:
@@ -392,6 +527,10 @@ MonitorWithLifetime()<suspends>:void =
 
 Minimize suspensions in tight loops:
 
+<!--verse
+ProcessItem(:int):void={}
+F()<suspends>:void={
+-->
 ```verse
 # Inefficient - suspends every iteration
 for (I := 0..1000):
@@ -404,6 +543,9 @@ for (Batch := 0..10):
         ProcessItem(I)
     Sleep(0.0)  # Suspend between batches
 ```
+<!--verse
+}
+-->
 
 ## Debugging Concurrent Code
 
@@ -411,6 +553,9 @@ for (Batch := 0..10):
 
 Add logging to understand execution order:
 
+<!--verse
+using{/Verse.org/VerseCLR}
+-->
 ```verse
 DebugConcurrency()<suspends>:void =
     sync:
@@ -424,35 +569,17 @@ DebugConcurrency()<suspends>:void =
             Print("Task 2 end")
 ```
 
-### Identifying Deadlocks
-
-Watch for patterns that might cause deadlocks:
-
-```verse
-# Potential issue: circular waiting
-# Task A waits for Task B
-# Task B waits for Task A
-```
-
-### Testing Concurrent Code
-
-Test with various timings:
-
-```verse
-TestWithVariableDelay()<suspends>:void =
-    for (Delay : [0.0, 0.1, 1.0, 5.0]):
-        race:
-            OperationUnderTest()
-            Sleep(Delay)
-        ValidateState()
-```
-
 ## Limitations and Considerations
 
 ### Iteration Restrictions
 
 The interaction between iteration and certain concurrency expressions requires careful consideration. Rush and branch cannot be used directly inside loop or for bodies, a restriction that prevents unbounded task accumulation. When you write a loop that might execute hundreds or thousands of times, allowing rush or branch directly would create that many background tasks, potentially overwhelming the system.
 
+<!--verse
+Operation1():void={}
+Operation2():void={}
+F()<suspends>:void={
+-->
 ```verse
 # Not allowed
 for (I := 0..10):
@@ -469,6 +596,9 @@ ProcessWithRush(I:int)<suspends>:void =
 for (I := 0..10):
     ProcessWithRush(I)  # OK
 ```
+<!--verse
+}
+-->
 
 This restriction forces you to be intentional about creating background tasks in iterations. By wrapping the concurrent operation in a function, you acknowledge the task creation and make it explicit in your code structure. This small friction prevents accidental resource exhaustion while maintaining the flexibility to use these patterns when genuinely needed.
 
