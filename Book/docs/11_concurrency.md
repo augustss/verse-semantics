@@ -59,9 +59,9 @@ The `sync` expression embodies the simplest concurrent pattern: doing multiple t
 
 <!--verse
 using{/Verse.org/VerseCLR}
-AsyncOperation1()<suspends>:void={}
-AsyncOperation2()<suspends>:void={}
-AsyncOperation3()<suspends>:void={}
+AsyncOperation1()<suspends>:int=1
+AsyncOperation2()<suspends>:int=1
+AsyncOperation3()<suspends>:int=1
 F():void={
 -->
 ```verse
@@ -85,16 +85,16 @@ The beauty of sync lies in its predictability. You always get results from all s
 Consider a more sophisticated example that demonstrates sync's composability:
 
 <!--verse
-LoadTexture():void={}
-ApplyTexture():void={}
+LoadTexture()<suspends>:void={}
+ApplyTexture()<suspends>:void={}
 LoadSound()<suspends>:void={}
 PlaySound()<suspends>:void={}
 LoadModel():void={}
 ProcessData(:int,:int,:int):void={}
-FetchDataA():int={}
-FetchDataB():int={}
+FetchDataA()<suspends>:int={}
+FetchDataB()<suspends>:int={}
 FetchDataC():int={}
-F():void={
+F()<suspends>:void={
 sync:
     block:  # Task 1 - sequential operations
         LoadTexture()

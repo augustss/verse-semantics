@@ -28,8 +28,29 @@ Distance(P1:point, P2:point)<reads>:float =
 
 In this pure world, equality means structural equality — two values are equal if they have the same shape and content. For primitive types and structs, this happens automatically. For classes, which have identity beyond their content, equality requires more careful consideration.
 
-<!-- TODO DOES NOT COMPILE -->
+<!--verse
+using{/Verse.org/VerseCLR}
+linked_list := class:
+    Value:int = 0
+    Next:?linked_list = false
 
+    Equals(Other:linked_list)<computes><decides>:void =
+        Self.Value = Other.Value
+        if (Self.Next?):
+            Tmp := Self.Next?
+            OtherNext := Other.Next?
+            Tmp.Equals[OtherNext]
+        else:
+            not Other.Next?
+
+F():void={
+List1 := linked_list{Value := 1, Next := option{linked_list{Value := 2}}}
+List2 := linked_list{Value := 1, Next := option{linked_list{Value := 2}}}
+
+if (List1.Equals[List2]):
+    Print("Structurally equal")  
+}<#
+-->
 ```verse
 # Recursive data structures using classes
 linked_list := class:
@@ -41,18 +62,21 @@ linked_list := class:
         Self.Value = Other.Value
         # Both have no next, or both have next and those are equal
         if (Self.Next?):
-            Next := Self.Next?
+            Tmp := Self.Next?
             OtherNext := Other.Next?
-            Next.Equals(OtherNext)
+            Tmp.Equals[OtherNext]
         else:
             not Other.Next?
 
 List1 := linked_list{Value := 1, Next := option{linked_list{Value := 2}}}
 List2 := linked_list{Value := 1, Next := option{linked_list{Value := 2}}}
 
-if (List1.Equals(List2)):
+if (List1.Equals[List2]):
     Print("Structurally equal")  # This succeeds
 ```
+<!--verse
+#>
+-->
 
 Pure computation forms the backbone of functional programming in Verse. It's predictable, testable, and parallelizable. When a function is marked `<computes>`, you know it will always produce the same output for the same input, with no hidden dependencies or surprising behaviors.
 
@@ -80,10 +104,25 @@ Verse's approach to mutability differs significantly between structs and classes
 
 When you declare a struct variable with `var`, you're declaring the entire structure as mutable — the variable itself and all its nested fields, recursively. This deep mutability means you can modify any part of the structure tree.
 
+<!--verse
+point:=struct<computes>{X:float=100.0}
+player_stats := struct<computes>:
+    Level:int = 1
+    Position:point = point{}
+    Inventory:[]string = array{}
+
+f():void={
+Stats1:player_stats = player_stats{}
+var Stats2:player_stats = player_stats{}
+set Stats2.Level = 2  # OK
+set Stats2.Position.X = 100.0  # OK - nested fields are mutable
+set Stats2.Inventory = Stats2.Inventory + array{"Sword"}  # OK
+}<#
+-->
 ```verse
 player_stats := struct<computes>:
     Level:int = 1
-    Position:Point = Point{}
+    Position:point = point{}
     Inventory:[]string = array{}
 
 # Immutable struct variable - nothing can change
@@ -96,14 +135,19 @@ set Stats2.Level = 2  # OK
 set Stats2.Position.X = 100.0  # OK - nested fields are mutable
 set Stats2.Inventory = Stats2.Inventory + array{"Sword"}  # OK
 ```
+<!--verse
+}
+-->
 
 When you assign one struct variable to another, Verse performs a deep copy. The two variables become independent, each with their own copy of the data. Changes to one don't affect the other.
 
 <!--verse
+point:=struct{}
 player_stats := struct<computes>:
     Level:int = 1
-    Position:Point = Point{}
+    Position:point = point{}
     Inventory:[]string = array{}
+F():void={
 -->
 ```verse
 var Original:player_stats = player_stats{Level := 5}
@@ -112,6 +156,9 @@ var Copy:player_stats = Original
 set Copy.Level = 10
 # Original.Level is still 5 - they're independent copies
 ```
+<!--verse
+}
+-->
 
 This deep-copy semantics extends to all value types: structs, arrays, maps, and tuples. When you pass a struct to a function, the function receives its own copy. When you store a struct in a container, the container holds a copy. This prevents aliasing and makes reasoning about struct mutations local and predictable.
 
@@ -124,14 +171,14 @@ game_character := class:
     Name:string = "Hero"
     var Health:float = 100.0  # This field is always mutable
     MaxHealth:float = 100.0   # This field is always immutable
-
+F():void={
 Player1:game_character = game_character{}
 set Player1.Health = 50.0  # OK: Health field is mutable
 
 var Player2:game_character = Player1  # Same object
 set Player2 = game_character{Name := "Villain"}  # OK: Can reassign
 set Player2.Health = 75.0  # OK: Modifies the new object
-<#
+}<#
 -->
 ```verse
 game_character := class:
@@ -159,7 +206,14 @@ set Player2.Health = 75.0  # OK: Modifies the new object
 The key insight: for classes, field mutability is determined at class definition time, not at variable declaration time. A `var` field is always mutable, regardless of how you access it. A non-`var` field is always immutable, even if accessed through a `var` variable.
 
 <!--verse
-point:=struct{X:float}
+point:=struct{X:float=1.0}
+container := class:
+    ImmutableData:point= point{}  # Always immutable
+    var MutableData:int = 0  # Always mutable
+f():void={
+Box:container = container{}
+set Box.MutableData = 42  # Allowed
+}<#
 -->
 ```verse
 container := class:
@@ -171,6 +225,9 @@ Box:container = container{}
 set Box.MutableData = 42  # Allowed
 # set Box.ImmutableData = Point{X := 1.0}  # ERROR: Field is immutable
 ```
+<!--verse
+#>
+-->
 
 ## Identity and Uniqueness
 
@@ -217,6 +274,7 @@ This identity-based equality is crucial for game objects that need distinct iden
 
 The distinction between struct and class mutability has profound implications for how you design data structures. Structs are ideal for value-like data that you want to manipulate locally without affecting other parts of your program. Classes are better for entities with identity that might be referenced from multiple places.
 
+<!--NoCompile-->
 ```verse
 # Struct: Each player has their own copy of stats
 player := struct<computes><persistable>:

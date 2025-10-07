@@ -73,6 +73,7 @@ There is another planned specifier, `<interacts>`, expected to be used for code 
 
 Think of effect specifiers as setting bits in a bit vector: one bit per fundamental effect. Without any annotation, a function has the following effects:
 
+<!--NoCompile-->
 ```verse
 GameUpdate():void = ...  # No explicit effects specified
 ```
@@ -103,24 +104,24 @@ Specifying `<reads><predicts>` clears the `writes` and `allocates` bits, clears 
 The cardinality family deals with whether functions return values successfully. Every function either succeeds (returning its declared type) or fails (producing no value). Most functions always succeed — they're deterministic transformations that always produce output. But functions marked with `<decides>` can fail, turning failure into a control flow mechanism.
 
 <!--verse
-ValidateHealth(Health:float)<decides>:void =
+ValidateHealth(Health:float)<transacts><decides>:void =
     Health > 0.0      # Fails if health is zero or negative
     Health <= 100.0   # Fails if health exceeds maximum
 StartCombat():void={}
 player:=struct{Health:float}
 F(Player:player):void={
-if (ValidateHealth(Player.Health)):
+if (ValidateHealth[Player.Health]):
     # Health is valid, continue processing
     StartCombat()
 }<#
 -->
 ```verse
-ValidateHealth(Health:float)<decides>:void =
+ValidateHealth(Health:float)<transacts><decides>:void =
     Health > 0.0      # Fails if health is zero or negative
     Health <= 100.0   # Fails if health exceeds maximum
 
 # Usage
-if (ValidateHealth(Player.Health)):
+    if (ValidateHealth[Player.Health]):
     # Health is valid, continue processing
     StartCombat()
 ```
@@ -167,7 +168,7 @@ player := class:
     var Score:int = 0
 -->
 ```verse
-HealPlayer(P:player, Amount:float)<writes><reads>:void =
+HealPlayer(P:player, Amount:float)<transacts>:void =
     NewHealth := P.Health + Amount
     set P.Health = Min(NewHealth, 100.0)
 ```
@@ -179,9 +180,9 @@ vector3:=struct{}
 GenerateID():int=0
 -->
 ```verse
-game_entity := class<unique>:
+game_entity := class<allocates>:
     ID:int
-    Position:vector3
+    var Position:vector3
 
 CreateEntity(Pos:vector3)<allocates>:game_entity =
     game_entity{ID := GenerateID(), Position := Pos}
@@ -233,15 +234,18 @@ Effects generally propagate up the call chain — a function must declare all th
 The `if` expression hides the `fails` effect when used for control flow. If a failable expression appears in a condition, the failure doesn't propagate to the enclosing function:
 
 ```verse
-SafeDivide(A:float, B:float)<computes>:float =
-    if (V:= A / B)  then V else 0.0
+SafeMod(A:int, B:int)<computes>:int =
+    if (V:= Mod[A,B])  then V else 0
 ```
 
 The `spawn` expression hides the `suspends` effect, allowing immediate functions to start asynchronous operations that continue independently:
 
+<!-- TODO DOES NOT COMPILE -->
+
 <!--verse
+Sleep(:float):void={}
 GetNextTrack():int=0
-PlayTrack(:int):void={}
+PlayTrack(:int)<suspends>:void={}
 -->
 ```verse
 StartBackgroundMusic():void =  # Note: no <suspends>
@@ -289,13 +293,13 @@ Effects are part of your API contract. Once published, removing effects is a bac
 Remember that over-specifying effects is allowed and sometimes beneficial. A function marked `<reads>` can be implemented as pure `<computes>` internally. This provides flexibility for future changes without breaking existing callers.
 
 <!--verse
-weapon:=struct{Type:weapon_type,Dammage:int}
+weapon:=struct<computes>{Type:weapon_type,Dammage:int}
 weapon_type:=enum:
     Sword
 -->
 ```verse
 # API promises it might read state
-GetDefaultWeapon<public><reads>():weapon =
+GetDefaultWeapon<public>()<reads>:weapon =
     # But current implementation is pure
     weapon{Type := weapon_type.Sword, Damage := 10}
 ```
