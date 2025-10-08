@@ -1,122 +1,71 @@
 #!/usr/bin/env node
-
-const { spawn } = require('child_process');
-const path = require('path');
-
+const { spawn } = require('child_process')
+const path = require('path')
+const defaultPath = "../../fortniteMain/Engine/Restricted/NotForLicensees/Binaries/Win64/VerseCLRVM-Win64-Shipping.exe"
 function printUsage() {
-  console.log('Usage: vc <compiler-path> <verse-file>');
-  console.log('');
-  console.log('Runs the Verse compiler and formats error messages.');
-  process.exit(1);
+  console.log('Usage: vc <compiler-path> <verse-file>'); console.log('')
+  console.log('Runs the Verse compiler and formats error messages.')
+  process.exit(1)
 }
-
 function parseArgs() {
-  const args = process.argv.slice(2);
-
-  if (args.length < 2) {
-    printUsage();
-  }
-
-  const compilerPath = args[0];
-  const verseFile = args[1];
-
-  return { compilerPath, verseFile };
+    const args = process.argv.slice(2)
+    if (args.length < 1) printUsage()
+    if (args.length == 2) {
+        const compilerPath = args[0]
+        const verseFile = args[1]
+        return { compilerPath, verseFile }
+    } else  if (args.length == 1) {
+        const compilerPath = defaultPath
+        const verseFile = args[0]
+        return { compilerPath, verseFile }
+    } else {
+        console.log("Not expected")
+    }
 }
-
 function parseErrorMessages(output) {
-  const lines = output.split('\n');
-  const errors = [];
-  let i = 0;
-
-  // Skip first line (vproject opened message)
-  if (lines.length > 0 && lines[0].includes('vproject has opened')) {
-    i = 1;
-  }
-
-  // Process lines until we hit the final error messages
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Stop if we hit the final error/command lines
-    if (line.startsWith('ERROR:') || line.startsWith('Command:')) {
-      break;
-    }
-
-    // Check if this is a "Build Failure:" line
-    if (line.startsWith('Build Failure:')) {
-      // Extract the error message
-      const match = line.match(/\((\d+),\d+,\s*\d+,\d+\):\s*(.+)$/);
-      if (match) {
-        const lineNumber = match[1];
-        const message = match[2];
-        errors.push({ lineNumber, message });
-      }
-    } else if (errors.length > 0 && line.trim() !== '') {
-      // This might be a continuation of the previous error message
-      // Only add it if it doesn't start with a known prefix
-      if (!line.startsWith('LogVerseVMEnvironment:') &&
-          !line.startsWith('-------:') &&
-          line.trim().length > 0) {
-        // Check if the last error doesn't already have this continuation
-        const lastError = errors[errors.length - 1];
-        if (!lastError.message.includes(line.trim())) {
-          lastError.message += ' ' + line.trim();
+    const lines = output.split('\n')
+    const errors = []
+    let i = 0
+    // Skip first line (vproject opened message)
+    if (lines.length > 0 && lines[0].includes('vproject has opened')) {  i = 1 }
+    // Process lines until we hit the final error messages
+    while (i < lines.length) {
+        const line = lines[i]
+        // Stop if we hit the final error/command lines
+        if (line.startsWith('ERROR:') || line.startsWith('Command:')) { break; }
+        // Check if this is a "Build Failure:" line
+        if (line.startsWith('Build Failure:')) {
+            // Extract the error message
+            const re = /^Build Failure:\s+(.+?)\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\):\s*([^\r\n]+)/
+            const m = re.exec(line)
+            if (!m) { console.log("No match")
+            } else {
+                const [_, file, lineNumber, startCol, endLine, endCol, message] = m
+                errors.push({ lineNumber, message })
+            }
         }
-      }
+        i++
     }
-
-    i++;
-  }
-
-  return errors;
+    return errors
 }
-
-function isSuccess(output) {
-  // Success is indicated by log errors but no "Build Failure:" messages
-  return !output.includes('Build Failure:');
-}
-
+function isSuccess(output) { return !output.includes('Build Failure:') }
 function main() {
   const { compilerPath, verseFile } = parseArgs();
-
-  // Run the compiler
-  const compiler = spawn(compilerPath, ['--open=' + verseFile], {
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
-
+  const compiler = spawn(compilerPath, ['--open=' + verseFile], { stdio: ['pipe', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
-
-  compiler.stdout.on('data', (data) => {
-    stdout += data.toString();
-  });
-
-  compiler.stderr.on('data', (data) => {
-    stderr += data.toString();
-  });
-
+  compiler.stdout.on('data', (data) => { stdout += data.toString(); });
+  compiler.stderr.on('data', (data) => { stderr += data.toString(); });
   compiler.on('close', (code) => {
     const output = stdout + stderr;
-
-    if (isSuccess(output)) {
-      // Success - print nothing
-      process.exit(0);
-    } else {
-      // Failure - parse and print error messages
-      const errors = parseErrorMessages(output);
-
-      errors.forEach(error => {
-        console.log(`${error.lineNumber}: ${error.message}`);
-      });
-
-      process.exit(1);
-    }
+      if (isSuccess(output)) { console.log("Success"); process.exit(0)
+      } else { // Failure - parse and print error messages
+          const errors = parseErrorMessages(output)
+          if (errors.length==0) console.log(output)
+          errors.forEach(error => { console.log(${error.lineNumber}: ${error.message}) })
+          process.exit(1)
+      }
   });
-
-  compiler.on('error', (err) => {
-    console.error(`Failed to run compiler: ${err.message}`);
-    process.exit(1);
-  });
+    compiler.on('error', (err) => {  console.error(Failed to run compiler: ${err.message});  process.exit(1) })
 }
-
 main();
