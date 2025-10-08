@@ -62,7 +62,7 @@ using{/Verse.org/VerseCLR}
 AsyncOperation1()<suspends>:int=1
 AsyncOperation2()<suspends>:int=1
 AsyncOperation3()<suspends>:int=1
-F():void={
+F()<suspends>:void={
 -->
 ```verse
 # All expressions start simultaneously and must all complete
@@ -71,8 +71,7 @@ Results := sync:
     AsyncOperation2()  # Returns value2
     AsyncOperation3()  # Returns value3
 
-# Results is a tuple containing (value1, value2, value3)
-Print("All operations complete with results: {Results}")
+Print("All operations complete with results: {Results(0)} {Results(1)} {Results(2)}")
 ```
 <!--verse
 }
@@ -135,10 +134,11 @@ ProcessData(sync:
 Where `sync` embodies cooperation, `race` represents competition. The race expression starts multiple async operations simultaneously, but only cares about the first one to cross the finish line. As soon as one subexpression completes, race immediately cancels all the others and continues with the winner's result. This winner-takes-all semantics makes race perfect for timeout patterns, fallback mechanisms, and any situation where you want the fastest possible response.
 
 <!--verse
-SlowOperation():int=0
-FastOperation()   :int=0
-MediumOperation()   :int=0
-F():void={
+using{/Verse.org/VerseCLR}
+SlowOperation()<suspends>:int=0
+FastOperation()<suspends>   :int=0
+MediumOperation()<suspends>   :int=0
+F()<suspends>:void={
 -->
 ```verse
 # First to complete wins, others are canceled
@@ -162,10 +162,11 @@ The type system handles race elegantly too. Since only one subexpression's resul
 A pattern involves adding identifiers to determine which subexpression won:
 
 <!--verse
-SlowOperation():int=0
-FastOperation()   :int=0
-MediumOperation()   :int=0
-F():void={
+using{/Verse.org/VerseCLR}
+SlowOperation()<suspends>:int=0
+FastOperation()  <suspends> :int=0
+InfiniteOperation()  <suspends> :int=0
+F()<suspends>:void={
 -->
 ```verse
 # Adding identifiers to determine which expression won
@@ -196,10 +197,10 @@ The `rush` expression occupies a unique middle ground between `sync` and `race`.
 
 <!--verse
 using{/Verse.org/VerseCLR}
-LongBackgroundTask():int=0
-QuickCheck()   :int=0
-MediumTask()   :int=0
-F():void={
+LongBackgroundTask()<suspends>:int=0
+QuickCheck() <suspends>  :int=0
+MediumTask() <suspends>  :int=0
+F()<suspends>:void={
 -->
 ```verse
 # First to complete allows continuation, others keep running
@@ -230,7 +231,7 @@ using{/Verse.org/VerseCLR}
 AsyncOperation1()<suspends>:int=0
 ImmediateOperation()   :int=0
 AsyncOperation2() <suspends>  :int=0
-F():void={
+F()<suspends>:void={
 -->
 ```verse
 branch:
@@ -261,8 +262,8 @@ While structured concurrency handles most concurrent programming needs elegantly
 
 <!--verse
 using{/Verse.org/VerseCLR}
-LongRunningTask()   :int=0
-F():void={
+LongRunningTask()  <suspends> :int=0
+F()<suspends>:void={
 -->
 ```verse
 # Can be used in ANY context (async or immediate)
@@ -295,6 +296,7 @@ Cancellation cascades through the task hierarchy. When a parent task is canceled
 
 The fundamental timing function that suspends execution for a specified duration:
 
+<!--NoCompile-->
 ```verse
 # Suspend for 1 second
 Sleep(1.0)
@@ -302,9 +304,10 @@ Sleep(1.0)
 # Suspend for one frame (smallest possible delay)
 Sleep(0.0)
 ```
+
 <!--verse
 ProcessFrame():void={}
-F():void={
+Sleep(:float):void={}
 -->
 ```verse
 # Common patterns
@@ -313,17 +316,15 @@ LoopWithDelay()<suspends>:void =
         ProcessFrame()
         Sleep(0.033)  # ~30 FPS
 ```
-<!--verse
-}
--->
 
 Timing Patterns are:
 
 <!--verse
 DoAction():void={}
-UpdateLogic:void={}
-Lerp(:float,:float,:float):int=0
+UpdateLogic()<computes>:void={}
+Lerp(:float,:float,:rational)<computes>:int=0
 SetPosition(:int):void={}
+Sleep(:float)<suspends>:void={}
 -->
 ```verse
 # Delayed action
@@ -339,8 +340,8 @@ PeriodicUpdate()<suspends>:void =
 
 # Animation timing
 AnimateMovement(Start:float,End:float)<suspends>:void =
-    for (T : 0.0..1.0):
-        SetPosition(Lerp(Start, End, T))
+    for (T : 0..10):
+        SetPosition(Lerp(Start, End, T/10))
         Sleep(0.0)  # One frame
 ```
 
@@ -349,7 +350,8 @@ AnimateMovement(Start:float,End:float)<suspends>:void =
 Implement operations with timeouts using `race`:
 
 <!--verse
-ActualOperation():void={}
+ActualOperation()<suspends>:void={}
+Sleep(:float)<suspends>:void={}
 -->
 ```verse
 PerformWithTimeout()<suspends>:logic =
@@ -366,10 +368,10 @@ Initialize multiple systems concurrently:
 
 <!--verse
 using{/Verse.org/VerseCLR}
-LoadAssets():void={}
-ConnectToServer():void={}
-InitializeUI():void={}
-PrepareAudio():void={}
+LoadAssets()<suspends>:void={}
+ConnectToServer()<suspends>:void={}
+InitializeUI()<suspends>:void={}
+PrepareAudio()<suspends>:void={}
 -->
 ```verse
 InitializeGame()<suspends>:void =
@@ -384,9 +386,9 @@ InitializeGame()<suspends>:void =
 Start background tasks that don't block gameplay:
 
 <!--verse
-MonitorPlayerStats():void={}
-UpdateLeaderboards():void={}
-ProcessAchievements():void={}
+MonitorPlayerStats()<suspends>:void={}
+UpdateLeaderboards()<suspends>:void={}
+ProcessAchievements()<suspends>:void={}
 -->
 ```verse
 StartBackgroundSystems()<suspends>:void =
@@ -403,27 +405,13 @@ Spawn entities with delays:
 
 <!--verse
 enemy_class := class:
-    Spawn():void={}
+    Spawn()<suspends>:void={}
 -->
 ```verse
 SpawnWave(Enemies:[]enemy_class)<suspends>:void =
     for (Enemy : Enemies):
         spawn{Enemy.Spawn()}
         Sleep(0.5)  # Half second between spawns
-```
-
-Animate multiple objects simultaneously:
-
-<!--verse
-platform:=class:
-    Animate():void={}
--->
-```verse
-AnimateAllPlatforms(Platforms:[]platform)<suspends>:void =
-    sync:
-        for (Platform : Platforms):
-            branch:
-                Platform.Animate()
 ```
 
 ## Error Handling in Concurrent Code
@@ -433,9 +421,9 @@ AnimateAllPlatforms(Platforms:[]platform)<suspends>:void =
 Failures in concurrent expressions propagate differently:
 
 <!--verse
-OperationThatSucceeds():void={}
-OperationThatFails():void={}
-AnotherOperation():void={}
+OperationThatSucceeds()<suspends>:void={}
+OperationThatFails()<suspends>:void={}
+AnotherOperation()<suspends>:void={}
 F()<suspends>:void={
 -->
 ```verse
@@ -455,131 +443,13 @@ race:
 }
 -->
 
-### Defensive Patterns
-
-<!--verse
-using{/Verse.org/VerseCLR}
-RiskyOperation():void={}
-HandleFailure():void={}
--->
-```verse
-# Safe concurrent operation with fallback
-SafeConcurrentOp()<suspends>:void =
-    if (race:
-        block:
-            RiskyOperation()
-            true
-        block:
-            Sleep(10.0)  # Timeout fallback
-            false):
-        Print("Operation succeeded")
-    else:
-        Print("Operation failed or timed out")
-        HandleFailure()
-```
-
-## Performance Considerations
-
-### Granularity
-
-Balance between too many small tasks and too few large tasks:
-
-<!--verse
-ProcessItem(:int):void={}
-ProcessItemBatch(:[]int):void={}
-F()<suspends>:void={
--->
-```verse
-# Too fine-grained (overhead)
-sync:
-    for (Item : Items):
-        spawn{ProcessItem(Item)}  # Creates many tasks
-
-# Better - batch processing
-sync:
-    ProcessItemBatch(Items[0..99])
-    ProcessItemBatch(Items[100..199])
-    ProcessItemBatch(Items[200..299])
-```
-<!--verse
-}
--->
-
-### Resource Management
-
-Be mindful of long-running tasks:
-
-<!--NoCompile-->
-```verse
-# Potential resource leak
-rush:
-    InfiniteMonitoring()  # Continues forever
-    QuickCheck()
-
-# Better - controllable lifetime
-MonitorWithLifetime()<suspends>:void =
-    race:
-        InfiniteMonitoring()
-        Sleep(60.0)  # Maximum 60 second lifetime
-```
-
-### Suspension Points
-
-Minimize suspensions in tight loops:
-
-<!--verse
-ProcessItem(:int):void={}
-F()<suspends>:void={
--->
-```verse
-# Inefficient - suspends every iteration
-for (I := 0..1000):
-    ProcessItem(I)
-    Sleep(0.0)  # Unnecessary suspension
-
-# Better - batch before suspending
-for (Batch := 0..10):
-    for (I := Batch*100..(Batch+1)*100):
-        ProcessItem(I)
-    Sleep(0.0)  # Suspend between batches
-```
-<!--verse
-}
--->
-
-## Debugging Concurrent Code
-
-### Tracing Execution
-
-Add logging to understand execution order:
-
-<!--verse
-using{/Verse.org/VerseCLR}
--->
-```verse
-DebugConcurrency()<suspends>:void =
-    sync:
-        block:
-            Print("Task 1 start")
-            Sleep(1.0)
-            Print("Task 1 end")
-        block:
-            Print("Task 2 start")
-            Sleep(0.5)
-            Print("Task 2 end")
-```
-
 ## Limitations and Considerations
 
 ### Iteration Restrictions
 
 The interaction between iteration and certain concurrency expressions requires careful consideration. Rush and branch cannot be used directly inside loop or for bodies, a restriction that prevents unbounded task accumulation. When you write a loop that might execute hundreds or thousands of times, allowing rush or branch directly would create that many background tasks, potentially overwhelming the system.
 
-<!--verse
-Operation1():void={}
-Operation2():void={}
-F()<suspends>:void={
--->
+<!--NoCompile-->
 ```verse
 # Not allowed
 for (I := 0..10):
