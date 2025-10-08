@@ -59,18 +59,22 @@ Protected access enables the template method pattern and other inheritance-based
 
 The `<private>` specifier provides the strictest access control, limiting visibility to the immediately enclosing scope. Private members are truly internal implementation details that can be changed freely without affecting any external code:
 
+<!--verse
+item:=struct{Weight:float=0.0}
+-->
 ```verse
 inventory := class:
-    var Items<private>:[]item = []
+    var Items<private>:[]item = array{}
     var Capacity<private>:int = 20
     var CurrentWeight<private>:float = 0.0
+    MaxWeight:float=20.0
 
     AddItem<public>(NewItem:item)<transacts><decides>:void =
-        ValidateCapacity(NewItem)?
+        ValidateCapacity[NewItem]
         set Items = Items + [NewItem]
         set CurrentWeight = CurrentWeight + NewItem.Weight
 
-    ValidateCapacity<private>(NewItem:item)<decides>:void =
+    ValidateCapacity<private>(NewItem:item)<reads><decides>:void =
         Items.Length < Capacity
         CurrentWeight + NewItem.Weight <= MaxWeight
 ```
@@ -91,7 +95,7 @@ physics := module:
             # Implementation details
 
     physics_world := class:
-        var Entities<internal>:[]game_entity = []
+        var Entities<internal>:[]game_entity = array{}
 
         SimulateStep<internal>(DeltaTime:float):void =
             for (Entity : Entities):
@@ -103,24 +107,7 @@ Internal access is ideal for module-wide utilities, shared implementation detail
 
 ## Scoped
 
-**TODO: CHECK THIS ONE**
-
-The `<scoped>` specifier provides access within the current scope and any enclosing scopes. This unique access level is particularly important for assets exposed to Verse, which automatically receive the scoped specifier:
-
-```verse
-ui_system := module:
-    dialog<scoped> := class:
-        var Content<scoped>:string = ""
-
-        button<scoped> := class:
-            Label<scoped>:string
-            OnClick<scoped>:type{():void}
-
-            Press():void =
-                OnClick()
-```
-
-Scoped access creates a hierarchical visibility model where inner scopes can access outer scope members, facilitating nested class designs and complex module structures while maintaining clear boundaries.
+**TODO**
 
 ## Separating Read and Write Access
 

@@ -4,7 +4,7 @@ Modules and paths are fundamental concepts for code organization, namespace mana
 
 In the context of game development, modules allow you to separate different aspects of your game logic into manageable, reusable pieces. For example, you might have one module for player inventory management, another for combat mechanics, and yet another for UI interactions. Each module encapsulates its own functionality while exposing only the necessary interfaces to other parts of your code.
 
-The module system in Verse is designed to support the vision of a persistent, shared Metaverse where code can be published once and used by anyone, anywhere, with confidence that it will continue to work even as the original author updates and improves it. This is achieved through strict backward compatibility rules and a global namespace system that ensures every piece of published code has a unique, permanent address.
+The module system is designed to support the vision of a persistent, shared Metaverse where code can be published once and used by anyone, anywhere, with confidence that it will continue to work even as the original author updates and improves it. This is achieved through strict backward compatibility rules and a global namespace system that ensures every piece of published code has a unique, permanent address.
 
 Each module is intrinsically linked to the file system structure of your project. When you create a folder in your Verse project, that folder automatically becomes a module. The module's name is simply the folder's name, making the relationship between your file organization and your code organization completely transparent.
 
@@ -12,7 +12,7 @@ All `.verse` files within the same folder are considered part of that module and
 
 ## Paths
 
-Paths are the addressing system that makes Verse's vision of a shared, persistent Metaverse possible. Just as every website on the internet has a unique URL, every module in Verse has a unique path that identifies it globally. This path system is more than just a naming convention - it's a fundamental part of how Verse manages code distribution, versioning, and dependencies.
+Paths are the addressing system that makes Verse's vision of a shared, persistent Metaverse possible. Just as every website on the internet has a unique URL, every module has a unique path that identifies it globally. This path system is more than just a naming convention - it's a fundamental part of how Verse manages code distribution, versioning, and dependencies.
 
 ### Understanding  Paths
 
@@ -30,7 +30,7 @@ The format `/domain/path/to/module` serves several important purposes:
 
 ### Standard  Paths
 
-Epic Games provides several standard modules that are commonly used in Verse development:
+Epic Games provides several standard modules that are commonly used:
 
 - `/Verse.org/Verse` - Core language features and standard library functions
 - `/Verse.org/Random` - Random number generation utilities
@@ -114,7 +114,7 @@ module_folder := module:
 
 ## Importing Modules
 
-The import system in Verse is designed to be explicit and predictable. Unlike some languages that automatically import commonly used modules or search multiple locations for dependencies, Verse requires you to explicitly declare every external module you want to use. This explicitness helps prevent naming conflicts and makes dependencies clear.
+The import system is designed to be explicit and predictable. Unlike some languages that automatically import commonly used modules or search multiple locations for dependencies, Verse requires you to explicitly declare every external module you want to use. This explicitness helps prevent naming conflicts and makes dependencies clear.
 
 ### Using
 
@@ -187,7 +187,7 @@ The restriction on import order exists because Verse resolves imports sequential
 
 ### Import Scope and Visibility
 
-Imports in Verse have file scope - they only affect the file in which they appear. If you have multiple `.verse` files in the same module, each file needs its own import statements for external modules. However, files within the same module can see each other's definitions without imports:
+Imports have file scope - they only affect the file in which they appear. If you have multiple `.verse` files in the same module, each file needs its own import statements for external modules. However, files within the same module can see each other's definitions without imports:
 
 ```verse
 # File: player_module/health.verse
@@ -273,7 +273,7 @@ outer_scope := module:
         Constant:int = 7  # Shadows outer Constant
 
         # Access both versions using qualified access
-        LocalVal := Constant  # Gets 7
+        LocalVal := (local:)Constant  # Gets 7
         OuterVal := (outer_scope:)Constant  # Gets 42
 ```
 
@@ -306,7 +306,7 @@ player_data := class<final><persistable>:
     Experience:int = 0
     UnlockedItems:[]string = array{}
 
-SavePlayerProgress(Player:player, NewData:player_data):void =
+SavePlayerProgress(Player:player, NewData:player_data)<decides>:void =
     set PlayerSaveData[Player] = NewData
 ```
 
@@ -362,6 +362,7 @@ When working with modules, you may encounter various issues. Understanding these
 
 1. **Incorrect path**: Double-check the module path in your `using` statement. Remember that paths are case-sensitive.
 
+<!--NoCompile-->
 ```verse
    # Wrong: different case
    using { /verse.org/random }  # Error: module not found
@@ -372,6 +373,7 @@ When working with modules, you may encounter various issues. Understanding these
 
 2. **Missing parent module import**: When importing nested modules, ensure the parent is imported first.
 
+<!--NoCompile-->
 ```verse
    # Wrong: child before parent
    using { inventory }  # Error if inventory is nested
@@ -391,6 +393,7 @@ When working with modules, you may encounter various issues. Understanding these
 
 1. **Missing access specifier**: Members without the `<public>` specifier are internal by default.
 
+<!--NoCompile-->
  ```verse
    # In module_a
    SecretValue:int = 42  # Internal by default
@@ -404,6 +407,7 @@ When working with modules, you may encounter various issues. Understanding these
 
 2. **Protected or private members**: These are not accessible outside their defining scope.
 
+<!--NoCompile-->
  ```verse
    # In a class
    class_a := class:
