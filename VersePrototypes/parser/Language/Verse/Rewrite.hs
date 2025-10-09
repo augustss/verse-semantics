@@ -213,10 +213,8 @@ rewriteExp expr = for expr $ \case
   -- Ignore attributes for now
   Parse.Inst (getMacroParensBraces "module" -> Just (Nothing, _specs)) e2 ->
     Module <$> rewriteExp e2
-  Parse.Inst e1 e2 | isPredefined "type" e1 -> do
-    x <- freshIdent $ loc e2
-    e2' <- rewriteExp e2
-    pure . Lam (infixColonEqual Val x e2') C Effect.Succeeds $ Name <$> x
+  Parse.Inst e1 e2 | isPredefined "type" e1 ->
+    Type <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "assume" e1 ->
     Assume <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "fails" e1 ->

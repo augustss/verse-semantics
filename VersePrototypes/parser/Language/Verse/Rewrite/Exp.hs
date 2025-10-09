@@ -52,6 +52,7 @@ data Exp f a
   | Option (Maybe (f (Exp f a)))
   | All (f (Exp f a))
   | Not (f (Exp f a))
+  | Type (f (Exp f a))
   | Verify (f (Exp f a))
   | Check Split.Effect (f (Exp f a))
   | f (Exp f a) `OfType` f (Exp f a)
