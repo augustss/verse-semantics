@@ -14,7 +14,6 @@ module ValueP(
   funNegate, funInt, funGt, funLt,
   funAdd, funSub, funMul, funDiv,
   funEmpty,
-  funXF,
   funDomain,
   funUnion, funConcat, tupConcat,
   allTuples, allTuplesLen, allTuplesLenV,
@@ -49,8 +48,19 @@ data Value
   | Fun FUN
  deriving ( Eq, Ord )
 
+instance Show Value where
+  show (Int k)   = show k
+  show (Tuple vs) = "<" ++ intercalate "," (map show vs) ++ ">"
+  show (Fun fn) = "F(" ++ showFUN fn ++ ")"
+
 -- Invariant: no overlapping domains among the partial functions
 type FUN = P PartialFun
+
+showFUN :: FUN -> String
+showFUN Empty = "{}"
+showFUN (Unit f) = show f
+showFUN (f1 :\/ f2) = showFUN f1 ++ " u " ++ showFUN f2
+showFUN (f1 :++ f2) = showFUN f1 ++ " ++ " ++ showFUN f2
 
 pattern Tuple :: [Value] -> Value
 pattern Tuple vs <- (getTuple -> Just vs)
@@ -67,14 +77,10 @@ getTuple (Fun p) =
          map fst xys == map Int [0..length sq-1] -> Just $ map snd xys
        | otherwise -> Nothing
 
-instance Show Value where
-  show (Int k)   = show k
-  show (Tuple vs) = "<" ++ intercalate "," (map show vs) ++ ">"
-  show (Fun fn) = show fn
-
 data PartialFun = PF { pfName :: String, pfMap :: M.Map Value Value }
 -- deriving ( Show )
 
+{-
 instance Eq PartialFun where
   PF f1 _ == PF f2 _  =  f1 == f2
 
@@ -84,6 +90,16 @@ instance Ord PartialFun where
   PF f1 _ >= PF f2 _  =  f1 >= f2
   PF f1 _ >  PF f2 _  =  f1 >  f2
   PF f1 _ `compare` PF f2 _  =  f1 `compare` f2
+-}
+instance Eq PartialFun where
+  PF _ f1 == PF _ f2  =  f1 == f2
+
+instance Ord PartialFun where
+  PF _ f1 <= PF _ f2  =  f1 <= f2
+  PF _ f1 <  PF _ f2  =  f1 <  f2
+  PF _ f1 >= PF _ f2  =  f1 >= f2
+  PF _ f1 >  PF _ f2  =  f1 >  f2
+  PF _ f1 `compare` PF _ f2  =  f1 `compare` f2
 
 instance Show PartialFun where
   show (PF s _m) = s -- show m
@@ -158,29 +174,51 @@ funNegSucc = PF "negsucc" $ M.fromList [(Int i, Int ((-i+1) `mod` numInt)) | i <
 funEmpty :: PartialFun
 funEmpty = PF "empty" M.empty
 
+{-
 funX12_3 :: PartialFun
 funX12_3 = PF "x12_3" $ M.fromList [(Int 1, Int 3), (Int 2, Int 3)]
 funX0_1 :: PartialFun
 funX0_1  = PF "x0_1"  $ M.fromList [(Int 0, Int 1)]
 funXF :: FUN
 funXF = fun[funX12_3, funX0_1]
+-}
 
-allPFs' :: [PartialFun]
-allPFs' =
+allPFs :: [PartialFun]
+allPFs =
          [funNegate, funInt, funGt, funLt, funAdd, funSub, funMul, funDiv
          ,funSucc, funPred, funNegSucc]
          ++
-         [ PF (show x ++ "->" ++ show y) $ M.fromList [(x, y)]
+         -- All int->int functions with singleton domains.
+         -- Needed to make tuples.
+         [ mkPFList' [(x, y)]
          | x <- allInts, y <- allInts ]
          ++
+         -- All int->int functions with singleton range
          [ PF ("K" ++ show y) $ M.fromList [(x, y) | x <- allInts]
          | y <- allInts ]
-
-allPFs' :: [PartialFun]
-allPFs' = allPFs'
          ++
-         [ mkPFList [(Int 0, Int 0), (Int 1, Int 0), (Int 2, Int 0)]
+         -- The {0,1,2}->{0} function
+         [ mkPFList' [(Int 0, Int 0), (Int 1, Int 0), (Int 2, Int 0)] ]
+         ++
+         -- All {0,1}->{0,1} functions
+         fun01s
+         ++
+         -- Sample HO functions
+         [ho01 0, ho01 1]
+         ++
+         -- {<1>}->{2} function
+         [ mkPFList' [(Tuple [Int 1], Int 2)] ]
+
+fun01s :: [PartialFun]
+fun01s =
+         [ mkPFList' [(Int 0, Int 0), (Int 1, Int 0)]
+         , mkPFList' [(Int 0, Int 1), (Int 1, Int 0)]
+         , mkPFList' [(Int 0, Int 0), (Int 1, Int 1)]
+         , mkPFList' [(Int 0, Int 1), (Int 1, Int 1)]
          ]
+
+ho01 :: Int -> PartialFun
+ho01 r = mkPFList' [(Fun (Unit f), Int r) | f <- fun01s ]
 
 mkPFSet :: Set.Set (Value, Value) -> PartialFun
 mkPFSet = mkPFList . Set.toList
@@ -189,21 +227,24 @@ mkPFSet = mkPFList . Set.toList
 mkPFList :: [(Value, Value)] -> PartialFun
 mkPFList pairs =
   let m = M.fromList pairs
-      thePF = PF { pfName = showPairs pairs, pfMap = m }
-  in  head $ filter (\ pf -> pfMap pf == m) allPFs' ++ [thePF]
+  in  head $ filter (\ pf -> pfMap pf == m) allPFs ++ [mkPFList' pairs]
+
+mkPFList' :: [(Value, Value)] -> PartialFun
+mkPFList' pairs = PF { pfName = showPairs pairs, pfMap = M.fromList pairs }
 
 showPairs :: [(Value, Value)] -> String
 showPairs xys = "{" ++ intercalate "," (map (\ (x,y) -> show x ++ "->" ++ show y) xys) ++ "}"
 
 allFUNs :: [FUN]
-allFUNs = [ fun[funNegate], fun[funInt], fun[funGt], fun[funLt], fun[funAdd], fun[funSub], fun[funMul], fun[funDiv],
-            funXF
-          ] ++
+allFUNs = -- [ fun[funNegate], fun[funInt], fun[funGt], fun[funLt], fun[funAdd], fun[funSub], fun[funMul], fun[funDiv] ]
+          [ fun [f] | f <- allPFs ]
+          ++
           [ f | Fun f <- allTuples ]
 
 -- Integers and pairs of integers
 allValues :: [Value]
 allValues = allInts ++ map Tuple (allTuplesLen 2)
+            ++ [ Fun (unit f) | f <- allPFs ]     -- all single lane functions
 
 allValuesSet :: Set.Set Value
 allValuesSet = Set.mkSetUnsafe allValues

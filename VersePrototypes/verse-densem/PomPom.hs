@@ -150,7 +150,7 @@ dE :: SrcEssential -> Ident -> Ident -> P ENV
 -- The denotational semantics itself (Fig 10)
 dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
 dE (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
-dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
+--dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
 dE (Variable v) i x | isSrcUnderscore v = unit $ i .=. x
                     | otherwise         = unit $ i .=. x /\ x .=. v
 dE (DefineE y t)                    i x = unit (x .=. y) *** dE t i x      -- y := t
@@ -294,6 +294,9 @@ tneg=Range (EPrim Neg)
 tadd x y = ApplyD (EPrim Add) (Array [x, y])
 tlt  x y = ApplyD (EPrim Lt)  (Array [x, y])
 
+tfun01 = Function Closed k0 effSucceeds k1
+tfunho = Function Closed tfun01 effSucceeds k2
+
 {-
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
@@ -418,13 +421,15 @@ fUN apt xs d@(Unit dd) t1 p q h f =
     sings =
       bigUnion [ h .= Fun (Unit hh) /\ f .= Fun (Unit ff) /\ ee
                | hh <- allPFs
---               , trace ("hh=" ++ show hh) True
+--               , trace ("t1=" ++ show t1 ++ ", hh=" ++ show hh) True
                , let poss :: Set (Value, Set (Value, Value, ENV))
                      poss = [ (pv, ves)
                             | pv <- allValuesSet
                             , let qvs = valsOf q (dd /\ p .= pv)  -- possible values for q
+--                            , trace ("qvs=" ++ show qvs ++ ", dd=" ++ show dd ++ ", p=" ++ show pv) True
                             , qv <- qvs                           -- try the q values
                             , let ves =
+--                                    trace("try hh[qv] hh=" ++ show hh ++ ", qv=" ++ show qv ++ " = " ++ show (applyPF hh qv)) $
                                     case applyPF hh qv of
                                       Nothing -> Set.empty
                                       Just r -> 
@@ -463,6 +468,7 @@ fUN apt xs d@(Unit dd) t1 p q h f =
 --               , trace ("sets'=" ++ show sets') True
                , (ff, qs, ee) <- sets'
                , apt /= Closed || domPF hh == qs
+--               , trace ("ok " ++ show (hh, ff)) True
                ]
     (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) t1
 
