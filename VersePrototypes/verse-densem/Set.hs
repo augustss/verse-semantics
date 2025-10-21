@@ -26,6 +26,7 @@ module Set(
   filterSet,
   anySet,
   cross,
+  unzip3Set,
   ) where
 import Control.Applicative
 import Data.List(intercalate, sort, groupBy, sortBy, partition)
@@ -153,6 +154,11 @@ filterSet p (S ss) = S (filter p ss)
 
 anySet :: (a -> Bool) -> Set a -> Bool
 anySet p (S ss) = any p ss
+
+-- Can produce duplicates, but that's ok
+unzip3Set :: Set (a, b, c) -> (Set a, Set b, Set c)
+unzip3Set (S ss) = (S as, S bs, S cs)
+  where (as, bs, cs) = unzip3 ss
 
 -----
 

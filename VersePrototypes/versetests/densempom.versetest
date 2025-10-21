@@ -99,5 +99,9 @@ testds("fun5", ppo, pass) { function(x:prefix'-'){x} }            {"{[{{u=F(int)
 testds("fun6", ppo, pass) { function(x:nat where x<2){x} }        {"{[{{u=v=F({0->0,1->1})}}]}"}
 testds("fun7", ppo, pass) { type{x:nat where x<2} }               {"{[{{u=v=F({0->0,1->1})}}]}"}
 testds("fun8", ppo, pass) { ltTwo:=type{x:nat where x<2}; :ltTwo} {"{[{{u=v=0}} U {{u=v=1}}]}"}
-testds("fun9", ppo, pass, broken) { ltTwo:=type{x:nat where x<2};
+testds("fun9a",ppo, pass){ function(y:type{x:nat where x<2}){y}} {"{[{{u=v=F({0->0,1->1})}}]}"}
+# fun9 is very slow
+testds("fun9", ppo, pass, skip) { ltTwo:=type{x:nat where x<2};
                             function(y:ltTwo){y} }                {"{[{{u=v=F({0->0,1->1})}}]}"}
+testds("fun10",ppo, pass, broken) { x:=1;  function(x){2} }               {"{[{{u=v=F({1->2})}}]}"}
+testds("fun11",ppo, pass) { function(1){x=2} }                    {"{[{{x=2,u=v=F({1->2})}}]}"}

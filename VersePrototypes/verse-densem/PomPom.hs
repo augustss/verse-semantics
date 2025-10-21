@@ -414,68 +414,80 @@ fUN apt xs (s :++ t) t1 p q h f =
         ufun _ _ = undefined
 fUN apt xs d@(Unit dd) t1 p q h f =
   (d *** unit sings >>> (p:q:xs))
---  `union`
---  (nOT (d >>> xs) *** unit (h .= Fun Empty /\ f .= Fun Empty))
+  `union`
+  (nOT (d >>> (p:q:xs)) *** unit (h .= Fun Empty /\ f .= Fun Empty))
   where
+    (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) t1
+    et1 = dE t1 x y
     sings :: ENV
-    sings =
-      bigUnion [ h .= Fun (Unit hh) /\ f .= Fun (Unit ff) /\ ee
-               | hh <- allPFs
---               , trace ("t1=" ++ show t1 ++ ", hh=" ++ show hh) True
-               , let poss :: Set (Value, Set (Value, Value, ENV))
-                     poss = [ (pv, ves)
-                            | pv <- allValuesSet
-                            , let qvs = valsOf q (dd /\ p .= pv)  -- possible values for q
---                            , trace ("qvs=" ++ show qvs ++ ", dd=" ++ show dd ++ ", p=" ++ show pv) True
-                            , qv <- qvs                           -- try the q values
-                            , let ves =
---                                    trace("try hh[qv] hh=" ++ show hh ++ ", qv=" ++ show qv ++ " = " ++ show (applyPF hh qv)) $
-                                    case applyPF hh qv of
-                                      Nothing -> Set.empty
-                                      Just r -> 
---                                        trace ("(qv,r,envss)=" ++ show (qv,r, singSeq (dE t1 x y *** Unit (x .= r)))) $
-                                        -- Possible range environments for this p=pv
-                                        let
-                                          et0 = Unit (dd /\ p .= pv /\ q .= qv) >>> [p, q]
-                                          et1 = dE t1 x y
-                                          res = Unit (x .= r)
-                                          yrs :: Set ENV
-                                          yrs = singSeq (et0 *** et1 *** res)
-                                        in
+    sings = bigUnion
+      [ h .= Fun (Unit hh) /\ f .= Fun (Unit ff) /\ env
+      | hh <- allPFs            -- try all possible partial functions
+--    , trace ("t1=" ++ show t1 ++ ", hh=" ++ show hh) True
+      -- poss is a set of input-output pairs.
+      -- For each input there is a set of possible outputs:
+      --   if h[p] fails the set is empty
+      --   each element is (output from t1, output from h, needed ENV)
+      , let
+          poss :: Set (Value, Set (Value, Value, ENV))
+          poss =
+            [ (pv, ves)
+            | pv <- allValuesSet
+            , let qvs = valsOf q (dd /\ p .= pv)  -- possible values for q
+--          , trace ("qvs=" ++ show qvs ++ ", dd=" ++ show dd ++ ", p=" ++ show pv) True
+--          , qv <- allValuesSet  -- could use this
+            , qv <- qvs                           -- try the q values
+            , let ves =
+--                  trace("try hh[qv] hh=" ++ show hh ++ ", qv=" ++ show qv ++ " = " ++ show (applyPF hh qv)) $
+                    case applyPF hh qv of
+                      Nothing -> Set.empty            -- h[q] failed
+                      Just hq -> 
+--                      trace ("(qv,r,envss)=" ++ show (qv,r, singSeq (dE t1 x y *** Unit (x .= r)))) $
+                        -- Possible range environments for this p=pv
+                        let
+                          et0 = Unit (dd /\ p .= pv /\ q .= qv) >>> [p, q]
+                          res = Unit (x .= hq)
+                          yrs :: Set ENV
+                          yrs = singSeqChk (et0 *** et1 *** res)
+                        in
 {-
-                                            trace ("dd="++show dd) $
-                                            trace ("pv="++show pv++", qv="++show qv++", r="++show r) $
-                                            trace ("et0="++show et0++", et1=" ++ show et1 ++ ", res=" ++ show res ++ ", yrs=" ++ show yrs) $
-                                            trace ("et0***et1=" ++ show (et0***et1)) $
+                          trace ("dd="++show dd) $
+                          trace ("pv="++show pv++", qv="++show qv++", r="++show r) $
+                          trace ("et0="++show et0++", et1=" ++ show et1 ++ ", res=" ++ show res ++ ", yrs=" ++ show yrs) $
+                          trace ("et0***et1=" ++ show (et0***et1)) $
 -}
-                                            [ (yv, qv, (x:y:p:q:xs) `hides` r)
-                                            | yr <- yrs
-                                            , yv <- allValuesSet
-                                            , let r = yr /\ y .= yv
-                                            , r /= empty
-                                            ]
-                            ]
+                          [ (yv, qv, (x:y:p:q:xs) `hides` r)
+                          | yr <- yrs
+                          , yv <- valsOf y yr  -- allValuesSet
+                          , let r = yr /\ y .= yv
+                          , r /= empty
+                          ]
+            ]
                
 --               , trace ("poss=" ++ show poss) True
-               , let
-                   sets :: [ [ (Value, Value, Value, ENV) ] ]
-                   sets = traverse (\ (x, yes) -> [ (x, y, q, e) | (y, q, e) <- Set.toList yes ])
-                                   (Set.toList poss)
-                   sets' :: [ (PartialFun, Set Value, ENV) ]
-                   sets' = [ (mkPFList $ zip xs ys, Set.mkSet qs, bigIntersect es)
-                           | xyeqs <- sets
-                           , let (xs, ys, qs, es) = L.unzip4 xyeqs ]
---               , trace ("sets'=" ++ show sets') True
-               , (ff, qs, ee) <- sets'
-               , apt /= Closed || domPF hh == qs
---               , trace ("ok " ++ show (hh, ff)) True
-               ]
-    (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) t1
+      , let
+          -- 
+          sets :: [ [ ((Value, Value), Value, ENV) ] ]
+          sets = traverse (\ (x, yes) -> [ ((x, y), q, e) | (y, q, e) <- Set.toList yes ])
+                          (Set.toList poss)
+          sets' :: [ (PartialFun, Set Value, ENV) ]
+          sets' = [ (mkPFList xys, Set.mkSet qs, bigIntersect es)
+                  | xyeqs <- sets
+                  , let (xys, qs, es) = unzip3 xyeqs
+                  ]
+--    , trace ("sets'=" ++ show sets') True
+      , (ff, qs, env) <- sets'
+      , apt /= Closed || domPF hh == qs
+--    , trace ("ok " ++ show (hh, ff)) True
+      ]
 
 -- Extract all possible values of a variable.
 -- Unlike extractVar this doesn't fail, but it is slower.
 valsOf :: Ident -> ENV -> Set Value
 valsOf i d = [ x | x <- allValuesSet, empty /= (d /\ i .= x) ]
 
-singSeq :: P a -> Set a
-singSeq p = [ a | [a] <- canon p ]
+singSeqChk :: P a -> Set a
+singSeqChk p = [ a | [a] <- canon p ]
+
+bigIntersectSet :: Set ENV -> ENV
+bigIntersectSet = bigIntersect . Set.toList
