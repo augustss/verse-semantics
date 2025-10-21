@@ -2,7 +2,7 @@
 
 Live variables represent a reactive programming paradigm in Verse, enabling variables to automatically recompute their values when dependencies change. Rather than requiring explicit callbacks or event handlers, live variables establish dynamic relationships between data, creating a declarative system where changes propagate naturally through your code.
 
-Traditional programming requires manual tracking of dependencies and explicit updates when values change. If variable A depends on variable B, you must remember to update A whenever B changes, often through callback functions or observer patterns. Live variables eliminate this bookkeeping by automatically tracking which variables are read during evaluation and re-evaluating when those dependencies change. This creates more maintainable code where the intent—that A should always reflect some function of B—is expressed directly in the code itself.
+Traditional programming requires manual tracking of dependencies and explicit updates when values change. If variable `A` depends on variable `B`, you must remember to update `A` whenever `B` changes, often through callback functions or observer patterns. Live variables eliminate this bookkeeping by automatically tracking which variables are read during evaluation and re-evaluating when those dependencies change. This creates more maintainable code where the intent—that `A` should always reflect some function of `B`—is expressed directly in the code itself.
 
 Live variables build a foundation for reactive programming constructs in Verse, including `await`, `upon`, and `when`. Understanding live variables is essential for working with Verse's event-driven programming model, particularly for game development scenarios where many values must stay synchronized.
 
@@ -10,7 +10,7 @@ Live variables build a foundation for reactive programming constructs in Verse, 
 
 ### Live Expressions
 
-A live expression establishes a dynamic relationship between a target variable and a guard expression. Once established, the guard is automatically re-evaluated whenever any of its dependencies change, keeping the target variable in sync.
+A live expression establishes a dynamic relationship between a variable and a target expression. Once established, the target is automatically re-evaluated whenever any of its dependencies change, keeping its variable in sync.
 
 ```verse
 var X:int = 0
@@ -19,36 +19,36 @@ set live X = Y  # X now tracks Y
 set Y = 5       # X automatically becomes 5
 ```
 
-The key insight is that Verse tracks which variables the guard expression reads during evaluation. When any of those variables change, the guard is re-evaluated, and if the result differs from the current value, the target variable updates automatically.
+The key insight is that Verse tracks which variables the target expression reads during evaluation. When any of those variables change, the target is re-evaluated, and if the result differs from the current value, the variable updates automatically.
 
 ### Declaration Forms
 
-Live variables can be declared in several forms, each suited to different use cases:
+Live variables can be declared in several ways, each suited to different use cases:
 
 ```verse
 # Live variable declaration
-var live X:int = Guard
+var live X:int = Target
 
 # Live assignment to existing variable
 var X:int = 0
-set live X = Guard
+set live X = Exp
 
 # Immutable live variable
-live Y:int = Guard
+live Y:int = Exp
 
 # Input-output variable pairs
-var In->Out:int = Guard
+var live In->Out:int = Exp
 ```
 
-The most common form, `var live X = Guard`, creates a mutable variable whose initial value comes from evaluating the guard and subsequently updates whenever dependencies change. The guard expression can read other variables, and those reads are tracked to establish the dependency relationship.
+The most common form, `var live X = Exp`, creates a mutable variable whose initial value comes from evaluating the target and subsequently updates whenever dependencies change. The target expression can read other variables, and those reads are tracked to establish the dependency relationship.
 
-The assignment form, `set live X = Guard`, converts an existing variable into a live variable by attaching a guard. This is useful when you need to make a variable reactive after initialization or conditionally based on program state.
+The assignment form, `set live X = Exp`, converts an existing variable into a live variable by attaching a target. This is useful when you need to make a variable reactive after initialization or conditionally based on program state.
 
-Immutable live variables, declared with just `live Y = Guard`, cannot be directly written but still update automatically when their dependencies change. This provides a read-only reactive value, useful for derived computations that should never be manually overridden.
+Immutable live variables, declared with just `live Y = Exp`, cannot be directly written but still update automatically when their dependencies change. This provides a read-only reactive value, useful for derived computations that should never be manually overridden.
 
 ### Input-Output Variables
 
-Input-output variable pairs provide bidirectional synchronization with transformation. The syntax `var In->Out:t = E` creates two related variables where `Out` is writable and `In` tracks assignments to `Out` through the type expression `t`.
+Input-output variable pairs provide bidirectional synchronization with transformation. The syntax `var live In->Out:t = E` creates two related variables where `Out` is writable and `In` tracks assignments to `Out` through the type expression `t`.
 
 ```verse
 min(Max:int)(Value:int):int = if (Value < Max) then Value else Max
@@ -93,7 +93,7 @@ Live variables form the foundation for three reactive constructs that handle asy
 
 ### The await Expression
 
-The `await` expression suspends execution until a guard expression succeeds, providing a synchronization primitive for asynchronous programming.
+The `await` expression suspends execution until a target expression succeeds, providing a synchronization primitive for asynchronous programming.
 
 <!--verse
 using {/Verse.org/Concurrency}
@@ -110,7 +110,7 @@ Print("X changed to: {X}")
 }
 -->
 
-The guard expression is evaluated immediately. If it fails (returns `false` or produces failure), the task suspends. Verse tracks which variables were read during evaluation. Whenever those variables change, the guard is re-evaluated. If it succeeds, execution resumes immediately.
+The target expression is evaluated immediately. If it fails (returns `false` or produces failure), the task suspends. Verse tracks which variables were read during evaluation. Whenever those variables change, the guard is re-evaluated. If it succeeds, execution resumes immediately.
 
 The practical implications are profound. You can write code that naturally expresses "wait for this condition" without manually managing event handlers or callback registration. The code suspends at the await point and resumes exactly when the condition becomes true.
 
@@ -276,7 +276,7 @@ set live X = block:
 
 This restriction also has a subtle implication: since any variable might become live after creation, reading any variable must be assumed to potentially trigger guard evaluation. The effect system accounts for this: the `<writes>` effect implies `<diverges>` because any write might trigger cyclic live variable evaluation.
 
-### Recursive Guards
+### Recursive Targets
 
 If a guard expression reads its own target variable, evaluation diverges into infinite recursion. Verse provides the `Old` function to safely access a variable's current value without triggering guard evaluation.
 
