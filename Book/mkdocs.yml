@@ -53,6 +53,6 @@ nav:
   - Access Specifiers: 13_access.md
   - Persistable Types: 14_persistable.md
   - Code Evolution: 15_evolution.md
-  - Grammar: 16_grammar.md
+  - Live Variables: 16_live_variables.md
   - "📚 Concept Index": concept_index.md
 

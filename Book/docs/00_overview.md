@@ -160,6 +160,30 @@ else:
 }
 -->
 
+**Reactive Programming with Live Variables**
+
+Verse provides first-class support for reactive programming through live variables that automatically recompute when their dependencies change, eliminating manual event handling.
+
+<!--verse
+F():void={
+-->
+```verse
+var MaxHealth:int = 100
+var Damage:int = 0
+var live Health:int = MaxHealth - Damage
+
+# Health automatically updates when dependencies change
+set Damage = 20  # Health becomes 80
+set MaxHealth = 150  # Health becomes 130
+
+# Reactive constructs for event handling
+when(Health < 25):
+    Print("Low health warning!")
+```
+<!--verse
+}
+-->
+
 Welcome to Verse—a language built not just for today's games, but for tomorrow's metaverse.
 
 ## Example: a Game Inventory System
