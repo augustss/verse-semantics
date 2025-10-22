@@ -39,7 +39,7 @@ Traditional programming languages carry decades of historical baggage and design
 
 Ready to dive in? Start with [Built-in Types](01_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](05_expressions.md) to see how everything in Verse computes values.
 
-For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](09_effects.md) sections highlight Verse's most distinctive features.
+For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](09_effects.md) sections highlight some of Verse's distinctive features.
 
 ## Key Features
 
@@ -75,7 +75,7 @@ myclass := class {
 -->
 ```verse
 ValidateInput[Data] # Proceeds only if validation succeeds
-ProcessData(Data)
+ProcessData[Data]
 ```
 <!--verse
 } }
@@ -173,7 +173,7 @@ var Damage:int = 0
 var live Health:int = MaxHealth - Damage
 
 # Health automatically updates when dependencies change
-set Damage = 20  # Health becomes 80
+set Damage = 20      # Health becomes 80
 set MaxHealth = 150  # Health becomes 130
 
 # Reactive constructs for event handling
@@ -556,7 +556,7 @@ CalculateReward(
 
 ## Comments
 
-Comments are the programmer's way of leaving notes in the code, explaining not just what the code does, but why it does it. In Verse, comments are ignored during execution but are invaluable for understanding and maintaining code.
+Comments are the programmer's way of leaving notes in the code, explaining not just what the code does, but why it does it. Comments are ignored during execution but are valuable for understanding and maintaining code.
 
 Verse offers several styles of comments to suit different documentation needs. The simplest is the single-line comment, which begins with `#` and continues to the end of the line:
 
@@ -584,7 +584,7 @@ CalculateFalloffDamage(Distance:float, MaxDamage:float):float =
     # Implementation here
 ```
 
-One of Verse's elegant features is nested block comments, which allow you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
+One elegant features is nested block comments, which allow you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
 
 <!--NoCompile-->
 ```verse
@@ -652,7 +652,7 @@ Result := if (Score > 90). "excellent" else. "needs improvement"
 ```
 
 **Mixed Styles:**
-You can even mix styles when it makes sense. The colon-based indented form is particularly useful for the condition while keeping the branches inline:
+You can even mix styles when it makes sense:
 
 <!--NoCompile-->
 ```verse
@@ -663,4 +663,4 @@ Result := if:
 then { "condition met" } ese { "condition not met" }
 ```
 
-All these forms are semantically equivalent—they produce the same result. The choice between them is about readability and context. Use braces when working with existing brace-heavy code, indentation for cleaner vertical layouts, and inline forms for simple expressions. This flexibility lets you write code that reads naturally.
+All these forms produce the same result. The choice between them is about readability and context. Use braces when working with existing brace-heavy code, indentation for cleaner vertical layouts, and inline forms for simple expressions. This flexibility lets you write code that reads naturally.

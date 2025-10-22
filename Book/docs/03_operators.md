@@ -1,6 +1,6 @@
 # Operators
 
-Operators are special functions that perform actions on their operands. They provide concise syntax for common operations like arithmetic, comparison, logical operations, and assignment.
+Operators are functions that perform actions on their operands. They provide concise syntax for common operations like arithmetic, comparison, logical operations, and assignment.
 
 ## Operator Formats
 
@@ -232,7 +232,9 @@ The following types support comparison operations:
 - Structs: If all fields are comparable (V1 feature)
 - Classes: Only with `=` and `<>` if they contain at least one `var` member
 
-Note: Comparisons between different types generally fail:
+<!-- TODO: check that classes are correct -->
+
+Comparisons between different types generally fail:
 
 <!--verse
 F()<decides>:void={
@@ -323,6 +325,8 @@ if (QuickCheck() or ExpensiveCheck()):
 
 ### Truth Table for Logical Operators
 
+Consider two expressions `P` and `Q` which may either succeed or fail, the following table shows the result of logical operators applied to them:
+
 | Expression P | Expression Q | P and Q | P or Q | not P |
 |--------------|--------------|---------|---------|-------|
 | Succeeds | Succeeds | Succeeds (Q's value) | Succeeds (P's value) | Fails |
@@ -393,10 +397,10 @@ else:
 
 ### Indexing Operator (`[]`)
 
-Used for multiple purposes in Verse:
+The square bracket operator is used for multiple purposes in Verse:
 
 1. **Array/Map indexing** - Access elements in collections
-2. **Function calls** (Verse-style) - Call functions with bracket syntax
+2. **Function calls** - Call functions which may fail
 3. **Computed member access** - Access object members dynamically
 
 <!--verse
@@ -431,7 +435,7 @@ EmptyCall := MyFunction2[]                 # and optional values
 
 ### Member Access Operator (`.`)
 
-Accesses fields and methods of objects:
+The dot operator accesses fields and methods of objects:
 
 <!--NoCompile-->
 ```verse
@@ -448,7 +452,7 @@ LongExpression := MyObject.
 
 ### Range Operator (`..`)
 
-Creates ranges for iteration:
+The range operator creates ranges for iteration:
 
 <!--verse
 using { /Verse.org/VerseCLR }
@@ -465,7 +469,7 @@ for (I := 0..4):
 
 ### Object Construction Operator (`{}`)
 
-Used to construct objects when placed after an identifier:
+Curly braces are used to construct objects when placed after a type:
 
 <!--verse
 point:=struct{X:int, Y:int}
@@ -496,7 +500,7 @@ Config := game_config{
 
 ### Tuple Access Operator (`()`)
 
-When used with a single argument after an expression, accesses tuple elements:
+Round braces when used with a single argument after a tuple expression, accesses tuple elements:
 
 <!--verse
 F():void={

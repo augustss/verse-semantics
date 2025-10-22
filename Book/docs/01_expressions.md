@@ -1,16 +1,14 @@
 # Expressions
 
-Everything is an expression. This fundamental design principle sets the language apart from many traditional programming languages where statements and expressions are distinct concepts. Every piece of code you write produces a value, even constructs you might expect to be purely side-effecting. This creates a powerful and consistent programming model where code can be composed and combined in ways that feel natural and predictable.
+Everything is an expression. This design principle sets Verse apart from many other languages where statements and expressions are distinct concepts. Every piece of code you write produces a value, even constructs you might expect to be purely side-effecting. This creates a programming model where code can be composed and combined in ways that feel natural and predictable.
 
 ## Primary Expressions
 
-At the foundation of the expression system lie the primary expressions—the atomic units from which more complex expressions are built. These include literals, identifiers, parenthesized expressions, and the powerful tuple construct that provides lightweight data aggregation.
+Everything starts with primary expressions—the atomic units from which more complex expressions are built. These include literals, identifiers, parenthesized expressions, and the tuple construct that provides lightweight data aggregation.
 
 ### Literals and Basic Values
 
-The language supports the expected set of literal values, but treats them uniformly as expressions. Integer literals can be written in decimal (42, -17), hexadecimal (0x1F), or binary (0b1010) notation. Floating-point literals support standard notation (3.14, -0.5) as well as scientific notation (1.0e10) and abbreviated forms (.5, 3.). String literals can use either double or single quotes and support escape sequences for special characters.
-
-What makes the treatment of literals interesting is that they're not special cases in the grammar—they're simply expressions that evaluate to themselves. This means you can use a literal anywhere an expression is expected, creating a highly uniform syntax:
+The language supports the expected set of literal values. Integer literals can be written in decimal (42, -17), hexadecimal (0x1F), or binary (0b1010) notation. Floating-point literals support standard notation (3.14, -0.5) as well as scientific notation (1.0e10) and abbreviated forms (.5, 3.). String literals can use either double or single quotes and support escape sequences for special characters.
 
 <!--NoCompile-->
 ```verse
@@ -21,7 +19,7 @@ Point{X:=0.0, Y:=1.0}                       # Literals in object construction
 
 ### Identifiers and References
 
-Identifiers serve as references to values, whether they're constants, variables, functions, or types. The language doesn't syntactically distinguish between these different kinds of identifiers—the context determines their meaning. This creates a clean, minimal syntax where the same identifier can represent different entities in different contexts:
+Identifiers serve as references to values, whether they're constants, variables, functions, or types. The language doesn't syntactically distinguish between these different kinds of identifiers:
 
 <!--NoCompile-->
 ```verse
@@ -43,7 +41,7 @@ if (X > 0 and Y > 0) then Positive else Negative
 
 ### Tuples: Lightweight Aggregation
 
-Tuples provide a fundamental way to group two or more values without defining a formal structure. The syntax distinguishes between parentheses used for grouping and those used for tuple construction through the presence of commas:
+Tuples provide a way to group two or more values with little ceremony. The syntax distinguishes between parentheses used for grouping and those used for tuple construction through the presence of commas:
 
 <!--NoCompile-->
 ```verse
@@ -79,9 +77,9 @@ TODO: What about tuples of zero element.   The following is accepted:
 
 -->
 
-## Postfix Operations: Building Complexity
+## Postfix Operations
 
-Verse builds complex expressions through postfix operations—operations that follow their operand and can be chained together. This creates a left-to-right reading order that feels natural and allows for intuitive composition.
+Postfix operations are operations that follow their operand and can be chained together. This creates a left-to-right reading order that feels natural and allows for intuitive composition.
 
 ### Member Access
 
@@ -114,7 +112,7 @@ Matrix[Row][Col]        # Nested indexing
 Data[ComputeIndex()]    # Dynamic index computation
 ```
 
-The function call syntax with square brackets, `Func[]` is equivalent to `Func()` for functions that may fail.
+The function call syntax with square brackets, `Func[]` is equivalent to `Func()` for functions that may fail. Array indexing can fail, if the index is out of bounds, and thus uses `[]`.
 
 ### Function Calls
 
@@ -128,9 +126,9 @@ Initialize()                    # No arguments
 Process[GetData(), Transform]   # Nested calls, outer call may fail
 ```
 
-## Object Construction: Creating Instances
+## Object Construction
 
-Object construction uses a distinctive brace syntax that clearly indicates the creation of a new instance. The syntax requires explicit field initialization using the `:=` operator:
+Object construction uses a distinctive brace syntax to indicates the creation of a new instance. The syntax requires explicit field initialization using the `:=` operator:
 
 <!--
 point := struct{ X:int, Y:int }
@@ -214,7 +212,7 @@ else:
     Value2
 ```
 
-### For Expressions: Iteration as Computation
+### For Expressions
 
 For expressions iterate over collections and produce values. The basic form iterates over elements:
 
@@ -229,7 +227,7 @@ for (Item : Collection) { Process(Item) }
 }
 -->
 
-An extended form provides access to both index and item:
+An extended form provides access to both index and item--in the case of a `Map`, indices are not limited to integers:
 
 <!--verse
 Print(S:string):void={}
@@ -245,9 +243,9 @@ for (Index -> Item : Collection) {
 }
 -->
 
-Since for expressions are expressions, they can produce values and be composed with other expressions. The body of a for expression is evaluated for each iteration, and the expression as a whole has a value determined by these evaluations.
+Since for expressions are themseleves expressions, they produce array values and compose with other expressions. The body of a for expression is evaluated for each successful iteration, and the expression as a whole has a value determined by these evaluations.
 
-### Loop Expressions: Unbounded Iteration
+### Loop Expressions
 
 Loop expressions provide indefinite iteration, continuing until explicitly terminated through failure or other control flow:
 
@@ -269,6 +267,8 @@ loop {
 -->
 
 The loop construct can use indented syntax for clarity.
+
+<!-- # TODO What is the value of a loop? -->
 
 ### Case Expressions: Pattern-Based Selection
 
@@ -296,13 +296,14 @@ Description := case(Color) {
 
 The `_` pattern serves as a catch-all, ensuring the case expression is exhaustive. Case expressions evaluate to the value of the matched branch, making them useful for value computation as well as control flow.
 
-## Lambda Expressions: Functions as Values
+<!-- 
+## Lambda Expressions
 
-<!-- TODO: Not yet true -->
+<!-- TODO: Not yet true -- >
 
 Lambda expressions create anonymous functions, treating functions as first-class values that can be passed around and composed:
 
-<!--NoCompile-->
+<!--NoCompile-- >
 ```verse
 Increment := X => X + 1
 Add := (X, Y) => X + Y
@@ -311,16 +312,18 @@ Constant := () => 42
 
 The arrow syntax (`=>`) clearly separates parameters from the body, and the body is an expression whose value becomes the lambda's return value. Lambdas capture their environment, creating closures:
 
-<!--NoCompile-->
+<!--NoCompile-- >
 ```verse
 Multiplier := Factor => (X => X * Factor)
 Double := Multiplier(2)
 Result := Double(21)  # Returns 42
 ```
 
-## Binary Operations: Combining Values
+-->
 
-Binary expressions follow a carefully designed precedence hierarchy that balances mathematical conventions with programming practicality. Understanding this hierarchy is crucial for writing correct expressions without excessive parentheses.
+## Binary Operations
+
+Binary expressions follow a carefully designed precedence hierarchy that balances mathematical conventions with programming practicality.
 
 ### Assignment and Binding
 
@@ -389,7 +392,7 @@ if (Value) in ValidRange then Accept() else Reject()
 
 ### Logical Operations
 
-Logical operators combine boolean values with short-circuit evaluation. Verse uses keyword operators (`and`, `or`, `not`) rather than symbols, improving readability:
+Logical operators combine boolean values with short-circuit evaluation. Their result is either success or failure. Verse uses keyword operators (`and`, `or`, `not`) rather than symbols, improving readability:
 
 <!--NoCompile-->
 ```verse
@@ -398,7 +401,8 @@ Result := logic{Validated or UseDefault[]}
 if (not IsReady[]) then Wait()
 ```
 
-The precedence ensures that `and` binds tighter than `or`, matching mathematical logic conventions:
+The precedence ensures that `and` binds tighter than `or`, matching mathematical logic conventions, the `logic{}` expression
+turns succes or failure into a value:
 
 <!--NoCompile-->
 ```verse
@@ -408,7 +412,7 @@ Condition := logic{ExpA and ExpB or ExpC and ExpD}
 
 ### Comparison Operations
 
-Comparison operators produce boolean values and can be chained for range checking:
+Comparison operators also either succeed or fail and can be chained for range checking:
 
 <!--verse
 InRange():void={}
@@ -462,9 +466,9 @@ Result := -X * Y    # Unary minus applies to x only
 }
 -->
 
-## Set Expressions: Mutation in a Functional World
+## Set Expressions
 
-While Verse emphasizes immutability, practical programming often requires mutation. Set expressions provide controlled mutation of variables and mutable fields:
+While Verse emphasizes immutability, practical programming sometimes requires mutation. Set expressions provide mutation of variables and fields:
 
 <!--verse
 c := class { var Field:int = 0 }
@@ -524,7 +528,7 @@ Compound expressions create new scopes for variables, allowing local bindings th
 }              # X and Y no longer accessible
 ```
 
-Expressions within a compound can be separated by semicolons, commas, or newlines, though mixing separators is discouraged in newer versions of Verse:
+Expressions within a compound can be separated by semicolons, commas, or newlines, though mixing separators is discouraged:
 
 <!--NoCompile-->
 ```verse
@@ -537,7 +541,7 @@ Expressions within a compound can be separated by semicolons, commas, or newline
 }
 ```
 
-## Array Expressions: Collections as Values
+## Array Expressions
 
 Array expressions create array values using the `array` keyword followed by elements in braces:
 
@@ -591,51 +595,4 @@ Processor : ProcessorType = ProcessData
 ```
 
 The underscore in function type expressions represents a placeholder for the function name, focusing on the signature rather than the identity.
--->
-
-## Expression Composition: The Power of Uniformity
-
-The true power of Verse's expression system emerges when different expression types are composed. Since everything is an expression, components can be combined in ways that would be impossible or awkward in statement-oriented languages:
-
-<!-- TODO:  
-   Check that this is correct.  (Besides the use of lambdas that we will support some day)
--->
-
-<!--NoCompile-->
-```verse
-# Control flow in initialization
-Player := player{
-    Health := if (IsHardMode) then 50 else 100,
-    Position := point{
-        X := for (I := 0..10) { if (ValidPosition(I)) then return I },
-        Y := 0
-    }
-}
-
-# Nested expressions in function calls
-Result := Process(
-    if (NeedsFiltering) then Filter(Data) else Data,
-    Transform(X => X * 2)
-)
-
-# Lambda with complex body
-Operation := X => {
-    Validated := Verify(X)
-    Transformed := Transform(Validated)
-    Finalize(Transformed)
-}
-```
-
-<!-- TODO : this don't seem to work
-
-This composability extends to the type system, where type expressions can be embedded within other constructs:
-
-```verse
-# Array of computed type
-Handlers : []type{_(:event)<decides>:void} = [H1, H2, H3]
-
-# Map with computed value type
-Cache : [string]type{ComputeValue()} = map{}
-```
-
 -->

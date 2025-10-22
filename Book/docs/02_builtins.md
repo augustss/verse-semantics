@@ -11,6 +11,7 @@ The `int` type represents integer, non-fractional values. An `int` can contain a
 You can include `int` values within your code as literals.
 
 <!--verse
+# The scary number does not compile due to a front end issue. It should work
 F():void={
 -->
 ```verse
@@ -47,7 +48,7 @@ For integers, the operator `/` is failable, and the result is a `rational` type 
 
 ## Rationals
 
-`rational` represents the result of **integer division**. Unlike `int` or `float`, you cannot write a `rational` literal directly. Instead, rationals arise only as intermediate results when dividing integers with the `/` operator.  
+`rational` represents the result of integer division. Unlike `int` or `float`, you cannot write a `rational` literal directly. Instead, rationals arise only as intermediate results when dividing integers with the `/` operator.  
 Because rational numbers are not meant to be used as general-purpose values, their role is intentionally limited. They serve as an intermediate type that can be rounded to an integer when needed.  
 
 <!--verse
@@ -99,22 +100,20 @@ if (NumberOfQuivers := Floor(Coins / CoinsPerQuiver)):
 
 Here, the rational `Coins / CoinsPerQuiver` represents the exact division of coins into quivers. Applying `Floor` converts it into the number of whole quivers the player can actually buy.  
 
-Rationals therefore serve a narrow but important role in Verse: they capture the result of dividing integers, and allow precise rounding into whole numbers when needed.  
-
 ## Floats
 
 The `float` type represents all non-integer numerical values. It can hold large values and precise fractions.
 
-The float type is used for storing and handling floating point numbers, such as 1.0, -50.5, and 3.14159. A float is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range [-2^1024 + 1, … , 0, … , 2^1024 - 1], or has the value NaN (Not a Number).
+The float type is used for storing and handling floating point numbers, such as `1.0`, `-50.5`, and `3.14159`. A float is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range `[-2^1024 + 1, … , 0, … , 2^1024 - 1]`, or has the value `NaN` (Not a Number).
 
 The implementation for float differs from the IEEE standard in the following ways:
 
-- There is only one NaN value.
-- NaN is equal to itself.
+- There is only one `NaN` value.
+-`NaN` is equal to itself.
 - Every number is equal to itself. If two numbers are equal, then no pure code can observe the difference between them.
-- 0 cannot be negative.
+- `0` cannot be negative.
 
-You can include predefined float values within your code as float literals. A float literal is a floating point number in your code:
+You can include predefined float values within your code as float literals:
 
 <!--verse
 F()<transacts><decides>:void={
@@ -136,7 +135,7 @@ C = 0                 # compile error; 0 is not a `float` literal
 
 You can use the four basic math operations with floats: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
 
-There are also combined operators for doing the basic math operations (addition, subtraction, multiplication, and division), and updating the value of a variable. These combined operators are the same as assigning the result to the first operand of the math operation.
+There are also combined operators for doing the basic math operations (addition, subtraction, multiplication, and division), and updating the value of a variable:
 
 <!--verse
 F()<transacts>:void={
@@ -181,7 +180,7 @@ Query expressions use the query operator `?` to check if a logic value is true a
 
 For comparison operations, use the failable operator `=` to test if two logic values are the same, and `<>` to test for inequality.
 
-Many programming languages find it idiomatic to use a type like `logic` to signal the success or failure of an operation. In Verse, it's considered idiomatic to prefer using the `<decides>` effect instead of `logic` for that purpose, whenever possible. The conditional only executes the `then` branch if the guard succeeds:
+Many programming languages find it idiomatic to use a type like `logic` to signal the success or failure of an operation. In Verse, we use success and failure instead for that purpose, whenever possible. The conditional only executes the `then` branch if the guard succeeds:
 
 <!--verse
 ShowTargetLockedIcon():void={}
@@ -253,7 +252,7 @@ MyName[100]                 # fails
 }
 -->
 
-The length of a string is the number of UTF-8 code units it contains, accessed via `.Length`. Note that this is **not the same as the number of Unicode characters**:  
+The length of a string is the number of UTF-8 code units it contains, accessed via `.Length`. Note that this is *not the same as the number of Unicode characters*:  
 
 <!--verse
 F()<decides>:void={
@@ -305,7 +304,7 @@ Formatting := "My name is {MyName} but my alter ego is {MyAlterEgo}."
 
 Interpolation works for any value that has a `ToString()` function in scope.  
 
-Literal characters in Verse are written with single quotes. The type depends on whether the character falls within the ASCII range (`U+0000`–`U+007F`) or not:  
+Literal characters are written with single quotes. The type depends on whether the character falls within the ASCII range (`U+0000`–`U+007F`) or not:  
 
 - `'e'` has type `char`,  
 - `'é'` has type `char32`.  
@@ -316,8 +315,8 @@ F():void={
 ```verse
 A :char = 'e'                       # ok
 B :char32 = 'é'                     # ok
-# C :char = 'é'                       # error: type of 'é' is char32
-# D :char32 = 'e'                     # error: type of 'e' is char
+# C :char = 'é'                     # error: type of 'é' is char32
+# D :char32 = 'e'                   # error: type of 'e' is char
 ```
 <!--verse
 }
@@ -342,19 +341,6 @@ F :char32 = 0u00E9                  # ok; same as 'é'
 Unlike some languages, Verse does not allow implicit conversion between characters and integers.  
 
 Strings can be compared using the failable operators `=` (equality) and `<>` (inequality). Comparison is done by code point, and is case sensitive.  
-
-Interpolation is  shorter thatn string concatenation:
-
-<!--verse
-F():void={
--->
-```verse
-WinningPlayerName :string = "Player One"
-Announcement :string = "...And the winner is: {WinningPlayerName}!"
-```
-<!--verse
-}
--->
 
 Equality depends on exact code unit sequences, not visual appearance. Unicode allows multiple encodings for the same abstract character. For example, `"é"` may appear as the single code point `{0u00E9}`, or as the two-code-point sequence `"e"` (`{0u0065}`) plus a combining accent (`{0u0301}`). These two strings look the same, but they are not equal in Verse.  
 
@@ -382,11 +368,11 @@ F()<transacts>:void={
 -->
 ```verse
 SecondsLeft :int = 30
-SecondsString :string = SecondsLeft   # convert int to string
+SecondsString :string = SecondsLeft    # convert int to string
 
 var Combined :string = "Time Remaining: "
 if (SecondsString.Length > 2):
-    set Combined += "99"              # clamp to maximum
+    set Combined += "99"               # clamp to maximum
 else if (SecondsString.Length < 2):
     set Combined += "0{SecondsString}" # pad with zero
 else:
@@ -403,7 +389,7 @@ Certain characters have special meaning inside strings and must be escaped:
 
 ## Optionals
 
-An optional is an immutable container that either holds one value of type `t` or nothing at all. The type is written `?t`. Optionals are useful whenever a value may or may not be present, such as when looking up a key in a map or calling a function that can fail. By making this possibility explicit in the type, Verse allows programmers to handle “no result” situations directly and consistently, instead of relying on ad hoc error codes or special values.
+An optional is an immutable container that either holds a value of type `t` or nothing at all. The type is written `?t`. Optionals are useful whenever a value may or may not be present, such as when looking up a key in a map or calling a function that can fail. By making this possibility explicit in the type, Verse allows programmers to handle “no result” situations directly and consistently, instead of relying on ad hoc error codes or special values.
 
 You can create a non-empty optional with `option{...}`, which wraps a value into an optional. For example:
 
@@ -509,7 +495,7 @@ Here the optional signals the possibility of failure directly in the type. The `
 
 ## Tuple
 
-The tuple is a container that groups two or more expressions into a single expression. Unlike arrays, which can only contain elements of one type, tuples allow you to combine values of mixed types and treat them as one unit. The elements of a tuple appear in the order in which you list them, and you access them by their position, called the index. Because the number of elements is always known at compile time, a tuple is both simple to create and safe to use.
+A tuple is a container that groups two or more values. Unlike arrays, which can only contain elements of one type, tuples allow you to combine values of mixed types and treat them as a unit. The elements of a tuple appear in the order in which you list them, and you access them by their position, called the index. Because the number of elements is always known at compile time, a tuple is both simple to create and safe to use.
 
 The term *tuple* is a back formation from *quadruple*, *quintuple*, *sextuple*, and so on. Conceptually, a tuple is like an unnamed data structure with ordered fields, or like a fixed-size array where each element may have a different type.
 
@@ -536,11 +522,11 @@ X:tuple(int,tuple(int,float,string),string)=
 (1, (10, 20.0, "thirty"), "three")
 ```
 
-Tuples are particularly useful when you want to return multiple values from a function or when you want a lightweight grouping of values without the overhead of defining a struct or class. The type of a tuple is written with the `tuple` keyword followed by the types of the elements, but in most cases it can be inferred. For instance, you can write `MyTuple : tuple(int, float, string) = (1, 2.0, "three")`, or simply `MyTuple := (1, 2.0, "three")` and let the compiler deduce the type.
+Tuples are useful when you want to return multiple values from a function or when you want a lightweight grouping of values without the overhead of defining a struct or class. The type of a tuple is written with the `tuple` keyword followed by the types of the elements, but in most cases it can be inferred. For instance, you can write `MyTuple : tuple(int, float, string) = (1, 2.0, "three")`, or simply `MyTuple := (1, 2.0, "three")` and let the compiler deduce the type.
 
 The elements of a tuple are accessed using a zero-based index operator written with parentheses. If `MyTuple := (1, 2.0, "three")`, then `MyTuple(0)` is the integer `1`, `MyTuple(1)` is the float `2.0`, and `MyTuple(2)` is the string `"three"`. Because the compiler knows the number of elements in every tuple, tuple indexing cannot fail: any attempt to use an out-of-bounds index results in a compile-time error.
 
-Another feature of tuples is *expansion* (or *splatting*). When a tuple is passed to a function as a single argument, its elements are automatically expanded as if the function had been called with each element separately. For example:
+Another feature of tuples is *expansion*. When a tuple is passed to a function as a single argument, its elements are automatically expanded as if the function had been called with each element separately. For example:
 
 ```verse
 F(Arg1:int, Arg2:string):void =
@@ -551,17 +537,17 @@ G():void =
     F(MyTuple)   # expands to F(1, "two")
 ```
 
-Tuples also play an important role in structured concurrency. The `sync` expression produces a tuple of results, allowing several computations that unfold over time to be evaluated simultaneously. In this way, tuples provide not only a convenient grouping mechanism but also a foundation for composing concurrent computations in Verse.
+Tuples also play a role in structured concurrency. The `sync` expression produces a tuple of results, allowing several computations that unfold over time to be evaluated simultaneously. In this way, tuples provide not only a convenient grouping mechanism but also a foundation for composing concurrent computations.
 
 ## Arrays
 
 An array is an immutable container that holds zero or more values of the same type `t`. The elements of an array are ordered, and each can be accessed by a zero-based index. Arrays are written with square brackets in their type, for example `[]int` or `[]float`, and are created with the `array{...}` literal form. For instance, `A : []int = array{}` creates an empty array, while `B : []int = array{1, 2, 3}` creates an array of three integers. Accessing elements by index is a failable operation: `B[0]` succeeds with the value `1`, while `B[10]` fails because the index is out of bounds.
 
-Arrays can be concatenated with the `+` operator, and when declared as `var` they can be extended with the shorthand operator `+=`. For example, `var C : []int = B + array{4}` gives `C` the value `array{1, 2, 3, 4}`, and `set C += array{5}` updates it to `array{1, 2, 3, 4, 5}`. The length of an array is available through the `.Length` member, so `C.Length` here would be `5`. Elements are always stored in the order they are inserted, and indexing starts at `0`. Thus `array{10, 20, 30}[0]` is `10`, and the last valid index of any array is always one less than its length.
+Arrays can be concatenated with the `+` operator, and when declared as `var` they can be extended with the shorthand operator `+=`. For example, `var C:[]int= B + array{4}` gives `C` the value `array{1,2,3,4}`, and `set C += array{5}` updates it to `array{1,2,3,4,5}`. The length of an array is available through the `.Length` member, so `C.Length` here would be `5`. Elements are always stored in the order they are inserted, and indexing starts at `0`. Thus `array{10,20,30}[0]` is `10`, and the last valid index of any array is always one less than its length.
 
-Although arrays themselves are immutable, variables declared with `var` can be reassigned to new arrays, or can appear to have their elements changed. For example, `var D : []int = array{1, 2, 3}` allows the update `set D[0] = 3`, after which `D` will hold `array{3, 2, 3}`. What actually happens is that a brand new array is created under the hood, with the specified element updated. In effect, `set D[0] = 3` is compiled into `set D = array{3, D[1], D[2]}`. The old array continues to exist if another variable was referencing it, which means that if `A` and `B` both start as `array{1}` and we update `A[0]`, then `A` and `B` will diverge: `A[0]` is now `2` while `B[0]` is still `1`.
+Although arrays themselves are immutable, variables declared with `var` can be reassigned to new arrays, or can appear to have their elements changed. For example, `var D:[]int = array{1,2,3}` allows the update `set D[0] = 3`, after which `D` will hold `array{3,2,3}`. What actually happens is that a brand new array is created under the hood, with the specified element updated. In effect, `set D[0] = 3` is compiled into `set D = array{3,D[1],D[2]}`. The old array continues to exist if another variable was referencing it, which means that if `A` and `B` both start as `array{1}` and we update `A[0]`, then `A` and `B` will diverge: `A[0]` is now `2` while `B[0]` is still `1`.
 
-Arrays are useful whenever you want to store multiple values of the same type, such as a list of players in a game: `Players : []player = array{Player1, Player2}`. Access is by index, for example `Players[0]` is the first player. Since indexing is failable, it is often combined with `if` expressions or iteration. For instance, the following code safely prints out every element of an array:  
+Arrays are useful whenever you want to store multiple values of the same type, such as a list of players in a game: `Players:[]player = array{Player1,Player2}`. Access is by index, for example `Players[0]` is the first player. Since indexing is failable, it is often combined with `if` expressions or iteration. For instance, the following code safely prints out every element of an array:  
 
 <!--verse
 using { /Verse.org/VerseCLR }
@@ -650,9 +636,9 @@ Arrays in Verse are thus immutable values with predictable behavior, but through
 
 ## Maps
 
-Maps are one of the core container types, alongside arrays and optionals. Arrays are ordered sequences indexed by integers, while optionals are the smallest container of all, holding either zero or one value. Maps generalize both ideas: like arrays, they provide efficient lookup, but instead of being limited to integer indices, they allow any *comparable* type as a key. You can think of a map as an array indexed by arbitrary keys, or as a larger optional that can hold many key–value associations at once.
+Maps are one of the core container types, alongside arrays and optionals. If arrays are ordered sequences indexed by integers, and optionals are the smallest container of all, holding either zero or one value, then Maps generalize both ideas: like arrays, they provide efficient lookup, but instead of being limited to integer indices, they allow any *comparable* type as a key. You can think of a map as an array indexed by arbitrary keys, or as a larger optional that can hold many key–value associations at once.
 
-A map is an immutable associative container that stores zero or more key–value pairs of type `[k]v`, written as `(Key:k, Value:v)`. Maps are the standard way to associate values with other values: you supply a key, and the map returns the value associated with it. This is similar to a dictionary in many programming languages.  
+A map is an immutable associative container that stores zero or more key–value pairs of type `[k]v`, written as `(Key:k, Value:v)`. Maps are the standard way to associate values with other values: you supply a key, and the map returns the value associated with it.
 
 Maps are useful whenever you want to store data that is naturally indexed by something other than an integer position. For example, you might want to store the weights of different objects keyed by their names:  
 
@@ -730,7 +716,7 @@ WordCount:[string]int = map{
 }
 -->
 
-Maps can also be iterated over, letting you traverse all key–value pairs in the order they were inserted:  
+Maps can also be iterated over, letting you traverse all key–value pairs exactly in the order they were inserted:  
 
 <!--verse
 using { /Verse.org/VerseCLR }
@@ -759,9 +745,9 @@ This produces:
 Sometimes you want to remove an entry from a map. Since maps are immutable, “removing” means creating a new map that excludes the given key. For example, here is a function that removes an element from a `[string]int` map:  
 
 ```verse
-RemoveKeyFromMap(ExampleMap:[string]int, ElementToRemove:string):[string]int =
+RemoveKeyFromMap(TheMap:[string]int, ToRemove:string):[string]int =
     var NewMap:[string]int = map{}
-    for (Key -> Value : ExampleMap, Key <> ElementToRemove):
+    for (Key -> Value : TheMap, Key <> ToRemove):
         set NewMap = ConcatenateMaps(NewMap, map{Key => Value})
     return NewMap
 ```
@@ -770,7 +756,7 @@ The key type of a map must belong to the class `comparable`, which guarantees th
 
 ### Weak Maps
 
-There is also a type `weak_map`, which is a supertype of `map`. It behaves similarly to ordinary maps, but it deliberately restricts what you can do. You cannot ask for its length, you cannot iterate over its entries, and you cannot use `ConcatenateMaps`. These restrictions make `weak_map` lighter and in some contexts more efficient, but at the cost of flexibility.  
+The `weak_map` type is a supertype of `map`. It behaves similarly to ordinary maps, but it deliberately restricts what you can do. You cannot ask for its length, you cannot iterate over its entries, and you cannot use `ConcatenateMaps`. These restrictions make `weak_map` lighter and in some contexts more efficient, but at the cost of flexibility.
 
 A `weak_map` is declared with `weak_map(k,v)` and can be initialized from an ordinary `map{}`. Updating and accessing values works the same way:  
 
@@ -793,7 +779,7 @@ Because `weak_map` is a supertype of `map`, you can switch between the two when 
 
 ## Any
 
-The `any` type is the **supertype of all types**. Every type in the language is a subtype of `any`. Because of this, `any` itself supports very few operations: whatever functionality `any` provides must also be implemented by every other type. In practice, there is very little you can do directly with values of type `any`. Still, it is important to understand the type, because it sometimes arises when working with code that mixes different kinds of values, or when the type checker has no more precise type to assign.  
+The `any` type is the *supertype of all types*. Every type in the language is a subtype of `any`. Because of this, `any` itself supports very few operations: whatever functionality `any` provides must also be implemented by every other type. In practice, there is very little you can do directly with values of type `any`. Still, it is important to understand the type, because it sometimes arises when working with code that mixes different kinds of values, or when the type checker has no more precise type to assign.  
 
 One way `any` appears is when combining values that do not share a more specific supertype. For example:  
 
@@ -822,7 +808,7 @@ FirstInt(X:int, :any) : int = X
 
 Here, the second parameter is ignored. Because it can be any value of any type, it is given the type `any`.  
 
-In more general code, the same idea can be expressed using **parametric types**, making the function flexible while still precise:  
+In more general code, the same idea can be expressed using *parametric types*, making the function flexible while still precise:  
 
 ```verse
 First(X:t, :any where t:type) : t = X
@@ -832,7 +818,7 @@ This version works for any type `t`, returning a value of type `t` while discard
 
 ## Void
 
-The `void` type is the **empty type**. Unlike `any`, which contains all possible values, `void` contains none. It represents the absence of a value and is used in places where no result is returned.  
+The `void` type is the *empty type*. Unlike `any`, which contains all possible values, `void` contains none. It represents the absence of a value and is used in places where no result is returned.  
 
 Because `void` has no values, you can never construct or assign a value of type `void`. This makes it useful as a marker type in function signatures and control flow.  
 
