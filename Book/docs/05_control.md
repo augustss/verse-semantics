@@ -1,6 +1,6 @@
 # Control Flow
 
-Every program has a natural rhythm to its execution, a sequence in which instructions are processed and decisions are made. In Verse, this flow is more than just a mechanical progression through lines of code - it's a carefully orchestrated dance between different types of expressions, each contributing to the overall behavior of your program. Understanding how to control this flow, structure your code into meaningful blocks, and document your thinking through comments is essential to mastering Verse.
+Every program has a natural rhythm to its execution, a sequence in which instructions are processed and decisions are made. In Verse, this flow is more than just a mechanical progression through lines of code - it's a carefully orchestrated dance between different types of expressions, each contributing to the overall behavior of your program.
 
 ## Code Blocks
 
@@ -69,11 +69,11 @@ FinalScore := block:
 
 ## Directing Program Execution
 
-Control flow expressions are how you shape the behavior of your program, making decisions, repeating operations, and handling different scenarios. Verse's approach to control flow is distinctive because it combines traditional imperative constructs with functional programming concepts and its unique failure-based decision making.
+Control flow expressions are how you shape the behavior of your program, making decisions, repeating operations, and handling different scenarios.
 
 ### The If Expression
 
-The `if` expression is perhaps the most fundamental control flow construct, but in Verse it works differently than in most languages. Instead of evaluating boolean conditions, `if` uses success and failure to drive decisions. When an expression in the condition succeeds, the corresponding branch executes:
+The `if` expression is a fundamental control flow construct, but in Verse it works differently than in most languages. Instead of evaluating boolean conditions, `if` uses success and failure to drive decisions. When an expression in the condition succeeds, the corresponding branch executes:
 
 <!--verse
 player:=class{
@@ -103,6 +103,10 @@ HandlePlayerAction(Player:player, Action:string):void =
 ```
 
 This failure-based approach integrates naturally with `decides` effect system, allowing you to chain conditions that might fail without explicit error handling at each step.
+
+If any experesion in the conditon fails, control flow proceed to the `else` branch if any, and any effects performed while evaluating the condition are undone, including side-effects.
+
+The condition can also introduce new bindings that can be used in the `then` branch.
 
 ### The Case Expression
 
@@ -164,7 +168,7 @@ CalculateTotalScore(Players:[]player):int =
     Total
 ```
 
-Verse's `for` expression is particularly powerful when combined with failure contexts, as it can naturally filter elements:
+Verse's `for` expressions are particularly powerful when they leverage failure contexts, as they can naturally filter:
 
 <!--verse
 player:=struct{ Name:string }
@@ -266,11 +270,3 @@ TryMultipleStrategies(Data:input_data)<decides>:output =
     else:
         false  # All strategies failed
 ```
-
-## Thinking in Verse
-
-The key to mastering control flow  is understanding that it's not just about directing execution - it's about composing expressions that produce values. Every `if`, every `loop`, every block contributes to the overall computation. This expression-oriented mindset, combined with the failure-based decision making and the scoping rules of code blocks, creates a programming model that's both powerful and elegant.
-
-As you write more Verse code, you'll find that the boundaries between control flow, data flow, and program structure become fluid. A loop isn't just repetition - it's a value-producing expression that can filter, transform, and aggregate. An `if` isn't just a branch - it's a computation that chooses between possible results based on success and failure. A block isn't just a grouping - it's a scoped computation that produces a value while managing local state.
-
-This unified view of program structure, where everything is an expression and control flow seamlessly integrates with computation, is what makes Verse unique.

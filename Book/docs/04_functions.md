@@ -2,7 +2,9 @@
 
 Functions are reusable code blocks that perform actions and produce outputs based on inputs. Think of them as abstractions for behaviors, much like ordering food from a menu at a restaurant. When you order, you tell the waiter what you want from the menu, such as `OrderFood("Ramen")`. You don't need to know how the kitchen prepares your dish, but you expect to receive food after ordering. This abstraction is what makes functions powerful - you define the instructions once and reuse them in different contexts throughout your code.
 
-Verse takes a unique approach to functions by supporting three programming paradigms simultaneously: functional programming with lambdas and immutable data structures, imperative programming with mutable variables and pointers, and logic programming where programs describe equations to solve. This multi-paradigm approach makes functions particularly versatile.
+Verse takes a distinctive approach to functions by supporting three programming paradigms simultaneously: functional programming, imperative programming, and logic programming. This multi-paradigm approach makes functions particularly versatile.
+
+<!-- TODO: We say "logic" a lot but we currently don't have it. Should that be toned down?  My current idea is to have some subsection early on that will explain the difference between MaxVerse and ShipVerse. -->
 
 ## Parameters and Arguments
 
@@ -106,7 +108,7 @@ All(Array:[]t, Test(:t)<decides>:void where t:type)<decides>:void =
         Test[Element]
 ```
 
-The interaction between `decides` and control structures like `for` expressions creates powerful patterns. When a `decides` function appears in a `for` expression, the loop continues only as long as the function succeeds, providing natural filtering behavior.
+The interaction between `decides` and control structures like `for` expressions creates powerful patterns. When a `decides` function appears in a `for` expression, the loop evaluates its body only if the function succeeds, providing natural filtering behavior.
 
 ## Types and Overloading
 
