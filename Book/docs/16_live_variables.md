@@ -304,7 +304,7 @@ Using `Old` in a variable declaration is disallowed: `var live X := 1 + Old(X)` 
 
 ### Convergence and Stability
 
-Live variables with interdependencies can form cycles. When guards use idempotent operations and proper guards, these cycles naturally converge to fixed points.
+Live variables with interdependencies can form cycles. When target expression use idempotent operations and values are comparable, these cycles can naturally converge to fixed points.
 
 <!--verse
 F():void={
@@ -322,7 +322,7 @@ set live Y = if (X < 0) then 0 else X - 1
 }
 -->
 
-The guards are re-evaluated until values stabilize. In this example, `X` decrements to -1, `Y` clamps to 0, and `X` would recompute but produces -1 again, so the system stabilizes.
+If the type of the variable is comparable, the guards are re-evaluated until values stabilize. In this example, `X` decrements to -1, `Y` clamps to 0, and `X` would recompute but produces -1 again, so the system stabilizes.
 
 However, cycles without proper termination conditions can diverge. Verse detects common patterns but cannot prevent all divergence—care must be taken when designing interdependent live variables.
 
