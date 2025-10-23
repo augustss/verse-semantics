@@ -184,6 +184,8 @@ player:=class<allocates>{Name :string, var Health : int, Mana :int}
 
  For classes with mutable fields (marked with `var`), initialization sets the starting values that can change during   the object's lifetime. Immutable fields must be initialized during construction and cannot be modified afterward.  This distinction makes the construction phase critical for  establishing invariants that will hold throughout the object's existence.
 
+ <!-- TODO: more details about this! -->
+
 ### Access Specifiers
 
 Classes support fine-grained control over member visibility through access specifiers:

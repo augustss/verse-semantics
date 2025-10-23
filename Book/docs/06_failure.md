@@ -1,8 +1,8 @@
 # Failure
 
-Most programming languages treat control flow as a matter of true or false, yes or no, one or zero. They evaluate boolean conditions and branch accordingly, creating a world of binary decisions that often requires checking conditions twice - once to see if something is possible, and again to actually do it. Verse takes a radically different approach. Instead of asking "is this true?", Verse asks "does this succeed?"
+Most programming languages treat control flow as a matter of true or false, yes or no, one or zero. They evaluate boolean conditions and branch accordingly, creating a world of binary decisions that often requires checking conditions twice - once to see if something is possible, and again to actually do it. Verse takes a different approach. Instead of asking "is this true?", Verse asks "does this succeed?"
 
-This distinction might seem subtle, but it fundamentally changes how programs are written and reasoned about. Failure isn't an error or an exception - it's a first-class concept that drives control flow. When an expression fails, it doesn't crash your program or throw an exception that needs to be caught. Instead, failure is a normal, expected outcome that your code handles gracefully through the structure of the language itself.
+This distinction might seem subtle, but it changes how programs are written and reasoned about. Failure isn't an error or an exception - it's a first-class concept that drives control flow. When an expression fails, it doesn't crash your program or throw an exception that needs to be caught. Instead, failure is a normal, expected outcome that your code handles gracefully through the structure of the language itself.
 
 Consider the simple act of accessing an array element. In traditional languages, you might write:
 
@@ -25,7 +25,7 @@ if (Value := MyArray[Index]):
 
 The array access either succeeds and binds the value, or it fails and the code moves on. There's no separate validation step, no possibility of the check and access becoming inconsistent, and no undefined behavior from accessing invalid indices.
 
-## Failable Expressions: The Building Blocks
+## Failable Expressions
 
 A failable expression is one that can either succeed and produce a value, or fail and produce nothing. This isn't the same as returning null or an error code - when an expression fails, it literally produces no value at all. The computation stops at that point in that particular path of execution.
 
@@ -44,14 +44,14 @@ You can create your own failable expressions through functions marked with the `
 
 ```verse
 ValidateAge(Age:int)<decides>:int =
-    Age >= 0  # Fails if age is negative
+    Age >= 0    # Fails if age is negative
     Age <= 150  # Fails if age is unrealistic
-    Age        # Returns the age if both checks pass
+    Age         # Returns the age if both checks pass
 ```
 
 This function doesn't just check conditions - it embodies them. If the age is invalid, the function fails. If it's valid, it succeeds with the age value. The validation and the value are inseparable.
 
-## Failure Contexts: Where Magic Happens
+## Failure Contexts
 
 Not every part of a program can execute failable expressions. They can only appear in failure contexts - places where the language knows how to handle both success and failure. Each failure context defines what happens when expressions within it fail.
 
@@ -97,7 +97,7 @@ FindBestWeapon(Inventory:[]item)<decides>:item =
 
 The function body is a failure context, allowing failable expressions throughout. The final line extracts the value from the option, failing if no weapon was found.
 
-## Speculative Execution: Try Before You Commit
+## Speculative Execution
 
 One of Verse's most powerful features is speculative execution within failure contexts. When you execute code in a failure context, changes to variables are provisional - they only become permanent if the entire context succeeds.
 

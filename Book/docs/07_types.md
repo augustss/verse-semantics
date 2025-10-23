@@ -2,7 +2,7 @@
 
 Every value has a type, and understanding the type system is fundamental to mastering any language. Types aren't merely labels - they form a rich hierarchy that governs how values flow through your program, what operations are permitted, and how the compiler reasons about your code. The type system combines static verification with practical flexibility, catching errors at compile time while still allowing sophisticated patterns of code reuse and abstraction.
 
-At the apex of this hierarchy sits `any`, the universal supertype from which all other types descend. At the opposite extreme lies `void`, the empty type that contains no values at all. Between these extremes exists a carefully designed lattice of types, each with its own capabilities and constraints. This structure isn't arbitrary - it reflects deep principles about computation, abstraction, and the relationships between different kinds of data.
+At the apex of this hierarchy sits `any`, the universal supertype from which all other types descend. At the opposite extreme lies `void`, the empty type that contains no values at all. Between these extremes exists a carefully designed lattice of types, each with its own capabilities and constraints. 
 
 ## Understanding Subtyping
 
@@ -43,8 +43,7 @@ This inheritance hierarchy means that a `sports_car` can be used anywhere a `car
 
 ## Casting and Conversion
 
-All type conversions must be explicit, a design choice that eliminates entire categories of bugs while making the programmer's intent clear. There's no implicit coercion between types - you must explicitly state how you want values to be converted.
-Converting between numeric types illustrates this principle clearly. To convert an integer to a float, you multiply by 1.0:
+All type conversions must be explicit, a design choice that eliminates entire categories of bugs while making the programmer's intent clear. Converting between numeric types illustrates this principle clearly. To convert an integer to a float, you multiply by 1.0:
 
 <!--verse
 F():void={
@@ -101,7 +100,7 @@ Type casting becomes particularly interesting with parametric types. When you ha
 DoIt(Value:t where t:subtype(any)):void =
 ```
 
-The constraint `t:subtype(any)` might seem redundant since all types are subtypes of `any` (inface the above would behave identifcally if one had written `t:type`), but it makes the type parameter explicit and allows for more specific constraints in real code.
+The constraint `t:subtype(any)` is redundant since all types are subtypes of `any` (inface the above would behave identifcally if one had written `t:type`), but it makes the type parameter explicit and allows for more specific constraints in real code.
 
 ## Where Clauses
 
@@ -122,7 +121,7 @@ Using the same type in multiple constraints is not yet supported, when implement
 <!--NoCompile-->
 ```verse
 # Multiple constraints on the same type
-Transform(Input:t where t:subtype(comparable), t:subtype(printable)):t =
+Transform(Input:t where t:subtype(comparable), t:subtype(printable)):t = # Not supported, yet 
     Print("Processing: {Input}")
     Input
 ```
@@ -233,11 +232,11 @@ The equality operators `=` and `<>` are defined in terms of the comparable type:
 
 <!--NoCompile-->
 ```verse
-operator'='(X:t, Y:comparable where t:subtype(comparable))<decides>:t
-operator'<>'(X:t, Y:comparable where t:subtype(comparable))<decides>:t
+operator'='(X:t, Y:t where t:subtype(comparable))<decides>:t
+operator'<>'(X:t, Y:t where t:subtype(comparable))<decides>:t
 ```
 
-This signature reveals something subtle: both operands must be of the same type (or at least share a common subtype of comparable). This prevents nonsensical comparisons while allowing flexibility within type hierarchies:
+This signature reveals something subtle: both operands must be of the same type. This prevents nonsensical comparisons while allowing flexibility within type hierarchies:
 
 <!--NoCompile-->
 ```verse
@@ -281,6 +280,11 @@ Player1 = Player3  # Succeeds - same instance
 With the `unique` specifier, instances are only equal to themselves (identity equality), not to other instances with the same field values (structural equality). This provides a clear, predictable semantics for class equality.
 
 The comparable type also constrains what can be used as map keys. Map keys must be comparable so the map can determine whether a key already exists. However, not all comparable types can be map keys - currently, `float`, `option`, and classes (even with `unique`) cannot be used as map keys. This restriction exists because these types either have special values (like `NaN` for floats) or reference semantics that complicate map implementation.
+
+There is currently no way to make a class comparable by writing a comparison method. 
+
+<!--TODO the above is right, right? It seems like a major limitation. People will invent their own solutions. -->
+
 
 ## Type Hierarchies
 
@@ -411,7 +415,6 @@ When designing class hierarchies, consider carefully whether to use inheritance 
 <!--verse
 player := class{}
 -->
-
 ```verse
 # Inheritance approach
 enhanced_player := class(player):
