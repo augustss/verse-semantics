@@ -3,7 +3,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-module Verse.Core.Eval
+module Verse.Eval
   ( eval
   ) where
 
@@ -32,9 +32,9 @@ import Fix
 import Loc
 import Ref
 
-import Verse.Core.Exp
-import Verse.Core.Val (Val)
-import Verse.Core.Val qualified as Val
+import Verse.Eval.Val (Val)
+import Verse.Eval.Val qualified as Val
+import Verse.Exp
 import Verse.Fun (Fun)
 import Verse.Fun qualified as Fun
 import Verse.Monad (Stream (..), VerseT, runVerseT)
@@ -546,7 +546,7 @@ supply = do
   put s { label = s.label + 1 }
   pure s.label
 
-insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
+insert :: Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
 insert k = IntMap.insertWith (++) k . (:[])
 
 infixr 3 ***

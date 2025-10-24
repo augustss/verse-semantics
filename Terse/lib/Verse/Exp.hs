@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Verse.Core.Exp
+module Verse.Exp
   ( ExpF (..)
   , Exp
   , LExp

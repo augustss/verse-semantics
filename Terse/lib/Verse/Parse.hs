@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Verse.Core.Parse
+module Verse.Parse
   ( parse
   , parse'
   , Result (..)
@@ -36,7 +36,7 @@ import Parser
 import Parser qualified
 import Pos
 
-import Verse.Core.Exp
+import Verse.Exp
   ( ExpF
   , LExp
   , pattern (:&)
@@ -47,7 +47,7 @@ import Verse.Core.Exp
   , pattern (:+)
   , pattern (:-)
   )
-import Verse.Core.Exp qualified as Exp
+import Verse.Exp qualified as Exp
 import Verse.Token
 
 parse :: Text -> Either Pos LExp
