@@ -64,7 +64,7 @@ comp' s1 s2 = wrap $ \ case
     Val.newVar $ Val.Int $(TH.litE . TH.integerL $ fromIntegral x) |]
   e1 :& e2 -> [| do
     s3 <- freshS
-    $(comp' s1 (TH.VarE 's3) e1)
+    _ <- $(comp' s1 (TH.VarE 's3) e1)
     $(comp' (TH.VarE 's3) s2 e2) |]
   e1 := e2 -> [| do
     s3 <- freshS
@@ -100,6 +100,16 @@ comp' s1 s2 = wrap $ \ case
         local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e)
       unifyChoiceFree $(pure s1) $(pure s2)
       unifyStoreFree $(pure s1) $(pure s2)
+    pure var |]
+  If e1 x e2 e3 -> [| do
+    var <- Val.freshVar
+    heap <- newHeap $(pure s1)
+    fork $ Val.unifyVar var =<< if'
+      (do s1 <- newS
+          s2 <- freshS
+          local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e1))
+      (\ var -> $(localEnv (Env.insert x (TH.VarE 'var)) $ comp' s1 s2 e2))
+      $(comp' s1 s2 e3)
     pure var |]
 
 localEnv :: (Env -> Env) -> Comp a -> Comp a
