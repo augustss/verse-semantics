@@ -128,9 +128,7 @@ eval' s1 s2 = wrap $ \ case
     s3 <- freshS
     var1 <- eval' s1 s3 e1
     var2 <- eval' s3 s2 e2
-    i <- addStack
-    unifyVar var1 var2
-    removeStack i
+    bracketStack $ unifyVar var1 var2
     pure var1
   e1 :| e2 -> do
     var <- freshVar

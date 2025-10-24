@@ -11,8 +11,12 @@ module Verse.Run
   , unifyChoiceFree
   , unifyStoreFree
   , freshHeap
+  , newHeap
+  , readHeap
   , unifyHeap
   ) where
+
+import Control.Monad.Reader
 
 import Ref
 
@@ -54,6 +58,17 @@ unifyStoreFree s1 s2 = unifyVar s1.storeFree s2.storeFree
 
 freshHeap :: MonadRef m => VerseT m (Heap m)
 freshHeap = freshVar
+
+newHeap :: MonadRef m => S m -> VerseT m (Heap m)
+newHeap s1 = do
+  heap <- freshHeap
+  fork $ do
+    readStoreFree s1
+    unifyHeap heap =<< ask
+  pure heap
+
+readHeap :: MonadRef m => VerseT m ()
+readHeap = readVar =<< ask
 
 unifyHeap :: MonadRef m => Heap m -> Heap m -> VerseT m ()
 unifyHeap = unifyVar

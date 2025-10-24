@@ -9,6 +9,7 @@ module Verse.Comp.Internal
   ) where
 
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Reader
 
 import Data.Functor
@@ -78,6 +79,28 @@ comp' s1 s2 = wrap $ \ case
       Val.unifyVar var =<< $(comp' s1 s2 e1) <|> $(comp' s1 s2 e2)
     pure var |]
   Fail -> [| empty |]
+  All e -> [| do
+    var <- Val.freshVar
+    heap <- newHeap $(pure s1)
+    fork $ do
+      Val.unifyVar var <=< Val.newVar . Val.Tup <=< all' $ do
+        s1 <- newS
+        s2 <- freshS
+        local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e)
+      unifyChoiceFree $(pure s1) $(pure s2)
+      unifyStoreFree $(pure s1) $(pure s2)
+    pure var |]
+  One e -> [| do
+    var <- Val.freshVar
+    heap <- newHeap $(pure s1)
+    fork $ do
+      Val.unifyVar var <=< one $ do
+        s1 <- newS
+        s2 <- freshS
+        local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e)
+      unifyChoiceFree $(pure s1) $(pure s2)
+      unifyStoreFree $(pure s1) $(pure s2)
+    pure var |]
 
 localEnv :: (Env -> Env) -> Comp a -> Comp a
 localEnv f = local (\ r -> r { env = f r.env })

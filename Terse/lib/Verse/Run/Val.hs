@@ -9,6 +9,7 @@ module Verse.Run.Val
   , freeze
   ) where
 
+import Control.Applicative
 import Control.Monad
 
 import Data.Function
@@ -22,15 +23,19 @@ import Verse.Monad (VerseT, Vars (..), ZipVars_ (..))
 import Verse.Monad qualified as Monad
 
 data Val f a
-  = Int !Integer deriving Show
+  = Int !Integer
+  | Tup [a] deriving Show
 
-instance Vars (Val f a) m where
-  vars _ = \ case
+instance Vars a m => Vars (Val f a) m where
+  vars f = \ case
     x@Int {} -> pure x
+    Tup x -> Tup <$> vars f x
 
-instance ZipVars_ (Val f a) m where
-  zipVars_ _ = curry $ \ case
+instance ZipVars_ a m => ZipVars_ (Val f a) m where
+  zipVars_ f = curry $ \ case
     (Int x, Int y) -> guard $ x == y
+    (Tup x, Tup y) -> zipVars_ f x y
+    _ -> empty
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))
 
@@ -51,3 +56,4 @@ freeze
   => Var m -> VerseT m (Fix (Val Identity))
 freeze = readVar >=> fmap Fix . \ case
   Int x -> pure $ Int x
+  Tup x -> Tup <$> traverse freeze x
