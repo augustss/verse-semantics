@@ -219,7 +219,7 @@ $$
   \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
 & = & \begin{array}[t]{@@{\;}l@@{\,}l}
         (S0 \pomseq \semess{B}{u}{v}{t_1} \pomHIDE xs)
-            \cup
+            \pomunion
           (\pomNOT(S0 \pomHIDE xs) \pomseq \semess{B}{u}{v}{t_2}) \\
         \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
       \end{array}
@@ -310,8 +310,20 @@ $$
   &&&  \pomseq \semFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \semFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
   &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
 &  \semFUN{\pomunit{\EV}}{xs}{pq}{hf}{t_1}
-       &  = & (\pomunit{\EV} \pomseq (\text{\bf Key part: Not done yet}))  \pomHIDE \{p,q,xs\} \\
- &&&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\
+                   &  = & \pomunit{ \bigcup \begin{array}[t]{@@{}l@@{\;}l}
+                       \{ & \rho \in \Env \\
+                       \vb & \hh \in extract(\rho(h)) \\
+                       , & |let|\; \EV' = \EV \cap (\rho \pomHIDE \{p,q,h,f\} \\
+                       , & |let|\; \ff = \{ \fpr{\rho'(p)}{\rho_2(v)} \vb \rho' \in \EV', \pomunit{\EV_2} = .., \rho_2 \in \EV_2 \} \\
+                       , & isFunction(\ff) \\
+                       , & \dom(\hh) = \{ \rho'(q) \vb \rho' \in \EV' \} \\
+                       , & \dom(\ff) = \{ \rho'(p) \vb \rho' \in \EV' \} \\
+                       \} }
+                       \end{array}
+
+% We have gotten rid of the  NOT case for unit(D)
+%  &&&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE \{p,q,xs\}) \pomseq \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\
+
 \end{array}
 \end{array}
 $$
