@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -16,7 +17,7 @@ import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
 
-import Language.Haskell.TH (Q, Quote)
+import Language.Haskell.TH (Q, Quote, pattern VarE, integerL, litE, varE)
 import Language.Haskell.TH qualified as TH
 
 import Loc
@@ -51,64 +52,86 @@ runCompT = flip runReaderT R {..} . unComp
     env = mempty
     stack = mempty
 
-comp' :: TH.Exp -> TH.Exp -> LExp -> Comp TH.Exp
+comp' :: TH.Name -> TH.Name -> LExp -> Comp TH.Exp
 comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
-    Just y -> [| unifyS $(pure s1) $(pure s2) $> $(pure y) |]
-    Nothing -> [| fork stuck *> freshVar' |]
+    Just y -> [| unifyS $(varE s1) $(varE s2) $> $(pure y) |]
+    Nothing -> [| fork stuck *> Val.freshVar |]
   Exi x e -> [| do
     var <- Val.freshVar
-    $(localEnv (Env.insert x (TH.VarE 'var)) $ comp' s1 s1 e) |]
+    $(localEnv (Env.insert x (VarE 'var)) $ comp' s1 s1 e) |]
   Int x -> [| do
-    unifyS $(pure s1) $(pure s2)
-    Val.newVar $ Val.Int $(TH.litE . TH.integerL $ fromIntegral x) |]
+    unifyS $(varE s1) $(varE s2)
+    Val.newVar $ Val.Int $(litE . integerL $ fromIntegral x) |]
   e1 :& e2 -> [| do
     s3 <- freshS
-    _ <- $(comp' s1 (TH.VarE 's3) e1)
-    $(comp' (TH.VarE 's3) s2 e2) |]
+    _ <- $(comp' s1 's3 e1)
+    $(comp' 's3 s2 e2) |]
   e1 := e2 -> [| do
     s3 <- freshS
-    var1 <- $(comp' s1 (TH.VarE 's3) e1)
-    var2 <- $(comp' (TH.VarE 's3) s2 e2)
+    var1 <- $(comp' s1 's3 e1)
+    var2 <- $(comp' 's3 s2 e2)
     Val.unifyVar var1 var2
     pure var1 |]
   e1 :| e2 -> [| do
     var <- Val.freshVar
     fork $ do
-      readChoiceFree $(pure s1)
+      readChoiceFree $(varE s1)
       Val.unifyVar var =<< $(comp' s1 s2 e1) <|> $(comp' s1 s2 e2)
     pure var |]
   Fail -> [| empty |]
   All e -> [| do
     var <- Val.freshVar
-    heap <- newHeap $(pure s1)
+    heap <- newHeap $(varE s1)
     fork $ do
       Val.unifyVar var <=< Val.newVar . Val.Tup <=< all' $ do
         s1 <- newS
         s2 <- freshS
-        local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e)
-      unifyChoiceFree $(pure s1) $(pure s2)
-      unifyStoreFree $(pure s1) $(pure s2)
+        local (const heap) $(comp' 's1 's2 e)
+      unifyChoiceFree $(varE s1) $(varE s2)
+      unifyStoreFree $(varE s1) $(varE s2)
+    pure var |]
+  For e1 x e2 -> [| do
+    let
+      init s1 = do
+        heap <- newHeap s1
+        split $ do
+          s1 <- newS
+          s2 <- freshS
+          local (const heap) $(comp' 's1 's2 e1)
+      loop s1 = \ case
+        Done -> unifyS s1 $(varE s2) $> []
+        Step var m -> do
+          s2 <- freshS
+          var <- $(localEnv (Env.insert x $ VarE 'var) $ comp' 's1 's2 e2)
+          heap <- newHeap s2
+          fmap (var:) . loop s2 =<< local (const heap) m
+    var <- Val.freshVar
+    fork $
+      Val.unifyVar var =<<
+      Val.newVar . Val.Tup =<<
+      loop $(varE s1) =<<
+      init $(varE s1)
     pure var |]
   One e -> [| do
     var <- Val.freshVar
-    heap <- newHeap $(pure s1)
+    heap <- newHeap $(varE s1)
     fork $ do
       Val.unifyVar var <=< one $ do
         s1 <- newS
         s2 <- freshS
-        local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e)
-      unifyChoiceFree $(pure s1) $(pure s2)
-      unifyStoreFree $(pure s1) $(pure s2)
+        local (const heap) $(comp' 's1 's2 e)
+      unifyChoiceFree $(varE s1) $(varE s2)
+      unifyStoreFree $(varE s1) $(varE s2)
     pure var |]
   If e1 x e2 e3 -> [| do
     var <- Val.freshVar
-    heap <- newHeap $(pure s1)
+    heap <- newHeap $(varE s1)
     fork $ Val.unifyVar var =<< if'
       (do s1 <- newS
           s2 <- freshS
-          local (const heap) $(comp' (TH.VarE 's1) (TH.VarE 's2) e1))
-      (\ var -> $(localEnv (Env.insert x (TH.VarE 'var)) $ comp' s1 s2 e2))
+          local (const heap) $(comp' 's1 's2 e1))
+      (\ var -> $(localEnv (Env.insert x (VarE 'var)) $ comp' s1 s2 e2))
       $(comp' s1 s2 e3)
     pure var |]
 

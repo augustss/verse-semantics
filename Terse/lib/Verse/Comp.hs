@@ -16,4 +16,4 @@ comp :: LExp -> Q TH.Exp
 comp e = [| runVerseT $ do
   s1 <- newS
   s2 <- freshS
-  Val.freeze =<< $(runCompT $ comp' (TH.VarE 's1) (TH.VarE 's2) e) |]
+  Val.freeze =<< $(runCompT $ comp' 's1 's2 e) |]
