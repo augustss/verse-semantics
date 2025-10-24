@@ -38,13 +38,14 @@ Verse is a *functional logic* programming language with three core principles:
 
 - [Effects](10_effects.md) - Effect families, specifiers, and capability declarations
 - [Concurrency](11_concurrency.md) - Structured concurrency with sync, race, rush, branch, and spawn
-- [Modules and Paths](12_modules.md) - Code organization and the global namespace
+- [Live Variables](12_live_variables.md) - Reactive values that automatically update
+- [Modules and Paths](13_modules.md) - Code organization and the global namespace
 
 ### Specialized Topics
 
-- [Access Specifiers](13_access.md) - Public, private, and protected visibility
-- [Persistable Types](14_persistable.md) - Types that can be saved and loaded
-- [Code Evolution](15_evolution.md) - Versioning and backward compatibility
+- [Access Specifiers](14_access.md) - Public, private, and protected visibility
+- [Persistable Types](15_persistable.md) - Types that can be saved and loaded
+- [Code Evolution](16_evolution.md) - Versioning and backward compatibility
 
 ### Language Reference
 

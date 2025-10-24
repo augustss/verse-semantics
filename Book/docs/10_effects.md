@@ -46,28 +46,58 @@ The six effect families are:
 
 Some effects have no specifier, while some specifiers imply multiple effects. For instance, `<transacts>` implies `reads`, `writes`, and `allocates`, and belongs to both the Heap and Internal families.
 
+### Exclusive vs Additive Effects
+
+Effect specifiers fall into two categories:
+
+**Exclusive effects** (only one allowed per function):
+- `<converges>` - Guaranteed to terminate (native functions only)
+- `<computes>` - Pure computation, no heap access
+- `<transacts>` - Full heap access (reads, writes, allocates)
+
+**Note:** `<varies>` was previously an exclusive effect but is now **deprecated and should not be used**.
+
+**Additive effects** (can be combined):
+- `<suspends>` - Can suspend execution
+- `<decides>` - Can fail
+- `<reads>` - Can read mutable state
+- `<writes>` - Can write mutable state
+- `<allocates>` - Can allocate memory/create unique values
+
+A function may have **at most one exclusive effect** but can combine multiple additive effects. For example, `<computes><decides>` is valid (pure computation that may fail), but `<computes><transacts>` is an error (cannot have two exclusive effects).
+
+**Important constraint:** The `<suspends>` and `<decides>` effects **cannot be combined** on the same function. A function cannot be both asynchronous and failable using these mechanisms—you must choose one or the other. This is enforced by the compiler and attempting to use both will result in an error.
+
 |Fundamental Effect|Effect Specifier|Effect Family|Effects implied by Specifier | Notes |
 | ----- | ----------- | ------- | ----- | ---- |
 | **succeeds** | | Cardinality | | *No specifier* |
 | **fails** | | Cardinality | | *No specifier* |
-| | `<decides>` | Cardinality | `{succeeds, fails}` | |
+| | `<decides>` | Cardinality | `{succeeds, fails}` | *Cannot combine with `<suspends>`* |
 | | `<ambiguates>` | Cardinality | | *Planned* |
 | | `<abstracts>` | Cardinality | | *Planned* |
 | | `<iterates>` | Cardinality | | *Planned* |
 | **reads** | `<reads>` | Heap | `{reads}` | |
 | **writes** | `<writes>` | Heap | `{writes}` | |
 | **allocates** | `<allocates>` | Heap | `{allocates}` | |
-| | `<transacts>` | Heap | `{reads, writes, allocates}` | |
-| | `<computes>` | Heap | `{}` | |
-| **suspends** | `<suspends>` | Suspension | `{suspends}` | |
+| | `<transacts>` | Heap | `{reads, writes, allocates}` | *Exclusive effect* |
+| | `<computes>` | Heap | `{}` | *Exclusive effect* |
+| | `<varies>` | Heap | | **DEPRECATED - Do not use** |
+| **suspends** | `<suspends>` | Suspension | `{suspends}` | *Cannot combine with `<decides>`* |
 | **diverges** | | Divergence | `{diverges}` | *No specifier* |
-| | `<converges>` | Divergence | `{}` | |
+| | `<converges>` | Divergence | `{}` | *Native functions only* |
 | **dictates** | | Prediction | `{dictates}` | *No specifier* |
 | | `<predicts>` | Prediction | `{}` | |
 | **no_rollback** | | Internal | `{no_rollback}` | *To be deprecated* |
 | | `<transacts>` | Internal | `{}` | |
 
-There is another planned specifier, `<interacts>`, expected to be used for code with external effects like network communication or user interaction. The `<ambiguates>` and `<abstracts>` specifiers are key to planned logic features, denoting functions that may return different values due to the choice operator. `<diverges>` and `<converges>` will indicate whether a function may not terminate or is guaranteed to return in finite steps.
+There is another planned specifier, `<interacts>`, expected to be used for code with external effects like network communication or user interaction. The `<ambiguates>` and `<abstracts>` specifiers are key to planned logic features, denoting functions that may return different values due to the choice operator.
+
+**Important restrictions:**
+- `<converges>` is only allowed on `<native>` functions—you cannot write a non-native converges function in Verse
+- `<varies>` is deprecated and produces errors when used; use `<transacts>` instead
+- `<transacts>` already includes `<allocates>`, so specifying both is redundant and produces an error
+- Duplicate effect specifiers (e.g., `<computes><computes>`) are errors
+- Combining incompatible exclusive effects produces errors
 
 ## How Effects Compose
 
@@ -206,6 +236,53 @@ PlayVictorySequence()<suspends>:void =
 
 The `suspends` effect is viral — any function that calls a suspending function must itself be marked `<suspends>`. This ensures you always know which functions might take time to complete.
 
+### Interaction Between suspends and decides
+
+While `<suspends>` and `<decides>` cannot be combined on the same function, they have specific rules for how they interact across function calls:
+
+**Calling decides from suspends:**
+
+A `<suspends>` function can call a `<decides>` function, but **only within a failure context** using the square bracket `[]` syntax:
+
+```verse
+ValidateInput(Value:int)<decides>:void =
+    Value > 0
+    Value < 100
+
+ProcessAsync(Value:int)<suspends>:void =
+    # Valid: calling decides function in failure context
+    if (ValidateInput[Value]):
+        # Process valid input
+        DoAsyncWork()
+    else:
+        # Handle validation failure
+        LogError()
+
+# Invalid: calling decides function outside failure context
+# ProcessAsync2(Value:int)<suspends>:void =
+#     ValidateInput(Value)  # ERROR: must use [] syntax
+```
+
+This ensures that the failure is handled locally and doesn't propagate as a failure effect.
+
+**Calling suspends from suspends:**
+
+A `<suspends>` function can call another `<suspends>` function, but **must not use failure-handling syntax** like `?`:
+
+```verse
+AsyncOperation()<suspends>:?int = false
+
+CallAsync()<suspends>:void =
+    # Valid: calling suspends function normally
+    Result := AsyncOperation()
+
+    # Invalid: cannot use ? with suspends in suspends context
+    # if (Value := AsyncOperation()?):
+    #     # ERROR: suspends calls cannot use failure syntax
+```
+
+The asymmetry exists because `<suspends>` and `<decides>` represent fundamentally different control flow mechanisms—suspension is about time, while failure is about success/failure. Mixing their syntactic forms creates ambiguity about what's being handled.
+
 ### The Prediction Family: Client-Server Execution
 
 The prediction family determines where code runs in a client-server architecture. By default, functions have the `dictates` effect, meaning they run authoritatively on the server. The `<predicts>` specifier allows functions to run predictively on clients for responsiveness, with the server later validating and potentially correcting the results.
@@ -255,6 +332,20 @@ StartBackgroundMusic():void =  # Note: no <suspends>
             Sleep(180.0)  # Suspends effect hidden by spawn
 ```
 
+**Important `spawn` constraints:**
+- `spawn` can only call functions with `<suspends>`, not functions with `<decides>`
+- The spawned function cannot have both `<suspends>` and `<decides>` (this combination is already disallowed)
+- Attempting to spawn a failable function produces a compiler error
+
+```verse
+FailableWork()<decides>:void = false?
+
+# Invalid: cannot spawn decides functions
+# StartWork():void =
+#     spawn:
+#         FailableWork()  # ERROR
+```
+
 The `option` expression converts failure into an optional value, transforming the `fails` effect into a regular value that can be handled without `<decides>`:
 
 <!--verse
@@ -264,6 +355,266 @@ item:=struct{}
 TryGetItem(Items:[]item, Index:int):?item =
     option{Items[Index]}  # Array access might fail, option catches it
 ```
+
+The `defer` expression provides cleanup code that runs when exiting a scope, but has strict effect limitations:
+
+**`defer` effect constraints:**
+- Cannot contain `<suspends>` operations—deferred code must execute synchronously
+- Cannot contain `<decides>` operations—deferred code must always succeed
+- Can have other effects like `<transacts>`, `<reads>`, or `<writes>`
+
+```verse
+AcquireResource()<transacts>:resource = GetResource()
+ReleaseResource(R:resource)<transacts>:void = {}
+
+ProcessResource()<suspends><decides>:void =
+    R := AcquireResource()
+    defer:
+        ReleaseResource(R)  # Valid: transacts allowed in defer
+
+    # Process resource with async operations
+    DoAsyncWork()
+
+# Invalid: suspends not allowed in defer
+# CleanupAsync()<suspends>:void =
+#     defer:
+#         Sleep(1.0)  # ERROR: suspends not allowed
+```
+
+These constraints ensure that cleanup code executes predictably and completely, without the possibility of suspension or failure that could leave resources in an inconsistent state.
+
+## Effect Subtyping and Type Compatibility
+
+Effect annotations create a subtyping relationship between function types. Understanding how effects interact with type compatibility is essential when storing functions in variables, passing them as parameters, or choosing between different implementations.
+
+### Effect Subtyping: Adding Effects
+
+A function with **fewer effects** can be used where a function with **more effects** is expected. This is effect subtyping—a function that does less is compatible with a context that allows more:
+
+```verse
+# Pure function with only computes
+PureAdd(X:int)<computes>:int = X + 1
+
+# Variable that expects computes and decides
+F:type{_(:int)<computes><decides>:int} = PureAdd
+
+# Calling through the variable
+Result := F[5]  # Must use [] syntax since type has <decides>
+# Returns option{6} since PureAdd never fails
+```
+
+In this example, `PureAdd` has only `<computes>`, but it can be assigned to a variable expecting `<computes><decides>`. The pure function is a valid implementation of the failable interface—it simply never exercises the failure capability.
+
+This principle applies to all effects:
+
+```verse
+# Function with <computes>
+Compute(X:int)<computes>:int = X * 2
+
+# Can assign to types expecting more effects
+F1:type{_(:int)<computes><decides>:int} = Compute
+F2:type{_(:int)<transacts>:int} = Compute
+F3:type{_(:int)<reads>:int} = Compute
+
+# All valid - Compute does less than what's allowed
+```
+
+**Effect subtyping hierarchy:**
+
+- `<computes>` is a subtype of `<reads>`, `<transacts>`, and any combination with `<decides>`
+- `<reads>` is a subtype of `<transacts>`
+- Functions without `<decides>` are subtypes of functions with `<decides>`
+- Functions without `<suspends>` are subtypes of functions with `<suspends>` (when compatible)
+
+### Restrictions: Cannot Remove Effects
+
+While you can add effects through subtyping, you **cannot remove** effects that a function actually has. Attempting to assign a function to a type with fewer effects than the function declares produces a compile error (error 3509):
+
+```verse
+# Function with <decides>
+Validate(X:int)<computes><decides>:int =
+    X > 0
+    X
+
+# ERROR: Cannot assign to type without <decides>
+# F:type{_(:int)<computes>:int} = Validate  # ERROR 3509
+# The function CAN fail, but the type doesn't allow it
+```
+
+Similarly, functions with heap effects cannot be assigned to pure types:
+
+```verse
+counter := class:
+    var Count:int = 0
+
+Increment(C:counter)<transacts>:int =
+    set C.Count = C.Count + 1
+    C.Count
+
+# ERROR: Cannot assign transacts function to computes type
+# F:type{_(:counter)<computes>:int} = Increment  # ERROR 3509
+# The function writes state, type doesn't permit it
+```
+
+This restriction ensures type safety—the type signature is a promise about what effects the function might perform, and the actual function must honor that promise. You can promise to do more (subtyping adds effects), but you cannot lie about doing less (cannot remove effects).
+
+### Effect Joining: Conditional Function Selection
+
+When you conditionally select between functions with different effects, the resulting expression has the **union of all possible effects**. This is effect joining—the compiler conservatively assumes the result might perform any effect that any branch could perform:
+
+```verse
+# Functions with different effects
+PureFunction(X:int)<computes>:int = X + 1
+FailableFunction(X:int)<computes><decides>:int =
+    X > 0
+    X + 1
+
+# Conditional selection joins effects
+SelectFunction(UseFailable:logic):type{_(:int)<computes><decides>:int} =
+    if (UseFailable?):
+        FailableFunction  # Has <computes><decides>
+    else:
+        PureFunction      # Has <computes>
+    # Result type must account for both: <computes><decides>
+
+# The returned function might fail (from FailableFunction)
+# or might not (from PureFunction), so type must include <decides>
+F := SelectFunction(true)
+Result := F[5]  # Must use [] because result type has <decides>
+```
+
+Effect joining applies to all control flow that selects between functions:
+
+```verse
+Identity(X:int)<computes>:int = X
+
+DecidesIdentity(X:int)<computes><decides>:int =
+    X > 0
+    X
+
+TransactsIdentity(X:int)<transacts>:int = X
+
+# Joining <computes> and <computes><decides>
+F1:type{_(:int)<computes><decides>:int} =
+    if (true?):
+        Identity
+    else:
+        DecidesIdentity
+# Result: <computes><decides> (union of effects)
+
+# Joining <computes><decides> and <transacts>
+F2:type{_(:int)<decides><transacts>:int} =
+    if (true?):
+        DecidesIdentity  # <computes><decides>
+    else:
+        TransactsIdentity  # <transacts>
+# Result: <decides><transacts> (union of effects)
+```
+
+**Important VM-specific behavior:**
+
+Effect joining behaves differently between Verse VM and Blueprint VM:
+
+```verse
+# In Verse VM: VALID
+# Effect joining is fully supported
+Main()<decides>:void =
+    UseFailure := true
+    F:type{_(:int)<computes><decides>:int} :=
+        if (UseFailure?):
+            DecidesIdentity
+        else:
+            Identity
+    F[1] = 1
+
+# In Blueprint VM: ERROR 3502
+# Effect joining produces IR-level errors in some contexts
+# Workaround: Avoid conditional function selection with different effects
+```
+
+For maximum compatibility, avoid conditional selection between functions with significantly different effects, especially when mixing exclusive effects like `<computes>` and `<transacts>`.
+
+### Practical Implications
+
+**Designing flexible APIs:**
+
+Effect subtyping enables flexible function parameters:
+
+```verse
+# Accepts any function that doesn't exceed <transacts><decides>
+ProcessValues(
+    Data:[]int,
+    Transform(:int)<transacts><decides>:int
+):[]int =
+    for (Value:Data, Result := Transform[Value]):
+        Result
+
+# Can pass pure functions
+ProcessValues(array{1, 2, 3}, PureAdd)
+
+# Can pass failable functions
+ProcessValues(array{1, 2, 3}, Validate)
+
+# Can pass transactional functions
+ProcessValues(array{1, 2, 3}, Increment)
+```
+
+**Function composition:**
+
+Effect subtyping makes function composition work naturally:
+
+```verse
+Compose(
+    F(:int)<computes>:int,
+    G(:int)<computes>:int
+):type{_(:int)<computes>:int} =
+    (X:int):int => G(F(X))
+
+# If we want to allow more effects:
+ComposeFlexible(
+    F(:int)<transacts><decides>:int,
+    G(:int)<transacts><decides>:int
+):type{_(:int)<transacts><decides>:int} =
+    (X:int)<transacts><decides>:int =>
+        if (IntermediateResult := F[X]):
+            G[IntermediateResult]?
+        else:
+            false
+
+# Can pass functions with fewer effects
+ComposeFlexible(PureFunction, PureFunction)
+ComposeFlexible(PureFunction, FailableFunction)
+```
+
+**Type-safe callbacks:**
+
+```verse
+# Callback registry that allows any effect level
+callback_registry := class:
+    var OnUpdate:type{_()<transacts>:void} = ():void => {}
+
+    SetCallback(CB()<transacts>:void):void =
+        set OnUpdate = CB
+
+    # Can register pure callbacks
+    # Can register transactional callbacks
+    # Can register reading/writing callbacks
+    # All work because they're subtypes of <transacts>
+```
+
+### Summary of Effect Type Rules
+
+| Scenario | Valid? | Explanation |
+|----------|--------|-------------|
+| Assign `<computes>` to `<computes><decides>` type | ✓ Yes | Adding effects via subtyping |
+| Assign `<computes>` to `<transacts>` type | ✓ Yes | Pure is subtype of transactional |
+| Assign `<reads>` to `<transacts>` type | ✓ Yes | Reads is subtype of transactional |
+| Assign `<computes><decides>` to `<computes>` type | ✗ No (3509) | Cannot remove `<decides>` |
+| Assign `<transacts>` to `<computes>` type | ✗ No (3509) | Cannot remove heap effects |
+| Select between `<computes>` and `<decides>` | Result: `<computes><decides>` | Effect joining |
+| Select between `<reads>` and `<transacts>` | Result: `<transacts>` | Effect joining |
+
+These rules ensure that effect annotations remain trustworthy contracts—functions can do less than declared (subtyping), but never more, and conditional selection conservatively accounts for all possibilities (joining).
 
 ## Effects on Data Types
 
@@ -282,7 +633,66 @@ monster := class<unique><allocates>:
     var Health:float = 100.0
 ```
 
+**Important constraints on class and struct effects:**
+
+Classes and structs **cannot** be marked with `<suspends>` or `<decides>`:
+
+```verse
+# Valid effect specifiers for classes/structs:
+valid_class := class<computes>{}
+valid_struct := struct<transacts>{}
+
+# Invalid: async and failable effects not allowed
+# invalid_class := class<suspends>{}   # ERROR
+# invalid_struct := struct<decides>{}  # ERROR
+```
+
+This restriction exists because constructors must complete synchronously and successfully. An object's construction cannot suspend across time boundaries or fail partway through—the object either exists fully formed or doesn't exist at all.
+
+**Class member initializer restrictions:**
+
+Field default values and block clauses in classes have strict effect requirements:
+
+```verse
+# Field initializers must use pure functions
+HelperFunction()<transacts>:int = 42
+
+# Invalid: field initializers cannot call transacts functions
+# bad_class := class:
+#     Value:int = HelperFunction()  # ERROR
+
+# Block clauses must respect class effects
+valid_class := class<transacts>:
+    var Counter:int = 0
+    block:
+        set Counter = 1  # Valid: class has transacts
+
+# Invalid: block effect exceeds class effect
+# bad_class := class<computes>:
+#     var Counter:int = 0
+#     block:
+#         set Counter = 1  # ERROR: computes class cannot write
+```
+
+Class member initializers and block clauses are implicitly restricted to have no more effects than what the class declares. This ensures that constructing an instance of the class respects the class's effect contract.
+
 Limiting constructor effects helps maintain architectural boundaries. Data transfer objects can be kept pure with `<computes>`, ensuring they're just data carriers. Game entities might require `<allocates>` for unique identity, while service objects might need full `<transacts>` to initialize their state.
+
+## Effect Name Shadowing
+
+Effect specifier names are reserved and cannot be shadowed by user-defined identifiers. You cannot create classes, modules, or other definitions with names like `suspends`, `decides`, `transacts`, etc.:
+
+```verse
+# Invalid: cannot shadow built-in effect names
+# my_module := module:
+#     suspends := class{}     # ERROR
+#     decides := class{}      # ERROR
+#     transacts := class{}    # ERROR
+#     computes := class{}     # ERROR
+#     allocates := class{}    # ERROR
+```
+
+This restriction prevents confusion between effect annotations and user-defined types, ensuring that effect syntax remains unambiguous throughout the codebase.
 
 ## Working with Effects
 

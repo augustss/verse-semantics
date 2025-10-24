@@ -96,32 +96,32 @@ This index provides quick access to key concepts, language features, and importa
 ## Class & Type Specifiers
 
 ### Structure Specifiers
-- **\<unique\>** - identity equality: [Overview](00_overview.md), [Composite Types](08_composites.md), [Mutability](09_mutability.md), [Access Specifiers](13_access.md)
-- **\<abstract\>** - cannot instantiate: [Composite Types](08_composites.md), [Access Specifiers](13_access.md)
-- **\<concrete\>** - can instantiate: [Composite Types](08_composites.md), [Access Specifiers](13_access.md)
-- **\<final\>** - cannot inherit: [Composite Types](08_composites.md), [Persistable Types](14_persistable.md), [Access Specifiers](13_access.md)
-- **\<final_super\>** - terminal inheritance: [Composite Types](08_composites.md), [Access Specifiers](13_access.md)
+- **\<unique\>** - identity equality: [Overview](00_overview.md), [Composite Types](08_composites.md), [Mutability](09_mutability.md), [Access Specifiers](14_access.md)
+- **\<abstract\>** - cannot instantiate: [Composite Types](08_composites.md), [Access Specifiers](14_access.md)
+- **\<concrete\>** - can instantiate: [Composite Types](08_composites.md), [Access Specifiers](14_access.md)
+- **\<final\>** - cannot inherit: [Composite Types](08_composites.md), [Persistable Types](15_persistable.md), [Access Specifiers](14_access.md)
+- **\<final_super\>** - terminal inheritance: [Composite Types](08_composites.md), [Access Specifiers](14_access.md)
 - **\<final_super_base\>** - inheritance root: [Composite Types](08_composites.md)
-- **\<castable\>** - runtime type checking: [Composite Types](08_composites.md), [Access Specifiers](13_access.md), [Code Evolution](15_evolution.md)
-- **\<persistable\>** - saveable data: [Overview](00_overview.md), [Composite Types](08_composites.md), [Persistable Types](14_persistable.md)
+- **\<castable\>** - runtime type checking: [Composite Types](08_composites.md), [Access Specifiers](14_access.md), [Code Evolution](16_evolution.md)
+- **\<persistable\>** - saveable data: [Overview](00_overview.md), [Composite Types](08_composites.md), [Persistable Types](15_persistable.md)
 - **\<constructor\>** - factory methods: [Composite Types](08_composites.md)
 
 ### Enum Specifiers
-- **\<open\>** - extensible enums: [Composite Types](08_composites.md), [Access Specifiers](13_access.md), [Code Evolution](15_evolution.md)
-- **\<closed\>** - fixed enums: [Composite Types](08_composites.md), [Access Specifiers](13_access.md), [Code Evolution](15_evolution.md)
+- **\<open\>** - extensible enums: [Composite Types](08_composites.md), [Access Specifiers](14_access.md), [Code Evolution](16_evolution.md)
+- **\<closed\>** - fixed enums: [Composite Types](08_composites.md), [Access Specifiers](14_access.md), [Code Evolution](16_evolution.md)
 
 ## Access Control
 
 ### Visibility Specifiers
-- **\<public\>** - universal access: [Overview](00_overview.md), [Composite Types](08_composites.md), [Modules and Paths](12_modules.md), [Access Specifiers](13_access.md)
-- **\<private\>** - class/module only: [Composite Types](08_composites.md), [Modules and Paths](12_modules.md), [Access Specifiers](13_access.md)
-- **\<protected\>** - subclass access: [Composite Types](08_composites.md), [Modules and Paths](12_modules.md), [Access Specifiers](13_access.md)
-- **\<internal\>** - module access: [Modules and Paths](12_modules.md), [Access Specifiers](13_access.md)
-- **\<scoped\>** - path-based access: [Access Specifiers](13_access.md)
+- **\<public\>** - universal access: [Overview](00_overview.md), [Composite Types](08_composites.md), [Modules and Paths](13_modules.md), [Access Specifiers](14_access.md)
+- **\<private\>** - class/module only: [Composite Types](08_composites.md), [Modules and Paths](13_modules.md), [Access Specifiers](14_access.md)
+- **\<protected\>** - subclass access: [Composite Types](08_composites.md), [Modules and Paths](13_modules.md), [Access Specifiers](14_access.md)
+- **\<internal\>** - module access: [Modules and Paths](13_modules.md), [Access Specifiers](14_access.md)
+- **\<scoped\>** - path-based access: [Access Specifiers](14_access.md)
 
 ### Method Specifiers
-- **\<override\>** - replace parent method: [Composite Types](08_composites.md), [Access Specifiers](13_access.md)
-- **\<native\>** - implemented in C++: [Access Specifiers](13_access.md)
+- **\<override\>** - replace parent method: [Composite Types](08_composites.md), [Access Specifiers](14_access.md)
+- **\<native\>** - implemented in C++: [Access Specifiers](14_access.md)
 
 ## Operators
 
@@ -163,30 +163,30 @@ This index provides quick access to key concepts, language features, and importa
 ## Modules & Organization
 
 ### Module System
-- **module** - code organization: [Modules and Paths](12_modules.md)
-- **using** - import statements: [Overview](00_overview.md), [Modules and Paths](12_modules.md)
-- **module paths** - hierarchical names: [Modules and Paths](12_modules.md)
-- **qualified names** - full paths: [Modules and Paths](12_modules.md)
-- **qualified access** - explicit paths: [Modules and Paths](12_modules.md)
-- **nested modules** - module hierarchy: [Modules and Paths](12_modules.md)
+- **module** - code organization: [Modules and Paths](13_modules.md)
+- **using** - import statements: [Overview](00_overview.md), [Modules and Paths](13_modules.md)
+- **module paths** - hierarchical names: [Modules and Paths](13_modules.md)
+- **qualified names** - full paths: [Modules and Paths](13_modules.md)
+- **qualified access** - explicit paths: [Modules and Paths](13_modules.md)
+- **nested modules** - module hierarchy: [Modules and Paths](13_modules.md)
 
 ## Persistence
 
 ### Save System
-- **weak_map(player, t)** - player data: [Modules and Paths](12_modules.md), [Persistable Types](14_persistable.md)
-- **weak_map(session, t)** - session data: [Modules and Paths](12_modules.md)
-- **persistable types** - saveable data: [Overview](00_overview.md), [Composite Types](08_composites.md), [Persistable Types](14_persistable.md)
-- **module-scoped variables** - persistent storage: [Modules and Paths](12_modules.md), [Persistable Types](14_persistable.md)
+- **weak_map(player, t)** - player data: [Modules and Paths](13_modules.md), [Persistable Types](15_persistable.md)
+- **weak_map(session, t)** - session data: [Modules and Paths](13_modules.md)
+- **persistable types** - saveable data: [Overview](00_overview.md), [Composite Types](08_composites.md), [Persistable Types](15_persistable.md)
+- **module-scoped variables** - persistent storage: [Modules and Paths](13_modules.md), [Persistable Types](15_persistable.md)
 
 ## Evolution & Compatibility
 
 ### Version Management
-- **backward compatibility** - preserving APIs: [Overview](00_overview.md), [Effects](10_effects.md), [Code Evolution](15_evolution.md)
-- **versioning** - tracking changes: [Code Evolution](15_evolution.md)
-- **deprecation** - phasing out features: [Code Evolution](15_evolution.md)
-- **publication** - making code public: [Modules and Paths](12_modules.md), [Access Specifiers](13_access.md), [Code Evolution](15_evolution.md)
-- **breaking changes** - incompatible updates: [Code Evolution](15_evolution.md)
-- **schema evolution** - data structure changes: [Composite Types](08_composites.md), [Code Evolution](15_evolution.md)
+- **backward compatibility** - preserving APIs: [Overview](00_overview.md), [Effects](10_effects.md), [Code Evolution](16_evolution.md)
+- **versioning** - tracking changes: [Code Evolution](16_evolution.md)
+- **deprecation** - phasing out features: [Code Evolution](16_evolution.md)
+- **publication** - making code public: [Modules and Paths](13_modules.md), [Access Specifiers](14_access.md), [Code Evolution](16_evolution.md)
+- **breaking changes** - incompatible updates: [Code Evolution](16_evolution.md)
+- **schema evolution** - data structure changes: [Composite Types](08_composites.md), [Code Evolution](16_evolution.md)
 
 ## Built-in Functions
 
@@ -201,7 +201,7 @@ This index provides quick access to key concepts, language features, and importa
 - **Print()** - output text: [Overview](00_overview.md), [Built-in Types](02_builtins.md), [Effects](10_effects.md)
 - **ToString()** - convert to string: [Built-in Types](02_builtins.md)
 - **Sleep()** - pause execution: [Concurrency](11_concurrency.md)
-- **GetSession()** - current session: [Modules and Paths](12_modules.md)
+- **GetSession()** - current session: [Modules and Paths](13_modules.md)
 
 ## Special Concepts
 
@@ -209,7 +209,7 @@ This index provides quick access to key concepts, language features, and importa
 - **archetype expression** - prototype patterns: [Composite Types](08_composites.md), [Expressions](01_expressions.md)
 - **string interpolation** - embedded expressions: [Built-in Types](02_builtins.md)
 - **pattern matching** - structural matching: [Overview](00_overview.md), [Composite Types](08_composites.md), [Control Flow](05_control.md)
-- **inheritance** - class hierarchy: [Composite Types](08_composites.md), [Type System](07_types.md), [Access Specifiers](13_access.md)
+- **inheritance** - class hierarchy: [Composite Types](08_composites.md), [Type System](07_types.md), [Access Specifiers](14_access.md)
 - **polymorphism** - multiple forms: [Composite Types](08_composites.md), [Type System](07_types.md)
 - **transactional semantics** - rollback behavior: [Overview](00_overview.md), [Failure](06_failure.md), [Effects](10_effects.md)
 - **option{}** constructor: [Overview](00_overview.md), [Built-in Types](02_builtins.md), [Composite Types](08_composites.md)

@@ -49,10 +49,10 @@ nav:
   - Mutability: 09_mutability.md
   - Effects: 10_effects.md
   - Concurrency: 11_concurrency.md
-  - Modules and Paths: 12_modules.md
-  - Access Specifiers: 13_access.md
-  - Persistable Types: 14_persistable.md
-  - Code Evolution: 15_evolution.md
-  - Live Variables: 16_live_variables.md
+  - Live Variables: 12_live_variables.md
+  - Modules and Paths: 13_modules.md
+  - Access Specifiers: 14_access.md
+  - Persistable Types: 15_persistable.md
+  - Code Evolution: 16_evolution.md
   - "📚 Concept Index": concept_index.md
 
