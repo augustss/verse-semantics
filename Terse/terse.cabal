@@ -40,6 +40,7 @@ library
     Verse.Monad
     Verse.Name
     Verse.Run
+    Verse.Run.S
     Verse.Run.Val
     Verse.TH
     Verse.Token

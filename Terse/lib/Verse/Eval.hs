@@ -181,8 +181,7 @@ eval' s1 s2 = wrap $ \ case
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      unifyChoiceFree s1 s2
-      unifyStoreFree s1 s2
+      unifyS s1 s2
     pure var
   For e1 x e2 -> do
     let
@@ -210,8 +209,7 @@ eval' s1 s2 = wrap $ \ case
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      unifyChoiceFree s1 s2
-      unifyStoreFree s1 s2
+      unifyS s1 s2
     pure var
   If e1 x e2 e3 -> do
     var <- freshVar
@@ -235,8 +233,7 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
     var <- asum $ zip [0 ..] xs <&> \ (i, var1) -> do
       unifyVar var2 <=< newVar $ Val.Int i
       pure var1
-    unifyChoiceFree s1 s2
-    unifyStoreFree s1 s2
+    unifyS s1 s2
     pure var
   Val.Fun f -> evalAppFun s1 s2 f var2
   Val.Ptr _ -> stuck
@@ -354,8 +351,7 @@ evalAppMap s1 s2 k xs = do
   var <- case IntMap.lookup k xs of
     Nothing -> empty
     Just xs -> asum $ pure <$> xs
-  unifyChoiceFree s1 s2
-  unifyStoreFree s1 s2
+  unifyS s1 s2
   pure var
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))

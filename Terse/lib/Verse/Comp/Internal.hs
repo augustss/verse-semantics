@@ -143,8 +143,7 @@ comp' s1 s2 = wrap $ \ case
         s1 <- newS
         s2 <- freshS
         local (const heap) $(comp' 's1 's2 e)
-      unifyChoiceFree $(varE s1) $(varE s2)
-      unifyStoreFree $(varE s1) $(varE s2)
+      unifyS $(varE s1) $(varE s2)
     pure var |]
   For e1 x e2 -> [| do
     var <- Val.freshVar
@@ -173,8 +172,7 @@ comp' s1 s2 = wrap $ \ case
         s1 <- newS
         s2 <- freshS
         local (const heap) $(comp' 's1 's2 e)
-      unifyChoiceFree $(varE s1) $(varE s2)
-      unifyStoreFree $(varE s1) $(varE s2)
+      unifyS $(varE s1) $(varE s2)
     pure var |]
   If e1 x e2 e3 -> [| do
     var <- Val.freshVar
