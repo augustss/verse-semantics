@@ -17,7 +17,15 @@ import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
 
-import Language.Haskell.TH (Q, Quote, pattern VarE, integerL, litE, varE)
+import Language.Haskell.TH
+  ( Q
+  , Quote
+  , pattern ListE
+  , pattern VarE
+  , integerL
+  , litE
+  , varE
+  )
 import Language.Haskell.TH qualified as TH
 
 import Loc
@@ -26,7 +34,6 @@ import Verse.Exp
 import Verse.Monad
 import Verse.Name
 import Verse.Run
-import Verse.Run.Val (newInteger, readInteger)
 import Verse.Run.Val qualified as Val
 
 newtype Comp a = Comp
@@ -68,6 +75,17 @@ comp' s1 s2 = wrap $ \ case
     s3 <- freshS
     _ <- $(comp' s1 's3 e1)
     $(comp' 's3 s2 e2) |]
+  Tup es ->
+    let
+      loop s1 vars = \ case
+        [] -> [| do
+          unifyS $(varE s1) $(varE s2)
+          Val.newVar $ Val.Tup $(pure . ListE $ VarE <$> reverse vars) |]
+        e:es -> [| do
+          s2 <- freshS
+          var <- $(comp' s1 's2 e)
+          $(loop 's2 ('var:vars) es) |]
+    in loop s1 [] es
   e1 := e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
@@ -129,26 +147,23 @@ comp' s1 s2 = wrap $ \ case
       unifyStoreFree $(varE s1) $(varE s2)
     pure var |]
   For e1 x e2 -> [| do
+    var <- Val.freshVar
     let
-      init s1 = do
-        heap <- newHeap s1
-        split $ do
-          s1 <- newS
-          s2 <- freshS
-          local (const heap) $(comp' 's1 's2 e1)
-      loop s1 = \ case
-        Done -> unifyS s1 $(varE s2) $> []
+      loop s1 vars = \ case
+        Done -> do
+          unifyS s1 $(varE s2)
+          Val.unifyVar var <=< Val.newVar . Val.Tup $ reverse vars
         Step var m -> do
           s2 <- freshS
           var <- $(localEnv (Env.insert x $ VarE 'var) $ comp' 's1 's2 e2)
           heap <- newHeap s2
-          fmap (var:) . loop s2 =<< local (const heap) m
-    var <- Val.freshVar
-    fork $
-      Val.unifyVar var =<<
-      Val.newVar . Val.Tup =<<
-      loop $(varE s1) =<<
-      init $(varE s1)
+          loop s2 (var:vars) =<< local (const heap) m
+    fork $ loop $(varE s1) [] =<< do
+      heap <- newHeap $(varE s1)
+      split $ do
+        s1 <- newS
+        s2 <- freshS
+        local (const heap) $(comp' 's1 's2 e1)
     pure var |]
   One e -> [| do
     var <- Val.freshVar
