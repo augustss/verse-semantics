@@ -65,6 +65,14 @@ comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
     Just y -> [| unifyS $(varE s1) $(varE s2) $> $(pure y) |]
     Nothing -> [| fork stuck *> Val.freshVar |]
+  App e1 e2 -> [| do
+    s3 <- freshS
+    var1 <- $(comp' s1 's3 e1)
+    s4 <- freshS
+    var2 <- $(comp' 's3 's4 e2)
+    var <- Val.freshVar
+    fork $ Val.unifyVar var =<< app var1 s4 $(varE s2) var2
+    pure var |]
   Exi x e -> [| do
     var <- Val.freshVar
     $(localEnv (Env.insert x (VarE 'var)) $ comp' s1 s1 e) |]
