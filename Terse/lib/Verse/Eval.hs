@@ -333,19 +333,19 @@ evalPlus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalPlus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
-  newInteger $ x1 + x2
+  newInteger $! x1 + x2
 
 evalMinus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalMinus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
-  newInteger $ x1 - x2
+  newInteger $! x1 - x2
 
 evalLess :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalLess s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
-  guard $ x1 < x2
+  guard $! x1 < x2
   pure var1
 
 evalAppMap :: MonadRef m => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)

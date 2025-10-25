@@ -7,6 +7,8 @@ module Verse.Run.Val
   , readVar
   , unifyVar
   , freeze
+  , newInteger
+  , readInteger
   ) where
 
 import Control.Applicative
@@ -57,3 +59,11 @@ freeze
 freeze = readVar >=> fmap Fix . \ case
   Int x -> pure $ Int x
   Tup x -> Tup <$> traverse freeze x
+
+newInteger :: MonadRef m => Integer -> VerseT m (Var m)
+newInteger = newVar . Int
+
+readInteger :: MonadRef m => Var m -> VerseT m Integer
+readInteger = readVar >=> \ case
+  Int x -> pure x
+  _ -> empty

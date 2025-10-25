@@ -26,6 +26,7 @@ import Verse.Exp
 import Verse.Monad
 import Verse.Name
 import Verse.Run
+import Verse.Run.Val (newInteger, readInteger)
 import Verse.Run.Val qualified as Val
 
 newtype Comp a = Comp
@@ -78,6 +79,42 @@ comp' s1 s2 = wrap $ \ case
     fork $ do
       readChoiceFree $(varE s1)
       Val.unifyVar var =<< $(comp' s1 s2 e1) <|> $(comp' s1 s2 e2)
+    pure var |]
+  e1 :.. e2 -> [| do
+    var <- Val.freshVar
+    fork $ do
+      readChoiceFree $(varE s1)
+      s3 <- freshS
+      var1 <- $(comp' s1 's3 e1)
+      var2 <- $(comp' 's3 s2 e2)
+      (,) <$> Val.readVar var1 <*> Val.readVar var2 >>= \ case
+        (Val.Int x1, Val.Int x2) ->
+          Val.unifyVar var <=< asum $ Val.newVar . Val.Int <$> [x1 .. x2]
+        _ -> stuck
+    pure var |]
+  e1 :+ e2 -> [| do
+    s3 <- freshS
+    var1 <- $(comp' s1 's3 e1)
+    s4 <- freshS
+    var2 <- $(comp' 's3 's4 e2)
+    var <- Val.freshVar
+    fork $ Val.unifyVar var =<< plus s4 $(varE s2) var1 var2
+    pure var |]
+  e1 :- e2 -> [| do
+    s3 <- freshS
+    var1 <- $(comp' s1 's3 e1)
+    s4 <- freshS
+    var2 <- $(comp' 's3 's4 e2)
+    var <- Val.freshVar
+    fork $ Val.unifyVar var =<< minus s4 $(varE s2) var1 var2
+    pure var |]
+  e1 :< e2 -> [| do
+    s3 <- freshS
+    var1 <- $(comp' s1 's3 e1)
+    s4 <- freshS
+    var2 <- $(comp' 's3 's4 e2)
+    var <- Val.freshVar
+    fork $ Val.unifyVar var =<< less s4 $(varE s2) var1 var2
     pure var |]
   Fail -> [| empty |]
   All e -> [| do
