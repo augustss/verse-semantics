@@ -18,7 +18,7 @@ import AnsiStyle
 import Pos
 import Pretty
 import Text (Text)
-import Text qualified as Text
+import Text qualified
 
 data Loc = Loc !Pos !Pos deriving Show
 

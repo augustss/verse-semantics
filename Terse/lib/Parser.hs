@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Parser
