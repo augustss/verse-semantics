@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Verse.TH
   ( verse
   , verseFile
@@ -8,9 +10,13 @@ import Control.Monad
 
 import Data.String
 import Data.Text (Text)
+import Data.Text.IO qualified as Text
 
-import Language.Haskell.TH (Q)
-import Language.Haskell.TH.Quote
+import Language.Haskell.TH (Q, runIO)
+import Language.Haskell.TH qualified as TH
+import Language.Haskell.TH.Quote (QuasiQuoter, pattern QuasiQuoter)
+import Language.Haskell.TH.Quote qualified as TH
+import Language.Haskell.TH.Syntax (addDependentFile)
 
 import Pos
 
@@ -20,16 +26,32 @@ import Verse.Parse
 
 verse :: QuasiQuoter
 verse = QuasiQuoter
-  { quoteExp = comp <=< parseQ . fromString
-  , quotePat = const $ fail "No Verse quasi-quoter for patterns"
-  , quoteType = const $ fail "No Verse quasi-quoter for types"
-  , quoteDec = const $ fail "No Verse quasi-quoter for declarations"
+  { TH.quoteExp = comp <=< parseQ . fromString
+  , TH.quotePat
+  , TH.quoteType
+  , TH.quoteDec
   }
 
 verseFile :: QuasiQuoter
-verseFile = quoteFile verse
+verseFile = QuasiQuoter
+  { TH.quoteExp = \ x -> do
+      addDependentFile x
+      comp <=< parseQ <=< runIO $ Text.readFile x
+  , TH.quotePat
+  , TH.quoteType
+  , TH.quoteDec
+  }
 
 parseQ :: Text -> Q LExp
 parseQ input = case parse input of
   Left pos -> fail . show $ prettyParseError input pos
   Right x -> pure x
+
+quotePat :: String -> Q TH.Pat
+quotePat = const $ fail "No Verse quasi-quoter for patterns"
+
+quoteType :: String -> Q TH.Type
+quoteType = const $ fail "No Verse quasi-quoter for types"
+
+quoteDec :: String -> Q [TH.Dec]
+quoteDec = const $ fail "No Verse quasi-quoter for declarations"
