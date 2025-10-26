@@ -5,7 +5,9 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Verse.Comp.Internal
-  ( runCompT
+  ( Comp
+  , Env
+  , runCompT
   , comp'
   ) where
 
@@ -52,19 +54,22 @@ data R = R
   , stack :: [Loc]
   }
 
-type Env = HashMap Name TH.Exp
+type Env = HashMap Name TH.Name
 
-runCompT :: Comp a -> Q a
-runCompT = flip runReaderT R {..} . unComp
+runCompT :: Comp a -> Env -> Q a
+runCompT m env = runReaderT (unComp m) R {..}
   where
-    env = mempty
     stack = mempty
 
 comp' :: TH.Name -> TH.Name -> LExp -> Comp TH.Exp
 comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
-    Just y -> [| unifyS $(varE s1) $(varE s2) $> $(pure y) |]
+    Just y -> [| unifyS $(varE s1) $(varE s2) $> $(varE y) |]
     Nothing -> [| fork stuck *> Val.freshVar |]
+  Abs x e -> [| do
+    unifyS $(varE s1) $(varE s2)
+    Val.newVar . Val.Lam () $ \ () s1 s2 var ->
+      $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e) |]
   App e1 e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
@@ -75,7 +80,7 @@ comp' s1 s2 = wrap $ \ case
     pure var |]
   Exi x e -> [| do
     var <- Val.freshVar
-    $(localEnv (Env.insert x (VarE 'var)) $ comp' s1 s1 e) |]
+    $(localEnv (Env.insert x 'var) $ comp' s1 s2 e) |]
   Int x -> [| do
     unifyS $(varE s1) $(varE s2)
     Val.newVar $ Val.Int $(litE . integerL $ fromIntegral x) |]
@@ -88,7 +93,7 @@ comp' s1 s2 = wrap $ \ case
       loop s1 vars = \ case
         [] -> [| do
           unifyS $(varE s1) $(varE s2)
-          Val.newVar $ Val.Tup $(pure . ListE $ VarE <$> reverse vars) |]
+          Val.newTup $(pure . ListE $ VarE <$> reverse vars) |]
         e:es -> [| do
           s2 <- freshS
           var <- $(comp' s1 's2 e)
@@ -124,7 +129,7 @@ comp' s1 s2 = wrap $ \ case
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
     var <- Val.freshVar
-    fork $ Val.unifyVar var =<< plus s4 $(varE s2) var1 var2
+    fork $ Val.unifyVar var =<< plus' s4 $(varE s2) var1 var2
     pure var |]
   e1 :- e2 -> [| do
     s3 <- freshS
@@ -132,7 +137,7 @@ comp' s1 s2 = wrap $ \ case
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
     var <- Val.freshVar
-    fork $ Val.unifyVar var =<< minus s4 $(varE s2) var1 var2
+    fork $ Val.unifyVar var =<< minus' s4 $(varE s2) var1 var2
     pure var |]
   e1 :< e2 -> [| do
     s3 <- freshS
@@ -140,14 +145,14 @@ comp' s1 s2 = wrap $ \ case
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
     var <- Val.freshVar
-    fork $ Val.unifyVar var =<< less s4 $(varE s2) var1 var2
+    fork $ Val.unifyVar var =<< less' s4 $(varE s2) var1 var2
     pure var |]
   Fail -> [| empty |]
   All e -> [| do
     var <- Val.freshVar
     heap <- newHeap $(varE s1)
     fork $ do
-      Val.unifyVar var <=< Val.newVar . Val.Tup <=< all' $ do
+      Val.unifyVar var <=< Val.newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
         local (const heap) $(comp' 's1 's2 e)
@@ -159,10 +164,10 @@ comp' s1 s2 = wrap $ \ case
       loop s1 vars = \ case
         Done -> do
           unifyS s1 $(varE s2)
-          Val.unifyVar var <=< Val.newVar . Val.Tup $ reverse vars
+          Val.unifyVar var <=< Val.newTup $ reverse vars
         Step var m -> do
           s2 <- freshS
-          var <- $(localEnv (Env.insert x $ VarE 'var) $ comp' 's1 's2 e2)
+          var <- $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e2)
           heap <- newHeap s2
           loop s2 (var:vars) =<< local (const heap) m
     fork $ loop $(varE s1) [] =<< do
@@ -189,7 +194,7 @@ comp' s1 s2 = wrap $ \ case
       (do s1 <- newS
           s2 <- freshS
           local (const heap) $(comp' 's1 's2 e1))
-      (\ var -> $(localEnv (Env.insert x (VarE 'var)) $ comp' s1 s2 e2))
+      (\ var -> $(localEnv (Env.insert x 'var) $ comp' s1 s2 e2))
       $(comp' s1 s2 e3)
     pure var |]
 

@@ -1,5 +1,6 @@
 module Verse.TH
   ( verse
+  , verseFile
   , parseQ
   ) where
 
@@ -24,6 +25,9 @@ verse = QuasiQuoter
   , quoteType = const $ fail "No Verse quasi-quoter for types"
   , quoteDec = const $ fail "No Verse quasi-quoter for declarations"
   }
+
+verseFile :: QuasiQuoter
+verseFile = quoteFile verse
 
 parseQ :: Text -> Q LExp
 parseQ input = case parse input of
