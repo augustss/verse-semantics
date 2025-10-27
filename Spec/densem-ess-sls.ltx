@@ -313,9 +313,12 @@ $$
                    &  = & \pomunit{ \bigcup \begin{array}[t]{@@{}l@@{\;}l}
                        \{ & \rho \in \Env \\
                        \vb & \hh \in extract(\rho(h)) \\
-                       , & |let|\; \EV' = \EV \cap (\rho \pomHIDE \{p,q,h,f\} \\
-                       , & |let|\; \ff = \{ \fpr{\rho'(p)}{\rho_2(v)} \vb \rho' \in \EV', \pomunit{\EV_2} = .., \rho_2 \in \EV_2 \} \\
+                       or & \rho(h) = \Fun{\pomunit{\hh}} \\
+                       , & |let|\; \EV' = \EV \cap (\rho \pomHIDE \{p,q,xs\}) \\
+                       , & \pomunit{\EV_2} = \pomunit{\EV'} \pomseq \conBrack{ u = hh(q) } \pomseq \semess{E}{u}{v}{|t_1|} \\
+                       , & |let|\; \ff = \{ \fpr{\rho(p)}{\rho(v)} \vb \rho \in \EV_2 \} \\
                        , & isFunction(\ff) \\
+                       , & \rho(f) = \Fun{\pomunit{\ff}} \\
                        , & \dom(\hh) = \{ \rho'(q) \vb \rho' \in \EV' \} \\
                        , & \dom(\ff) = \{ \rho'(p) \vb \rho' \in \EV' \} \\
                        \} }
