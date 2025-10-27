@@ -18,6 +18,7 @@ module Verse.Run.Val
   , readPair
   , newString
   , readString
+  , newLam
   ) where
 
 import Control.Applicative
@@ -126,3 +127,8 @@ readString :: MonadRef m => Var m -> VerseT m String
 readString = readVar >=> \ case
   Tup xs -> traverse readChar xs
   _ -> empty
+
+newLam
+  :: (Vars a m, MonadRef m)
+  => a -> (a -> S m -> S m -> Var m -> VerseT m (Var m)) -> VerseT m (Var m)
+newLam x f = newVar $ Lam x f

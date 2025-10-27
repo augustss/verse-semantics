@@ -33,14 +33,11 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 
 import Prelude
-  ( Bool
-  , Integer
+  ( Integer
   , Integral
   , Num
   , ($)
-  , (&&)
   , (.)
-  , (<=)
   , (+)
   , (*)
   , (-)
