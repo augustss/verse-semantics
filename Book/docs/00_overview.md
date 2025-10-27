@@ -37,9 +37,9 @@ Traditional programming languages carry decades of historical baggage and design
 - Backward compatibility is not optional but essential
 - The boundary between compile-time and runtime is fluid
 
-Ready to dive in? Start with [Built-in Types](01_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](05_expressions.md) to see how everything in Verse computes values.
+Ready to dive in? Start with [Built-in Types](02_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](01_expressions.md) to see how everything in Verse computes values.
 
-For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](09_effects.md) sections highlight some of Verse's distinctive features.
+For experienced programmers coming from other languages, the [Failure System](06_failure.md) and [Effects](10_effects.md) sections highlight some of Verse's distinctive features.
 
 ## Key Features
 
