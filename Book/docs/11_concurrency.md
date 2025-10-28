@@ -26,7 +26,7 @@ Async expressions naturally align with this update cycle. When an async expressi
 
 ### The `suspends` Effect
 
-The `suspends` effect marks functions that can perform async operations, serving as the gateway between immediate and async execution contexts. When you mark a function with `<suspends>`, you're declaring that this function might take time to complete and needs the ability to pause and resume its execution.
+Concurrent operations require the `<suspends>` effect specifier (see [Effects](10_effects.md)). Functions marked with `<suspends>` can use concurrency expressions, call other suspending functions, and cooperatively yield execution:
 
 <!--verse
 using {/Verse.org/VerseCLR}
@@ -34,7 +34,7 @@ using {/Verse.org/VerseCLR}
 ```verse
 # Function marked with suspends can use async expressions
 MyAsyncFunction()<suspends>:void =
-    Sleep(1.0)  # Wait for 1 second
+    Sleep(1.0)  # Pause execution
     Print("One second later!")
 
 # Regular functions cannot use async expressions
@@ -43,9 +43,7 @@ MyImmediateFunction():void =
     Print("This happens immediately")
 ```
 
-Functions with the `suspends` effect gain powerful capabilities. They can call other suspending functions, creating chains of async operations that flow naturally. They can use concurrency expressions like `sync`, `race`, `rush`, and `branch` to orchestrate multiple simultaneous activities. They have access to timing functions like `Sleep()` that pause execution for specified durations. Most importantly, they cooperatively yield control to other concurrent tasks, ensuring the game remains responsive even during complex operations.
-
-The `suspends` effect propagates through the call chain. If function A calls suspending function B, then A must also be marked with `<suspends>`. This explicit marking helps you understand at a glance which functions might take time and which are guaranteed to complete immediately.
+The `<suspends>` effect propagates through the call chain—any function calling a suspending function must itself be marked `<suspends>`.
 
 ## Structured Concurrency
 

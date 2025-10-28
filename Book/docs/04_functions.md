@@ -714,25 +714,22 @@ GetConstant()     # No arguments - automatically creates empty tuple
 
 ### Named Parameters with Effects
 
-Named and default parameters work with all function effects:
-
-**With `<decides>` (failable functions)**:
+Named and default parameters work with all function effects (see [Effects](10_effects.md) for details on effect specifiers):
 
 ```verse
+# Failable function with default parameters
 Validate(Value:int, ?Min:int = 0, ?Max:int = 100)<decides>:int =
     Value >= Min
     Value <= Max
     Value
 
-if (Result := Validate[42, ?Max := 50]):
-    # Validation succeeded
-```
-
-**With `<suspends>` (async/coroutines)**:
-
-```verse
+# Async function with default timeout
 WaitForEvent(?Timeout:float = 5.0)<suspends>:void =
     # Implementation
+
+# Calling with named parameters
+if (Result := Validate[42, ?Max := 50]):
+    # Validation succeeded
 
 spawn:
     WaitForEvent(?Timeout := 10.0)

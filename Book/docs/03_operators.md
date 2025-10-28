@@ -189,7 +189,7 @@ Logical operators work with failable expressions and control the flow of success
 
 ### Query Operator (`?`)
 
-The query operator checks if a `logic` value is `true`:
+The query operator checks if a `logic` value is `true` (see [Failure](06_failure.md#failable-expressions) for how `?` works with other types):
 
 <!--verse
 StartGame():void={}

@@ -221,7 +221,7 @@ if (IsComplete = true):
     ShowResults()
 ```
 
-The `logic{}` expression creates boolean values from failable expressions:
+The `logic{}` expression creates boolean values from failable expressions (see [Failure](06_failure.md) for details on failable expressions):
 
 ```verse
 # Converts <decides> expression to logic value
