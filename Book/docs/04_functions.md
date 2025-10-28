@@ -2395,7 +2395,7 @@ Result := Transform(42, (N:int) => "{N}")  # Returns "42"
 
 The nested function `Apply` inherits the type parameters `t` and `u` from `Transform`.
 
-### Practical Patterns
+<!-- ### Practical Patterns
 
 **Option mapping:**
 
@@ -2465,6 +2465,7 @@ builder(t where t:type) := class:
 
     Build()<decides>:t = Current?
 ```
+-->
 
 ### Restrictions
 

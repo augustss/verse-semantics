@@ -1721,7 +1721,7 @@ C1:converter(player, entity) = converter(entity, player){}
 C2:converter(entity, player) = C1  # Valid!
 ```
 
-#### Practical Implications
+<!-- #### Practical Implications
 
 Understanding variance is crucial for designing flexible, reusable parametric types:
 
@@ -1752,6 +1752,7 @@ processor(t:type) := class:
 
 # Cannot substitute - must use exact type
 ```
+-->
 
 #### Variance and Inheritance
 
@@ -2256,7 +2257,7 @@ You cannot inherit from a type variable or create recursive inheritance through 
 
 **Why this is disallowed:** Inheritance requires knowing the parent's structure, but with parametric recursion, this structure would be self-referential before being defined.
 
-#### Practical Patterns for Recursive Types
+<!-- #### Practical Patterns for Recursive Types
 
 **Linked list with helper functions:**
 
@@ -2328,6 +2329,7 @@ Node1 := graph_node(string){Data := "A"}
 Node2 := graph_node(string){Data := "B"}
 Node1.AddEdge(Node2)  # Create edge A -> B
 ```
+-->
 
 #### Summary
 

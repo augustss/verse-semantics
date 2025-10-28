@@ -978,7 +978,7 @@ if (Item1 = Item3):
 
 This identity-based equality is crucial for game objects that need distinct identities even when their data is identical. Two monsters might have the same stats, but they're still different monsters.
 
-## Practical Implications
+<!-- ## Practical Implications
 
 The distinction between struct and class mutability has profound implications for how you design data structures. Structs are ideal for value-like data that you want to manipulate locally without affecting other parts of your program. Classes are better for entities with identity that might be referenced from multiple places.
 
@@ -1053,3 +1053,4 @@ When designing your data structures, consider:
 - Be aware that **arrays of classes share references** while **arrays of structs copy**
 - Use **map ordering** intentionally, knowing it affects equality
 - Understand **restrictions** to avoid compilation errors in complex nested structures
+-->

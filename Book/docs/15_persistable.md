@@ -429,7 +429,7 @@ Data := Persistence.FromJsonV1[OldJson, int_ref]
 # Current format avoids this issue by using proper integer serialization
 ```
 
-### Practical Considerations
+<!-- ### Practical Considerations
 
 **Serialization is for persistable types only:**
 
@@ -471,6 +471,7 @@ wrapper := class<final><persistable>:
 Persistence.ToJson[wrapper{NativeData := ...}]
 # {..., "x_NativeData":{"$package_name":"/Engine/...", "$class_name":"native_persistable_class", ...}}
 ```
+-->
 
 ## Best Practices
 
