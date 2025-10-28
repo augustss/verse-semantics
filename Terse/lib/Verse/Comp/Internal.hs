@@ -14,10 +14,18 @@ module Verse.Comp.Internal
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Reader
+import Control.Monad.Trans.Writer.CPS (runWriterT)
+import Control.Monad.Writer.CPS
 
+import Data.Foldable
 import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Vars
+import Data.Traversable
 
 import Language.Haskell.TH
   ( Q
@@ -26,28 +34,32 @@ import Language.Haskell.TH
   , pattern VarE
   , integerL
   , litE
+  , tupE
+  , tupP
   , varE
+  , varP
   )
 import Language.Haskell.TH qualified as TH
 
 import Loc
 
 import Verse.Exp
-import Verse.Monad
+import Verse.Monad (Stream (..), all', if', one, fork, split, stuck)
 import Verse.Name
 import Verse.Run
 import Verse.Run.Val qualified as Val
 
 newtype Comp a = Comp
-  { unComp :: ReaderT R Q a
+  { unComp :: ReaderT R (WriterT Vars Q) a
   } deriving ( Functor
              , Applicative
              , Monad
              , MonadReader R
+             , MonadWriter Vars
              )
 
 instance Quote Comp where
-  newName = Comp . lift . TH.newName
+  newName = Comp . lift . lift . TH.newName
 
 data R = R
   { env :: !Env
@@ -56,20 +68,33 @@ data R = R
 
 type Env = HashMap Name TH.Name
 
+type Vars = Set TH.Name
+
 runCompT :: Comp a -> Env -> Q a
-runCompT m env = runReaderT (unComp m) R {..}
+runCompT m env = evalRWT (unComp m) R {..}
   where
     stack = mempty
+
+evalRWT :: (Monoid w, Functor m) => ReaderT r (WriterT w m) a -> r -> m a
+evalRWT m = fmap fst . runWriterT . runReaderT m
 
 comp' :: TH.Name -> TH.Name -> LExp -> Comp TH.Exp
 comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
-    Just y -> [| unifyS $(varE s1) $(varE s2) $> $(varE y) |]
     Nothing -> [| fork stuck *> Val.freshVar |]
-  Abs x e -> [| do
-    unifyS $(varE s1) $(varE s2)
-    Val.newVar . Val.Lam () $ \ () s1 s2 var ->
-      $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e) |]
+    Just y -> do
+      tell $ Vars.singleton y
+      [| unifyS $(varE s1) $(varE s2) $> $(varE y) |]
+  Abs x e -> do
+    s3 <- TH.newName "s1"
+    s4 <- TH.newName "s2"
+    var <- TH.newName "var"
+    (e, xs) <- freeVars . localEnv (Env.insert x var) $ comp' s3 s4 e
+    [| do
+      unifyS $(varE s1) $(varE s2)
+      Val.newLam $(tupE $ varE <$> toList xs) $
+        \ $(tupP $ varP <$> Map.keys xs) $(varP s3) $(varP s4) $(varP var) ->
+          $(pure e) |]
   App e1 e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
@@ -198,8 +223,25 @@ comp' s1 s2 = wrap $ \ case
       $(comp' s1 s2 e3)
     pure var |]
 
+freeVars :: Comp a -> Comp (a, Map TH.Name TH.Name)
+freeVars m = do
+  r <- ask
+  (xs, env) <- mapAccumM (\ xs x -> do
+    y <- TH.newName "var"
+    pure (Map.insert y x xs, y)) mempty r.env
+  (x, w) <- liftQ $ runRWT (unComp m) r { env }
+  let ys = Map.restrictKeys xs w
+  for_ ys $ tell . Vars.singleton
+  pure (x, ys)
+
 localEnv :: (Env -> Env) -> Comp a -> Comp a
 localEnv f = local (\ r -> r { env = f r.env })
+
+runRWT :: Monoid w => ReaderT r (WriterT w m) a -> r -> m (a, w)
+runRWT m = runWriterT . runReaderT m
+
+liftQ :: Q a -> Comp a
+liftQ = Comp . lift . lift
 
 wrap :: (ExpF LExp -> Comp a) -> LExp -> Comp a
 wrap f (L i x) = local (\ r -> r { stack = i:r.stack }) $ f x

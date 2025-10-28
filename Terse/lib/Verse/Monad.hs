@@ -42,6 +42,7 @@ import Data.Functor.Compose
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Kind
 import Data.Monoid (Ap (..), Sum (..))
+import Data.Tuple
 
 import Fix
 import Ref
@@ -447,8 +448,20 @@ instance Vars Integer m where
 instance Vars () m where
   vars _ = pure
 
+instance Vars a m => Vars (Solo a) m where
+  vars f = traverse (vars f)
+
 instance (Vars a m, Vars b m) => Vars (a, b) m where
-  vars f (x, y) = (,) <$> vars f x <*> vars f y
+  vars f (a, b) =
+    (,) <$> vars f a <*> vars f b
+
+instance (Vars a m, Vars b m, Vars c m) => Vars (a, b, c) m where
+  vars f (a, b, c) =
+    (,,) <$> vars f a <*> vars f b <*> vars f c
+
+instance (Vars a m, Vars b m, Vars c m, Vars d m) => Vars (a, b, c, d) m where
+  vars f (a, b, c, d) =
+    (,,,) <$> vars f a <*> vars f b <*> vars f c <*> vars f d
 
 instance Vars a m => Vars (Maybe a) m where
   vars f = \ case
