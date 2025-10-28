@@ -87,7 +87,15 @@ $$
 \pomcanon( S \pomcat T ) & = & \{ ss \append ts \vb ss \in \pomcanon(S), ts \in \pomcanon(T) \}
 \end{array}
 \\ \\
-% \text{\textbf{Theorems} \hspace{3mm} ``You can remove any sub-sequence''.}\\
+\text{\textbf{Theorems} \hspace{3mm} ``You can remove empties''.} \\
+ \begin{array}{lrcl}
+  \rulename{T1} & \pomcanon( S \pomunion \pomunit{\pomempty} ) & = & \pomcanon(S) \\
+  \rulename{T2} & \pomcanon( \pomunit{\pomempty} \pomunion S ) & = & \pomcanon(S) \\
+  \rulename{T3} & \pomcanon( S \pomcat \pomunit{\pomempty} ) & = & \pomcanon(S) \\
+  \rulename{T4} & \pomcanon( \pomunit{\pomempty} \pomcat S ) & = & \pomcanon(S) \\
+ \end{array}
+
+% \text{\textbf{Theorems} \hspace{3mm} ``You can remove any sub-sequence''}\\
 % \begin{array}{lrcl}
 %  \rulename{T1} & (S \pomcat T) \pomunion T & = & S \pomcat T \\
 %  \rulename{T2} & S \pomunion (S \pomcat T) & = & S \pomcat T \\
