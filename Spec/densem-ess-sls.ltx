@@ -20,7 +20,7 @@ $$
   \multicolumn{1}{c}{\fbox{
   \begin{minipage}{10cm}
   $$\begin{array}{rcll}
-  \multicolumn{4}{c}{{\bf type} \; \pom{A}} \;\text{where}\; A has a zero written $\pomempty$ \\[1mm]
+  \multicolumn{4}{c}{{\bf type} \; \pom{A}} \;\text{where} A has a zero written $\pomempty$ \\[1mm]
   \pomunit{\_}  & : & A \rightarrow \pom{A} \\
   \pomcat   & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
   \pomunion & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
@@ -36,7 +36,7 @@ $$
 \rulename{ax3} & (S \pomunion T) \pomunion R & = & S \pomunion (T \pomunion R) \\[1mm]
 \rulename{ax4} & (S \pomunion T) \pomcat R   & = & (S \pomcat R) \pomunion (T \pomcat R) \\
 \rulename{ax5} & S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
-\multicolumn{4}{@@{}l}{\textbf{Constructors}} \\
+\multicolumn{4}{@@{}l}{\textbf{Smart constructors}\;\text{$(\mkpomunion)$ and $(\mkpomcat)$}} \\
 \rulename{c1} & \pomunit{\pomempty} \mkpomcat S      & = & S \\
 \rulename{c2} & S \mkpomcat \pomunit{\pomempty}      & = & S \\
 \rulename{c3} & \pomunit{\pomempty} \mkpomunion S      & = & S \\
@@ -47,8 +47,8 @@ $$
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
   (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom{B} \\
   \pomunit{a} \pombind h  	& = & h(a) \\
-  (S \pomcat T) \pombind h      & = & (S \pombind h) \pomcat (T \pombind h) \\
-  (S \pomunion T) \pombind h    & = & (S \pombind h) \pomunion (T \pombind h) \\
+  (S \pomcat T) \pombind h      & = & (S \pombind h) \mkpomcat (T \pombind h) \\
+  (S \pomunion T) \pombind h    & = & (S \pombind h) \mkpomunion (T \pombind h) \\
 %   \\
 %   \pommap & : & (A \rightarrow B) \rightarrow \pom{A} \rightarrow \pom{B} \\
 %  \pommap(f,S) & = & S \pombind \lambda a.\, \pomunit{ f(a) } 
@@ -87,7 +87,15 @@ $$
 \pomcanon( S \pomcat T ) & = & \{ ss \append ts \vb ss \in \pomcanon(S), ts \in \pomcanon(T) \}
 \end{array}
 \\ \\
-% \text{\textbf{Theorems} \hspace{3mm} ``You can remove any sub-sequence''.}\\
+\text{\textbf{Theorems} \hspace{3mm} ``You can remove empties''.} \\
+ \begin{array}{lrcl}
+  \rulename{T1} & \pomcanon( S \pomunion \pomunit{\pomempty} ) & = & \pomcanon(S) \\
+  \rulename{T2} & \pomcanon( \pomunit{\pomempty} \pomunion S ) & = & \pomcanon(S) \\
+  \rulename{T3} & \pomcanon( S \pomcat \pomunit{\pomempty} ) & = & \pomcanon(S) \\
+  \rulename{T4} & \pomcanon( \pomunit{\pomempty} \pomcat S ) & = & \pomcanon(S) \\
+ \end{array}
+
+% \text{\textbf{Theorems} \hspace{3mm} ``You can remove any sub-sequence''}\\
 % \begin{array}{lrcl}
 %  \rulename{T1} & (S \pomcat T) \pomunion T & = & S \pomcat T \\
 %  \rulename{T2} & S \pomunion (S \pomcat T) & = & S \pomcat T \\
@@ -108,21 +116,21 @@ $$
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{3}{l}{\text{\textbf{Conjunction (sequencing, intersection).}  Theorem: $\pomseq$ satisfies axioms.}} \\
 (\pomseq) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
-  (S \pomunion T) \pomseq R               & = & (S \pomseq R) \pomunion (T \pomseq R) \\
-  (S \pomcat T) \pomseq R                 & = & (S \pomseq R) \pomcat (T \pomseq R) \\
-  \pomunit{\EV} \pomseq (S \pomunion T)  & = & (\pomunit{\EV} \pomseq S) \pomunion (\pomunit{\EV} \pomseq T) \\
-  \pomunit{\EV} \pomseq (S \pomcat T)    & = & (\pomunit{\EV} \pomseq S) \pomcat (\pomunit{\EV} \pomseq T) \\
+  (S \pomunion T) \pomseq R               & = & (S \pomseq R) \mkpomunion (T \pomseq R) \\
+  (S \pomcat T) \pomseq R                 & = & (S \pomseq R) \mkpomcat (T \pomseq R) \\
+  \pomunit{\EV} \pomseq (S \pomunion T)  & = & (\pomunit{\EV} \pomseq S) \mkpomunion (\pomunit{\EV} \pomseq T) \\
+  \pomunit{\EV} \pomseq (S \pomcat T)    & = & (\pomunit{\EV} \pomseq S) \mkpomcat (\pomunit{\EV} \pomseq T) \\
   \pomunit{\EV_1} \pomseq \pomunit{\EV_2} & = & \pomunit{\EV_1 \cap \EV_2} \\
   \\
 \multicolumn{3}{l}{\textbf{Theorems}}  \\
-\pomunit{\pomempty} \pomseq S & = & S \\
-S \pomseq \pomunit{\pomempty} & = & S \\
+\pomunit{\pomempty} \pomseq S & = & \pomunit{\pomempty} \\
+S \pomseq \pomunit{\pomempty} & = & \pomunit{\pomempty} \\
 
   \\
 \multicolumn{3}{l}{\text{\textbf{Alternative definitions of sequencing}}} \\
     S \pomseq T & = & S \pombind (\lambda \EV_1.\, T \pombind (\lambda \EV_2. \,
-        \text{if}\,\EV_1 \cap \EV_2 = \{\} \, \text{then}\,  \pomempty \, \text{else} \, \pomunit{\EV_1 \cap \EV_2})) \\
-        & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 \pomelem S, \; \EV_2 \pomelem T, \; \EV_1 \cap \EV_2 \not= \{\} \pomcompR \\[1mm]
+        \pomunit{\EV_1 \cap \EV_2})) \\
+        & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 \pomelem S, \; \EV_2 \pomelem T \pomcompR \\[1mm]
 
 \multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
 (\pomor) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
@@ -139,8 +147,7 @@ S \pomseq \pomunit{\pomempty} & = & S \\
 \hline
 \\
 \mathbf{type}\; \pomFUN = \pom{\parfun{\Val}{\Val}}\\
-\text{{\bf Invariant:} $\pomFUN$ has no nested $\pomempty$, no $\pomunit{\{\}}$ (empty partial function),
-  and no domain overlap}
+\text{{\bf Invariant:} $\pomFUN$ has no domain overlap}
 \\
 \\
 \text{ToDo: define tuple concatenation $\pomtupcat$.}
@@ -186,7 +193,7 @@ $$
          \hfill u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v} \\
 
 % Choice and failure
-\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \pomempty \\
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \pomunit{\pomempty} \\
 \rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
   & = & \semess{B}{u}{v}{t_1} \pomcat \semess{B}{u}{v}{t_2} \\
 \rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
@@ -242,19 +249,21 @@ $$
 \end{array} \\
 \\
 
+%% --------------- ONE -------------------------------
 \begin{array}{r@@{\;\;}c@@{\;\;}l}
   \pomONE & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV
        \hspace{5mm} \text{Result has no $(\pomcat)$}\\
 
-  \pomONE( xs, \pomempty )  & = & \pomempty \\
+%   \pomONE( xs, \pomempty )  & = & \pomempty \\
   \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
   \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
   \pomONE( xs, S \pomcat T )  & = & S1 \pomor ( \pomNOT(S1 \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
                               & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
 
-  \semFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
-\semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
-                   \hfill \text{(NB: |for1 fail| returns empty tuple)} \\[1mm]
+%% --------------- FOR -------------------------------
+\semFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
+% \semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
+%                   \hfill \text{(NB: |for1 fail| returns empty tuple)} \\[1mm]
 \semFOR{S \pomunion T}{xs}{u}{v}{t_1}
                    & = & \pomunit{\conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2}}
                    \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
@@ -292,7 +301,7 @@ $$
 \hfill p,q, \not\in \freevars{t_0,t_1,h,f} \\[2mm]
 
 &  \semFUN{\_}{xs}{pq}{hf}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\[1mm]
-&  \semFUN{\pomempty}{xs}{pq}{hf}{t_1} & = & \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\[1mm]
+% &  \semFUN{\pomempty}{xs}{pq}{hf}{t_1} & = & \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\[1mm]
 % &  \semFUN{S \pomunion T}{xs}{pq}{hf}{t_1 } & = & \semFUN{S}{xs}{pq}{hf}{t_1} \pomunion \semFUN{T}{xs}{pq}{hf}{t_1} \\[1mm]
 
 &  \semFUN{S \pomunion T}{xs}{pq}{hf}{t_1}
@@ -307,16 +316,15 @@ $$
   &&&  \pomseq \semFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \semFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
   &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
 &  \semFUN{\pomunit{\EV}}{xs}{pq}{hf}{t_1}
-                   &  = & \pomunit{ \bigcup \begin{array}[t]{@@{}l@@{\;}l}
+                   &  = & \pomunit{ \begin{array}[t]{@@{}l@@{\;}l}
                        \{ & \rho \in \Env \\
-                       \vb & \hh \in extract(\rho(h)) \\
-                       or & \rho(h) = \Fun{\pomunit{\hh}} \\
-                       , & |let|\; \EV' = \EV \cap (\rho \pomHIDE \{p,q,xs\}) \\
+                       \vb & |let|\; \EV' = \EV \cap (\rho \pomHIDE \{p,q,xs\}) \\
+                       , & \Fun{\pomunit{\hh}} = \rho(h) \hfill \text{(binds $hh$)} \\
+                       , & \dom(\hh) = \{ \rho'(q) \vb \rho' \in \EV' \} \\
                        , & \pomunit{\EV_2} = \pomunit{\EV'} \pomseq \conBrack{ u = hh(q) } \pomseq \semess{E}{u}{v}{|t_1|} \\
                        , & |let|\; \ff = \{ \fpr{\rho(p)}{\rho(v)} \vb \rho \in \EV_2 \} \\
                        , & isFunction(\ff) \\
-                       , & \rho(f) = \Fun{\pomunit{\ff}} \\
-                       , & \dom(\hh) = \{ \rho'(q) \vb \rho' \in \EV' \} \\
+                       , & \Fun{\pomunit{\ff}} = \rho(f)  \\
                        , & \dom(\ff) = \{ \rho'(p) \vb \rho' \in \EV' \} \\
                        \} }
                        \end{array}

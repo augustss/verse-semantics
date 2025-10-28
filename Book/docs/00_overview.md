@@ -37,9 +37,9 @@ Traditional programming languages carry decades of historical baggage and design
 - Backward compatibility is not optional but essential
 - The boundary between compile-time and runtime is fluid
 
-Ready to dive in? Start with [Built-in Types](01_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](05_expressions.md) to see how everything in Verse computes values.
+Ready to dive in? Start with [Built-in Types](02_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](01_expressions.md) to see how everything in Verse computes values.
 
-For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](09_effects.md) sections highlight some of Verse's distinctive features.
+For experienced programmers coming from other languages, the [Failure System](06_failure.md) and [Effects](10_effects.md) sections highlight some of Verse's distinctive features.
 
 ## Key Features
 
@@ -64,7 +64,7 @@ Multiply := for (X : Array) { X * 42 }
 
 **Failure as Control Flow**
 
-Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), and this failure propagates naturally through the program.
+Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), enabling natural control flow patterns:
 
 <!--verse
 ValidateInput(x:string)<computes><decides>:void= {}
@@ -80,6 +80,8 @@ ProcessData[Data]
 <!--verse
 } }
 -->
+
+See [Failure](06_failure.md) for complete details on failable expressions and failure contexts, and [Control Flow](05_control.md) for if expressions.
 
 **Strong Static Typing with Inference**
 
@@ -98,7 +100,7 @@ Name := "Verse"            # Type inferred as string
 
 **Effect Tracking**
 
-The language tracks side effects through its effect system, making it clear what a function can do beyond computing its return value.
+Functions declare their side effects through specifiers like `<computes>`, `<reads>`, `<writes>`, `<transacts>`, `<decides>`, and `<suspends>`. These effect specifiers make it immediately clear what a function can do beyond computing its return value:
 
 <!--verse
 x := class {
@@ -107,12 +109,14 @@ x := class {
 -->
 ```verse
 PureCompute()<computes>:int = 2 + 2           # No side effects
-ReadState()<reads>:int = GetCurrentValue()     # Can read memory
-UpdateGame()<transacts>:void = set Score += 10 # Full transactional effects
+ReadState()<reads>:int = GetCurrentValue()    # Can read mutable state
+UpdateGame()<transacts>:void = set Score += 10 # Can read, write, allocate
 ```
 <!--verse
 }
 -->
+
+See [Effects](10_effects.md) for complete details on the effect system.
 
 **Built-in Concurrency**
 

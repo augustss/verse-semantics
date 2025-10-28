@@ -99,7 +99,7 @@ The function body is a failure context, allowing failable expressions throughout
 
 ## Speculative Execution
 
-One of Verse's most powerful features is speculative execution within failure contexts. When you execute code in a failure context, changes to variables are provisional - they only become permanent if the entire context succeeds.
+When you execute code in a failure context, changes to mutable variables are provisional—they only become permanent if the entire context succeeds. Functions that modify state in failure contexts must use the `<transacts>` effect specifier (see [Effects](10_effects.md)):
 
 <!-- TODO MUTABLE PARAMETERS ARE NOT YET IMPLMENTED -->
 
@@ -111,9 +111,7 @@ AttemptPurchase(var PlayerGold:int, Cost:int)<transacts><decides>:void =
     # If this fails, PlayerGold reverts to original value
 ```
 
-If the player doesn't have enough gold, the subtraction is rolled back automatically. You don't need to manually restore the original value or check conditions before modifying state. This transactional behavior eliminates entire categories of bugs related to partial state updates.
-
-The `<transacts>` effect is required for any function that might be called in a failure context and modifies state. This makes the transactional behavior explicit in the function signature:
+If the check fails, the subtraction is automatically rolled back. You don't need to manually restore the original value or check conditions before modifying state. The `<transacts>` effect provides special failure semantics—heap modifications are rolled back on failure.
 
 <!--NoCompile-->
 ```verse
@@ -124,7 +122,7 @@ ComplexTransaction(var State:game_state)<transacts><decides>:void =
     ValidateFinalState[State]         # If this fails, everything rolls back
 ```
 
-This approach makes complex state updates safe and predictable. Either everything succeeds and all changes are committed, or something fails and nothing changes.
+This transactional behavior makes complex state updates safe and predictable. Either everything succeeds and all changes are committed, or something fails and nothing changes.
 
 ## The Logic of Failure
 

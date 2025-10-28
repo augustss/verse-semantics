@@ -534,7 +534,7 @@ Main()<decides>:void =
 
 For maximum compatibility, avoid conditional selection between functions with significantly different effects, especially when mixing exclusive effects like `<computes>` and `<transacts>`.
 
-### Practical Implications
+<!-- ### Practical Implications
 
 **Designing flexible APIs:**
 
@@ -601,6 +601,7 @@ callback_registry := class:
     # Can register reading/writing callbacks
     # All work because they're subtypes of <transacts>
 ```
+-->
 
 ### Summary of Effect Type Rules
 

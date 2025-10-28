@@ -2622,22 +2622,31 @@ set Scores = ConcatenateMaps(Scores, map{"Alice" => 100})
 
 Without type context, you may need to provide explicit type annotations.
 
-### Map Covariance
+### Map Variance
 
-Maps are covariant in both their key and value types. This means a map with more specific key or value types can be used where a map with more general types is expected:
+Maps exhibit different variance behavior for keys and values. A map type `[K1]V1` is a subtype of `[K2]V2` when:
+- **Keys are contravariant**: `K2` is a subtype of `K1` (more general keys → more specific keys)
+- **Values are covariant**: `V1` is a subtype of `V2` (more specific values → more general values)
+
+This means a map that accepts more general keys and returns more specific values can be used where a map with more specific keys and more general values is expected:
 
 ```verse
 class1 := class<unique> {}
-class2 := class<unique>(class1) {}
+class2 := class<unique>(class1) {}  # class2 is a subtype of class1
 
-# Map with specific types
-SpecificMap : [class2]class2 = map{class2{} => class2{}}
+# Map with general keys, specific values: [class1]class2
+GeneralKeyMap : [class1]class2 = map{class1{} => class2{}}
 
-# Can be assigned to map with general types
-GeneralMap : [class1]class1 = SpecificMap
+# Can be assigned to map with specific keys, general values: [class2]class1
+# This works because:
+# - Keys: class2 <: class1 (contravariant - we can look up with more specific keys)
+# - Values: class2 <: class1 (covariant - we get back more specific values)
+SpecificKeyMap : [class2]class1 = GeneralKeyMap
 ```
 
-However, when modifying a mutable map through `set`, you can only insert keys and values that are subtypes of the map's declared types. You cannot insert a supertype key into a map expecting a subtype:
+The contravariance in keys reflects how maps are used: if a map can handle lookups with general keys (like `class1`), it can certainly handle lookups with more specific keys (like `class2`). The covariance in values means getting back more specific values is always safe when expecting general ones.
+
+When modifying a mutable map through `set`, you can only insert keys and values that match the map's declared types:
 
 ```verse
 class1 := class<unique> {}

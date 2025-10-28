@@ -589,7 +589,7 @@ AutoProcess(MyInts)  # t is inferred as int
 AutoProcess([]nat)(MyNaturals)  # Explicitly specify t as nat
 ```
 
-### Practical Applications
+<!-- ### Practical Applications
 
 Where clauses are essential for writing reusable, type-safe code:
 
@@ -629,6 +629,7 @@ builder(t where t:type) := class:
 ```
 
 Where clauses thus provide the foundation for Verse's generic programming capabilities, allowing you to write code that is both highly reusable and completely type-safe. They enable you to express precise requirements about types while maintaining the flexibility to work with any types that meet those requirements.
+-->
 
 -->
 
@@ -1683,7 +1684,7 @@ else:
     # Else branch has type false - unreachable if we don't handle it
 ```
 
-### Practical Uses
+<!-- ### Practical Uses
 
 **Ignoring return values:**
 
@@ -1713,6 +1714,7 @@ LogMessage(Msg:string):void =
     WriteToFile(Msg)
     # void signals: call for effects, not return value
 ```
+-->
 
 Between the universal supertypes (`any`, `void`) and the bottom type (`false`), types form natural groupings. The numeric types (`int`, `float`, `rational`) share common arithmetic operations but don't form a single hierarchy - they're siblings rather than ancestors and descendants. The container types (arrays, maps, tuples, options) each have their own subtyping rules based on their element types.
 
