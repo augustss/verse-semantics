@@ -12,13 +12,14 @@ module Verse.Comp.Internal
   ) where
 
 import Control.Applicative
+import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Trans.Writer.CPS (runWriterT)
 import Control.Monad.Writer.CPS
 
 import Data.Foldable
-import Data.Functor
+import Data.Functor (($>))
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
 import Data.Map.Strict (Map)
@@ -90,8 +91,11 @@ comp' s1 s2 = wrap $ \ case
     var <- TH.newName "var"
     (e, xs) <- freeVars . localEnv (Env.insert x var) $ comp' s3 s4 e
     let
-      freeVarsE = tupE $ varE <$> toList xs
-      freeVarsP = tupP $ varP <$> Map.keys xs
+      (freeVarsP, freeVarsE)
+        = tupP *** tupE
+        $ unzip
+        $ fmap (varP *** varE)
+        $ Map.toList xs
     [| do
       unifyS $(varE s1) $(varE s2)
       Val.newLam $freeVarsE $ \ $freeVarsP $(varP s3) $(varP s4) $(varP var) ->
