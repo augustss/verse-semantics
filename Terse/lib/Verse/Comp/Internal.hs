@@ -30,9 +30,8 @@ import Data.Traversable
 import Language.Haskell.TH
   ( Q
   , Quote
-  , pattern ListE
-  , pattern VarE
   , integerL
+  , listE
   , litE
   , tupE
   , tupP
@@ -90,11 +89,13 @@ comp' s1 s2 = wrap $ \ case
     s4 <- TH.newName "s2"
     var <- TH.newName "var"
     (e, xs) <- freeVars . localEnv (Env.insert x var) $ comp' s3 s4 e
+    let
+      freeVarsE = tupE $ varE <$> toList xs
+      freeVarsP = tupP $ varP <$> Map.keys xs
     [| do
       unifyS $(varE s1) $(varE s2)
-      Val.newLam $(tupE $ varE <$> toList xs) $
-        \ $(tupP $ varP <$> Map.keys xs) $(varP s3) $(varP s4) $(varP var) ->
-          $(pure e) |]
+      Val.newLam $freeVarsE $ \ $freeVarsP $(varP s3) $(varP s4) $(varP var) ->
+        $(pure e) |]
   App e1 e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
@@ -118,7 +119,7 @@ comp' s1 s2 = wrap $ \ case
       loop s1 vars = \ case
         [] -> [| do
           unifyS $(varE s1) $(varE s2)
-          Val.newTup $(pure . ListE $ VarE <$> reverse vars) |]
+          Val.newTup $(listE $ varE <$> reverse vars) |]
         e:es -> [| do
           s2 <- freshS
           var <- $(comp' s1 's2 e)
