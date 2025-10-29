@@ -19,7 +19,7 @@ set live X = Y  # X now tracks Y
 set Y = 5       # X automatically becomes 5
 ```
 
-The key insight is that Verse tracks which variables the target expression reads during evaluation. When any of those variables change, the target is re-evaluated, and if the result differs from the current value, the variable updates automatically.
+Live variables extend the regular mutable variable system (see [Mutability](09_mutability.md)) with automatic dependency tracking. The key insight is that Verse tracks which variables the target expression reads during evaluation. When any of those variables change, the target is re-evaluated, and if the result differs from the current value, the variable updates automatically.
 
 ### Declaration Forms
 

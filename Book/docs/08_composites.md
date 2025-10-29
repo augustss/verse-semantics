@@ -32,7 +32,7 @@ character := class:
     MaxHealth : int = 100
 ```
 
-This class definition establishes several important concepts. Fields without the `var` modifier are immutable after construction—once you create a character with a specific name, that name cannot change. Fields marked with `var` are mutable and can be modified after the object is created. Default values provide sensible starting points, making object construction more convenient while ensuring objects start in valid states.
+This class definition establishes several important concepts. Fields without the `var` modifier are immutable after construction—once you create a character with a specific name, that name cannot change. Fields marked with `var` are mutable and can be modified after the object is created (see [Mutability](09_mutability.md) for details on `var` and `set`). Default values provide sensible starting points, making object construction more convenient while ensuring objects start in valid states.
 
 ### Object Construction
 
@@ -1580,7 +1580,7 @@ The variance of a parametric type depends on how the type parameter is used with
 
 #### Covariant: Return Types Only
 
-When a type parameter appears only in **return positions** (method return types, field types being read), the parametric class is **covariant** in that parameter. This means instantiations follow the same subtyping direction as their type arguments:
+When a type parameter appears only in **return positions** (method return types, field types being read), the parametric class is **covariant** in that parameter (see [Types](07_types.md#understanding-subtyping) for details on variance). This means instantiations follow the same subtyping direction as their type arguments:
 
 ```verse
 # Base class hierarchy
@@ -1611,7 +1611,7 @@ Result := ProcessProducer(PlayerProducer)  # Works!
 
 #### Contravariant: Parameter Types Only
 
-When a type parameter appears only in **parameter positions** (method parameters being consumed), the parametric class is **contravariant** in that parameter. This means instantiations follow the **opposite** subtyping direction:
+When a type parameter appears only in **parameter positions** (method parameters being consumed), the parametric class is **contravariant** in that parameter (see [Types](07_types.md#understanding-subtyping) for details on variance). This means instantiations follow the **opposite** subtyping direction:
 
 ```verse
 entity := class:

@@ -85,7 +85,7 @@ See [Failure](06_failure.md) for complete details on failable expressions and fa
 
 **Strong Static Typing with Inference**
 
-Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference.
+Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference. See [Types](07_types.md) for complete details on the type system and subtyping.
 
 <!--verse
 M():={
@@ -400,7 +400,7 @@ The code begins with `using` statements that import functionality from other mod
 
 **Immutable by Default**
 
-Data structures are immutable unless explicitly marked with `var`. This eliminates large classes of bugs and makes concurrent programming safer. When we do need mutation, it's explicit and tracked by the effect system.
+Data structures are immutable unless explicitly marked with `var`. This eliminates large classes of bugs and makes concurrent programming safer. When we do need mutation, it's explicit and tracked by the effect system. See [Mutability](09_mutability.md) for complete details on `var` and `set`.
 
 ## Naming Conventions
 

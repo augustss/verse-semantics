@@ -71,6 +71,7 @@ AnswerToTheQuestion :int= 42               # A variable that never changes
 CoinsPerQuiver :int= 100                   # A quiver costs this many coins
 ArrowsPerQuiver :int= 15                   # A quiver contains this many arrows
 
+# Mutable variables (see Mutability chapter for details on var and set)
 var Coins :int= 225                        # The player currently has 225 coins
 var Arrows :int= 3                         # The player currently has 3 arrows
 var TotalPurchases :int= 0                 # Track total purchases

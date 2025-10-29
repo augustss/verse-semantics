@@ -238,7 +238,7 @@ FastInstance.Move()  # Uses 2.0 (overridden value)
 
 ### Type System Interactions
 
-Named and default parameters interact with Verse's type system in specific ways:
+Named and default parameters interact with Verse's type system (see [Types](07_types.md)) in specific ways:
 
 **Subtyping with defaults**: A function with default parameters is a subtype of the same function without those parameters:
 
