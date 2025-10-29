@@ -315,17 +315,17 @@ $$
                    \hspace{3mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
   &&&  \pomseq \semFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \semFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
   &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
-&  \semFUN{\pomunit{\EV}}{xs}{pq}{hf}{t_1}
+&  \semFUN{\pomunit{\EV_0}}{xs}{pq}{hf}{t_1}
                    &  = & \pomunit{ \begin{array}[t]{@@{}l@@{\;}l}
                        \{ & \rho \in \Env \\
-                       \vb & |let|\; \EV' = \EV \cap (\rho \pomHIDE \{p,q,xs\}) \\
+                       \vb & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{p,q,xs\}) \\
                        , & \Fun{\pomunit{\hh}} = \rho(h) \hfill \text{(binds $hh$)} \\
-                       , & \dom(\hh) = \{ \rho'(q) \vb \rho' \in \EV' \} \\
-                       , & \pomunit{\EV_2} = \pomunit{\EV'} \pomseq \conBrack{ u = hh(q) } \pomseq \semess{E}{u}{v}{|t_1|} \\
-                       , & |let|\; \ff = \{ \fpr{\rho(p)}{\rho(v)} \vb \rho \in \EV_2 \} \\
+                       , & \dom(\hh) = \envlk{\EV'}{q} \\
+                       , & \pomunit{\EV_1} = \pomunit{\EV'} \pomseq \conBrack{ u = hh(q) } \pomseq \semess{E}{u}{v}{|t_1|}  \hfill \text{(binds $\EV'$)} \\
+                       , & |let|\; \ff = \{ \fpr{\rho(p)}{\rho(v)} \vb \rho \in \EV_1 \} \\
                        , & isFunction(\ff) \\
                        , & \Fun{\pomunit{\ff}} = \rho(f)  \\
-                       , & \dom(\ff) = \{ \rho'(p) \vb \rho' \in \EV' \} \\
+                       , & \dom(\ff) = \envlk{\EV'}{p} \\
                        \} }
                        \end{array}
 
