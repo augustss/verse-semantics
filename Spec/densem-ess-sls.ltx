@@ -140,8 +140,7 @@ S \pomseq \pomunit{\pomempty} & = & \pomunit{\pomempty} \\
 
 \multicolumn{3}{l}{\text{\textbf{Negation (or, complement)}}} \\
 \pomNOT & : & \pomENV \rightarrow \pomENV \\
-\pomNOT(\pomempty) & = & \pomunit{ \conUniv } \hfill \text{(|if3 fail t_1 t_2| = |t_2|)} \\
-\pomNOT(S) & = & \pomcompL \conCompl(\EV) \vb \EV \in S, \conCompl(\EV) \not= \{\} \pomcompR
+\pomNOT(S) & = & \pomcompL \conCompl(\EV) \vb \EV \in S \pomcompR
 \end{array} \\
 \\
 \hline
@@ -240,9 +239,9 @@ $$
 & \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N f x|}r & : & \pomENV \\
 & \semap{F}{|apply1N f x|}r  & = &
-\pomcompL \EV \begin{array}[t]{@@{}l@@{\,}l}
-  \vb & Fun(F) \in \Val, \; h \pomelem F  \\
-  \; ,   & \EV = \conBrack{ f = Fun(F) } \cap \conBrack{ \fpr{x}{r} \in h }, \EV \not= \emptyset \pomcompR
+\begin{array}[t]{@@{}l@@{\,}l}
+  \pomcompL  & \conBrack{ f = Fun(F) } \cap \conBrack{ \fpr{x}{r} \in h } \\
+  \vb & Fun(F) \in \Val, \; h \pomelem F \pomcompR
   \end{array}
 %    \pomunions \{ \ \pomcats [ \; \conBrack{\conFun{x}{r}{f}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
 %      \; \}
@@ -319,9 +318,9 @@ $$
                    &  = & \pomunit{ \begin{array}[t]{@@{}l@@{\;}l}
                        \{ & \rho \in \Env \\
                        \vb & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{p,q,xs\}) \\
-                       , & \Fun{\pomunit{\hh}} = \rho(h) \hfill \text{(binds $hh$)} \\
+                       , & \Fun{\pomunit{\hh}} = \rho(h) \;\;\hfill \text{(binds $hh$)} \\
                        , & \dom(\hh) = \envlk{\EV'}{q} \\
-                       , & \pomunit{\EV_1} = \pomunit{\EV'} \pomseq \conBrack{ u = hh(q) } \pomseq \semess{E}{u}{v}{|t_1|}  \hfill \text{(binds $\EV'$)} \\
+                       , & \pomunit{\EV_1} = \pomunit{\EV'} \pomseq \conBrack{ \fpr{q}{u} \in hh } \pomseq \semess{E}{u}{v}{|t_1|}  \hspace{6mm} \hfill \text{(binds $\EV'$)} \\
                        , & |let|\; \ff = \{ \fpr{\rho(p)}{\rho(v)} \vb \rho \in \EV_1 \} \\
                        , & isFunction(\ff) \\
                        , & \Fun{\pomunit{\ff}} = \rho(f)  \\
