@@ -350,19 +350,14 @@ Functions can destructure tuple parameters directly in the parameter list, allow
 Func(A:int, (B:int, C:int), D:int):int =
     A + B + C + D
 
-# All these calling forms work:
 Func(1, (2, 3), 4)        # Direct tuple literal - returns 10
-
 X := (2, 3)
 Func(1, X, 4)             # Tuple variable - returns 10
-
 Y := (1, (2, 3), 4)
 Func(Y)                   # Entire argument list as tuple - returns 10
 ```
 
 The parameter `(B:int, C:int)` destructures the tuple, giving direct access to `B` and `C` instead of requiring `Tuple(0)` and `Tuple(1)` indexing.
-
-#### Nested Tuple Destructuring
 
 Tuples can be destructured to arbitrary depth:
 
@@ -376,25 +371,7 @@ T := (2, (3, 4))
 H(1, T, 5)                        # Returns 15
 T2 := (1, (2, (3, 4)), 5)
 H(T2)                             # Returns 15
-
-# Complex multi-level nesting
-I(A:int, (B:int, (C:int, D:int)), E:int, (F:int, G:int, (H:int, I:int))):int =
-    A + B + C + D + E + F + G + H + I
-
-# Call with inline literals
-I(1, (2, (3, 4)), 5, (6, 7, (8, 9)))  # Returns 45
-
-# Call with mixed variables
-T3 := (2, (3, 4))
-T4 := (6, 7, (8, 9))
-I(1, T3, 5, T4)                       # Returns 45
-
-# Call with entire signature as tuple
-T5 := (1, (2, (3, 4)), 5, (6, 7, (8, 9)))
-I(T5)                                 # Returns 45
 ```
-
-#### Mixed Destructured and Non-Destructured Forms
 
 You can mix destructured tuple parameters with regular tuple parameters that aren't destructured:
 
@@ -414,8 +391,6 @@ G(1, (2, 3), 4)  # Returns 10
 
 Choose destructured form when you need direct access to individual elements, and non-destructured when you need to pass the tuple as a whole to other functions.
 
-#### Named Parameters in Tuple Destructuring
-
 Tuple parameters can contain named/optional parameters, allowing for flexible APIs that combine structural decomposition with optional values:
 
 ```verse
@@ -428,13 +403,7 @@ SumValues(1, (2, (3, (?Z := 4))))  # Returns 10
 
 # Can omit Z to use default
 SumValues((1, (2, (3))))           # Returns 6
-
-# Pre-constructed tuple also works
-T := (3)
-SumValues((1, (2, T)))             # Returns 6
 ```
-
-**Multiple Named Parameters in Tuples:**
 
 A tuple can contain multiple named parameters, and they can be specified in any order:
 
@@ -447,15 +416,14 @@ ProcessData(Base:int, (Items:[]int, ?Scale:int = 1, ?Offset:int = 0)):int =
 
 Data := array{100, 200}
 
-# All these are valid
 ProcessData(10, Data)                              # Uses defaults: 110
-ProcessData(10, (Data, ?Scale := 2))              # 210
-ProcessData(10, (Data, ?Offset := 5))             # 115
+ProcessData(10, (Data, ?Scale := 2))               # 210
+ProcessData(10, (Data, ?Offset := 5))              # 115
 ProcessData(10, (Data, ?Scale := 2, ?Offset := 5)) # 215
 ProcessData(10, (Data, ?Offset := 5, ?Scale := 2)) # 215 (order doesn't matter)
 ```
 
-**Limitation:**
+#### Restrictions
 
 When a tuple parameter contains **only** named parameters (no positional parameters), you must provide an empty tuple `()` even when using all defaults:
 
@@ -473,31 +441,6 @@ Configure(5, ())  # Returns 35
 
 This is a known limitation in the current implementation. When the tuple contains at least one positional parameter, this restriction doesn't apply.
 
-#### Tuples Containing Other Types
-
-Tuple parameters can contain arrays, other complex types, and be further nested:
-
-```verse
-# Tuple containing array
-ProcessData(X:tuple([]int, int))<decides>:int =
-    X(0)[0] + X(0)[1] + X(1)
-
-ProcessData[(array{1, 2}), 3]  # Returns 6
-T := ((3, 4), 5)
-ProcessData[T]                  # Returns 12
-
-# Equivalent flattened destructured form
-ProcessFlattened(A:[]int, B:int)<decides>:int =
-    A[0] + A[1] + B
-
-ProcessFlattened[(array{1, 2}), 3]  # Returns 6
-ProcessFlattened[T]                  # Returns 12
-```
-
-#### Restrictions
-
-**Cannot use refined types (where clauses) in tuple parameters:**
-
 Refined types with `where` clauses are not allowed in destructured tuple parameters:
 
 ```verse
@@ -508,64 +451,32 @@ Refined types with `where` clauses are not allowed in destructured tuple paramet
 
 This restriction applies to the types within the tuple destructuring. Regular parameter refinements outside tuples work normally.
 
-### Automatic Tuple Flattening and Unflattening
+### Flattening and Unflattening
 
 Verse provides automatic conversion between tuples and multiple arguments at function call sites, enabling flexible calling conventions without explicit packing or unpacking.
 
-**Direction 1: Tuple to Multiple Arguments (Flattening):**
-
-A function expecting multiple parameters can be called with a single tuple:
+**Flattening:** A function expecting multiple parameters can be called with a single tuple:
 
 ```verse
 # Function with multiple parameters
 Add(X:int, Y:int):int = X + Y
 
-# Can call with individual arguments
-Add(3, 5)  # Returns 8
-
-# Can also call with a tuple
 Args := (3, 5)
 Add(Args)  # Returns 8 - tuple automatically flattened
 ```
 
 The tuple is automatically unpacked into the function's parameters.
 
-**Direction 2: Multiple Arguments to Tuple (Unflattening):**
-
-A function expecting a single tuple parameter can be called with flattened arguments:
+**Unflattening:** A function expecting a single tuple parameter can be called with flattened arguments:
 
 ```verse
 # Function with single tuple parameter
 ProcessPair(P:tuple(int, int)):int = P(0) + P(1)
 
-# Can call with a tuple
-Pair := (3, 5)
-ProcessPair(Pair)  # Returns 8
-
-# Can also call with flattened arguments
 ProcessPair(3, 5)  # Returns 8 - args automatically packed into tuple
 ```
 
 The individual arguments are automatically packed into the tuple parameter.
-
-**Bidirectional Flexibility:**
-
-This works in both directions, making function calls more convenient:
-
-```verse
-# Multi-parameter function
-Multiply(A:int, B:int, C:int):int = A * B * C
-
-# Tuple-parameter function
-Sum(Values:tuple(int, int, int)):int = Values(0) + Values(1) + Values(2)
-
-# Can use tuples for both
-Args := (2, 3, 4)
-Multiply(Args)  # 2 * 3 * 4 = 24 (flattening)
-Sum(2, 3, 4)    # 2 + 3 + 4 = 9 (unflattening)
-```
-
-**Works with Tuple Parameter Destructuring:**
 
 This flattening also works when the function uses tuple destructuring:
 
@@ -579,8 +490,6 @@ Compute(1, 2, 3)       # Flattened: all separate args
 Args := (1, (2, 3))
 Compute(Args)          # Packed: entire signature as tuple
 ```
-
-**Empty Tuples:**
 
 Empty tuples work with the same flattening behavior:
 
@@ -643,9 +552,7 @@ Z := 7.Double()  # Returns 14
 
 The type in parentheses can be any Verse type: primitives, tuples, classes, interfaces, arrays, maps, or structs.
 
-### Extending Different Types
-
-**Primitives:**
+Extending primitives:
 
 ```verse
 (N:int).IsEven()<computes>:logic = N % 2 = 0
@@ -655,7 +562,7 @@ The type in parentheses can be any Verse type: primitives, tuples, classes, inte
 "Hello".FirstChar()   # Returns 'H'
 ```
 
-**Tuples:**
+Extending tuples:
 
 ```verse
 # Extend a specific tuple type
@@ -665,7 +572,7 @@ The type in parentheses can be any Verse type: primitives, tuples, classes, inte
 (3, 4).Distance()  # Returns 5.0
 ```
 
-**Arrays:**
+Extending arrays:
 
 ```verse
 (Numbers:[]int).Sum()<computes>:int =
@@ -677,7 +584,7 @@ The type in parentheses can be any Verse type: primitives, tuples, classes, inte
 array{1, 2, 3, 4, 5}.Sum()  # Returns 15
 ```
 
-**Maps:**
+Extending maps:
 
 ```verse
 (M:[int]string).Keys()<computes>:[]int =
@@ -687,7 +594,7 @@ array{1, 2, 3, 4, 5}.Sum()  # Returns 15
 map{1=>"a", 2=>"b", 3=>"c"}.Keys()  # Returns array{1, 2, 3}
 ```
 
-**Classes:**
+Extending classes:
 
 ```verse
 player := class:
@@ -702,31 +609,6 @@ Player1 := player{Name := "Alice", Score := 100}
 Player1.AddScore(50)  # Score becomes 150
 ```
 
-### Extension Methods with Additional Parameters
-
-Extension methods can accept additional parameters beyond the extended type:
-
-```verse
-(Numbers:[]int).Scale(Factor:int):[]int =
-    for (N:Numbers):
-        N * Factor
-
-array{1, 2, 3}.Scale(10)  # Returns array{10, 20, 30}
-```
-
-Multiple parameters work naturally:
-
-```verse
-(Base:int).InRange(Min:int, Max:int)<decides>:logic =
-    Base >= Min
-    Base <= Max
-
-if (50.InRange(0, 100)):
-    # Value is in range
-```
-
-### Extension Methods with Named and Default Parameters
-
 Extension methods support all parameter features including named and default parameters:
 
 ```verse
@@ -738,38 +620,7 @@ Extension methods support all parameter features including named and default par
 "Hello".Pad(?Left := 2, ?Right := 3)  # "  Hello   "
 ```
 
-### Extension Methods with Tuple Parameters
-
-Extension methods can combine with all tuple parameter features, including destructuring and named parameters in tuples:
-
-```verse
-# Extension with destructured tuple
-(Base:int).AddPair((X:int, Y:int)):int =
-    Base + X + Y
-
-10.AddPair((5, 3))  # Returns 18
-
-# Extension with nested tuple destructuring
-(A:int).SumNested(B:int, (C:int, (D:int, E:int))):int =
-    A + B + C + D + E
-
-1.SumNested(2, (3, (4, 5)))  # Returns 15
-
-# Extension with named parameters in tuples
-(Base:int).Configure(Settings:([]int, ?Scale:int = 1, ?Offset:int = 0)):int =
-    if (First := Settings(0)[0]):
-        First * Settings(1) + Settings(2) + Base
-    else:
-        Base
-
-Data := array{100}
-10.Configure((Data, ?Scale := 2))              # Returns 210
-10.Configure((Data, ?Scale := 2, ?Offset := 5)) # Returns 215
-```
-
-Extension methods work identically to regular functions for tuple parameters—all the same rules and patterns apply.
-
-### Overloading Extension Methods
+### Overloading
 
 You can define multiple extension methods with the same name for different types:
 
@@ -786,7 +637,7 @@ true.Format()   # Returns "true"
 
 The compiler selects the appropriate overload based on the receiver type.
 
-### Extension Methods on the Empty Tuple
+### On the Empty Tuple
 
 The empty tuple `tuple()` represents the unit type and can have extension methods:
 
@@ -798,14 +649,7 @@ The empty tuple `tuple()` represents the unit type and can have extension method
 
 This can be useful for creating namespace-like groupings of functions.
 
-### Restrictions and Rules
-
-**Cannot add fields**: Extension methods can only add methods, not data members:
-
-```verse
-# Invalid: Cannot add extension fields
-# (N:int).StoredValue:int = N  # ERROR
-```
+### Rules
 
 **Must be called**: Extension methods cannot be referenced as first-class values without calling them:
 
@@ -819,27 +663,7 @@ X := 5.Double()
 # F := 5.Double  # ERROR
 ```
 
-**No direct field accessor syntax**: You cannot directly define field accessors like `.Length`:
-
-```verse
-# Invalid: Cannot define field accessor operators
-# operator'.CustomField'(N:int):int = N  # ERROR
-```
-
-**Short tuple syntax limited**: In current Verse, you cannot use the short form for tuple parameters:
-
-```verse
-# Invalid in current Verse
-# ().Extension():int = 0  # ERROR
-# (A:int, B:int).Extension():int = 0  # ERROR
-
-# Valid: Use full tuple type
-(AB:tuple(int, int)).Extension():int = AB(0) + AB(1)
-```
-
-### Conflicts with Class Methods
-
-Extension methods cannot have the same signature as methods defined directly in classes or interfaces:
+**Conflicts with Class Methods:**  Extension methods cannot have the same signature as methods defined directly in classes or interfaces:
 
 ```verse
 player := class:
@@ -851,9 +675,7 @@ player := class:
 
 This prevents ambiguity and ensures that class methods always take precedence.
 
-### Scope and Visibility
-
-Extension methods are scoped like regular functions. They're only visible where they're defined or imported:
+**Scope and Visibility:** Extension methods are scoped like regular functions. They're only visible where they're defined or imported:
 
 ```verse
 # In module A
@@ -867,9 +689,7 @@ using { utils }
 "Hello".Reverse()  # Available after importing
 ```
 
-### Extension Methods in Class Scope
-
-Extension methods can be defined inside classes and access class members:
+**Extension Methods in Class Scope:** Extension methods can be defined inside classes and access class members:
 
 ```verse
 game_manager := class:
@@ -887,90 +707,7 @@ GM.ProcessScore(5)  # Returns 50
 
 This creates a lexical closure where the extension method can reference the enclosing class's members.
 
-### Extension Methods on Special Types
-
-**Arrays and Maps**: Extension methods work on collection types:
-
-```verse
-(Items:[]t).First<public>()<decides>:t where t:type =
-    Items[0]?
-
-array{1, 2, 3}.First()  # Returns option{1}
-```
-
-Note that arrays `[]t` and maps `[k]v` are different types for extension method purposes, but you cannot define conflicting overloads:
-
-```verse
-# Valid: Different signatures
-(A:[]int).Process():void = {}
-(M:[int]string).Process():void = {}
-
-# Invalid: Same name, would conflict
-# (A:[]int).Convert():[]int = {}
-# (M:[int]int).Convert():[]int = {}  # ERROR
-```
-
-**Built-in Special Cases**: Some built-in properties like `Length` on arrays and maps have special handling, but extension methods still work. You can even define extension methods with names that match fields on some types:
-
-```verse
-has_length := class{Length:int = 10}
-no_length := class{}
-
-(:no_length).Length():int = 20
-
-has_length{}.Length     # Field: 10
-no_length{}.Length()    # Extension method: 20
-```
-
-### Extension Methods with Effects
-
-Extension methods support all function effects:
-
-**With `<decides>` (failable):**
-
-```verse
-(Numbers:[]int).GetAt(Index:int)<decides>:int =
-    Numbers[Index]?
-
-if (Value := array{10, 20, 30}.GetAt(1)):
-    # Value is 20
-```
-
-**With `<transacts>` (side effects):**
-
-```verse
-player := class:
-    var Score:int
-
-(P:player).ResetScore()<transacts>:void =
-    set P.Score = 0
-```
-
-**With `<suspends>` (async):**
-
-```verse
-(Delay:float).Wait()<suspends>:void =
-    Sleep(Delay)
-
-spawn:
-    5.0.Wait()  # Wait 5 seconds
-```
-
-### Extension Methods with Parametric Types
-
-Extension methods can use type parameters:
-
-```verse
-(Items:[]t).FilterNonEmpty()<computes>:[]t where t:subtype(comparable) =
-    for (Item:Items, Item <> false):
-        Item
-
-array{option{1}, false, option{2}}.FilterNonEmpty()  # Returns array with non-false values
-```
-
-### Tuple Argument Conversion
-
-When an extension method has multiple parameters, you can pass a tuple to provide all arguments at once:
+**Tuple Argument Conversion:** When an extension method has multiple parameters, you can pass a tuple to provide all arguments at once:
 
 ```verse
 point := class:
@@ -989,32 +726,21 @@ This works when the tuple type matches the parameter list.
 
 ## Function Types and Lambdas
 
-Functions in Verse are first-class values - they can be stored in variables, passed as parameters, returned from other functions, and created anonymously. This enables powerful functional programming patterns including higher-order functions, callbacks, and composable operations.
+Functions are first-class values; they can be stored in variables, passed as parameters, returned from other functions, and created anonymously. This enables powerful functional programming patterns including higher-order functions, callbacks, and composable operations.
 
-### Lambda Expressions
+### Lambdas
 
 Lambda expressions create anonymous functions using the `=>` operator:
 
 ```verse
-# Simple lambda
 Square := (X:int) => X * X
 Square(5)  # Returns 25
-
-# Multiple parameters
-Add := (X:int, Y:int) => X + Y
-Add(3, 4)  # Returns 7
-
-# No parameters
-GetFortyTwo := () => 42
-GetFortyTwo()  # Returns 42
 ```
 
 Lambdas can have blocks with multiple statements:
 
 ```verse
-# Lambda with block
-ComplexCalculation := (X:int, Y:int) =>
-{
+ComplexCalculation := (X:int, Y:int) => {
     Temp := X * 2
     Result := Temp + Y
     Result * Result
@@ -1026,7 +752,6 @@ ComplexCalculation(3, 4)  # Returns 100
 Using explicit `return`:
 
 ```verse
-# Lambda with explicit return
 Process := (X:int) => return(X * X + 10)
 Process(5)  # Returns 35
 ```
@@ -1040,8 +765,6 @@ Lambdas cannot have explicit return type annotations. The return type is inferre
 # Correct: Type is inferred
 Good := (X:int) => X * X
 ```
-
-### Closures
 
 Lambdas capture variables from their enclosing scope, creating closures:
 
@@ -1059,7 +782,7 @@ Triple(5)  # Returns 15
 
 The captured variables are bound when the lambda is created, not when it's called.
 
-### Function Type Syntax with `->`
+### Function Types
 
 The arrow operator `->` declares function types explicitly:
 
@@ -1077,7 +800,7 @@ AddFive := MakeAdder(5)
 AddFive(3)  # Returns 8
 ```
 
-**Important**: Use `tuple()` for multiple parameters. Without it, `(int, int)` is a tuple value, not a type:
+Use `tuple()` for multiple parameters. Without it, `(int, int)` is a tuple value, not a type:
 
 ```verse
 # Wrong: This is a tuple value type
@@ -1110,7 +833,7 @@ Evens := Filter(Numbers, (X:int) => X % 2 = 0)
 # Returns array{2, 4}
 ```
 
-### Lambda Precedence and Parentheses
+### Precedence and Parentheses
 
 The `:=` operator has higher precedence than `=>`, so you must use parentheses when assigning lambdas:
 
@@ -1192,8 +915,6 @@ There is no subtyping relationship between functions with different effects, eve
 
 When you assign different functions conditionally, Verse finds the least upper bound (join) of their types:
 
-**Join with compatible return types**:
-
 ```verse
 base := class{Value:int}
 derived := class(base){Extra:string}
@@ -1206,33 +927,11 @@ G := if(true?) {F1} else {F2}
 G().Value  # Can access base members
 ```
 
-**Cannot join incompatible types**:
-
-```verse
-ReturnInt():int = 1
-ReturnFloat():float = 1.0
-
-# BP VM: ERROR - cannot join int and float
-# Verse VM: Joins to numeric supertype
-Conditional := if(true?) {ReturnInt} else {ReturnFloat}
-```
-
-**Cannot join different parameter types without common subtype**:
-
-```verse
-class_a := class{}
-class_b := class{}
-
-TakeA(X:class_a):int = 1
-TakeB(X:class_b):int = 2
-
-# ERROR: Cannot find common subtype for parameters
-# Joined := if(true?) {TakeA} else {TakeB}
-```
-
 ### Mutable and Optional Functions
 
 Unlike regular variables, function members in classes can be mutable or optional using special syntax:
+
+<!-- TODO REALL? -->
 
 **Mutable function members** (declared without a body):
 
@@ -1269,23 +968,6 @@ System.Trigger("test")  # Uses default
 # Override with custom handler
 System2 := event_system{OnEvent := (E:string) => Print("Custom: {E}")}
 System2.Trigger("test")  # Uses custom
-```
-
-**Mutable optional functions** (both `?` and no body):
-
-```verse
-flexible_system := class:
-    # Mutable and optional
-    Handler?(EventType:string):void
-
-System := flexible_system{Handler := (E:string) => Print(E)}
-
-# Can reassign
-set System.Handler = (E:string) => Print("Changed: {E}")
-
-# Can check existence
-if (H := System.Handler?):
-    H("event")
 ```
 
 ### Overriding Functions in Constructors
@@ -1376,11 +1058,9 @@ Add5 := Partial[Add, 5]
 Add5(3)  # Returns 8
 ```
 
-### Using `type{}` Syntax
+### Using `type{}`
 
 The `type{_(...):...}` syntax declares function types with full detail. This is Verse's primary mechanism for creating precise function type signatures that include parameter types, return types, and effects.
-
-#### Basic Function Type Declarations
 
 The `type{}` construct uses an underscore `_` as a placeholder for the function name, emphasizing that it describes a signature, not a specific function:
 
@@ -1399,26 +1079,13 @@ Process(F:type{_(:int):int}, Value:int):int =
 Process((X:int) => X * 2, 5)  # Returns 10
 ```
 
-#### Important: Function Types Only
-
 The `type{}` construct **exclusively declares function type signatures**. It cannot be used for general type expressions or to extract types from values:
 
 ```verse
-# VALID: Function signatures
 ValidType1 := type{_():int}
 ValidType2 := type{_(:string, :int):float}
 ValidType3 := type{_()<transacts><decides>:void}
-
-# INVALID: Not function signatures (all produce errors)
-# InvalidType1 := type{}                    # ERROR 3544: empty
-# InvalidType2 := type{x:int}               # ERROR 3552: field
-# InvalidType3 := type{1}                   # ERROR 3552: literal
-# InvalidType4 := type{GetValue()}          # ERROR 3502: function call
-# InvalidType5 := type{int}                 # ERROR 3552: type reference
-# InvalidType6 := type{array}               # ERROR 3502: type constructor
 ```
-
-#### Function Declarations Without Bodies
 
 Within `type{}`, function declarations must have return types but **cannot have bodies**:
 
@@ -1433,8 +1100,6 @@ C := class:
 ```
 
 This restriction ensures that `type{}` describes signatures, not implementations.
-
-#### Function Types as Class Members
 
 Function types work as field types in classes:
 
@@ -1452,8 +1117,6 @@ Multiplier := calculator{Operation := Multiply}
 Adder.Operation(5, 3)      # Returns 8
 Multiplier.Operation(5, 3) # Returns 15
 ```
-
-#### Function Types as Local Variables
 
 Function types can be used for local variables, enabling conditional function selection:
 
@@ -1474,8 +1137,6 @@ SelectFunction(true)   # Returns 10
 SelectFunction(false)  # Returns 20
 ```
 
-#### Optional Function Types
-
 Combine `type{}` with `?` to create optional function types:
 
 ```verse
@@ -1489,26 +1150,6 @@ Process(Handler:?type{_():int}):int =
 Process(false)                   # Returns -1 (no handler)
 Process(option{CustomHandler})   # Returns 42 (custom handler)
 ```
-
-#### Mutable Function Variables
-
-Function variables can be mutable, allowing runtime reassignment:
-
-```verse
-ModeA():int = 1
-ModeB():int = 2
-
-RunWithModes():int =
-    var CurrentMode:type{_():int} = ModeA
-    Result1 := CurrentMode()     # Calls ModeA, returns 1
-
-    set CurrentMode = ModeB
-    Result2 := CurrentMode()     # Calls ModeB, returns 2
-
-    Result1 + Result2            # Returns 3
-```
-
-#### Arrays of Functions
 
 Create arrays of functions sharing the same signature:
 
@@ -1525,8 +1166,6 @@ SumFunctions(Functions:[]type{_():int}):int =
 
 SumFunctions(array{GetZero, GetOne, GetTwo})  # Returns 3
 ```
-
-#### Effect Specifications in Function Types
 
 Function types can include effect specifications, ensuring type safety with effects:
 
