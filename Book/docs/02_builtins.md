@@ -1513,7 +1513,7 @@ using { /Verse.org/VerseCLR }
 F():void={
 -->
 ```verse
-ExampleArray : []int = array{10, 20, 30, 40, 50}
+ExampleArray : []int = array{10, 20, 30}
 for (Index := 0..ExampleArray.Length - 1):
     if (Element := ExampleArray[Index]):
         Print("{Element} in ExampleArray at index {Index}")
@@ -1522,14 +1522,12 @@ for (Index := 0..ExampleArray.Length - 1):
 }
 -->
 
-which produces  
+produces  
 
 ```
 10 in ExampleArray at index 0
 20 in ExampleArray at index 1
 30 in ExampleArray at index 2
-40 in ExampleArray at index 3
-50 in ExampleArray at index 4
 ```
 
 Because arrays are values, “changing” them always means replacing the old array with a new one. With `var` this feels natural, since variables can be reassigned. For example, you can concatenate arrays and then update an element:  
@@ -1591,42 +1589,6 @@ Example : [][]int =
 
 produces a triangular array with rows of increasing length: row 0 has none, row 1 has a single `0`, row 2 has `0, 2, 4`, and row 3 has `0, 3, 6, 9`.
 
-**Nested arrays with custom classes:**
-
-Multi-dimensional arrays work with any type, including custom classes. This enables powerful data structures for game boards, spatial grids, and structured data:
-
-<!--verse
-point:=class{X:int,Y:int}
-tile_class:=class{Position:tuple(int,int)}
-F():void={
--->
-```verse
-# Define a point class
-point := class:
-    X:int
-    Y:int
-
-# Create a grid of point objects
-Grid:[][]point =
-    for (Row := 0..2):
-        for (Col := 0..4):
-            point{X := Row, Y := Col}
-
-# Access individual points
-if (TopLeft := Grid[0][0]):
-    Print("Top-left point: ({TopLeft.X}, {TopLeft.Y})")
-    # Prints: "Top-left point: (0, 0)"
-
-if (BottomRight := Grid[2][4]):
-    Print("Bottom-right point: ({BottomRight.X}, {BottomRight.Y})")
-    # Prints: "Bottom-right point: (2, 4)"
-```
-<!--verse
-}
--->
-
-**Using nested arrays as class fields:**
-
 Nested arrays with complex initialization work naturally as class field defaults:
 
 <!--verse
@@ -1670,8 +1632,6 @@ FloatArray : []float = array{}   # Empty array of floats
 
 Without a type annotation, the compiler cannot determine what type of array you want, so you must either provide the type explicitly or include at least one element that establishes the type.
 
-### Type Compatibility and Subtyping
-
 Arrays determine their element type from the common supertype of all elements. When you create an array with values of different but related types, Verse finds the most specific type that encompasses all elements:
 
 ```verse
@@ -1690,11 +1650,9 @@ This applies to any type hierarchy, including interfaces. If you mix completely 
 DisjointArray : []any = array{42, 13.37, true}
 ```
 
-### Tuples and Arrays
+### From Tuples to Arrays
 
-Verse provides automatic conversion between tuples and arrays in specific contexts, enabling flexible function calls while maintaining type safety. This conversion is **one-way**: tuples can become arrays, but arrays cannot become tuples.
-
-#### Direct Assignment
+Verse provides automatic conversion between tuples and arrays in specific contexts, enabling flexible function calls while maintaining type safety. This conversion is *one-way*: tuples can become arrays, but arrays cannot become tuples.
 
 Tuples can be directly assigned to array variables when all tuple elements are compatible with the array's element type:
 
@@ -1711,8 +1669,6 @@ NumberArray.Length = 4
 ```
 
 This conversion creates an array containing all the tuple's elements in order.
-
-#### Calls with Multiple Arguments
 
 When a function has a single array parameter, you can call it with multiple arguments, which automatically form an array:
 
@@ -1742,11 +1698,7 @@ Values := (10, 20, 30)
 Sum[Values]                        # Returns 60
 ```
 
-#### Type Safety Rules
-
-The conversion only succeeds when **all tuple elements are compatible** with the array's element type:
-
-**Valid conversions:**
+Array conversion only succeeds when **all tuple elements are compatible** with the array's element type:
 
 ```verse
 # Homogeneous tuple - all int
@@ -1767,21 +1719,6 @@ E := entity{ID := 2}
 ProcessEntities[P, E]             # Valid - player is subtype of entity
 ```
 
-**Invalid conversions (heterogeneous types):**
-
-```verse
-# Mixed int and float
-F(X:[]int):int = X.Length
-Values := (1, 2.0)
-F[Values]                         # ERROR 3509 - 2.0 is float, not int
-
-# Mixed types even if all numeric
-G(X:[]float):float = X[0]
-G[(1, 2.0)]                       # ERROR 3509 - 1 is int, not float
-```
-
-#### Universal Conversion with `[]any`
-
 Functions taking `[]any` accept **any tuple**, regardless of element types:
 
 ```verse
@@ -1794,8 +1731,6 @@ GetLength[(1, 2.0, "hello")]      # Explicit tuple OK
 ```
 
 This enables generic functions that work with heterogeneous data.
-
-#### Common Supertype Conversion
 
 When tuple elements share a common supertype (via inheritance or interface), they convert to an array of that supertype:
 
@@ -1819,8 +1754,6 @@ ProcessInterfaces[X, Y]           # Returns 2
 ```
 
 The compiler finds the most specific common supertype and uses it for the array element type.
-
-#### Nested Arrays and Optional Arrays
 
 Tuple-to-array conversion works with nested structures:
 
@@ -1854,64 +1787,6 @@ ProcessComplex(Data:tuple([]int, int)):int = Data(0).Length
 
 # First element of tuple becomes array
 ProcessComplex[((1, 2), 3)]       # Valid - (1,2) becomes []int
-```
-
-#### Restrictions: Array to Tuple Conversion
-
-The conversion is **one-way only**. Arrays cannot convert to tuples:
-
-**Invalid: Array cannot assign to tuple:**
-
-```verse
-Array:[]int = array{1, 2}
-Tuple:tuple(int, int) = Array     # ERROR 3509
-```
-
-**Invalid: Array cannot spread into parameters:**
-
-```verse
-F(X:int, Y:int):int = X + Y
-
-Values:[]int = array{1, 2}
-F(Values)                         # ERROR 3509 - cannot spread array
-```
-
-**Why this restriction exists:** Arrays have dynamic length, while tuples have fixed length known at compile time. Converting arrays to tuples would require runtime length checks and could break type safety.
-
-**Workaround using indexing:**
-
-```verse
-F(X:int, Y:int):int = X + Y
-
-Values:[]int = array{1, 2}
-if (X := Values[0], Y := Values[1]):
-    F(X, Y)                       # Valid - explicit indexing
-```
-
-#### Type Compatibility Requirements
-
-For tuple-to-array conversion to succeed, the array element type must be a **supertype of all tuple element types**:
-
-```verse
-# Valid: int is supertype of int
-F(X:[]int):void = {}
-F[1, 2, 3]                        # All elements are int
-
-# Invalid: int is not supertype of float
-F(X:[]int):void = {}
-F[1.0, 2.0]                       # ERROR 3509 - float ≠ int
-
-# Valid: any is supertype of everything
-G(X:[]any):void = {}
-G[1, 2.0, "hello"]                # All types subtype of any
-
-# Valid: Common interface
-interface1 := interface:
-class1 := class(interface1):
-class2 := class(interface1):
-
-H(X:[]interface1):void = {}
-H[class1{}, class2{}]             # Both implement interface1
 ```
 
 ### Array Slicing
@@ -1952,8 +1827,6 @@ Slicing also works on strings and character tuples, returning a string:
 
 Arrays provide intrinsic methods for searching, removing, and replacing elements. These operations create new arrays rather than modifying existing ones, maintaining Verse's immutability guarantees.
 
-#### Find
-
 The `Find()` method searches for the first occurrence of an element and returns its index, or `false` if not found:
 
 ```verse
@@ -1975,16 +1848,12 @@ if (not Numbers.Find[0]):
 
 `Find()` returns an optional (`?int`), enabling safe handling of missing elements without exceptions or special sentinel values.
 
-#### Removing Elements
-
-**RemoveFirstElement()** - Remove first occurrence:
+`RemoveFirstElement()` removes the first occurrence:
 
 ```verse
 # Signature
 Array.RemoveFirstElement[Element:t]<decides>:[]t  # Returns ?[]t
-```
 
-```verse
 Numbers := array{1, 2, 3, 1, 2, 3}
 
 if (Updated := Numbers.RemoveFirstElement[2]):
@@ -1996,14 +1865,12 @@ if (not Numbers.RemoveFirstElement[0]):
     Print("Element not in array")
 ```
 
-**RemoveAllElements()** - Remove all occurrences:
+`RemoveAllElements()` removes all occurrences:
 
 ```verse
 # Signature
 Array.RemoveAllElements[Element:t]:[]t
-```
 
-```verse
 Numbers := array{1, 2, 3, 1, 2, 3}
 Updated := Numbers.RemoveAllElements[2]
 # Updated is array{1, 3, 1, 3}
@@ -2013,14 +1880,12 @@ Same := Numbers.RemoveAllElements[0]
 # Same is array{1, 2, 3, 1, 2, 3}
 ```
 
-**Remove() by index** - Remove element at specific position:
+`Remove()` removes element at specific position:
 
 ```verse
 # Signature
 Array.Remove[Index:int]<decides>:[]t  # Returns ?[]t
-```
 
-```verse
 Numbers := array{10, 20, 30, 40}
 
 if (Updated := Numbers.Remove[1]):
@@ -2033,16 +1898,12 @@ if (not Numbers.Remove[10]):
     # Out of bounds fails
 ```
 
-#### Replacing Elements
-
-**ReplaceFirstElement()** - Replace first occurrence:
+`ReplaceFirstElement()` replace first occurrence:
 
 ```verse
 # Signature
 Array.ReplaceFirstElement[OldValue:t, NewValue:t]<decides>:[]t  # Returns ?[]t
-```
 
-```verse
 Numbers := array{1, 2, 3, 1, 2, 3}
 
 if (Updated := Numbers.ReplaceFirstElement[2, 99]):
@@ -2052,14 +1913,12 @@ if (not Numbers.ReplaceFirstElement[0, 99]):
     # Element not found - returns false
 ```
 
-**ReplaceAllElements()** - Replace all occurrences:
+`ReplaceAllElements()` replace all occurrences:
 
 ```verse
 # Signature
 Array.ReplaceAllElements[OldValue:t, NewValue:t]:[]t
-```
 
-```verse
 Numbers := array{1, 2, 3, 1, 2, 3}
 Updated := Numbers.ReplaceAllElements[2, 99]
 # Updated is array{1, 99, 3, 1, 99, 3}
@@ -2069,14 +1928,12 @@ Same := Numbers.ReplaceAllElements[0, 99]
 # Same is array{1, 2, 3, 1, 2, 3}
 ```
 
-**ReplaceElement()** - Replace at specific index:
+`ReplaceElement()` replaces at specific index:
 
 ```verse
 # Signature
 Array.ReplaceElement[Index:int, NewValue:t]<decides>:[]t  # Returns ?[]t
-```
 
-```verse
 Numbers := array{10, 20, 30, 40}
 
 if (Updated := Numbers.ReplaceElement[1, 99]):
@@ -2089,14 +1946,12 @@ if (not Numbers.ReplaceElement[10, 99]):
     # Out of bounds fails
 ```
 
-**ReplaceAll()** - Pattern-based replacement:
+`ReplaceAll()` is a pattern-based replacement:
 
 ```verse
 # Signature
 Array.ReplaceAll[Pattern:[]t, Replacement:[]t]:[]t
-```
 
-```verse
 Numbers := array{1, 2, 3, 4, 2, 3, 5}
 Pattern := array{2, 3}
 Replacement := array{99}
@@ -2111,16 +1966,12 @@ Updated2 := Numbers2.ReplaceAll[array{2, 2}, array{9, 9, 9}]
 
 `ReplaceAll()` finds contiguous subsequences matching `Pattern` and replaces each with `Replacement`. The replacement can be any length, including empty.
 
-#### Inserting Elements
-
-**Insert()** - Insert element at specific position:
+`Insert()` inserts an element at a specific position:
 
 ```verse
 # Signature
 Array.Insert[Index:int, Element:t]<decides>:[]t  # Returns ?[]t
-```
 
-```verse
 Numbers := array{10, 20, 40}
 
 if (Updated := Numbers.Insert[2, 30]):
@@ -2142,8 +1993,6 @@ if (not Numbers.Insert[-1, 5]):
 if (not Numbers.Insert[Numbers.Length + 1, 5]):
     # Beyond Length fails
 ```
-
-#### Arrays Concatenate
 
 The `Concatenate()` function is a variadic intrinsic that combines any number of arrays into one:
 
@@ -2169,7 +2018,7 @@ Many := Concatenate(array{1}, array{2, 3}, array{4}, array{5, 6})
 # Many is array{1, 2, 3, 4, 5, 6}
 ```
 
-**Empty arrays are handled seamlessly:**
+Empty arrays are handled seamlessly:
 
 ```verse
 # Empty arrays contribute nothing
@@ -2179,8 +2028,6 @@ Result2 := Concatenate(array{}, array{}, array{})       # array{}
 # Can concatenate many empty arrays
 EmptyResult := Concatenate(for (I := 0..100): array{})  # array{}
 ```
-
-**Variadic array input:**
 
 `Concatenate()` shines when combining arrays generated dynamically:
 
@@ -2207,20 +2054,6 @@ Result2 := Concatenate(A1, A2, A3)  # Single operation
 
 # Result1 = Result2 = array{1, 2, 3, 4, 5, 6}
 ```
-
-**Type homogeneity:**
-
-All arrays must have the same element type:
-
-```verse
-# Valid: All arrays are []int
-Numbers := Concatenate(array{1, 2}, array{3}, array{4, 5})
-
-# Invalid: Cannot mix types
-# Mixed := Concatenate(array{1, 2}, array{"three"})  # ERROR
-```
-
-**String concatenation:**
 
 `Concatenate()` also works on strings, joining multiple strings into one:
 
@@ -2359,8 +2192,6 @@ RemoveKeyFromMap(TheMap:[string]int, ToRemove:string):[string]int =
 
 The key type of a map must belong to the class `comparable`, which guarantees that two keys can be checked for equality. All basic scalar types such as `int`, `float`, `rational`, `logic`, `char`, and `char32` are comparable, and so are compound types like arrays, maps, tuples, and `struct`s whose components are comparable. Classes and interfaces cannot be used as keys, since their instances do not provide a built-in notion of equality.
 
-### Comparable Key Types
-
 Not all types can be used as map keys. A type must be comparable—meaning values of that type can be checked for equality. Here's a comprehensive guide to what can and cannot be used as map keys:
 
 **Types that can be used as map keys:**
@@ -2383,13 +2214,10 @@ Not all types can be used as map keys. A type must be comparable—meaning value
 - `type` - type values themselves
 - Function types like `t -> u`
 - `subtype(t)` - subtype expressions
-- `^t` - weak references
 - Regular classes (without `<unique>`)
 - Interfaces
 
 Attempting to use a non-comparable type as a key results in a compile-time error.
-
-### Type Inference and Supertypes
 
 Like arrays, maps infer their key and value types from the common supertype of all keys and values. When you create a map with mixed but related types, Verse finds the most specific types that encompass all keys and all values:
 
@@ -2406,14 +2234,7 @@ Instance3 := class3{}
 MixedKeyMap : [class1]int = map{Instance2 => 1, Instance3 => 2}
 ```
 
-For value types, if you mix unrelated types, the value type becomes `any`:
-
-```verse
-# Value type is any - unrelated value types
-MixedValueMap : [string]any = map{"int" => 42, "float" => 3.14}
-```
-
-### Map Ordering and Equality
+### Ordering and Equality
 
 Maps preserve insertion order, which is significant for both iteration and equality checks. When you insert entries into a map, they maintain the order of insertion. Two maps are equal only if they contain the same key–value pairs **in the same order**:
 
@@ -2440,7 +2261,7 @@ Map := map{0 => "zero", 1 => "one", 0 => "ZERO", 2 => "two"}
 
 Iteration over the map will visit entries in their preserved insertion order.
 
-### Empty Maps and Type Inference
+### Empty Map Types
 
 Empty maps can infer their key and value types from context, similar to arrays:
 
@@ -2453,7 +2274,7 @@ set Scores = ConcatenateMaps(Scores, map{"Alice" => 100})
 
 Without type context, you may need to provide explicit type annotations.
 
-### Map Variance
+### Variance
 
 Maps exhibit different variance behavior for keys and values. A map type `[K1]V1` is a subtype of `[K2]V2` when:
 
@@ -2492,21 +2313,6 @@ set Map[Key2] = 1      # Succeeds - exact type match
 # set Map[Key1] = 2    # ERROR - cannot use supertype as key
 ```
 
-### Floating-Point Keys
-
-When using `float` values as keys, be aware of special cases in floating-point equality:
-
-- Positive and negative zero (`0.0` and `-0.0`) are treated as equal, so they map to the same key
-- `NaN` (not-a-number) compares equal to itself in map contexts, unlike standard float comparison
-
-```verse
-Map1 := map{0.0 => "zero", -0.0 => "negative zero"}
-# Second entry overwrites first - both zeros are the same key
-
-Map2 := map{NaN => "first", NaN => "second"}
-# Second entry overwrites first - NaN equals NaN in maps
-```
-
 ### Nested Maps
 
 Maps can contain other maps as values, enabling multi-level associations:
@@ -2523,9 +2329,9 @@ if (InnerMap := NestedMap["numbers"]):
         # Value is "one"
 ```
 
-Maps as keys are currently not fully supported, though the type system allows declaring them.
+Maps as keys are currently not supported.
 
-### Concatenating Maps: ConcatenateMaps()
+### Concatenating Maps
 
 The `ConcatenateMaps()` function merges multiple maps into a single map, similar to how `Concatenate()` combines arrays:
 
@@ -2535,8 +2341,6 @@ ConcatenateMaps(Maps:[]map(k,v)...):map(k,v)
 ```
 
 `ConcatenateMaps()` is variadic—it accepts any number of maps and combines them into one. When maps contain duplicate keys, values from **later** maps override values from earlier ones:
-
-**Basic usage:**
 
 ```verse
 Map1 := map{1 => "one", 2 => "two"}
@@ -2577,75 +2381,6 @@ Empty := ConcatenateMaps(map{}, map{}, map{})  # map{}
 Single := ConcatenateMaps(map{1 => "one"})  # map{1 => "one"}
 ```
 
-**Practical applications:**
-
-```verse
-# Configuration merging with cascading overrides
-default_config := class:
-    DefaultSettings:map(string, int) = map{
-        "volume" => 50,
-        "brightness" => 75,
-        "difficulty" => 1
-    }
-
-    UserSettings:map(string, int) = map{}
-
-    SessionSettings:map(string, int) = map{}
-
-    # Merge with priority: Default < User < Session
-    GetEffectiveSettings():map(string, int) =
-        ConcatenateMaps(DefaultSettings, UserSettings, SessionSettings)
-
-Config := default_config{}
-set Config.UserSettings = map{"volume" => 80}  # User preference
-set Config.SessionSettings = map{"brightness" => 100}  # Session override
-
-FinalSettings := Config.GetEffectiveSettings()
-# FinalSettings is map{"volume" => 80, "brightness" => 100, "difficulty" => 1}
-```
-
-```verse
-# Merging data from multiple sources
-player_stats := class:
-    BaseStats:map(string, int)
-    BonusStats:map(string, int)
-    TemporaryStats:map(string, int)
-
-    TotalStats():map(string, int) =
-        ConcatenateMaps(BaseStats, BonusStats, TemporaryStats)
-
-Player := player_stats{
-    BaseStats := map{"strength" => 10, "agility" => 8},
-    BonusStats := map{"strength" => 5, "intelligence" => 3},
-    TemporaryStats := map{"agility" => 2}
-}
-
-Stats := Player.TotalStats()
-# Stats is map{"strength" => 15, "agility" => 10, "intelligence" => 3}
-# strength was overridden (10 -> 15), agility was overridden (8 -> 10)
-```
-
-```verse
-# Building maps incrementally
-BuildResourceMap(Levels:[]int):map(string, int) =
-    LevelMaps := for (Level : Levels):
-        map{
-            "level_{ToString(Level)}_wood" => Level * 10,
-            "level_{ToString(Level)}_stone" => Level * 5
-        }
-    ConcatenateMaps(LevelMaps)
-
-Resources := BuildResourceMap(array{1, 2, 3})
-# Resources is map{
-#     "level_1_wood" => 10,
-#     "level_1_stone" => 5,
-#     "level_2_wood" => 20,
-#     "level_2_stone" => 10,
-#     "level_3_wood" => 30,
-#     "level_3_stone" => 15
-# }
-```
-
 **Type constraints:**
 
 All maps must have the same key and value types:
@@ -2663,31 +2398,9 @@ Combined := ConcatenateMaps(M1, M2)  # OK
 # )  # ERROR: Type mismatch
 ```
 
-**Comparison with manual merging:**
-
-```verse
-# Manual approach
-Map1 := map{1 => "a", 2 => "b"}
-Map2 := map{2 => "updated", 3 => "c"}
-var Manual := Map1
-for (Key->Value : Map2):
-    set Manual[Key] = Value
-# Manual is map{1 => "a", 2 => "updated", 3 => "c"}
-
-# Using ConcatenateMaps
-Auto := ConcatenateMaps(Map1, Map2)
-# Auto is map{1 => "a", 2 => "updated", 3 => "c"}
-
-# Results are identical, but ConcatenateMaps is more concise
-```
-
-The variadic nature of `ConcatenateMaps()` makes it ideal for configuration systems, data aggregation, and any scenario where multiple maps need to be merged with clear precedence rules.
-
-### Weak Maps
+## Weak Maps
 
 The `weak_map` type is a specialized supertype of `map` designed for persistent data storage with weak key references. It behaves similarly to ordinary maps for individual entry access, but deliberately restricts bulk operations. You cannot ask for its length, you cannot iterate over its entries, and you cannot use `ConcatenateMaps`. These restrictions enable efficient weak reference semantics and integration with Verse's persistence system.
-
-#### Basic Usage
 
 A `weak_map` is declared with `weak_map(k,v)` and can be initialized from an ordinary `map{}`. Updating and accessing individual entries works the same way as regular maps:
 
@@ -2708,7 +2421,7 @@ set MyWeakMap = map{0 => 2}   # reassignment still works (for local variables)
 
 Because `weak_map` is a supertype of `map`, you can assign regular maps to weak_map variables when needed, but you lose the ability to count or iterate once you are working with a weak map.
 
-#### Restrictions
+### Restrictions
 
 **No Length Property (Error 3506):**
 
@@ -2742,7 +2455,7 @@ var MyWeakMap:weak_map(int,int) = map{1 => 2}
 # Result:[int]int = if (true?) then MyWeakMap else map{3 => 4}
 ```
 
-#### Module-Scoped weak_map Variables
+### Module-Scoped weak_map Variables
 
 When using `weak_map` as a module-scoped variable (for persistent data), there are additional critical restrictions:
 
@@ -2788,8 +2501,6 @@ SetPlayerScore(Player:player, Score:int):void =
 
 This restriction exists because module-scoped weak_maps integrate with the persistence system, which only tracks individual entry updates, not complete map replacements.
 
-#### Type Requirements for Module-Scoped Variables
-
 For module-scoped `var weak_map` variables, both key and value types have strict requirements:
 
 **Key Type Must Have `<module_scoped_var_weak_map_key>` Specifier (Error 3502):**
@@ -2832,7 +2543,7 @@ Common key types that satisfy the requirements:
 - **`persistent_key`** - Custom persistent keys with validity tracking
 - **`session_key`** - Transient keys that don't persist across sessions
 
-#### Covariance
+### Covariance
 
 The `weak_map` type is **covariant** in its key type, meaning you can use a weak_map with a subclass key type where a parent class key type is expected:
 
@@ -2862,7 +2573,7 @@ RegularMap:[derived_class]value_struct = map{DerivedKey => value_struct{}}
 WeakMap:weak_map(base_class, value_struct) = RegularMap
 ```
 
-#### Partial Field Updates
+### Partial Field Updates
 
 When the value type is a struct or class, you can update individual fields of stored values:
 
@@ -2881,7 +2592,7 @@ UpdatePlayerLevel(Player:player, NewLevel:int):void =
     set PlayerData[Player].Level = NewLevel + 1
 ```
 
-#### Transaction and Rollback Semantics
+### Transaction and Rollback Semantics
 
 Like all mutable state in Verse, `weak_map` updates participate in transaction semantics. If a `<decides>` expression fails, all changes are rolled back:
 
@@ -2901,7 +2612,7 @@ AttemptUpdate():void =
 
 This applies to complete map replacements (for local variables), individual entries, and partial field updates.
 
-#### Island Limits
+### Island Limits
 
 There is a **limit on the number of persistent `weak_map` variables** per island. In the standard environment, this limit is 4 persistent weak_maps. Exceeding this limit produces error 3502:
 
@@ -2927,27 +2638,6 @@ var Map2:weak_map(key_class, int) = map{}       # Counts (2/4)
 var Map3:weak_map(key_class, int) = map{}       # Counts (3/4)
 var Map4:weak_map(key_class, value_class) = map{}  # Doesn't count (class value)
 ```
-
-#### Integration with Persistence System
-
-The `weak_map(player, t)` type is the primary mechanism for storing persistent player data in Verse. When used at module scope, these maps automatically integrate with the game's save system:
-
-```verse
-player_stats := struct<persistable>:
-    Level:int
-    Experience:int
-
-# Automatically persisted across game sessions
-var PlayerStats:weak_map(player, player_stats) = map{}
-
-UpdatePlayerStats(Player:player, XP:int):void =
-    if (Stats := PlayerStats[Player]):
-        set PlayerStats[Player].Experience = Stats.Experience + XP
-    else:
-        set PlayerStats[Player] = player_stats{Level := 1, Experience := XP}
-```
-
-For more details on persistent data, see the Persistable Types chapter.
 
 ## type
 
