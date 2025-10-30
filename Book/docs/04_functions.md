@@ -2,8 +2,6 @@
 
 Functions are reusable code blocks that perform actions and produce outputs based on inputs. Think of them as abstractions for behaviors, much like ordering food from a menu at a restaurant. When you order, you tell the waiter what you want from the menu, such as `OrderFood("Ramen")`. You don't need to know how the kitchen prepares your dish, but you expect to receive food after ordering. This abstraction is what makes functions powerful - you define the instructions once and reuse them in different contexts throughout your code.
 
-Verse takes a distinctive approach to functions by supporting three programming paradigms simultaneously: functional programming, imperative programming, and logic programming. This multi-paradigm approach makes functions particularly versatile.
-
 <!-- TODO: We say "logic" a lot but we currently don't have it. Should that be toned down?  My current idea is to have some subsection early on that will explain the difference between MaxVerse and ShipVerse. -->
 
 ## Parameters and Arguments
@@ -15,7 +13,7 @@ ProcessData(Name:string, Age:int, Score:float):string =
     "{Name} is {Age} years old with a score of {Score}"
 ```
 
-For functions with many parameters or optional configuration, Verse supports named and default parameters. These are covered in detail in [Named and Default Parameters](#named-and-default-parameters) below.
+For functions with many parameters or optional configuration, Verse supports named and default parameters. These are covered next.
 
 ## Named and Default Parameters
 
@@ -54,9 +52,7 @@ Log("Warning", ?Level := 2)  # Returns "[Level 2] Warning (white)"
 Log("Error", ?Color := "red", ?Level := 3)  # Returns "[Level 3] Error (red)"
 ```
 
-When declaring functions with named parameters, several rules ensure consistency:
-
-**Once named, always named**: When you introduce a named parameter, all subsequent parameters must also be named:
+When you introduce a named parameter, all subsequent parameters must also be named:
 
 ```verse
 # Valid: positional followed by named
@@ -66,25 +62,16 @@ Process(Required:int, ?Optional:string):void = {}
 # Invalid(? Named:int, Positional:string):void = {}  # ERROR
 ```
 
-**No `?` in function body**: Named parameters are referenced without the `?` prefix inside the function:
-
-```verse
-Calculate(?Amount:float, ?Rate:float):float =
-    Amount * Rate  # Not ?Amount * ?Rate
-```
-
-**No duplicate names**: Parameter names must be unique within a function:
+Parameter names must be unique within a function:
 
 ```verse
 # Invalid: duplicate parameter name
 # Duplicate(?Value:int, ?Value:int):void = {}  # ERROR
 ```
 
-### Calling with Named Arguments
+When calling functions with named parameters, you must use the `?Name:=Value` syntax.
 
-When calling functions with named parameters, you must use the `?Name:=Value` syntax:
-
-**Required named parameters must be specified**:
+Required named parameters must be specified:
 
 ```verse
 Format(?Text:string, ?Width:int):string =
@@ -97,19 +84,7 @@ Format(?Text := "Hello", ?Width := 10)
 # Format(?Text := "Hello")  # ERROR: missing ?Width
 ```
 
-**Named arguments must match parameter names**:
-
-```verse
-Connect(?Host:string, ?Port:int):void = {}
-
-# Correct
-Connect(?Host := "localhost", ?Port := 8080)
-
-# Wrong name
-# Connect(?Server := "localhost", ?Port := 8080)  # ERROR
-```
-
-**Positional arguments must come first**:
+Positional arguments must come first:
 
 ```verse
 Configure(Required:int, ?Option1:string, ?Option2:bool):void = {}
@@ -121,7 +96,7 @@ Configure(42, ?Option1 := "test", ?Option2 := true)
 # Configure(?Option1 := "test", 42, ?Option2 := true)  # ERROR
 ```
 
-**Named arguments can appear in any order**:
+Named arguments can appear in any order:
 
 ```verse
 Setup(?Width:int, ?Height:int, ?Depth:int):void = {}
@@ -132,43 +107,9 @@ Setup(?Depth := 30, ?Width := 10, ?Height := 20)
 Setup(?Height := 20, ?Depth := 30, ?Width := 10)
 ```
 
-**Cannot specify the same argument twice**:
-
-```verse
-# Invalid: duplicate named argument
-# Setup(?Width := 10, ?Height := 20, ?Width := 15)  # ERROR
-```
-
-### Default Parameter Values
-
-Default values make parameters truly optional by providing a value when none is supplied:
-
-**Syntax**: Defaults are specified with `= value` after the type:
-
-```verse
-CreateWindow(?Title:string = "Untitled", ?Width:int = 800, ?Height:int = 600):window =
-    # Implementation
-```
-
-**Calling with defaults**: Omit any parameter to use its default:
-
-```verse
-# Use all defaults
-CreateWindow()
-
-# Override some defaults
-CreateWindow(?Title := "My Window")
-
-# Override in any combination
-CreateWindow(?Width := 1920, ?Height := 1080)
-CreateWindow(?Height := 1080, ?Title := "Game")
-```
-
-### Default Value Scoping
-
 Default values are evaluated in the function's defining scope, not at the call site. This allows defaults to reference:
 
-**Module-level definitions**:
+Module-level definitions:
 
 ```verse
 DefaultTimeout:int = 30
@@ -177,7 +118,7 @@ Connect(?Host:string, ?Timeout:int = DefaultTimeout):void =
     # Uses DefaultTimeout from module scope
 ```
 
-**Class or interface members**:
+Class or interface members:
 
 ```verse
 game_config := class:
@@ -190,7 +131,7 @@ Player := game_config{}
 Player.StartGame()  # Uses DefaultLives value (3)
 ```
 
-**Earlier parameters in the same function**:
+Earlier parameters in the same function:
 
 ```verse
 CreateRange(?Start:int, ?End:int = Start + 10):[]int =
@@ -200,7 +141,7 @@ CreateRange(?Start:int, ?End:int = Start + 10):[]int =
 CreateRange(?Start := 5)  # Creates range from 5 to 15
 ```
 
-**Expressions and function calls**:
+Pure expressions:
 
 ```verse
 GetDefaultSize()<computes>:int = 100
@@ -214,8 +155,6 @@ Configure(?Name:string = "default",
           ?Items:[]int = array{1, 2, 3},
           ?Map:[int]string = map{0 => "zero"}):void = {}
 ```
-
-### Default Values with Inheritance
 
 Default values work with overridden members in class hierarchies:
 
@@ -236,11 +175,11 @@ FastInstance := fast_game{}
 FastInstance.Move()  # Uses 2.0 (overridden value)
 ```
 
-### Type System Interactions
+### Interactons with Types
 
-Named and default parameters interact with Verse's type system (see [Types](07_types.md)) in specific ways:
+Named and default parameters interact with the type system in the following specific ways:
 
-**Subtyping with defaults**: A function with default parameters is a subtype of the same function without those parameters:
+A function with default parameters is a subtype of the same function without those parameters:
 
 ```verse
 ProcessData(?Required:int, ?Optional:int = 0):int =
@@ -260,7 +199,7 @@ F3:type{_():int} = DefaultAll
 F3()  # Returns 3
 ```
 
-**Parameter names must match**: Function types preserve named parameter names:
+Function types preserve named parameter names:
 
 ```verse
 Calculate(?Amount:float, ?Rate:float):float = Amount * Rate
@@ -272,7 +211,7 @@ F1:type{_(?Amount:float, ?Rate:float):float} = Calculate
 # F2:type{_(?Value:float, ?Factor:float):float} = Calculate  # ERROR
 ```
 
-**Defaults are not part of the type**: The type signature doesn't include default values:
+Function types do not include default values:
 
 ```verse
 F1(?X:int = 1):int = X
@@ -283,8 +222,6 @@ Type1:type{_(?X:int):int} = F1
 Type1 = F2  # Valid - same type
 ```
 
-### Overload Resolution
-
 Named parameters participate in function overload resolution:
 
 ```verse
@@ -292,53 +229,37 @@ Process(Value:int):string = "One parameter"
 Process(Value:int, ?Option:string):string = "Two parameters"
 Process(Value:int, ?Option1:string, ?Option2:bool):string = "Three parameters"
 
-Process(42)                                    # Calls first overload
-Process(42, ?Option := "test")                 # Calls second overload
+Process(42)                                        # Calls first overload
+Process(42, ?Option := "test")                     # Calls second overload
 Process(42, ?Option1 := "test", ?Option2 := true)  # Calls third overload
 ```
 
 The compiler selects the overload that matches the provided arguments. Named parameters make overload resolution more precise since names must match exactly.
 
-#### Named Parameter Distinctness
+Named parameters have specific rules for *overload distinctness* that differ from positional parameters. Two function signatures are considered **indistinct** (cannot overload) if they could be called with the same arguments.
 
-Named parameters have specific rules for overload distinctness that differ from positional parameters. Two function signatures are considered **indistinct** (cannot overload) if they could be called with the same arguments.
-
-**Parameter order doesn't matter for named parameters:**
-
-Named parameters are matched by name, not position, so reordering doesn't create distinctness:
+**Order doesn't matter for named parameters:** Named parameters are matched by name, not position, so reordering doesn't create distinctness:
 
 ```verse
-# ERROR 3532: Not distinct - same parameters, different order
+# Not distinct - same parameters, different order
 # F(?Y:int, ?X:int):int = X + Y
 # F(?X:int, ?Y:int):int = X - Y  # ERROR
 ```
 
-**Defaults don't create distinctness:**
-
-The presence or absence of default values doesn't make signatures distinct if the parameter names are the same:
+**Defaults don't create distinctness:** The presence or absence of default values doesn't make signatures distinct if the parameter names are the same:
 
 ```verse
-# ERROR 3532: Same parameter name with/without default
+# Same parameter name with/without default
 # F(?X:int=42):int = X
 # F(?X:int):int = X  # ERROR
-
-# ERROR 3532: Different defaults don't help
-# F(?X:int=42):int = X
-# F(?X:int=100):int = X  # ERROR
 ```
 
-**The all-defaults rule:**
-
-If all parameters in both overloads have default values, the signatures are indistinct because both can be called with no arguments:
+**The all-defaults rule:** If all parameters in both overloads have default values, the signatures are indistinct because both can be called with no arguments:
 
 ```verse
 # ERROR 3532: Both can be called as F()
 # F(?X:int=42):int = X
 # F(?Y:int=42):int = Y  # ERROR
-
-# ERROR 3532: Even with multiple parameters
-# F(?X:int=1, ?Y:int=2):int = X + Y
-# F(?A:int=3, ?B:int=4):int = A + B  # ERROR
 ```
 
 This applies even if the parameter types differ:
@@ -349,55 +270,31 @@ This applies even if the parameter types differ:
 # F(?X:float=3.14):float = X  # ERROR
 ```
 
-**Different parameter names ARE distinct:**
-
-Functions with completely different named parameter names can overload:
+**Different parameter names are distinct:** Functions with different named parameter names can overload:
 
 ```verse
 # Valid: Different names
 F(?X:int):int = X
 F(?Y:int):int = Y  # OK - distinct parameter names
-
-# Valid: Different type and name
-F(?X:int):int = X
-F(?Y:comparable):comparable = Y  # OK
 ```
 
-**Named vs positional parameters are distinct:**
-
-A named parameter is distinct from a positional parameter, even with the same name and type:
+**Named vs positional parameters are distinct:** A named parameter is distinct from a positional parameter, even with the same name and type:
 
 ```verse
 # Valid: Named vs positional
 F(?X:int):int = X
 F(X:int):int = X  # OK
-
-# Valid: Even with defaults
-F(?X:int=42):int = X
-F(X:int):int = X  # OK
 ```
 
-**At least one required parameter must differ:**
-
-If the set of required (no default) named parameters differs, the overloads are distinct:
+**At least one required parameter must differ:** If the set of required (no default) named parameters differs, the overloads are distinct:
 
 ```verse
 # Valid: First requires ?Y, second doesn't
 F(?Y:int, ?X:int=42):int = X
 F(?X:int):int = X  # OK - different required parameter set
-
-# Valid: Completely different required parameters
-F(?Y:int, ?Z:int=42):int = Y
-F(?X:int):int = X  # OK
-
-# ERROR 3532: Same required parameters
-# F(?Y:int, ?X:int=42):int = X
-# F(?Y:int, ?X:int):int = X  # ERROR - ?Y required in both
 ```
 
-**Positional parameters create distinctness:**
-
-Different positional parameter types make signatures distinct, even if named parameters are the same:
+**Positional parameters create distinctness:** Different positional parameter types make signatures distinct, even if named parameters are the same:
 
 ```verse
 # Valid: Different positional parameter types
@@ -405,18 +302,12 @@ F(Arg:float, ?X:int):int = X
 F(Arg:int, ?X:int):int = X  # OK
 ```
 
-**Superset of calls:**
-
-If one signature can handle all the calls that another can, they're indistinct:
+**Superset of calls:** If one signature can handle all the calls that another can, they're indistinct:
 
 ```verse
 # ERROR 3532: First can handle all calls to second
 # F(?Y:int=42, ?X:int=42):int = X
 # F(?X:int):int = X  # ERROR - can call first as F(?X := 10)
-
-# ERROR 3532: Same parameter names with/without defaults
-# F(?Y:int=42, ?X:int):int = X + Y
-# F(?X:int, ?Y:int):int = X - Y  # ERROR
 ```
 
 ### First-Class Functions
@@ -427,12 +318,6 @@ Functions with named parameters can be stored in variables and passed as argumen
 Compute(Base:int, ?Multiplier:int = 2, ?Offset:int = 0):int =
     Base * Multiplier + Offset
 
-# Store in variable
-MyCompute := Compute
-
-# Call through variable
-MyCompute(10, ?Multiplier := 3, ?Offset := 5)  # Returns 35
-
 # Pass as parameter
 ApplyFunction(F(?Base:int, ?Multiplier:int, ?Offset:int):int, Value:int):int =
     F(?Base := Value, ?Multiplier := 2, ?Offset := 10)
@@ -440,7 +325,7 @@ ApplyFunction(F(?Base:int, ?Multiplier:int, ?Offset:int):int, Value:int):int =
 ApplyFunction(Compute, 5)  # Returns 20 (5 * 2 + 10)
 ```
 
-### Tuple Arguments and Named Parameters
+### Tuple as Arguments
 
 Tuples can be used to provide positional arguments. However, you cannot mix a pre-constructed tuple variable with additional named arguments:
 
@@ -457,10 +342,6 @@ Calculate(1, 2, ?C := 5)  # Returns 8
 # Invalid: cannot mix tuple variable with named arguments
 # Calculate(Args, ?C := 5)  # ERROR
 ```
-
-Named parameters **can** appear inside tuple parameter structures when destructuring—see [Named Parameters in Tuple Destructuring](#named-parameters-in-tuple-destructuring) below for details.
-
-### Tuple Parameter Destructuring
 
 Functions can destructure tuple parameters directly in the parameter list, allowing you to extract tuple elements inline without manual indexing:
 
@@ -712,44 +593,6 @@ GetConstant(())   # Explicit empty tuple
 GetConstant()     # No arguments - automatically creates empty tuple
 ```
 
-### Named Parameters with Effects
-
-Named and default parameters work with all function effects (see [Effects](10_effects.md) for details on effect specifiers):
-
-```verse
-# Failable function with default parameters
-Validate(Value:int, ?Min:int = 0, ?Max:int = 100)<decides>:int =
-    Value >= Min
-    Value <= Max
-    Value
-
-# Async function with default timeout
-WaitForEvent(?Timeout:float = 5.0)<suspends>:void =
-    # Implementation
-
-# Calling with named parameters
-if (Result := Validate[42, ?Max := 50]):
-    # Validation succeeded
-
-spawn:
-    WaitForEvent(?Timeout := 10.0)
-```
-
-**With parametric types**:
-
-```verse
-FindFirst(Items:[]t, ?Default:t where t:type)<decides>:t =
-    if (First := Items[0]):
-        First
-    else if (Default?):
-        Default?
-    else:
-        false
-
-FindFirst[array{1, 2, 3}]           # Returns option{1}
-FindFirst[array{}, ?Default := 42]  # Returns option{42}
-```
-
 ### Evaluation Order
 
 Arguments are evaluated in a specific order to maintain predictable behavior:
@@ -761,7 +604,6 @@ Arguments are evaluated in a specific order to maintain predictable behavior:
 If named arguments appear in a different order than parameters, the compiler uses temporary variables to preserve the evaluation order you specified:
 
 ```verse
-# Parameters are: A, B, C, D
 Process(A:int, ?B:int, ?C:int, ?D:int):string =
     "{A}, {B}, {C}, {D}"
 
