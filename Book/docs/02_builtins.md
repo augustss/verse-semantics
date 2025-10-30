@@ -3,11 +3,9 @@
 Verse provides a rich set of built-in types that cover the full spectrum of programming needs. The numeric types `int`, `float`, and `rational` handle mathematical operations, counters, and measurements. The `logic` type represents boolean values for conditions and flags. Text is handled through `char`, `char32`, and `string` types for character data, player names, and messages. Container types like arrays, maps, optionals, and tuples manage collections and structured data. Two special types, `any` and `void`, serve unique roles in the type hierarchy as the supertype of all types and the empty type respectively.
 Let's explore each built-in type in detail, starting with the numeric types that form the backbone of game logic.
 
-## Intrinsic Functions
+## Intrinsics
 
-Verse includes **intrinsic functions**—built-in operations provided directly by the runtime that cannot be implemented in pure Verse code. These functions receive special compiler treatment and form the foundation for many language features. Understanding intrinsics helps you work effectively with Verse's built-in capabilities and understand their unique constraints.
-
-Intrinsic functions are special because they:
+*intrinsic functions* are built-in operations provided directly by the runtime that cannot be implemented in pure Verse code. These functions receive special compiler treatment and form the foundation for many language features. Intrinsic functions are special because they:
 
 - **Implemented by the runtime**: Written in C++ or other native code, not Verse
 - **Cannot be replicated in Verse**: Require access to runtime internals or low-level operations
@@ -15,7 +13,7 @@ Intrinsic functions are special because they:
 
 Examples include mathematical operations like `Abs()`, collection methods like `Find()`, and type conversions like `ToString()`.
 
-Most intrinsic functions **cannot be referenced as first-class values**. This means you can call them directly, but you cannot store them in variables or pass them as function arguments:
+Most intrinsic functions *cannot be referenced as first-class values*. This means you can call them directly, but you cannot store them in variables or pass them as function arguments:
 
 ```verse
 Result := Abs(-42)  # Returns 42
@@ -28,30 +26,6 @@ Result := Abs(-42)  # Returns 42
 ```
 
 This restriction exists because intrinsics often require special calling conventions or optimizations that don't fit the standard function model. If you need to pass intrinsic functionality around, wrap it in a lambda or regular function.
-
-Intrinsic functions fall into several categories:
-
-**Mathematical operations:**
-
-- Absolute value, rounding, trigonometry
-- Example: `Abs(X)`
-
-**Collection operations:**
-
-- Searching, slicing, concatenating
-- Example: `Array.Find(Element)`
-
-**Type conversions:**
-
-- Converting between types
-- Example: `ToString(Value)`
-
-**Runtime queries:**
-
-- Asking questions about values at runtime
-- Example: `GetSecondsSinceEpoch()`
-
-The following sections document each built-in type and its associated intrinsic operations.
 
 ## Integers
 
@@ -290,18 +264,14 @@ if (NumberOfQuivers := Floor(Coins / CoinsPerQuiver)):
 
 ## Floats
 
-The `float` type represents all non-integer numerical values. It can hold large values and precise fractions.
-
-The float type is used for storing and handling floating point numbers, such as `1.0`, `-50.5`, and `3.14159`. A float is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range `[-2^1024 + 1, … , 0, … , 2^1024 - 1]`, or has the value `NaN` (Not a Number).
-
-The implementation for float differs from the IEEE standard in the following ways:
+The `float` type represents all non-integer numerical values. It can hold large values and precise fractions, such as `1.0`, `-50.5`, and `3.14159`. A float is an IEEE 64-bit float, which means it can contain a positive or negative number that has a decimal point in the range `[-2^1024 + 1, … , 0, … , 2^1024 - 1]`, or has the value `NaN` (Not a Number). The implementation differs from the IEEE standard in the following ways:
 
 - There is only one `NaN` value.
--`NaN` is equal to itself.
-- Every number is equal to itself. If two numbers are equal, then no pure code can observe the difference between them.
+- `NaN` is equal to itself.
+- Every number is equal to itself.
 - `0` cannot be negative.
 
-You can include predefined float values within your code as float literals:
+You can include float values within your code as literals:
 
 <!--verse
 F()<transacts><decides>:void={
@@ -321,9 +291,7 @@ C = 0                 # compile error; 0 is not a `float` literal
 }
 -->
 
-You can use the four basic math operations with floats: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division.
-
-There are also combined operators for doing the basic math operations (addition, subtraction, multiplication, and division), and updating the value of a variable:
+You can use the four basic math operations with floats: `+` for addition, `-` for subtraction, `*` for multiplication, and `/` for division. There are also combined operators for doing the basic math operations (addition, subtraction, multiplication, and division), and updating the value of a variable:
 
 <!--verse
 F()<transacts>:void={
@@ -344,8 +312,6 @@ To convert an `int` to a `float`, multiply it by `1.0`: `MyFloat := MyInt * 1.0`
 
 Verse provides intrinsic mathematical functions for common numerical operations. These functions are optimized by the runtime and work with both `int` and `float` types.
 
-### Abs()
-
 The `Abs()` function returns the absolute value of a number—its distance from zero without regard to sign:
 
 ```verse
@@ -361,17 +327,6 @@ Abs(0)    # Returns 0
 Abs(3.14) # Returns 3.14
 ```
 
-Floating-point numbers have two representations of zero: positive zero (+0.0) and negative zero (-0.0). `Abs()` normalizes both to positive zero:
-
-```verse
-PositiveZero := Abs(0.0)   # +0.0
-NormalizedZero := Abs(-0.0) # Also +0.0 (negative zero converted)
-```
-
-This ensures consistent behavior when zero values are used in comparisons or as map keys.
-
-### Min and Max
-
 The `Min()` and `Max()` functions return the minimum or maximum of two values:
 
 ```verse
@@ -380,11 +335,7 @@ Min(A:int, B:int):int
 Min(A:float, B:float):float
 Max(A:int, B:int):int
 Max(A:float, B:float):float
-```
 
-**Special float values:**
-
-```verse
 # NaN propagates through comparison
 Max(NaN, 5.0)   # Returns NaN
 Min(NaN, 5.0)   # Returns NaN
@@ -396,8 +347,6 @@ Min(-Inf, 100.0)   # Returns -Inf
 Max(-Inf, -Inf)    # Returns -Inf
 Min(Inf, Inf)      # Returns Inf
 ```
-
-### Rounding
 
 Verse provides multiple rounding functions that convert floats to integers with different rounding strategies:
 
@@ -424,7 +373,7 @@ Round(1.6)    # Returns 2 (no tie, rounds up)
 
 The "round to nearest even" strategy (also called banker's rounding) avoids bias when rounding many tie values.
 
-### Sqrt and Pow
+Some additional mathematical functions:
 
 ```verse
 # Signature
@@ -436,9 +385,7 @@ Sqrt(-1.0)    # Returns NaN
 # Special values
 Sqrt(Inf)     # Returns Inf
 Sqrt(NaN)     # Returns NaN
-```
 
-```verse
 # Signature
 Pow(Base:float, Exponent:float):float
 
@@ -452,8 +399,6 @@ Pow(0.0, 0.0)     # Returns 1.0 (by convention)
 Pow(NaN, 0.0)     # Returns 1.0 (0 exponent always 1)
 Pow(1.0, NaN)     # Returns 1.0 (1 to any power is 1)
 ```
-
-### Exp and Ln
 
 ```verse
 Exp(X:float):float
@@ -493,8 +438,6 @@ Log(10.0, 100.0)   # Returns 2.0 (log₁₀(100) = 2)
 Log(2.0, 8.0)      # Returns 3.0 (log₂(8) = 3)
 Log(2.0, 2.0)      # Returns 1.0 (logₙ(n) = 1)
 ```
-
-### Sin, Cos, Tan
 
 Verse provides standard trigonometric functions operating on radians:
 
@@ -553,9 +496,7 @@ ArcTan(1.0, -1.0)    # Returns 3π/4 (135 degrees)
 ArcTan(-1.0, -1.0)   # Returns -3π/4 (-135 degrees)
 ```
 
-### Hyperbolic Functions
-
-Hyperbolic functions are analogs of trigonometric functions for hyperbolas:
+Hyperbolic functions are analogs of trigonometric functions for hyperbolas. They are useful in physics simulations, catenary curves, and certain mathematical models.
 
 ```verse
 # Signatures
@@ -592,21 +533,13 @@ ArCosh(Inf)   # Returns Inf
 ArCosh(-1.0)  # Returns NaN (domain error)
 ```
 
-Hyperbolic functions are useful in physics simulations, catenary curves, and certain mathematical models.
-
-### Mod and Quotient
-
-For integer division with remainder, Verse provides `Mod` and `Quotient`:
+For integer division with remainder, Verse provides `Mod` and `Quotient`. Both functions are failable—they fail when the divisor is zero.
 
 ```verse
 # Signatures
 Mod(Dividend:int, Divisor:int)<decides>:int
 Quotient(Dividend:int, Divisor:int)<decides>:int
-```
 
-Both functions are failable—they fail when the divisor is zero.
-
-```verse
 # Positive operands
 Mod[15, 4]      # Returns 3
 Quotient[15, 4] # Returns 3
@@ -639,19 +572,13 @@ The sign of the result follows specific rules:
 - `Mod` result has the same sign as the divisor (Euclidean division)
 - `Quotient` adjusts accordingly to maintain the identity
 
-### Utility Functions
-
-**Sgn - Sign function:**
+There are also some utility functions:
 
 ```verse
 # Signatures
 Sgn(X:int):int
 Sgn(X:float):float
-```
 
-Returns -1, 0, or 1 depending on the sign:
-
-```verse
 Sgn(10)       # Returns 1
 Sgn(0)        # Returns 0
 Sgn(-5)       # Returns -1
@@ -666,16 +593,12 @@ Sgn(-Inf)     # Returns -1.0
 Sgn(NaN)      # Returns NaN
 ```
 
-**Lerp - Linear interpolation:**
+Lerp interpolates between two values:
 
 ```verse
 # Signature
 Lerp(From:float, To:float, Parameter:float):float
-```
 
-Interpolates between two values:
-
-```verse
 Lerp(0.0, 10.0, 0.0)    # Returns 0.0 (0% = From)
 Lerp(0.0, 10.0, 0.5)    # Returns 5.0 (50%)
 Lerp(0.0, 10.0, 1.0)    # Returns 10.0 (100% = To)
@@ -688,16 +611,12 @@ Lerp(-10.0, 10.0, 0.5)  # Returns 0.0
 
 The formula is: `From + Parameter * (To - From)`
 
-**IsFinite - Check if float is finite:**
+`IsFinite` checks if a float is finite and returns `true` if the value is not NaN, Inf, or -Inf:
 
 ```verse
 # Method on float values
 X.IsFinite():logic
-```
 
-Returns `true` if the value is not NaN, Inf, or -Inf:
-
-```verse
 (5.0).IsFinite[]      # Returns true
 (0.0).IsFinite[]      # Returns true
 (-100.0).IsFinite[]   # Returns true
@@ -714,59 +633,14 @@ SafeCalculation(X:float, Y:float)<decides>:float =
     Result
 ```
 
-### Mathematical Constants
-
 Verse provides constants for common mathematical values:
 
-**PiFloat - The constant π:**
-
 ```verse
-PiFloat    # 3.14159265358979323846...
-```
-
-Use for angle calculations and circular mathematics:
-
-```verse
-# Convert degrees to radians
-DegreesToRadians(Degrees:float):float =
-    Degrees * PiFloat / 180.0
-
-# Convert radians to degrees
-RadiansToDegrees(Radians:float):float =
-    Radians * 180.0 / PiFloat
-
-# Circle circumference
-Circumference := 2.0 * PiFloat * Radius
-```
-
-**Infinity and NaN:**
-
-```verse
+PiFloat # 3.14159265358979323846...
 Inf     # Positive infinity
 -Inf    # Negative infinity (negation of Inf)
 NaN     # Not a Number
 ```
-
-These special float values represent mathematical edge cases:
-
-```verse
-# Infinity represents unbounded values
-1.0 / 0.0    # Produces Inf
--1.0 / 0.0   # Produces -Inf
-
-# NaN represents undefined results
-0.0 / 0.0    # Produces NaN
-Sqrt(-1.0)   # Produces NaN
-
-# Check for special values
-IsSpecial(X:float):logic =
-    not X.IsFinite[]
-
-# NaN comparisons
-NaN = NaN    # True (in Verse; differs from IEEE-754)
-```
-
-Remember that in Verse, `NaN = NaN` returns `true` (unlike standard IEEE-754), and there is only one `NaN` value.
 
 ## Booleans
 
@@ -791,9 +665,7 @@ false?            # fails
 -->
 
 The `logic` type only supports query operations and comparison operations.
-
 Query expressions use the query operator `?` to check if a logic value is true and fail if the logic value is `false`.
-
 For comparison operations, use the failable operator `=` to test if two logic values are the same, and `<>` to test for inequality.
 
 Many programming languages find it idiomatic to use a type like `logic` to signal the success or failure of an operation. In Verse, we use success and failure instead for that purpose, whenever possible. The conditional only executes the `then` branch if the guard succeeds:
@@ -829,9 +701,7 @@ not GotIt?                                        # and this fails too
 
 ## Characters and Strings
 
-Text is represented in terms of characters and strings.  
-
-A `char` is a single **UTF-8 code unit** (not a full Unicode code point). A string is therefore an array of characters, written as `[]char`. For convenience, the type alias `string` is provided for `[]char`:  
+Text is represented in terms of characters and strings.   A `char` is a single **UTF-8 code unit** (not a full Unicode code point). A string is therefore an array of characters, written as `[]char`. For convenience, the type alias `string` is provided for `[]char`:  
 
 <!--verse
 F():void={
@@ -994,9 +864,7 @@ Brace := '\{'
 }
 -->  
 
-Strings can be compared using the failable operators `=` (equality) and `<>` (inequality). Comparison is done by code point, and is case sensitive.  
-
-Equality depends on exact code unit sequences, not visual appearance. Unicode allows multiple encodings for the same abstract character. For example, `"é"` may appear as the single code point `{0u00E9}`, or as the two-code-point sequence `"e"` (`{0u0065}`) plus a combining accent (`{0u0301}`). These two strings look the same, but they are not equal in Verse.  
+Strings can be compared using the failable operators `=` (equality) and `<>` (inequality). Comparison is done by code point, and is case sensitive.  Equality depends on exact code unit sequences, not visual appearance. Unicode allows multiple encodings for the same abstract character. For example, `"é"` may appear as the single code point `{0u00E9}`, or as the two-code-point sequence `"e"` (`{0u0065}`) plus a combining accent (`{0u0301}`). These two strings look the same, but they are not equal in Verse.  
 
 Checking whether a player has selected the correct item:  
 
@@ -1036,13 +904,6 @@ else:
 }
 -->
 
-Certain characters have special meaning inside strings and must be escaped:
-
-- `{` and `}` are used for interpolation and code points, so literal braces must be written as `"\{\}"`.
-- All the escape sequences listed in the table above work in strings.
-
-**String interpolation details:**
-
 String interpolation supports complex expressions, not just simple variables:
 
 <!--verse
@@ -1061,8 +922,6 @@ Formatted := "Distance: {Format(Distance, ?Decimals:=2)}"
 }
 -->
 
-**Multi-line strings:**
-
 Strings can span multiple lines using interpolation braces for continuation:
 
 <!--verse
@@ -1079,8 +938,6 @@ LongMessage := "This is a multi-line{
 
 Empty interpolants `{}` are ignored, which is useful for line continuation without adding content.
 
-**String-array equivalence:**
-
 Since `string` is `[]char`, strings and character arrays can be compared:
 
 <!--verse
@@ -1094,8 +951,6 @@ F()<decides>:void={
 }
 -->
 
-**Comments in strings:**
-
 Block comments within strings are removed during parsing:
 
 <!--verse
@@ -1107,10 +962,6 @@ Text := "abc<#this comment is removed#>def"    # Same as "abcdef"
 <!--verse
 }
 -->
-
-## Type Conversions
-
-Verse provides intrinsic functions for converting values between types, essential for formatting output, debugging, and interfacing with external systems.
 
 ### ToString()
 
@@ -1253,11 +1104,11 @@ Json := ObjectToJson(Root)
 # Serialization handles recursion (exact behavior VM-dependent)
 ```
 
-While `ObjectToJson()` is highly flexible, it has constraints:
+`ObjectToJson` has constraints:
 
 - Output format is not guaranteed to be identical across VM implementations
 - Some types (functions, type values) serialize as metadata rather than executable representations
-- The function produces JSON strings—parsing them back into Verse objects requires separate deserialization logic (not provided as a built-in intrinsic)
+- The function produces JSON strings—parsing them back into Verse objects requires separate deserialization logic
 - Circular references are handled, but exact output depends on VM implementation
 
 ### Type-Aware JSON Serialization
@@ -1271,17 +1122,11 @@ These functions enable:
 - Integration with JSON-based configuration systems
 - Dynamic type handling and registration
 
-**Importing the module:**
-
-```verse
-using { /Verse.org/Persona }
-```
-
-**ToJson - Schema Generation:**
-
 `ToJson[Type]` generates a JSON Schema string describing the structure of a Verse type:
 
 ```verse
+using { /Verse.org/Persona }
+
 player_data := struct:
     Name:string
     Score:int
@@ -1293,8 +1138,6 @@ Schema := ToJson[player_data]
 ```
 
 The generated schema follows JSON Schema conventions with properties, types, and required fields.
-
-**FromJson - Deserialization:**
 
 `FromJson[JsonString, Type]` deserializes JSON data into a Verse value, validating against the type structure:
 
@@ -1313,8 +1156,6 @@ BadJson := "{\"Name\":\"Bob\"}"
 if (not FromJson[BadJson, player_data]):
     # Deserialization fails - returns false
 ```
-
-**Supported Types:**
 
 Different Verse types serialize with different JSON representations:
 
@@ -1484,15 +1325,6 @@ These types return `false` from `ToJson` and `FromJson`:
 - **Recursive types** (types referencing themselves)
 - **String types** (not supported)
 - **Types with internal-only fields**
-
-```verse
-iface := interface:
-    GetValue():int
-
-# Cannot serialize
-if (not ToJson[iface]):
-    # Interfaces have no schema
-```
 
 **Multiple Type Schemas:**
 
@@ -1828,8 +1660,6 @@ if (CenterTile := Board.GetTile[5, 5]):
 ```
 <!--verse
 -->
-
-### Array Type Inference
 
 When you create an empty array with `array{}`, Verse infers the element type from the variable's type annotation:
 
@@ -2626,6 +2456,7 @@ Without type context, you may need to provide explicit type annotations.
 ### Map Variance
 
 Maps exhibit different variance behavior for keys and values. A map type `[K1]V1` is a subtype of `[K2]V2` when:
+
 - **Keys are contravariant**: `K2` is a subtype of `K1` (more general keys → more specific keys)
 - **Values are covariant**: `V1` is a subtype of `V2` (more specific values → more general values)
 
