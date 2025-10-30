@@ -2,9 +2,11 @@
 
 This documentation provides an in-depth look at the Verse programming language, its philosophy, and core concepts.
 
+Verse is a multi-paradigm programming language developed by Epic Games, drawing from functional, logic, and imperative traditions to create a coherent system for building metaverse experiences.
+
 ## Philosophy
 
-Verse is a *functional logic* programming language with three core principles:
+Verse has three core principles:
 
 - **It's just code** - Complex concepts are expressed as primitive Verse constructs
 - **Just one language** - Same constructs for compile-time and run-time
@@ -40,14 +42,6 @@ Verse is a *functional logic* programming language with three core principles:
 - [Concurrency](11_concurrency.md) - Structured concurrency with sync, race, rush, branch, and spawn
 - [Live Variables](12_live_variables.md) - Reactive values that automatically update
 - [Modules and Paths](13_modules.md) - Code organization and the global namespace
-
-### Specialized Topics
-
 - [Access Specifiers](14_access.md) - Public, private, and protected visibility
 - [Persistable Types](15_persistable.md) - Types that can be saved and loaded
 - [Code Evolution](16_evolution.md) - Versioning and backward compatibility
-
-### Language Reference
-
-- [Grammar Features](16_grammar.md) - Language grammar and syntax
-- [Concept Index](concept_index.md) - Comprehensive index of all language concepts with links
