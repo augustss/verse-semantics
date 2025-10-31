@@ -93,11 +93,9 @@ Message:string = "Your score: {Score}"  # Implicit ToString() call
 }
 -->
 
-## The `any` Type
+## Type `any`
 
 At the apex of Verse's type hierarchy sits `any`, the universal supertype that can hold a value of any type. Every type in Verse is a subtype of `any`, making it the most permissive type in the system. While this flexibility is powerful, it comes with significant trade-offs in type safety and capabilities.
-
-### Understanding `any`
 
 The `any` type serves as an escape hatch when you genuinely need to work with values of unknown or varying types. When you assign a value to an `any` variable, the value retains its runtime type information, but you lose compile-time knowledge of what operations are valid:
 
@@ -119,22 +117,15 @@ Value4:any = player{Name := "Alice"}
 
 Once a value is typed as `any`, you've effectively told the compiler "I don't know what this is," and the compiler responds by preventing most operations. This is by design—without knowing the actual type, the compiler cannot verify that operations are safe.
 
-### Explicit Coercion to `any`
-
 You can explicitly coerce any value to `any` using function call syntax:
 
 ```verse
 # Explicit coercion
 IntValue:int = 42
 AnyValue:any = any(IntValue)
-
-# Also works in expressions
-ProcessValue(any(array{1, 2, 3}))
 ```
 
 This explicit form makes it clear when you're intentionally widening a type to `any`, though assignment to an `any` variable performs this coercion implicitly.
-
-### Implicit Coercion to `any`
 
 Verse automatically coerces values to `any` in several contexts where types would otherwise be incompatible. Understanding these rules is crucial for working effectively with heterogeneous data.
 
@@ -158,8 +149,7 @@ MixedMap := map{0 => "zero", 1 => 1, 2 => 2.0}
 
 ConfigMap:[string]any = map{
     "count" => 42,
-    "name" => "Player",
-    "active" => true
+    "name" => "Player"
 }
 ```
 
@@ -211,42 +201,10 @@ AnyTuple:tuple(any, any) = SpecificTuple
 
 These implicit coercions make working with heterogeneous data more ergonomic, automatically widening types when necessary.
 
-### Limitations of `any`
-
 The `any` type has important restrictions that reflect its role as a truly generic container:
 
-**Not comparable**: You cannot use equality operators with `any`:
-
-<!--NoCompile-->
-```verse
-# Error: any is not comparable
-Value1:any = 42
-Value2:any = 42
-Value1 = Value2  # Compilation error
-```
-
-This restriction exists because equality comparison requires knowing the actual types being compared. Without type information, the compiler cannot generate correct comparison code.
-
-**Cannot be a map key**: Because `any` is not comparable, it cannot be used as a map key type:
-
-<!--NoCompile-->
-```verse
-# Error: any cannot be a map key
-BadMap:[any]int = map{}  # Compilation error
-```
-
-Map operations require key comparison to determine if a key already exists, which is impossible without comparability.
-
-**Limited operations**: Besides assignment and passing to functions, `any` values support very few operations directly. You cannot:
-
-- Perform arithmetic or logical operations
-- Access fields or methods
-- Index into collections
-- Call as a function
-
-To perform any meaningful operations on an `any` value, you must first narrow it to a more specific type through casting or pattern matching.
-
-### Working with `any`
+- *Not comparable*: You cannot use equality operators with `any`
+- *Cannot be a map key*: Because `any` is not comparable, it cannot be used as a map key type
 
 Despite its limitations, `any` serves important purposes:
 
@@ -294,8 +252,6 @@ When using `any`, prefer to narrow back to specific types as quickly as possible
 
 Verse provides two distinct casting mechanisms for classes and interfaces: fallible casts for runtime type checking, and infallible casts for compile-time verified conversions. Understanding when and how to use each is essential for working with inheritance hierarchies and polymorphic code.
 
-### Fallible Casts: Runtime Type Checking
-
 Fallible casts use square bracket syntax `TargetType[value]` to perform runtime type checks. These casts return an optional value (`?TargetType`), succeeding only if the value is actually of the target type or a subtype:
 
 ```verse
@@ -341,8 +297,6 @@ if (E := entity[P]):
     E = P  # True - same instance
 ```
 
-### Fallible Cast Restrictions
-
 Fallible casts work **only with class and interface types**. You cannot dynamically cast from or to primitive types, structs, arrays, or other value types:
 
 <!--NoCompile-->
@@ -363,9 +317,7 @@ Value := (?int)[component{}]   # class to option - not allowed
 
 The restriction exists because fallible casts rely on runtime type information that only classes and interfaces maintain. Value types like integers and structs don't have runtime type tags.
 
-### Infallible Casts: Compile-Time Verification
-
-Infallible casts use parenthesis syntax `TargetType(value)` for conversions that the compiler can verify will always succeed. These casts require the source type to be a compile-time subtype of the target type:
+**Infallible** casts use parenthesis syntax `TargetType(value)` for conversions that the compiler can verify will always succeed. These casts require the source type to be a compile-time subtype of the target type:
 
 ```verse
 # Upcasting: always safe, always succeeds
@@ -373,18 +325,7 @@ Base:component = physics_component{Velocity := 10.0}
 BaseAgain:component = component(physics_component{Velocity := 5.0})
 ```
 
-Infallible casts never fail at runtime because the type relationship is verified at compile time. If the compiler cannot prove the cast will succeed, it produces a compilation error:
-
-<!--NoCompile-->
-```verse
-# Error: cannot cast parent to child (not a subtype)
-Derived := physics_component(component{})  # Compilation error
-
-# Error: unrelated types
-Other := render_component(physics_component{})  # Compilation error
-```
-
-**Casting to `void`**: Any type can be infallibly cast to `void`, which discards the value:
+Any type can be infallibly cast to `void`, which discards the value:
 
 ```verse
 void(42)           # Discard an integer
@@ -393,45 +334,6 @@ void(component{})  # Discard an object
 ```
 
 This is occasionally useful when you need to call a function for its side effects but want to explicitly ignore its return value.
-
-### When to Use Each Cast Type
-
-Use **fallible casts** when:
-
-- You need to test if a value is of a specific type at runtime
-- Working with polymorphic collections where elements might be different types
-- Implementing type-specific behavior based on actual runtime types
-- Building systems with dynamic type dispatch
-
-```verse
-# Process different component types differently
-for (Comp : AllComponents):
-    if (Physics := physics_component[Comp]):
-        UpdatePhysics(Physics)
-    else if (Render := render_component[Comp]):
-        UpdateRendering(Render)
-```
-
-Use **infallible casts** when:
-
-- Explicitly documenting an upcast in the type hierarchy
-- Converting a value to a less specific type for API compatibility
-- Making type relationships explicit in the code
-
-```verse
-# Make the upcast explicit for clarity
-StoreComponent(component(physics_component{}))
-
-# Interface implementation
-drawable := interface<castable>:
-    Draw():void
-
-sprite := class(drawable):
-    Draw<override>():void = Print("Drawing sprite")
-
-# Explicit upcast to interface
-DrawableObject:drawable = drawable(sprite{})
-```
 
 ### Dynamic Type-Based Casting
 
@@ -480,37 +382,6 @@ for (Comp : Components):
 ```
 
 This bridges compile-time type safety with runtime flexibility, allowing type decisions to be made based on program state while maintaining type correctness.
-
-### Casting Best Practices
-
-When working with casts:
-
-**Prefer static types**: Use specific types when possible rather than casting from generic types. This catches errors at compile time.
-
-**Use type hierarchies carefully**: Design class hierarchies so that you rarely need to downcast. Frequent downcasting often indicates a design issue.
-
-**Check before casting**: When using fallible casts, always handle the failure case:
-
-```verse
-if (Specific := specific_type[value]):
-    # Success path
-    UseSpecific(Specific)
-else:
-    # Failure path - value wasn't the expected type
-    HandleUnexpectedType()
-```
-
-**Document cast rationale**: When casts are necessary, comment why they're safe or what invariant ensures they'll succeed:
-
-```verse
-# Safe cast: this function only called with physics components
-ProcessPhysics(Comp:component):void =
-    if (Physics := physics_component[Comp]):
-        # Invariant: caller guarantees this is a physics component
-        UpdateVelocity(Physics)
-```
-
-Casting is a powerful feature but represents a departure from compile-time verification. Use it judiciously and with clear understanding of the runtime type relationships in your code.
 
 ## Where Clauses
 
@@ -571,73 +442,9 @@ MapFunction(F:type{_(a):b}, Container:[]a where a:type, b:type):[]b =
         F(Element)
 ```
 
-<!--  THIS DON'T WORK  ... sadly
-
-Verse's type inference works with where clauses to deduce type parameters:
-
-```verse
-# Type parameters can often be inferred
-AutoProcess(Items:[]t where t:subtype(comparable)):void =
-    for (Item : Items):
-        Print("Item: {Item}")
-
-# Called without explicit type arguments
-MyInts:[]int = array{1, 2, 3}
-AutoProcess(MyInts)  # t is inferred as int
-
-# Explicit type arguments when needed
-AutoProcess([]nat)(MyNaturals)  # Explicitly specify t as nat
-```
-
-<!-- ### Practical Applications
-
-Where clauses are essential for writing reusable, type-safe code:
-
-```verse
-# Generic sorting with comparison constraint
-Sort(Items:[]t where t:subtype(comparable)):[]t =
-    # Implementation can use < and > because t is comparable
-    var Sorted:[]t = array{}
-    for (Item : Items):
-        set Sorted = InsertInOrder(Sorted, Item)
-    Sorted
-
-# Generic caching with hashable constraint
-cache(key_type, value_type where key_type:subtype(hashable)) := class:
-    Storage:[key_type]value_type = map{}
-
-    Get(Key:key_type):?value_type =
-        if (Value := Storage[Key]):
-            option{Value}
-        else:
-            false
-
-    Put(Key:key_type, Value:value_type):void =
-        set Storage[Key] = Value
-
-# Builder pattern with type safety
-builder(t where t:type) := class:
-    var Current:?t = false
-
-    With(Modifier:type{_(t):t}):builder(t) =
-        if (C := Current?):
-            set Current = option{Modifier(C)}
-        self
-
-    Build()<decides>:t =
-        Current?
-```
-
-Where clauses thus provide the foundation for Verse's generic programming capabilities, allowing you to write code that is both highly reusable and completely type-safe. They enable you to express precise requirements about types while maintaining the flexibility to work with any types that meet those requirements.
--->
-
--->
-
-## Refinement Types: Value-Level Constraints
+## Refinement Types
 
 While `where` clauses constrain type parameters in generic code, **refinement types** use `where` to constrain the *values* a type can hold. This creates subtypes that only accept values satisfying specific conditions, enabling domain-specific constraints enforced by the type system.
-
-### Basic Syntax
 
 A refinement type defines a constrained subtype using value predicates:
 
@@ -663,8 +470,6 @@ TypeName := type{_Variable:BaseType where Constraint1, Constraint2, ...}
 - `BaseType` is `int` or `float`
 - Constraints are comparison expressions using `<=`, `<`, `>=`, `>`, or `=`
 
-### Integer Refinement Types
-
 Integer refinements restrict int values to specific ranges:
 
 ```verse
@@ -684,8 +489,6 @@ Count:positive_int = 42
 small_int := type{_X:int where _X < 100}
 ```
 
-### Float Refinement Types
-
 Float refinements handle continuous ranges with IEEE 754 semantics:
 
 ```verse
@@ -699,7 +502,7 @@ positive := type{_X:float where _X > 0.0}
 celsius := type{_X:float where _X >= -273.15}
 ```
 
-**Finite Floats (Excluding Infinity):**
+Finite Floats (Excluding Infinity):
 
 ```verse
 # Finite values only (no ±Inf)
@@ -711,21 +514,6 @@ MinFinite:finite = -1.7976931348623157e+308
 
 # Invalid: infinities excluded
 # Infinite:finite = Inf  # Fails constraint
-```
-
-**Infinity Types:**
-
-```verse
-# Only positive infinity
-infinity_type := type{_X:float where 1.7976931348623157e+308 < _X}
-
-PosInf:infinity_type = Inf  # Valid
-# Finite:infinity_type = 100.0  # Fails: not infinite
-
-# Only negative infinity
-neg_infinity := type{_X:float where -1.7976931348623157e+308 > _X}
-
-NegInf:neg_infinity = -Inf  # Valid
 ```
 
 ### IEEE 754 Edge Cases
@@ -831,7 +619,7 @@ Since `NaN` comparisons are always false, such constraints would be meaningless.
 - Integer literals: `0`, `42`, `-100` (for int refinements)
 - Special float values: `Inf`, `-Inf`
 
-### Runtime Checking with Fallible Casts
+### Fallible Casts
 
 Refinement types are checked at assignment and through fallible casts:
 
@@ -853,7 +641,7 @@ else:
 
 The cast `percent[UserInput]` returns `?percent`—succeeding if the value satisfies the constraint, failing otherwise.
 
-### Using Refinement Types in Functions
+### Examples
 
 Refinement types work as parameter and return types:
 
@@ -1062,11 +850,9 @@ There is currently no way to make a regular class comparable by writing a custom
 
 <!--TODO the above is right, right? It seems like a major limitation. People will invent their own solutions. -->
 
-## Generators: Lazy Sequences
+## Generators
 
 Generators represent lazy sequences that produce values on demand rather than storing all elements in memory. Unlike arrays which materialize all elements upfront, generators compute each value only when requested during iteration. This makes them memory-efficient for large or infinite sequences, and essential for scenarios where you're processing streaming data or expensive computations.
-
-### Basic Syntax and Type
 
 Generators use the parametric type `generator(t)` where `t` is the element type:
 
@@ -1081,7 +867,7 @@ entity := class:
 EntityStream:generator(entity) = GetAllEntities()
 ```
 
-**Important syntax restrictions:**
+Syntax restrictions:
 
 ```verse
 # Correct: Use parentheses
@@ -1114,7 +900,7 @@ Constrained types work as element types:
 PositiveInts:generator(type{X:int where X > 0, X < 10}) = GetConstrainedSequence()
 ```
 
-### Using Generators in For Loops
+### For Loops
 
 The primary way to consume generators is through `for` expressions:
 
@@ -1164,50 +950,7 @@ FilteredSum()<transacts>:float =
     Total
 ```
 
-### Generators as Function Parameters and Returns
-
-Generators are first-class types and can be used anywhere types appear:
-
-**As parameters:**
-
-```verse
-SumSequence(Values:generator(float)):float =
-    var Total:float = 0.0
-    for (Value : Values):
-        set Total += Value
-    Total
-
-Result := SumSequence(GetFloatSequence())
-```
-
-**As return values:**
-
-```verse
-MakeSequence()<transacts>:generator(int) =
-    GetIntegerSequence()
-
-# Use returned generator
-for (Item : MakeSequence()):
-    ProcessItem(Item)
-```
-
-**As class fields:**
-
-```verse
-stream_processor := class:
-    Source:generator(int)
-
-    Process():int =
-        var Product:int = 1
-        for (Value : Source):
-            set Product *= Value
-        Product
-
-Processor := stream_processor{Source := GetIntegerSequence()}
-Result := Processor.Process()
-```
-
-### Type Conversion and Restrictions
+### Restrictions
 
 Generators have strict type conversion rules to maintain safety:
 
@@ -1246,7 +989,7 @@ Numbers := GeneratorToArray(GetIntegerSequence())
 # Numbers is now array{1, 2, 3, 4}
 ```
 
-### Generator Covariance with Class Hierarchies
+### Covariance
 
 Generators are **covariant** in their element type when the element type has subtyping relationships:
 
@@ -1278,7 +1021,7 @@ ProcessAnimals(Animals:generator(animal)):void =
 ProcessAnimals(GetDogSequence())  # OK due to covariance
 ```
 
-### Type Joining with Generators
+### Type Joining
 
 When conditionally selecting between generators, Verse finds the least common supertype:
 
@@ -1302,76 +1045,6 @@ GetStream(UseFirst:logic):generator(base) =
 ```
 
 Similar to effect joining, the compiler computes the least upper bound (join) of the generator element types.
-
-### Parametric Functions with Generators
-
-Generators work naturally with parametric functions:
-
-```verse
-# Generic function accepting any generator
-GetFirstValue(Seq:generator(t) where t:type)<decides>:t =
-    for (Value : Seq):
-        return Value
-    false?  # Fails if sequence is empty
-
-# Works with any element type
-FirstInt := GetFirstValue[GetIntegerSequence()]?
-FirstFloat := GetFirstValue[GetFloatSequence()]?
-FirstEntity := GetFirstValue[GetEntitySequence()]?
-```
-
-### Optional Generators
-
-Generators can be optional, allowing you to represent "maybe a sequence":
-
-```verse
-# Optional generator
-MaybeGetSequence()<decides>:?generator(int) =
-    if (SomeCondition?):
-        option{GetIntegerSequence()}
-    else:
-        false
-
-# Check if sequence exists
-if (Seq := MaybeGetSequence[]):
-    for (Item : Seq?):
-        ProcessItem(Item)
-```
-
-### Mutable Generator Variables
-
-Generator variables can be mutable, allowing you to swap between different sequences:
-
-```verse
-ProcessDynamicStream()<transacts>:void =
-    var CurrentStream:generator(float) = GetFloatSequence()
-
-    # Process first sequence
-    SumSequence(CurrentStream)
-
-    # Switch to different sequence
-    set CurrentStream = GetAnotherFloatSequence()
-
-    # Process second sequence
-    SumSequence(CurrentStream)
-```
-
-### Generators in Parametric Types
-
-Generators can be used as type arguments to other parametric types:
-
-```verse
-# Wrapper class parameterized over generator
-stream_wrapper(element_type:type) := class:
-    Source:generator(element_type)
-
-    Process():[]element_type =
-        for (Item : Source):
-            Item
-
-IntWrapper := stream_wrapper(int){Source := GetIntegerSequence()}
-IntArray := IntWrapper.Process()
-```
 
 ### Design Patterns and Best Practices
 
@@ -1481,35 +1154,6 @@ GenericValue:any = Seq  # OK - upcast to any
 # Recovered:generator(int) = any[GenericValue]  # ERROR 3509
 ```
 
-**Version gating:**
-
-Generators were introduced in Fortnite version 29.30. Code using generators won't compile for earlier versions:
-
-```verse
-# Requires UploadedAtFNVersion >= 2930
-MyFunction():generator(int) = GetSequence()
-```
-
-### Summary
-
-Generators provide:
-
-- **Memory efficiency**: Process large sequences without materializing them
-- **Lazy evaluation**: Compute values only when needed
-- **Composability**: Chain operations naturally with `for` expressions
-- **Type safety**: Covariant in element type with strict conversion rules
-- **Integration**: First-class types usable anywhere types appear
-
-Key rules to remember:
-
-- Syntax: `generator(element_type)` with parentheses
-- Primary usage: `for (Item : Generator)`
-- Covariant in element type (child generator → parent generator)
-- Cannot convert arrays to generators or vice versa directly
-- Use `for` expressions to materialize generators into arrays
-- Cannot index or randomly access generator elements
-- Most generators are single-use (consumed after iteration)
-
 ## Type Hierarchies
 
 The type system forms a graph rather than a simple tree. This means types can have multiple supertypes, though multiple inheritance is currently limited to interfaces. Understanding these relationships helps you design flexible, reusable code.
@@ -1540,7 +1184,7 @@ ProcessValue(MyInt)  # Works, but loses type information
 
 The `void` type is another universal supertype alongside `any`. **Every type is a subtype of `void`**, meaning `void` accepts all values. This is fundamentally different from `false`, the true empty/bottom type.
 
-### Understanding void as Universal Supertype
+### Understanding void
 
 Unlike `any`, which erases type information, `void` serves as a "discard" type indicating that a value's specific type doesn't matter:
 
@@ -1551,8 +1195,6 @@ Y:void = 3.14            # float → void ✓
 Z:void = "hello"         # string → void ✓
 W:void = array{1, 2}     # []int → void ✓
 ```
-
-**void as return type:**
 
 Functions with `void` return type can return any value, which is then discarded by the type system:
 
@@ -1575,8 +1217,6 @@ MakePair(X:string, Y:string):void = (X, Y)
 MakePair("hello", "world")  # Still creates ("hello", "world")
 ```
 
-**void as parameter type:**
-
 Functions with `void` parameters accept any argument type:
 
 ```verse
@@ -1592,8 +1232,6 @@ Process(X:void, Y:void):int = 100
 Process(42, "hello")     # Different types OK
 ```
 
-**void in class fields:**
-
 Class fields can be typed as `void`, accepting any initialization value:
 
 ```verse
@@ -1603,26 +1241,6 @@ config := class:
 # Can initialize with different type
 Instance := config{Setting := "custom"}
 ```
-
-**void with generic types:**
-
-`void` works in generic contexts as a universal supertype:
-
-```verse
-# Optional void
-X:?int = option{42}
-Y:?void = X              # ?int → ?void ✓
-
-# Array of void
-Numbers:[]int = array{1, 2, 3}
-AnyArray:[]void = Numbers  # []int → []void ✓
-
-# Map to void
-IntMap:[string]int = map{"a" => 1}
-VoidMap:[string]void = IntMap  # [string]int → [string]void ✓
-```
-
-**Function type variance with void:**
 
 In function types, `void` participates in variance:
 
@@ -1744,8 +1362,6 @@ function_type2 := type{_(:int):any}
 
 Type aliases allow you to create alternative names for types, making complex type signatures more readable and maintainable. They're particularly valuable for function types, parametric types, and frequently-used type combinations.
 
-### Basic Syntax
-
 A type alias is created using simple assignment syntax at module scope:
 
 <!--verse
@@ -1765,8 +1381,6 @@ transformer := type{_(:string):int}
 
 Type aliases are compile-time only - they create no runtime overhead and are purely for programmer convenience and code clarity.
 
-### What Type Aliases Are
-
 **Type aliases are alternative names, not new types.** They don't create distinct types like `newtype` in some languages. Values of the alias and the original type are completely interchangeable:
 
 ```verse
@@ -1785,217 +1399,6 @@ ProcessPlayer(GID)      # OK - game_id is also int
 ProcessPlayer(42)       # OK - int literal works too
 ProcessGame(PID)        # OK - player_id is also int
 ```
-
-### Module Scope Requirement
-
-**Type aliases can ONLY be defined at module scope.** They cannot be defined inside classes, functions, or any nested scope:
-
-```verse
-# VALID: Module scope
-coordinate := tuple(float, float)
-
-MyFunction():void =
-    # INVALID: Cannot define in function (ERROR 3502)
-    # local_alias := int
-    {}
-
-my_class := class:
-    # INVALID: Cannot define in class (ERROR 3502)
-    # member_alias := string
-    {}
-```
-
-This restriction ensures type aliases have consistent visibility and prevents scope-dependent type interpretations.
-
-### Forward Reference Restrictions
-
-Type aliases must be defined **before** they are used. Forward references are not allowed:
-
-```verse
-# VALID: Definition before use
-IntArray := []int
-IntMap := [string]IntArray    # OK - IntArray already defined
-
-# INVALID: Forward reference (ERROR 3502)
-# ForwardMap := [string]ForwardArray
-# ForwardArray := []int          # Too late!
-```
-
-This applies to all type constructs that reference aliases:
-
-```verse
-# All require the alias to be defined first
-A := int
-
-B := ?A           # Optional of alias
-C := []A          # Array of alias
-D := [A]string    # Map with alias key
-E := tuple(A, string)  # Tuple with alias
-F := A -> logic   # Function type with alias
-G := type{_(:A):void}  # Function type with alias
-```
-
-### What You Can Alias
-
-Type aliases work with all Verse types:
-
-#### Primitive Types
-
-```verse
-player_health := int
-damage_multiplier := float
-is_active := logic
-display_name := string
-```
-
-#### Optional Types
-
-```verse
-OptionalInt := ?int
-MaybeString := ?string
-
-# Nested optionals
-DoubleOptional := ?OptionalInt
-
-# Can chain: value of type DoubleOptional needs `??` to unwrap
-ProcessDouble(Value:DoubleOptional)<transacts><decides>:int = Value??
-```
-
-**Circular optional references are prohibited:**
-
-```verse
-# INVALID: Circular references (ERROR 3502)
-# O1 := ?O2
-# O2 := ?O1
-```
-
-#### Array and Map Types
-
-```verse
-# Arrays
-IntArray := []int
-StringList := []string
-
-# Maps
-PlayerScores := [string]int
-EntityRegistry := [int]entity
-
-# Using aliases in other aliases
-NestedArray := []IntArray      # Array of arrays
-ScoreMap := [string]PlayerScores  # Map of maps
-```
-
-#### Tuple Types
-
-```verse
-Point2D := tuple(float, float)
-Point3D := tuple(float, float, float)
-NamedPair := tuple(string, int)
-
-ProcessPoint(P:Point2D):float =
-    X := P(0)
-    Y := P(1)
-    X + Y
-```
-
-#### Function Types
-
-```verse
-# Using type{} syntax
-Handler := type{_(:string, :int):void}
-Predicate := type{_(:int)<decides>:logic}
-Generator := type{_()<suspends>:int}
-
-# Using arrow syntax
-Transformer := int -> string
-BiFunction := tuple(int, int) -> float
-
-CallHandler(H:Handler, Name:string, Count:int):void = H(Name, Count)
-```
-
-#### Class, Struct, Enum, and Interface Types
-
-```verse
-player := class:
-    Name:string
-    Health:int
-
-PlayerAlias := player       # Alias a class
-Enemy := player             # Another alias for same class
-
-# Both are interchangeable
-ProcessEntity(E:PlayerAlias):void = {}
-Entity:Enemy = player{Name := "Test", Health := 100}
-ProcessEntity(Entity)       # OK - same underlying type
-```
-
-**Aliases of nominal types work seamlessly:**
-
-```verse
-color := enum{Red, Green, Blue}
-ColorType := color
-
-# Can use enum values from either name
-MyColor:ColorType = color.Red
-OtherColor:color = ColorType.Green
-
-# Values are equal
-MyColor = color.Red          # true
-```
-
-#### Subtype Constraints
-
-```verse
-AnyClass := subtype(class)
-ComparableType := subtype(comparable)
-EntitySubtype := subtype(entity)
-
-AcceptClass(C:AnyClass):void = {}
-AcceptComparable(C:ComparableType):void = {}
-```
-
-### Parametric Type Aliases
-
-Type aliases can be parametric, creating reusable generic type patterns:
-
-```verse
-# Parametric collection aliases
-Pair(t:type) := tuple(t, t)
-Triple(t:type) := tuple(t, t, t)
-Registry(k:type, v:type) := [k]v
-
-# Use with concrete types
-IntPair := Pair(int)
-Point3D := Triple(float)
-PlayerRegistry := Registry(string, player)
-
-# Parametric function type aliases
-Transformer(input:type, output:type) := input -> output
-Predicate(t:type) := t -> logic
-BinaryOp(t:type) := type{_(:t, :t):t}
-
-# Use in function signatures
-Map(Values:[]t, Transform:Transformer(t, u) where t:type, u:type):[]u =
-    for (V : Values):
-        Transform(V)
-
-Filter(Values:[]t, Test:Predicate(t) where t:type):[]t =
-    for (V : Values, Test(V)?):
-        V
-```
-
-**Parametric aliases can have constraints:**
-
-```verse
-ComparablePair(t:subtype(comparable)) := tuple(t, t)
-SortableArray(t:subtype(comparable)) := []t
-
-# Constraint is enforced when using the alias
-Scores:ComparablePair(int) = (100, 200)    # OK - int is comparable
-# Invalid:ComparablePair(player) = ...     # ERROR if player not comparable
-```
-
-### Access Control and Visibility
 
 Type aliases can have access specifiers that control their visibility across modules:
 
@@ -2039,34 +1442,52 @@ PrivateType := class{}
 # Pub8<public> := type{_():PrivateType}  # Function type
 ```
 
-### Restrictions: What Aliases Are NOT
+### Requirement
 
-#### Cannot Be Called as Macros or Functions
-
-Type aliases are names, not executable constructs:
+**Type aliases can ONLY be defined at module scope.** They cannot be defined inside classes, functions, or any nested scope:
 
 ```verse
-OptInt := ?int
+# VALID: Module scope
+coordinate := tuple(float, float)
 
-# INVALID: Cannot call as macro (ERROR 3545)
-# Value := OptInt{}
+MyFunction():void =
+    # INVALID: Cannot define in function (ERROR 3502)
+    # local_alias := int
+    {}
 
-# INVALID: Cannot call as function (ERROR 3552)
-# Result := OptInt(42)
+my_class := class:
+    # INVALID: Cannot define in class (ERROR 3502)
+    # member_alias := string
+    {}
 ```
 
-#### Cannot Have Circular References
+This restriction ensures type aliases have consistent visibility and prevents scope-dependent type interpretations.
+
+Type aliases must be defined **before** they are used. Forward references are not allowed:
 
 ```verse
-# INVALID: Circular optional references (ERROR 3502)
-# A := ?B
-# B := ?A
+# VALID: Definition before use
+IntArray := []int
+IntMap := [string]IntArray    # OK - IntArray already defined
 
-# INVALID: Self-referential (ERROR 3502)
-# C := ?C
+# INVALID: Forward reference (ERROR 3502)
+# ForwardMap := [string]ForwardArray
+# ForwardArray := []int          # Too late!
 ```
 
-#### Cannot Be Used in Type Expressions
+This applies to all type constructs that reference aliases:
+
+```verse
+# All require the alias to be defined first
+A := int
+
+B := ?A           # Optional of alias
+C := []A          # Array of alias
+D := [A]string    # Map with alias key
+E := tuple(A, string)  # Tuple with alias
+F := A -> logic   # Function type with alias
+G := type{_(:A):void}  # Function type with alias
+```
 
 Type aliases are not first-class values:
 
@@ -2078,11 +1499,11 @@ MyInt := int
 # X := MyInt + 1        # Aliases are types, not values
 ```
 
-## Metatypes: subtype, concrete_subtype and castable_subtype
+## Metatypes
 
 Verse provides advanced type constructors that allow you to work with types as values, enabling powerful patterns for runtime polymorphism and generic instantiation. These metatypes—`subtype`, `concrete_subtype`, and `castable_subtype`—bridge the gap between compile-time type safety and runtime flexibility.
 
-### subtype: General Runtime Type Values
+### subtype
 
 The `subtype(T)` type constructor represents runtime type values that are subtypes of `T`. Unlike `concrete_subtype` and `castable_subtype`, which are specialized for classes and interfaces, `subtype(T)` works with **any type** in Verse, including primitives, enums, collections, and function types.
 
@@ -2103,8 +1524,6 @@ C2 := class:
 ```
 
 The key capability of `subtype(T)` is holding type values at runtime while maintaining type safety through the subtype relationship.
-
-**Works with Any Type:**
 
 Unlike the other metatypes, `subtype(T)` accepts any type as its parameter:
 
@@ -2228,7 +1647,7 @@ While `subtype(T)` is flexible, it has important restrictions:
    # D := class { f(subtype:int):void = {} }
    ```
 
-### concrete_subtype: Types as First-Class Values
+### concrete_subtype
 
 The `concrete_subtype(t)` type constructor creates a type that represents concrete (instantiable) subclasses of `t`. A concrete class is one that can be instantiated directly—it has the `<concrete>` specifier and provides default values for all fields:
 
@@ -2262,7 +1681,7 @@ NewEntity := PlayerSpawner.Spawn()  # Creates a player instance
 
 The key feature of `concrete_subtype` is that it ensures the stored type can be instantiated. Without this constraint, you couldn't safely call `EntityType{}` because abstract classes cannot be instantiated.
 
-### Requirements for concrete_subtype
+#### Requirements
 
 A type can be used with `concrete_subtype` only if it's a class or interface type. Additionally, the actual type value assigned must be a concrete class—one marked with `<concrete>` and having all fields with defaults:
 
@@ -2300,7 +1719,7 @@ Instance := EntityType{}
 # Instance := EntityType{Health := 150}
 ```
 
-### castable_subtype: Runtime Type Queries
+### castable_subtype
 
 The `castable_subtype(t)` type constructor represents types that are subtypes of `t` and marked with the `<castable>` specifier. This enables runtime type queries and dynamic casting, which is essential for component systems and polymorphic hierarchies:
 
@@ -2323,11 +1742,9 @@ ProcessComponent(CompType:castable_subtype(component), Comp:component):void =
         # Comp is now known to be of type CompType
 ```
 
-### The final_super Specifier and Runtime Type Queries
+### final_super and Type Queries
 
 The `castable_subtype` works with the `<final_super>` specifier and `GetCastableFinalSuperClass` function to enable sophisticated runtime type queries. This combination provides a powerful mechanism for component systems and polymorphic architectures.
-
-#### The final_super Specifier
 
 The `<final_super>` specifier marks classes as stable anchor points in inheritance hierarchies. These "final super classes" act as canonical representatives for families of related types:
 
@@ -2349,7 +1766,7 @@ soft_body := class(physics_component):
 
 By marking `physics_component` as `<final_super>`, you declare it as the canonical representative for all physics-related components. Even though `rigid_body` and `soft_body` are distinct types, they both belong to the "physics_component family" anchored at `physics_component`.
 
-#### GetCastableFinalSuperClass Function
+#### GetCastableFinalSuperClass
 
 The `GetCastableFinalSuperClass` function queries the type hierarchy to find the `<final_super>` class between a base type and a derived type. Two variants exist:
 
@@ -2367,8 +1784,6 @@ Both return a `castable_subtype` representing the most specific `<final_super>` 
 2. Is in the inheritance chain of the instance/type
 
 The function fails if no appropriate `<final_super>` class exists.
-
-#### How It Works: Inheritance Chains
 
 Consider this hierarchy:
 
@@ -2404,7 +1819,7 @@ The function "walks up" the inheritance chain from `character_body` → `rigid_b
 1. It has `<final_super>`
 2. It directly inherits from the queried base (`component`)
 
-#### When Queries Succeed and Fail
+**When Queries Succeed and Fail?**
 
 **Succeeds when:**
 
@@ -2450,7 +1865,7 @@ GetCastableFinalSuperClass[base, derived{}]  # Fails
 GetCastableFinalSuperClass[derived, derived{}]  # Fails
 ```
 
-#### Multiple Final Supers in Hierarchy
+#### Multiple Final Supers
 
 You can have multiple `<final_super>` classes at different levels. The function returns the one directly inheriting from the queried base:
 
@@ -2499,7 +1914,7 @@ if (Family := GetCastableFinalSuperClass[component, instance]):
     # Can use Family[...] for type-safe casting to family members
 ```
 
-#### Variant: GetCastableFinalSuperClassFromType
+#### GetCastableFinalSuperClassFromType
 
 The type-based variant works identically but takes a type instead of instance:
 
@@ -2513,71 +1928,11 @@ InstanceFamily := GetCastableFinalSuperClass[component, rigid_body{}]
 
 This is useful when working with type values directly rather than instances.
 
-### Choosing Between Metatypes
-
-The three metatype constructors serve different purposes. Understanding when to use each is key to effective Verse programming:
-
-| Feature | `subtype(T)` | `concrete_subtype(T)` | `castable_subtype(T)` |
-|---------|--------------|----------------------|---------------------|
-| **Works with** | Any type | Classes/interfaces | Classes/interfaces with `<castable>` |
-| **Can hold** | Any subtype of T | Only `<concrete>` classes | Only `<castable>` types |
-| **Instantiation** | No | Yes with `{}` | No |
-| **Runtime casting** | No | No | Yes with `Type[value]` |
-| **Primitives** | ✓ (int, float, etc.) | ✗ | ✗ |
-| **Enums** | ✓ | ✗ | ✗ |
-| **Collections** | ✓ (arrays, maps) | ✗ | ✗ |
-| **Function types** | ✓ | ✗ | ✗ |
-| **Use case** | Store/pass type values | Factory pattern, instantiation | Component systems, dynamic casting |
-
-**When to use `subtype(T)`:**
-
-- Need to work with primitive types, enums, or collections
-- Want to store or pass type values without instantiation
-- Building type registries or metadata systems
-- Working with any type in the Verse type system
-
-**When to use `concrete_subtype(T)`:**
-
-- Need to instantiate types at runtime (factory pattern)
-- Working with configurable object creation
-- The types are all concrete classes with complete defaults
-- Type is determined dynamically but instantiation is needed
-
-**When to use `castable_subtype(T)`:**
-
-- Need runtime type queries and casting
-- Building component-based architectures
-- Types are marked with `<castable>` specifier
-- Need to perform safe downcasts at runtime
-
-**Common Pattern Combinations:**
-
-```verse
-# Registry using subtype for flexibility
-type_registry := class:
-    var AllTypes:[]subtype(my_interface) = array{}  # Any subtype
-
-# Factory using concrete_subtype for instantiation
-entity_factory := class:
-    EntityType:concrete_subtype(entity)
-    CreateEntity():entity = EntityType{}  # Can instantiate
-
-# Component system using castable_subtype for casting
-component_system := class:
-    GetComponent(Entity:entity, CompType:castable_subtype(component)):<decides>component =
-        if (Comp := CompType[Entity.GetComponent()]):
-            Comp  # Type-safe cast
-```
-
-All three metatypes are subtypes of `type`, so they can be used interchangeably where `type` is expected, but each provides distinct capabilities for its specific use case.
-
-## classifiable_subset
+### classifiable_subset
 
 Building on the concept of runtime type queries introduced by `castable_subtype`, Verse provides `classifiable_subset`—a sophisticated mechanism for maintaining sets of runtime types. Where `castable_subtype` represents a single type value, `classifiable_subset` represents a collection of types, tracking which classes are present in a system and supporting queries based on type hierarchies.
 
 This feature is particularly valuable for component-based architectures, where you need to track which component types an entity possesses, query for specific capabilities, or filter operations based on type compatibility. Rather than maintaining separate boolean flags or type tags, `classifiable_subset` provides a type-safe, hierarchy-aware registry of runtime types.
-
-### The classifiable_subset Family
 
 Three related types work together to provide both immutable and mutable type sets:
 
@@ -2586,8 +1941,6 @@ Three related types work together to provide both immutable and mutable type set
 **`classifiable_subset_var(t)`** provides a mutable variant with `Read()` and `Write()` operations, enabling dynamic type sets that change during program execution. This is essential for runtime systems where component types are added or removed as entities evolve.
 
 **`classifiable_subset_key(t)`** represents keys used to identify specific instances when adding them to a mutable set. These keys enable removal of specific instances later, supporting lifecycle management of registered types.
-
-### Construction and Type Safety
 
 Unlike ordinary classes, `classifiable_subset` types cannot be directly instantiated. You must use the constructor functions `MakeClassifiableSubset()` and `MakeClassifiableSubsetVar()`:
 
@@ -2622,7 +1975,7 @@ regular_class := class:
 
 You cannot subclass these types or create instances through ordinary construction syntax. This ensures that all sets use the proper internal representation for efficient type queries.
 
-### Type Hierarchy Semantics
+#### Type Hierarchy Semantics
 
 The crucial insight of `classifiable_subset` is that it tracks runtime types, not individual instances. When you add an instance to the set, the system records that instance's actual runtime type. More importantly, type queries respect the inheritance hierarchy:
 
@@ -2680,7 +2033,7 @@ Set.Remove[Key2]
 Set.Contains[physics_component]  # false - last instance removed
 ```
 
-### Core Operations
+#### Core Operations
 
 The `classifiable_subset` types provide several operations for querying and manipulating type sets:
 
@@ -2772,7 +2125,7 @@ var Set2:classifiable_subset_var(component) = MakeClassifiableSubsetVar()
 Set2.Write(Set1.Read())  # Copy Set1's contents to Set2
 ```
 
-### Design Considerations
+#### Design Considerations
 
 Several important constraints govern `classifiable_subset` usage:
 

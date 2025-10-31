@@ -8,7 +8,7 @@ Consider the simple act of accessing an array element. In traditional languages,
 
 <!--NoCompile-->
 ```verse
-# Traditional approach (not Verse)
+# Traditional 
 # if (index < array.length) {
 #     value = array[index]
 #     process(value)
@@ -157,9 +157,9 @@ ValidatePlayer(Player:player)<decides>:void =
 
 This function succeeds only if the player is alive, not stunned, and has either ammunition or a melee weapon. Each line is a separate failable expression that must succeed.
 
-## Expression Semantics in Decidable Contexts
+## Expression in Decides Contexts
 
-One of Verse's most subtle but powerful features is how expressions behave in decidable contexts. When a comparison appears in a context that can handle failure, it doesn't just test a condition—it produces a value.
+One of Verse's most subtle but powerful features is how expressions behave in decides contexts. When a comparison appears in a context that can handle failure, it doesn't just test a condition—it produces a value.
 
 Consider this function:
 
@@ -170,7 +170,7 @@ ValidatePositive(X:int)<decides>:int =
 
 This looks like it just checks a condition, but there's more happening. When `X > 0` succeeds (when the comparison is true), it returns the value of `X`. When the comparison fails (when it's false), the function fails. The comparison is both a test and a value-producing expression.
 
-This behavior applies to all comparison operators in decidable contexts:
+This behavior applies to all comparison operators in decides contexts:
 
 ```verse
 GetIfNotEqual(X:int, Y:int)<decides>:int =
@@ -183,7 +183,7 @@ GetIfGreaterThan(X:int, Threshold:int)<decides>:int =
     X > Threshold  # Returns X when X > Threshold, fails otherwise
 ```
 
-**The rule:** A comparison expression `A op B` in a decidable context returns the left operand `A` when the comparison succeeds, and fails when the comparison is false.
+A comparison expression `A op B` in a decides context returns the left operand `A` when the comparison succeeds, and fails when the comparison is false.
 
 This creates concise validation functions:
 
@@ -215,7 +215,7 @@ GetValidatedPlayer(Name:string)<decides>:player =
 
 Understanding this semantic is crucial for writing idiomatic Verse code. It's why you often see comparison chains without explicit return statements—the comparisons themselves produce the values.
 
-## Options and Failure: Two Sides of the Same Coin
+## Options and Failure
 
 The option type and failure are intimately connected. An option either contains a value or is empty (represented by `false`). The query operator `?` converts between options and failure:
 
@@ -254,9 +254,7 @@ This bidirectional conversion makes options and failure interchangeable, allowin
 
 The option type `?T` represents values that may or may not be present. This section provides a comprehensive reference for option type syntax, operations, and constraints.
 
-### Syntax and Construction
-
-**Type syntax**: The question mark appears *before* the type, not after:
+The question mark appears *before* the type, not after:
 
 ```verse
 ValidSyntax:?int = option{42}      # Correct
@@ -271,7 +269,7 @@ MaybeText:?string = option{"hello"}
 MaybePlayer:?player = option{player{}}
 ```
 
-**Creating options**: Use the `option{}` constructor to wrap a value:
+Use the `option{}` constructor to wrap a value:
 
 ```verse
 # Filled option
@@ -562,68 +560,14 @@ if (Opt? = Regular):
     Print("Equal")
 ```
 
-### Best Practices
-
-**Use options for truly optional data**:
-
-```verse
-player := class:
-    Name:string = "Player"
-    Guild:?string = false  # Guild membership is optional
-```
-
-**Prefer early unwrapping in failure contexts**:
-
-```verse
-# Good: Unwrap early and work with non-optional value
-ProcessEntity(MaybeEntity:?entity)<decides>:void =
-    Entity := MaybeEntity?  # Fail fast if empty
-    Entity.Update()
-    Entity.Render()
-
-# Avoid: Repeatedly checking the same option
-# ProcessEntity(MaybeEntity:?entity):void =
-#     if (MaybeEntity?):
-#         MaybeEntity?.Update()  # Redundant check
-#     if (MaybeEntity?):
-#         MaybeEntity?.Render()  # Redundant check
-```
-
-**Use `or` for simple defaults, nested `if` for complex handling**:
-
-```verse
-# Simple default - use or
-DisplayName := Player.Nickname? or Player.Username? or "Anonymous"
-
-# Complex handling - use if/else
-GetDisplayInfo(Player:player):string =
-    if (Nick := Player.Nickname?):
-        "Known as {Nick}"
-    else if (User := Player.Username?):
-        "Username: {User}"
-    else:
-        "Anonymous player"
-```
-
-**Consider nested options for multi-level absence**:
-
-```verse
-# Database lookup that might fail (outer ?),
-# returning a value that might be null (inner ?)
-GetOptionalField(ID:int)<decides>:?string =
-    Record := DatabaseLookup[ID]  # Fails if record not found
-    Record.OptionalField          # Returns ?string even if record exists
-```
-
-The option type system ensures that the presence or absence of values is always explicit, preventing null-reference errors while maintaining expressive power through integration with Verse's failure system.
-
 ## Multi-Layer Failure with Optionals
 
-When you combine decidable functions with optional return types, you create a sophisticated system with multiple layers of failure. This enables expressing complex conditions concisely while maintaining clarity.
+When you combine decides functions with optional return types, you create a sophisticated system with multiple layers of failure. This enables expressing complex conditions concisely while maintaining clarity.
 
 A function can fail at two levels:
-1. **Function-level failure**: The entire function fails using `<decides>`
-2. **Value-level failure**: The function succeeds but returns an empty option
+
+- *Function-level failure*: The entire function fails using `<decides>`
+- *Value-level failure*: The function succeeds but returns an empty option
 
 ```verse
 FindEligiblePlayer(Name:string)<decides>:?player =
@@ -633,9 +577,10 @@ FindEligiblePlayer(Name:string)<decides>:?player =
 ```
 
 This function has three possible outcomes:
-- **Function fails**: Empty name or player not found
-- **Function succeeds with empty option**: Player found but inactive
-- **Function succeeds with filled option**: Player found and active
+
+- *Function fails*: Empty name or player not found
+- *Function succeeds with empty option*: Player found but inactive
+- *Function succeeds with filled option*: Player found and active
 
 Calling this function demonstrates the layered failure:
 
@@ -663,6 +608,7 @@ ValidateScore(Score:int)<decides>:?int =
 ```
 
 Testing:
+
 ```verse
 ValidateScore[-1]   # Function fails - invalid input
 ValidateScore[50]?  # Succeeds, returns 50 - valid score
@@ -696,9 +642,9 @@ GetTopScore(Name:string)<decides>:int =
 
 This multi-layer approach creates expressive APIs where different failure modes have different meanings, and callers can choose how deeply to inspect the results.
 
-## Dynamic Casts as Decidable Operations
+## Dynamic Casts as Decides
 
-Type casting in Verse integrates seamlessly with the failure system. A dynamic cast using square brackets `Type[value]` is inherently a decidable operation—it succeeds if the value is of the target type, and fails otherwise.
+Type casting in Verse integrates seamlessly with the failure system. A dynamic cast using square brackets `Type[value]` is inherently a decides operation—it succeeds if the value is of the target type, and fails otherwise.
 
 ```verse
 component := class<castable>:
@@ -707,7 +653,7 @@ component := class<castable>:
 physics_component := class<castable>(component):
     Velocity:float = 0.0
 
-# Casting as a decidable operation
+# Casting as a decides operation
 TryGetPhysics(Comp:component)<decides>:physics_component =
     physics_component[Comp]  # Succeeds if Comp is actually a physics_component
 ```
@@ -727,7 +673,7 @@ ProcessComponent(Comp:component):void =
 
 The cast itself is the condition—no separate type checking needed. When the cast succeeds, you have both confirmed the type and obtained a properly-typed reference.
 
-You can chain casts with other decidable operations:
+You can chain casts with other decides operations:
 
 ```verse
 GetActivePhysicsComponent(Entity:entity)<decides>:physics_component =
@@ -750,95 +696,9 @@ GetInteractable(Entity:entity)<decides>:component =
 
 This tries each cast in order, returning the first successful one. It's type-safe because all options share the common `component` base type.
 
-## Decidable Functions with Different Return Types
-
-Decidable functions work with any return type, each bringing its own semantics and use cases. Understanding how `<decides>` interacts with different types helps you choose the right approach for your problem.
-
-**Returning `void`:**
-
-When a decidable function returns `void`, failure is pure control flow with no associated value:
-
-```verse
-ValidateAlive(Player:player)<decides>:void =
-    Player.Health > 0
-
-ValidateInBounds(Pos:vector3, Bounds:box)<decides>:void =
-    Pos.X >= Bounds.Min.X
-    Pos.X <= Bounds.Max.X
-    Pos.Y >= Bounds.Min.Y
-    Pos.Y <= Bounds.Max.Y
-```
-
-Use `void` when you only care about success/failure, not about producing a result. These functions are essentially predicates that can be chained.
-
-**Returning integers and primitives:**
-
-Decidable functions returning primitives produce validated values:
-
-```verse
-GetPositiveScore(Score:int)<decides>:int =
-    Score > 0
-
-GetValidIndex(Index:int, Length:int)<decides>:int =
-    Index >= 0
-    Index < Length
-    Index  # Returns the validated index
-```
-
-The return value is both the input (validated) and the output.
-
-**Returning objects:**
-
-Classes and structs work identically to primitives, but enable validation during construction:
-
-```verse
-player := class:
-    Name:string
-    Score:int
-
-CreateValidPlayer(Name:string, Score:int)<decides>:player =
-    Name <> ""  # Fail if name is empty
-    Score >= 0  # Fail if score is negative
-    player{Name := Name, Score := Score}
-```
-
-This pattern ensures objects are only created when all invariants are satisfied.
-
-**Returning optionals:**
-
-As covered in the multi-layer failure section, returning `?T` creates two distinct failure modes—function-level and value-level:
-
-```verse
-FindBestMatch(Candidates:[]player, Criteria:criteria)<decides>:?player =
-    Candidates.Length > 0  # Function fails if no candidates
-    option{BestPlayerMeetingCriteria[Candidates, Criteria]}  # Option empty if none match
-```
-
-**Returning arrays:**
-
-Decidable functions can return filtered arrays:
-
-```verse
-GetEligiblePlayers(Players:[]player, MinScore:int)<decides>:[]player =
-    Players.Length > 0  # Fail if input empty
-    Eligible := for (P : Players, P.Score >= MinScore): P
-    Eligible.Length > 0  # Fail if none eligible
-    Eligible
-```
-
-This ensures you never return an empty array—the function fails instead.
-
-Choose your return type based on what makes sense semantically:
-- `void` for pure validation
-- Primitives/objects for validated values
-- `?T` for "might not find a result" scenarios
-- Arrays for "filter and ensure non-empty" scenarios
-
 ## Composition and Call Chains
 
-Decidable functions compose naturally, allowing complex operations to be built from simple, reusable pieces. When a decidable function calls another decidable function, failures propagate automatically.
-
-**Basic chaining:**
+Decides functions compose naturally, allowing complex operations to be built from simple, reusable pieces. When a decides function calls another decides function, failures propagate automatically.
 
 ```verse
 ValidatePositive(X:int)<decides>:int =
@@ -914,7 +774,7 @@ Any failure stops the chain, and the transaction is invalid.
 
 **Preserving failure context:**
 
-When calling decidable functions in non-decidable contexts, you must handle failure explicitly:
+When calling decides functions in non-decides contexts, you must handle failure explicitly:
 
 ```verse
 # This won't compile - ProcessPlayer doesn't have <decides>
@@ -938,8 +798,6 @@ Understanding composition helps you build complex validation logic from simple, 
 
 When working with optional containers, you can access their contents using specialized query syntax that combines optional checking with element access.
 
-**Optional tuple indexing:**
-
 Optional tuples support direct element access through the query operator:
 
 ```verse
@@ -957,11 +815,13 @@ if (SecondValue := MaybePair?(1)):
 ```
 
 The syntax `Option?(index)` simultaneously:
+
 - Queries whether the option is non-empty
 - Accesses the tuple element at the given index
 - Binds the element value if both succeed
 
 This fails if either:
+
 - The option is empty (`false`)
 - The index is out of bounds (though type-checked tuples prevent this)
 
@@ -982,7 +842,7 @@ The one-step form is more concise when you only need a specific element.
 
 **Chaining with other operations:**
 
-Optional tuple indexing works in any decidable context:
+Optional tuple indexing works in any decides context:
 
 ```verse
 ProcessFirstElement(Data:?tuple(int, int))<decides>:int =
@@ -1071,8 +931,6 @@ Either the entire trade succeeds, or nothing changes.
 
 While failure (`<decides>`) represents normal control flow with transactional rollback, **runtime errors** represent unrecoverable conditions that terminate execution. Runtime errors propagate up the call stack, bypassing normal failure handling, and cannot be caught or recovered within Verse code.
 
-### The Err() Function
-
 The `Err()` function explicitly triggers a runtime error with an optional message:
 
 ```verse
@@ -1142,7 +1000,7 @@ TopFunction():void =
 
 The runtime error propagates immediately, bypassing all subsequent code in the call chain.
 
-### Runtime Errors in Async Contexts
+### Async Contexts
 
 Runtime errors propagate through asynchronous operations, terminating spawned tasks:
 
@@ -1164,7 +1022,7 @@ spawn { AsyncOperation() }  # Task terminates with runtime error
 
 When a spawned task encounters a runtime error, that specific task terminates. The runtime error does not automatically propagate to the spawning context.
 
-### Runtime Errors in Constructors
+### Constructors
 
 Runtime errors during class construction prevent object creation:
 
@@ -1188,7 +1046,7 @@ manager := class:
 
 The runtime error prevents the object from being constructed, unwinding any partial initialization.
 
-### Infinite Loop Detection
+### Infinite Loop
 
 The Verse VM detects infinite loops and terminates them as runtime errors to prevent program hangs:
 
@@ -1207,7 +1065,7 @@ spawn { InfiniteLoop() }
 
 The VM tracks iteration counts and suspension time. When limits are exceeded, it triggers a runtime error with messages like "LoopIterationLimit" or "HangTimeLimit".
 
-### Runtime Errors in Failure Contexts
+### Failure Contexts
 
 Runtime errors can occur within failure contexts (like `if` conditions), and they terminate execution rather than flowing to the else branch:
 
@@ -1223,51 +1081,6 @@ CheckAndProcess()<decides>:int =
 ```
 
 The runtime error propagates immediately, not treating the condition as failed but as terminated.
-
-### Testing Runtime Errors
-
-When testing code that should produce runtime errors, use `assert_runtime_error`:
-
-```verse
-# Test that invalid input causes runtime error
-assert_runtime_error:
-    ValidateInput(-5)  # Expected to call Err()
-
-# Test with custom error messages
-assert_runtime_error("Invariant violated"):
-    CheckInvariant(false)
-```
-
-This assertion verifies that the enclosed code triggers a runtime error, making it possible to test error conditions systematically.
-
-### When to Use Runtime Errors
-
-Use runtime errors (`Err()`) for:
-
-- **Invariant violations** - Conditions that should never occur
-- **Unrecoverable errors** - Problems that cannot be handled gracefully
-- **Programming errors** - Bugs that need immediate attention
-- **Contract violations** - Preconditions or postconditions failed
-
-```verse
-# Good: Invariant violation
-EnsurePositive(Value:int):int =
-    if (Value <= 0):
-        Err("Value must be positive - this is a bug")
-    Value
-
-# Bad: Expected condition (use failure instead)
-FindItem(Key:int)<decides>:item =
-    if (not Map[Key]?):
-        Err("Item not found")  # Wrong - use failure
-    Map[Key]
-
-# Good: Use failure for expected cases
-FindItem(Key:int)<decides>:item =
-    Map[Key]  # Naturally fails if not found
-```
-
-Use failures (`<decides>`) for expected conditions where alternative paths make sense. Use runtime errors only when execution cannot meaningfully continue.
 
 ## The Deeper Meaning of Failure
 
