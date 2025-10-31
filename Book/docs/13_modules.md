@@ -14,8 +14,6 @@ All `.verse` files within the same folder are considered part of that module and
 
 Paths are the addressing system that makes Verse's vision of a shared, persistent Metaverse possible. Just as every website on the internet has a unique URL, every module has a unique path that identifies it globally. This path system is more than just a naming convention - it's a fundamental part of how Verse manages code distribution, versioning, and dependencies.
 
-### Understanding  Paths
-
 Paths borrow conceptually from web domains with adaptations for the needs of a programming language. A path starts with a forward slash `/` and typically includes a domain-like identifier followed by one or more path segments. This creates a hierarchical namespace that is both human-readable and globally unique.
 
 The format `/domain/path/to/module` serves several important purposes:
@@ -28,8 +26,6 @@ The format `/domain/path/to/module` serves several important purposes:
 
 - **Hierarchical organization**: The path structure naturally supports organizing related modules together. For example, all UI-related modules might live under `/YourGame.com/UI/`, making them easy to find and understand as a group.
 
-### Standard  Paths
-
 Epic Games provides several standard modules that are commonly used:
 
 - `/Verse.org/Verse` - Core language features and standard library functions
@@ -40,8 +36,6 @@ Epic Games provides several standard modules that are commonly used:
 - `/UnrealEngine.com/Temporary/SpatialMath` - 3D math and spatial operations
 
 The use of "Temporary" in some paths indicates that these modules are provisional and may be reorganized in future versions of Verse. This naming convention helps set expectations about the stability of the API.
-
-### Custom Paths
 
 When you create your own modules, they can exist at various levels of the path hierarchy:
 
@@ -63,11 +57,7 @@ A module can contain:
 - Other module definitions
 - Type definitions
 
-### File-Based Modules
-
 When you create a subfolder in a Verse project, a module is automatically created for that folder. The file structure directly maps to the module hierarchy.
-
-### Inline Module Definition
 
 You can create modules within a `.verse` file using the following syntax:
 
@@ -87,8 +77,6 @@ module2 := module
     AnotherConstant<public>:string = "Hello"
 }
 ```
-
-### Nested Modules
 
 Modules can contain other modules, creating a hierarchy:
 
@@ -112,7 +100,7 @@ module_folder := module:
                 # Class definition
 ```
 
-### Module Body Restrictions
+### Restrictions
 
 Module bodies have strict requirements about what they can contain. Understanding these restrictions helps avoid common errors when defining modules.
 
@@ -199,8 +187,6 @@ utilities := module:
     coordinate<public> := tuple(float, float)
 ```
 
-### Modules Are Not First-Class Values
-
 Unlike functions, classes, or data values, modules are not first-class citizens in Verse. You cannot treat modules as values that can be stored, passed, or manipulated at runtime.
 
 **Cannot Assign Modules to Variables:**
@@ -244,38 +230,9 @@ module_b := module:
 # Modules := (module_a, module_b)  # ERROR 3502
 ```
 
-**Valid Module Usage:**
-
-Modules can only be used in these specific ways:
-
-1. **In qualified access expressions** using dot notation:
-```verse
-config := module:
-    MaxPlayers<public>:int = 100
-
-Players := config.MaxPlayers  # OK: Access member
-```
-
-2. **As qualifiers** in explicit qualification syntax:
-```verse
-my_module := module:
-    Value<public>:int = 42
-
-    GetValue<public>():int = (my_module:)Value  # OK: As qualifier
-```
-
-3. **In `using` statements** for imports:
-```verse
-using { my_module }  # OK: Import module
-```
-
-These restrictions ensure that modules remain purely compile-time organizational tools and don't incur runtime overhead.
-
 ## Importing Modules
 
 The import system is designed to be explicit and predictable. Unlike some languages that automatically import commonly used modules or search multiple locations for dependencies, Verse requires you to explicitly declare every external module you want to use. This explicitness helps prevent naming conflicts and makes dependencies clear.
-
-### Using
 
 The `using` statement is the primary mechanism for importing modules into your Verse code. It appears at the top of your file, before any other code definitions, and makes the contents of the specified module available in your current scope.
 
@@ -368,7 +325,7 @@ using { Subsystems/WeaponSystem }
 
 The choice between absolute and relative imports often depends on your project structure and whether you plan to reorganize your modules. Absolute imports are more stable when refactoring, while relative imports can make module groups more portable.
 
-### Importing Nested Modules
+### Nested Imports
 
 Nested modules present special considerations for importing. The order in which you import modules matters, and there are multiple valid approaches:
 
@@ -391,7 +348,7 @@ using { game_systems }
 
 The restriction on import order exists because Verse resolves imports sequentially. When you import a nested module directly, Verse needs to know about its parent module first. This is why importing the parent before the child always works, while the reverse order fails.
 
-### Import Scope and Visibility
+### Scope and Visibility
 
 Imports have file scope - they only affect the file in which they appear. If you have multiple `.verse` files in the same module, each file needs its own import statements for external modules. However, files within the same module can see each other's definitions without imports:
 
@@ -406,7 +363,7 @@ armor_component := class:
     HealthComp:health_component = health_component{}
 ```
 
-### Managing Import Conflicts
+### Import Conflicts
 
 When two imported modules define members with the same name, you need to disambiguate:
 
@@ -421,7 +378,7 @@ DamageA := /GameA/Combat.CalculateDamage(10.0)  # OK: fully qualified
 DamageB := /GameB/Combat.CalculateDamage(10.0)  # OK: fully qualified
 ```
 
-### Qualified Names and  Access
+### Qualified Names
 
 After importing, you can refer to module contents using qualified names. Verse provides two forms of qualification: standard dot notation for most cases, and special qualified access syntax for disambiguation.
 
@@ -542,9 +499,7 @@ Thing<public>:nat = 20  # nat is a subtype of int
 
 ## Local Qualifiers
 
-In V1, the `(local:)` qualifier can disambiguate identifiers within functions. This is critical for evolution compatibility—when external modules add new public definitions after your code is published, `(local:)` ensures your local definitions take precedence.
-
-### Basic Usage
+The `(local:)` qualifier can disambiguate identifiers within functions. This is critical for evolution compatibility—when external modules add new public definitions after your code is published, `(local:)` ensures your local definitions take precedence.
 
 ```verse
 # External module adds ShadowX after your code published
@@ -565,17 +520,17 @@ MyModule := module:
         (local:)ShadowX              # Returns 0.0, not 10
 ```
 
-### Valid `(local:)` Locations
-
 The `(local:)` qualifier can be used in these contexts:
 
 **Function parameters:**
+
 ```verse
 ProcessValue((local:)Value:int):int =
     (local:)Value + 1
 ```
 
 **Function body data definitions:**
+
 ```verse
 Compute():int =
     (local:)Result:int = 42
@@ -583,6 +538,7 @@ Compute():int =
 ```
 
 **For loop variables:**
+
 ```verse
 SumValues():int =
     var Total:int = 0
@@ -592,6 +548,7 @@ SumValues():int =
 ```
 
 **If conditions:**
+
 ```verse
 CheckValue():float =
     if ((local:)X := GetValue[], (local:)X > 5.0):
@@ -601,6 +558,7 @@ CheckValue():float =
 ```
 
 **Block scopes:**
+
 ```verse
 ComputeInBlock():int =
     block:
@@ -609,6 +567,7 @@ ComputeInBlock():int =
 ```
 
 **Class blocks:**
+
 ```verse
 my_class := class:
     var Value<public>:int = 0
@@ -617,11 +576,10 @@ my_class := class:
         set (/PackagePath/my_class:)Value = (local:)Value
 ```
 
-### Invalid `(local:)` Locations
-
 The `(local:)` qualifier **cannot** be used in these contexts (all produce error 3612):
 
 **Module members:**
+
 ```verse
 # Error 3612: local not allowed here
 MyModule := module:
@@ -629,6 +587,7 @@ MyModule := module:
 ```
 
 **Class/struct fields:**
+
 ```verse
 # Error 3612: local not allowed here
 my_class := class:
@@ -636,6 +595,7 @@ my_class := class:
 ```
 
 **Interface methods:**
+
 ```verse
 # Error 3612: local not allowed here
 my_interface := interface:
@@ -643,6 +603,7 @@ my_interface := interface:
 ```
 
 **Enum values:**
+
 ```verse
 # Error 3612: local only allowed inside functions
 my_enum := enum:
@@ -650,12 +611,13 @@ my_enum := enum:
 ```
 
 **Using statements:**
+
 ```verse
 # Error 3612: local not allowed here
 using{(local:)SomeModule}  # Compile error
 ```
 
-### Nested Scope Limitation
+**Nested Scope Limitation:**
 
 Currently, you **cannot** redefine a `(local:)` qualified identifier in nested blocks (error 3532):
 
@@ -675,8 +637,6 @@ When you write Verse code, you use simple, unqualified identifiers for clarity a
 
 Understanding automatic qualification helps you understand how Verse resolves names, why certain errors occur, and how the module system maintains correctness even in complex codebases with many modules and overlapping names.
 
-### What Gets Qualified
-
 The compiler qualifies several categories of identifiers:
 
 1. **Top-level definitions** - Functions, variables, classes, modules at package scope
@@ -685,8 +645,6 @@ The compiler qualifies several categories of identifiers:
 4. **Class and interface members** - Methods, fields, nested within composite types
 5. **Module members** - Public and internal definitions within modules
 6. **Nested scopes** - References within nested modules, classes, and functions
-
-### Qualification Patterns
 
 Verse uses several patterns to qualify identifiers based on their scope:
 
@@ -751,8 +709,6 @@ config := module:
         (/YourPackage/config:)MaxPlayers
 ```
 
-### Built-in Type Qualification
-
 All built-in types are qualified with their standard library paths. This makes it explicit where these types come from and maintains consistency with user-defined types:
 
 ```verse
@@ -766,7 +722,7 @@ message   → (/Verse.org/Verse:)message
 
 When you write `X:int`, the compiler expands it to `X:(/Verse.org/Verse:)int`, making the type's origin explicit.
 
-### Complex Example: Module with References
+### Example
 
 Here's a more realistic example showing how qualification works across multiple scopes:
 
@@ -793,12 +749,13 @@ game_system := module:
 ```
 
 Notice how:
+
 - The parameter `Input` is `(local:)`
 - `Multiplier` is qualified with its containing module path
 - `BaseValue` is qualified with the outer module path
 - All type references are qualified with the Verse standard library path
 
-### Qualification with Using Statements
+### Qualification with Using
 
 When you import modules with `using`, the compiler still qualifies all identifiers, but it can resolve unqualified names to the imported modules:
 
@@ -818,7 +775,7 @@ using { /Verse.org/Random }
 
 The compiler resolves `GetRandomFloat` to `/Verse.org/Random:GetRandomFloat` based on the `using` statement.
 
-### When Automatic Qualification Matters
+### When It Matters
 
 You rarely need to think about automatic qualification during normal development, as the compiler handles it transparently. However, understanding it helps in several situations:
 
@@ -874,27 +831,15 @@ game_system := module:
 ```
 
 Explicit qualification is particularly valuable when:
+
 - Resolving naming conflicts between imported modules
 - Making code more self-documenting
 - Overriding shadowing behavior
 - Working with dynamic or computed qualifiers
 
-### Summary
-
-Automatic qualification is Verse's mechanism for ensuring every identifier has a unique, unambiguous meaning. The compiler transforms your readable, unqualified code into fully-qualified internal representations using patterns like:
-
-- `(/PackagePath:)` for package-level definitions
-- `(local:)` for parameters and local variables
-- `(/PackagePath/Container:)` for nested members
-- `(/Verse.org/Verse:)` for built-in types
-
-Understanding this transformation helps you reason about name resolution, debug scoping issues, and write more precise code when needed using explicit qualification.
-
 ## Local Scope Using
 
 While module-level `using` imports modules by their paths, Verse also supports **local scope `using`** within function bodies to enable member access inference from local variables and parameters. This feature makes code cleaner when working with objects that have many member accesses.
-
-### Basic Syntax
 
 Local scope `using` takes a local variable or parameter identifier (not a module path) and makes its members accessible without explicit qualification:
 
@@ -944,6 +889,7 @@ CreateAndProcess():void =
 The `using` scope is limited to the block where it appears and any nested blocks:
 
 **Using in same block:**
+
 ```verse
 ProcessData():void =
     block:
@@ -954,6 +900,7 @@ ProcessData():void =
 ```
 
 **Using from outer block:**
+
 ```verse
 ProcessData():void =
     Data := data_record{}
@@ -963,6 +910,7 @@ ProcessData():void =
 ```
 
 **Nested block inheritance:**
+
 ```verse
 ProcessData():void =
     Data := data_record{}
@@ -973,7 +921,7 @@ ProcessData():void =
         UpdateField(Value)  # Still infers Data.UpdateField(Data.Value)
 ```
 
-### Order Dependency
+### Order
 
 Member inference only works **after** the `using` expression is encountered:
 
@@ -994,7 +942,7 @@ ProcessData(Data:data_record):void =
 
 The `using` statement acts as a declaration point - inference is not retroactive.
 
-### Multiple Using and Conflict Resolution
+### Conflict Resolution
 
 You can have multiple `using` expressions in the same scope, but conflicting member names must be explicitly qualified:
 
@@ -1031,7 +979,7 @@ ProcessCombat(Player:player_stats, Enemy:enemy_stats):void =
 
 When members exist in multiple `using` contexts, you must explicitly qualify to disambiguate.
 
-### Mutable Member Access
+### Mutable Member
 
 Local `using` works with mutable fields through the `set` keyword:
 
@@ -1047,189 +995,6 @@ UpdateSettings(Settings:config):void =
     set Volume = 0.8     # Inferred as: set Settings.Volume = 0.8
     set Quality = 3      # Inferred as: set Settings.Quality = 3
 ```
-
-### Error Cases and Restrictions
-
-**Error 3666 - Cannot use same identifier twice:**
-
-```verse
-# ERROR 3666
-ProcessData(Data:data_record):void =
-    using{Data}
-    using{Data}  # ERROR - already in using
-```
-
-**Error 3667 - Cannot use Self type:**
-
-You cannot use `using` with an object of the same type you're currently inside:
-
-```verse
-# ERROR 3667
-entity := class:
-    Process():void =
-        Other := entity{}
-        using{Other}  # ERROR - same type as Self
-```
-
-This prevents confusion between `Self` members and `using` members.
-
-**Error 3668 - Cannot use supertype of existing using:**
-
-```verse
-# ERROR 3668
-base_class := class:
-    BaseMethod():void = {}
-
-derived_class := class(base_class):
-    DerivedMethod():void = {}
-
-Process():void =
-    Derived := derived_class{}
-    using{Derived}
-
-    Base := base_class{}
-    using{Base}  # ERROR - base_class is supertype of derived_class
-```
-
-Prevents ambiguity when a subclass is already in the `using` scope.
-
-**Error 3588 - Data member name conflict:**
-
-```verse
-# ERROR 3588
-class_a := class:
-    Value:int = 1
-class_b := class:
-    Value:int = 2
-
-Process():void =
-    ObjA := class_a{}
-    ObjB := class_b{}
-    using{ObjA}
-    using{ObjB}
-    # Value  # ERROR - ambiguous, must qualify
-    ObjA.Value  # OK
-```
-
-**Error 3518 - Method name conflict:**
-
-```verse
-# ERROR 3518
-class_a := class:
-    Method():void = {}
-class_b := class:
-    Method():void = {}
-
-Process():void =
-    ObjA := class_a{}
-    ObjB := class_b{}
-    using{ObjA}
-    using{ObjB}
-    # Method()  # ERROR - ambiguous, must qualify
-    ObjA.Method()  # OK
-```
-
-**Error 3669 - Cannot use module paths:**
-
-Local scope `using` only accepts identifiers, not module paths:
-
-```verse
-# ERROR 3669
-ProcessData():void =
-    using{/Verse.org/Simulation}  # ERROR - module paths not allowed
-    using{MyModule}                # ERROR - module identifiers not allowed
-```
-
-Module imports must be at file/module level using full paths.
-
-**Error 3669 - Cannot use member paths:**
-
-Currently, you cannot use member access expressions in `using`:
-
-```verse
-# ERROR 3669
-outer := class:
-    Inner:inner_class = inner_class{}
-
-inner_class := class:
-    Value:int = 0
-
-Process():void =
-    Outer := outer{}
-    using{Outer.Inner}  # ERROR - no member paths allowed
-```
-
-This may be supported in a future version (SOL-4877).
-
-**Error 3669 - Cannot use inferred members:**
-
-```verse
-# ERROR 3669
-Process():void =
-    Outer := outer{}
-    using{Outer}
-    using{Inner}  # ERROR - even though Inner could be inferred from Outer
-```
-
-You cannot chain `using` with inferred members. This may be supported in future (SOL-4877).
-
-### Comparison: Module Using vs Local Using
-
-| Aspect | Module Using | Local Using |
-|--------|--------------|-------------|
-| **Syntax** | `using { /Module/Path }` | `using{Variable}` |
-| **Location** | File/module level only | Function body/blocks |
-| **Target** | Module paths | Local variables/parameters |
-| **Scope** | Entire file/module | Current block and nested blocks |
-| **Purpose** | Import module members | Infer member access from object |
-| **Qualification** | Module name prefix | Variable member access |
-| **Order** | Must be before definitions | Must be before inferred usage |
-| **Conflicts** | Resolved by qualification | Require explicit qualification |
-
-### Best Practices
-
-**Use local `using` when:**
-- You have many member accesses on the same object
-- The member names are unambiguous in context
-- The code becomes more readable without repeated qualifications
-
-**Avoid local `using` when:**
-- Only a few member accesses occur
-- Multiple objects with similar members create conflicts
-- Explicit qualification aids understanding
-
-**Example - Good use case:**
-
-```verse
-# Many member accesses - local using improves readability
-ProcessPlayer(P:player):void =
-    using{P}
-    UpdateHealth(Damage)
-    IncrementScore(Points)
-    CheckAchievements(Level)
-    UpdateInventory(Item)
-    SaveProgress(Checkpoint)
-    NotifyFriends(Status)
-```
-
-**Example - Poor use case:**
-
-```verse
-# Few accesses - using adds complexity without benefit
-ProcessPlayer(P:player):void =
-    using{P}
-    UpdateHealth(Damage)  # Just use P.UpdateHealth(P.Damage) directly
-```
-
-### Future Enhancements
-
-The following features are planned for local scope `using` (tracked in Jira SOL-4877):
-
-- **Member paths**: `using{Outer.Inner}` to use nested object members
-- **Chained inference**: `using{Outer}` followed by `using{Inner}` where `Inner` is inferred
-- **Module identifiers**: Potentially allowing module identifiers in local scope
-
-These enhancements would make local `using` more flexible while maintaining type safety.
 
 ## Troubleshooting
 
@@ -1340,7 +1105,7 @@ DamageB := /GameB/Combat.CalculateDamage(10.0)  # Clear
 2. **Type not persistable**: Check that your custom types have the `<persistable>` specifier.
 3. **Initialization timing**: Make sure you're initializing persistent data at the right time in the game lifecycle.
 
-### Local Qualifier Conflicts (V1)
+### Local Qualifier Conflicts
 
 **Problem**: Shadowing errors when local identifiers conflict with module members.
 
@@ -1353,291 +1118,3 @@ module_x := module:
     ProcessValue((local:)Value:int):int =
         (module_x:)Value + (local:)Value  # Clear distinction
 ```
-
-## Qualified Identifier Error Codes
-
-Understanding error codes for qualified identifiers helps diagnose naming and scoping issues:
-
-### Qualifier Errors
-
-**Error 3506:** Undefined identifier in qualifier
-```verse
-# Error: identifier 'Unknown' not found
-(Unknown:)Value:int = 5
-```
-
-**Error 3612:** Qualifier not allowed in this context
-```verse
-# Error: qualifiers not allowed here
-module_x := module:
-    (module_x:)Field:int = 5  # Invalid: use at module level
-```
-
-**Error 3514:** Reserved keyword cannot be used as identifier
-```verse
-# Error: 'local' is reserved
-module_x := module:
-    local<public>:int = 42  # Invalid even without qualifier
-```
-
-**Error 3525:** Multiple qualifiers not supported
-```verse
-# Error: only one qualifier allowed
-(ModuleA, ModuleB:)Value:int = 5
-```
-
-**Error 3587:** Invalid path literal
-```verse
-# Error: path does not exist
-C := class((/Invalid/Path:)BaseClass){}
-```
-
-### Shadowing Errors
-
-**Error 3588/3532:** Identifier shadows another definition
-```verse
-# Without (local:) qualifier
-ExternalModule<public> := module:
-    Value<public>:int = 10
-
-MyModule := module:
-    using{ExternalModule}
-    Process():int =
-        Value:int = 5  # Error 3588/3532: shadows ExternalModule.Value
-        Value
-
-# Fix with (local:)
-MyModule := module:
-    using{ExternalModule}
-    Process():int =
-        (local:)Value:int = 5  # OK: explicitly local
-        (local:)Value
-```
-
-### Unsupported Features
-
-**Error 3552:** Unsupported qualified identifier form
-```verse
-# Some qualified forms not yet fully supported
-C := class:
-    m:int
-    f():void = C{(C:)m := 1}  # Error 3552: not yet supported
-```
-
-**Path literals with using/import:**
-
-Path literals cannot currently be used to refer to classes in `using` or `import` statements (error 3587):
-```verse
-# Error 3587: classes not supported in using
-A<public> := module:
-    C<public> := class{}
-
-using {/Verse.org/VerseTests/A/C}  # Error: can only use paths to modules
-
-# Error 3587: classes not supported in import
-Test := import(/Verse.org/VerseTests/A/C)  # Error
-```
-
-This limitation may be lifted in future versions.
-
-## Detailed Example
-
-Let's walk through building a complete module system for a game, explaining each step and decision along the way.
-
-### Step 1: Planning the Module Structure
-
-First, we need to plan our module hierarchy. For a typical game, we might want:
-
-- Core game systems (player, combat, inventory)
-- UI components
-- Game configuration
-- Utility functions
-
-This translates to a folder structure:
-
-```
-MyGame/
-├── Core/
-│   ├── Player/
-│   ├── Combat/
-│   └── Inventory/
-├── UI/
-├── Config/
-└── Utils/
-```
-
-### Step 2: Creating the Configuration Module
-
-Let's start with a configuration module that other modules will depend on:
-
-```verse
-# File: MyGame/Config/game_settings.verse
-
-# This module holds all game-wide configuration
-# Other modules will import this to access shared settings
-
-# Basic game parameters
-MaxPlayers<public>:int = 100
-DefaultPlayerHealth<public>:float = 100.0
-RespawnDelay<public>:float = 5.0
-
-# Nested module for damage configuration
-damage_config<public> := module:
-    BaseDamage<public>:float = 10.0
-    CriticalMultiplier<public>:float = 2.0
-
-    # Function to calculate final damage
-    CalculateFinalDamage<public>(Base:float, IsCritical:logic):float =
-        if (IsCritical?) then Base * CriticalMultiplier else Base
-
-# Enum for game modes
-game_mode<public> := enum:
-    Deathmatch
-    TeamDeathmatch
-    CaptureTheFlag
-    Survival
-```
-
-This configuration module demonstrates several important concepts:
-
-- Public members that other modules can access
-- Nested modules for organizing related settings
-- Functions within modules for configuration-related calculations
-- Enums for defining game constants
-
-### Step 3: Creating the Player Module
-
-Now let's create a player module that uses the configuration:
-
-```verse
-# File: MyGame/Core/Player/player_manager.verse
-
-using { /MyGame/Config }  # Import our configuration
-using { /Verse.org/Simulation }
-using { /Fortnite.com/Devices }
-
-# Player data structure
-player_data := class<final><persistable>:
-    Name:string = "Player"
-    Level:int = 1
-    Experience:int = 0
-    TotalKills:int = 0
-    TotalDeaths:int = 0
-
-# Runtime player state (not persisted)
-player_state := class:
-    CurrentHealth:float = game_settings.DefaultPlayerHealth
-    IsAlive:logic = true
-    Position:vector3 = vector3{X := 0.0, Y := 0.0, Z := 0.0}
-
-# Global player tracking
-var ActivePlayers:weak_map(player, player_state) = map{}
-var PlayerData:weak_map(player, player_data) = map{}
-
-# Initialize a new player
-InitializePlayer<public>(Player:player):void =
-    # Set up persistent data if not exists
-    if (not PlayerData[Player]):
-        set PlayerData[Player] = player_data{Name := Player.GetName()}
-
-    # Set up runtime state
-    set ActivePlayers[Player] = player_state{}
-
-# Handle player damage
-ApplyDamage<public>(Player:player, Damage:float, IsCritical:logic):void =
-    if (State := ActivePlayers[Player]):
-        FinalDamage := damage_config.CalculateFinalDamage(Damage, IsCritical)
-        NewHealth := State.CurrentHealth - FinalDamage
-
-        if (NewHealth <= 0.0):
-            HandlePlayerDeath(Player)
-        else:
-            set ActivePlayers[Player] = player_state:
-                CurrentHealth := NewHealth
-                IsAlive := State.IsAlive
-                Position := State.Position
-
-# Internal function (not public)
-HandlePlayerDeath(Player:player):void =
-    if (State := ActivePlayers[Player]):
-        set ActivePlayers[Player] = player_state:
-            CurrentHealth := 0.0
-            IsAlive := false
-            Position := State.Position
-
-        # Update persistent stats
-        if (Data := PlayerData[Player]):
-            set PlayerData[Player] = player_data:
-                Name := Data.Name
-                Level := Data.Level
-                Experience := Data.Experience
-                TotalKills := Data.TotalKills
-                TotalDeaths := Data.TotalDeaths + 1
-```
-
-This player module shows:
-
-- How to import and use configuration from another module
-- Separation of persistent and runtime data
-- Public functions for external module interaction
-- Private helper functions for internal logic
-- Use of weak_maps for player data storage
-
-### Step 4: Creating an Interacting Combat Module
-
-Finally, let's create a combat module that uses both the configuration and player modules:
-
-```verse
-# File: MyGame/Core/Combat/combat_system.verse
-
-using { /MyGame/Config }
-using { /MyGame/Core/Player }
-using { /Verse.org/Random }
-
-# Weapon definition
-weapon := class:
-    Name:string = "Default Weapon"
-    BaseDamage:float = 10.0
-    CriticalChance:float = 0.1  # 10% chance
-    FireRate:float = 1.0  # Shots per second
-
-# Combat event
-combat_event := struct:
-    Attacker:player
-    Target:player
-    Weapon:weapon
-    Damage:float
-    WasCritical:logic
-
-# Process an attack between players
-ProcessAttack<public>(Attacker:player, Target:player, WeaponUsed:weapon):void =
-    # Calculate if this is a critical hit
-    CritRoll := GetRandomFloat(0.0, 1.0)
-    IsCritical := CritRoll < WeaponUsed.CriticalChance
-
-    # Calculate damage
-    BaseDamage := WeaponUsed.BaseDamage
-
-    # Apply damage through player module
-    player_manager.ApplyDamage(Target, BaseDamage, IsCritical)
-
-    # Log the combat event (for analytics, achievements, etc.)
-    LogCombatEvent(combat_event:
-        Attacker := Attacker
-        Target := Target
-        Weapon := WeaponUsed
-        Damage := BaseDamage
-        WasCritical := IsCritical)
-
-# Internal logging function
-LogCombatEvent(Event:combat_event):void =
-    # Implementation would log to analytics system
-    Print("Combat: {Event.Attacker} hit {Event.Target} for {Event.Damage}")
-```
-
-This combat module demonstrates:
-
-- Importing multiple modules
-- Using public functions from other modules
-- Creating module-specific data structures
-- Interaction between different game systems
