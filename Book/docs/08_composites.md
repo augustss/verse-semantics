@@ -8,7 +8,7 @@ Verse provides four fundamental composite type constructors, each serving a dist
 
 Classes form the backbone of object-oriented programming in Verse. A class serves as a blueprint for creating objects that share common properties and behaviors. When you define a class, you're creating a new type that bundles data (fields) with operations on that data (methods), encapsulating related functionality into a cohesive unit.
 
-**Important:** Class definitions must occur at module scope. You cannot define a class inside another class, struct, interface, or function. Classes are top-level type definitions that establish the type system's structure:
+Class definitions occur at module scope. You cannot define a class inside another class, struct, interface, or function. Classes are top-level type definitions that establish the type system's structure:
 
 ```verse
 # Valid: class at module scope
@@ -52,7 +52,7 @@ Villager := character{Name := "Martha"}  # Uses default values for unspecified f
 
 The archetype syntax uses named parameters, making the construction explicit and self-documenting. Any field with a default value can be omitted from the archetype, and the default will be used. Fields without defaults must be specified, ensuring objects are always fully initialized. Fields can be passed to an archetype in any order.
 
-### Methods and Behavior
+### Methods
 
 Classes become truly powerful when you add methods that operate on the class's data:
 
@@ -79,7 +79,7 @@ character := class:
 
 Methods have access to all fields of the class and can modify mutable fields. They encapsulate the logic for how objects of the class should behave, ensuring that state changes happen in controlled, predictable ways.
 
-**Important:** All methods in non-abstract classes must have implementations. Unlike interfaces (which can declare abstract methods), a concrete class method declaration without an implementation is an error:
+All methods in non-abstract classes must have implementations. Unlike interfaces (which can declare abstract methods), a concrete class method declaration without an implementation is an error:
 
 ```verse
 # Valid: method with implementation
@@ -91,7 +91,7 @@ valid_class := class:
 #     Compute():int  # ERROR: needs implementation
 ```
 
-### Block Clauses for Initialization
+### Blocks for Initialization
 
 Classes can include `block` clauses in their body, which execute when an instance is created. These blocks run initialization code that goes beyond simple field assignment, allowing you to perform setup logic, validation, or side effects during construction:
 
@@ -132,22 +132,22 @@ Instance := multi_step_init{}
 **Execution order with inheritance:** When a class inherits from another class, the Verse VM executes blocks in subclass-before-superclass order, while the BP VM uses superclass-before-subclass order. For portable code, avoid depending on the execution order of blocks across inheritance hierarchies.
 
 **Constraints on block clauses:**
+
 - Blocks cannot contain failure (`<decides>`) operations
 - Blocks cannot call suspending (`<suspends>`) functions
 - Blocks can use `defer` statements, which execute when the block exits
 - Block clauses are only allowed in classes, not in interfaces, structs, or modules
 
 Block clauses are particularly useful for:
+
 - Logging object creation
 - Computing derived values during initialization
 - Registering objects with global systems
 - Performing validation that goes beyond simple field checks
 
-### The Self Identifier
+### Self
 
 Within class methods, `Self` is a special keyword that refers to the current instance of the class. Each method invocation has its own `Self` that refers to the specific object the method was called on.
-
-#### Basic Self Usage
 
 You can use `Self` in multiple ways within method bodies:
 
@@ -208,26 +208,6 @@ validator := class<unique>:
         Self.Check()  # Call another method on this instance
 ```
 
-#### Instance-Specific Behavior
-
-Each instance has its own `Self`. When you call a method on different instances, `Self` refers to the specific instance that was used:
-
-```verse
-player := class<unique>:
-    ID:int
-
-    GetSelf():player = Self
-
-Player1 := player{ID := 1}
-Player2 := player{ID := 2}
-
-Player1.GetSelf() = Player1  # True - Self refers to Player1
-Player2.GetSelf() = Player2  # True - Self refers to Player2
-Player1.GetSelf() = Player2  # False - different instances
-```
-
-#### Capturing Self in Nested Archetypes
-
 You can capture `Self` when creating nested objects:
 
 ```verse
@@ -245,121 +225,7 @@ Child := C.CreateChild()
 Child.Parent.ID = 42  # Child stores reference to C
 ```
 
-#### Restrictions on Self
-
-`Self` is a reserved keyword with strict usage rules:
-
-**Cannot use Self as an identifier (error 3514):**
-
-Self cannot be used as a name for classes, methods, parameters, variables, or fields:
-
-```verse
-# ERROR 3514: Cannot use Self as class name
-# Self := class {}
-
-# ERROR 3514: Cannot use Self as method name
-# my_class := class:
-#     Self():void = {}
-
-# ERROR 3514: Cannot use Self as parameter name
-# my_class := class:
-#     Process(Self:int):void = {}
-
-# ERROR 3514: Cannot use Self as local variable
-# my_class := class:
-#     Method():void =
-#         Self:int = 42
-
-# ERROR 3514: Cannot use Self as field name
-# my_class := class:
-#     Self:int
-```
-
-**Cannot use Self as a type (error 3548, 3547):**
-
-`Self` cannot appear in type positions:
-
-```verse
-# ERROR 3548: Cannot inherit from Self
-# my_class := class(Self) {}
-
-# ERROR 3547: Cannot use Self as parameter type
-# my_class := class:
-#     Compare(Other:Self):logic = true
-```
-
-While some languages allow `Self` as a type to refer to "the type of the current class," Verse does not support this pattern.
-
-**Cannot access Self on other instances (error 3506):**
-
-`Self` is instance-specific and cannot be accessed as a member of other instances:
-
-```verse
-# ERROR 3506: Self is not a field
-# my_class := class:
-#     Compare(Other:my_class):logic =
-#         Other.Self  # ERROR - Self is not accessible on Other
-```
-
-**Cannot use Self in static/class-level context (error 3502):**
-
-`Self` is only available in method bodies, not in field initializers:
-
-```verse
-# ERROR 3502: Self not available in field initializer
-# my_class := class:
-#     Reference:my_class = Self  # ERROR
-```
-
-Field initializers execute before the instance exists, so `Self` has no meaning in that context.
-
-#### When to Use Self
-
-**Use `Self` when:**
-- Passing the entire instance to another function
-- Returning the instance for method chaining (builder pattern)
-- Explicitly clarifying that you're accessing the current instance
-- Capturing the instance in nested objects or closures
-
-**Direct field access is usually sufficient:**
-
-Within methods, you can access fields directly without `Self`:
-
-```verse
-character := class:
-    Name:string
-    Level:int
-
-    Display():void =
-        # Direct access - no Self needed
-        Print("Name: {Name}, Level: {Level}")
-
-        # Explicit Self - same result
-        Print("Name: {Self.Name}, Level: {Self.Level}")
-```
-
-Both forms work identically. Use direct access for brevity, or use `Self.` when you want to make it explicit that you're accessing instance members.
-
-#### Self in Inherited Methods
-
-In subclasses, `Self` refers to the derived instance, not the base instance:
-
-```verse
-base := class<unique>:
-    ID:int
-    GetSelf():base = Self
-
-derived := class<unique>(base):
-    Name:string
-
-D := derived{ID := 1, Name := "Test"}
-Result := D.GetSelf()
-# Result is the derived instance, type is base but refers to the full derived object
-```
-
-This ensures that methods inherited from base classes correctly reference the actual instance they're called on.
-
-### Inheritance and Subclassing
+### Inheritance
 
 Classes support single inheritance, allowing you to create specialized versions of existing classes. This creates an "is-a" relationship where the subclass is a more specific type of the superclass:
 
@@ -442,7 +308,7 @@ base := class:
 
 To override a method, use the `<override>` specifier with the matching signature.
 
-### The super Keyword
+### Super
 
 Within a subclass, you can use the `super` keyword to refer to the superclass type. This is primarily used to access the superclass's implementation or to construct a superclass instance:
 
@@ -464,8 +330,6 @@ character := class(entity):
 ```
 
 The `super` keyword represents the superclass type itself. When you write `super{...}`, you're creating an instance of the superclass with the specified field values. This allows you to delegate to superclass behavior while adding subclass-specific functionality.
-
-#### Calling Parent Methods with (super:)
 
 Within an overriding method, you can call the parent class's implementation using the `(super:)` syntax. This is the primary way to invoke parent method implementations while adding or modifying behavior:
 
@@ -590,26 +454,6 @@ derived := class(base):
         Print("Derived string: {S}")
 ```
 
-**In Inheritance Chains:**
-
-The `(super:)` syntax works correctly in multi-level inheritance hierarchies, always calling the immediate parent's implementation:
-
-```verse
-grandparent := class:
-    Method():int = 1
-
-parent := class(grandparent):
-    Method<override>():int =
-        (super:)Method() + 10  # Calls grandparent, returns 11
-
-child := class(parent):
-    Method<override>():int =
-        (super:)Method() + 100  # Calls parent, returns 111
-
-Instance := child{}
-Result := Instance.Method()  # Returns 111
-```
-
 **Return Type Covariance:**
 
 When overriding methods with `(super:)`, the return type can be a subtype of the parent's return type (covariant return types):
@@ -631,97 +475,6 @@ derived := class(base):
         # Can still call parent even with different return type
         Parent := (super:)Create()
         derived_type{Name := Parent.Name, Value := 42}
-```
-
-#### Restrictions on (super:)
-
-The `(super:)` syntax has several important restrictions:
-
-**Cannot Capture as Value (Error 3502):**
-
-```verse
-base := class:
-    Method():void = {}
-
-derived := class(base):
-    Method<override>():void =
-        # ERROR: Cannot capture (super:) as a value
-        # F := (super:)Method
-        {}
-```
-
-The `(super:)` is a special syntax form, not a value that can be stored or passed around.
-
-**Must Call Same Method Name (Error 3612):**
-
-```verse
-base := class:
-    Method1():void = {}
-    Method2():void = {}
-
-derived := class(base):
-    Method1<override>():void =
-        # ERROR: Must call Method1, not Method2
-        # (super:)Method2()
-        {}
-```
-
-You can only use `(super:)MethodName()` to call the parent's version of the current method being overridden.
-
-**Cannot Use on Non-Methods (Error 3506, 3560):**
-
-```verse
-base := class:
-    Value:int = 0
-
-derived := class(base):
-    # ERROR: Cannot use (super:) on fields
-    # GetValue():int = (super:)Value
-    {}
-```
-
-The `(super:)` syntax only works with methods, not fields or other class members.
-
-**Cannot Use Without Parent Class (Error 3552):**
-
-```verse
-standalone := class:
-    Method():void =
-        # ERROR: Class has no parent
-        # (super:)Method()
-        {}
-```
-
-**Cannot Use in Block Clauses (Error 3560):**
-
-```verse
-base := class:
-    Method():void = {}
-
-derived := class(base):
-    # ERROR: (super:) not allowed in block clauses yet
-    block:
-        # (super:)Method()
-        {}
-```
-
-Currently, `(super:)` is restricted to method bodies and cannot be used in class block clauses.
-
-**Cannot Use in Nested Functions:**
-
-As documented in the Functions chapter, `(super:)` cannot be used within nested function definitions, even if those nested functions are defined within a method:
-
-```verse
-base := class:
-    Method():void = {}
-
-derived := class(base):
-    Method<override>():void =
-        NestedFunction():void =
-            # ERROR: Cannot use (super:) in nested function
-            # (super:)Method()
-            {}
-        NestedFunction()
 ```
 
 ### Method Overriding
@@ -796,8 +549,6 @@ Hero := MakePlayer("Aldric", 5)
 
 Constructor functions are regular functions that return class instances, but the `<constructor>` annotation enables special capabilities like delegating to other constructors. When calling a constructor function from normal code, use just the function name—the `<constructor>` annotation only appears in the definition.
 
-### Constructor Effects and Behavior
-
 Constructor functions can have effects that control their behavior. Common effects include `<computes>`, `<allocates>`, and `<transacts>`. A particularly useful effect is `<decides>`, which allows constructors to fail if preconditions aren't met:
 
 ```verse
@@ -815,7 +566,7 @@ else:
     # Construction failed - level out of range
 ```
 
-**Important:** Constructor functions cannot use the `<suspends>` effect. Construction must complete synchronously to maintain object consistency.
+Constructor functions cannot use the `<suspends>` effect. Construction must complete synchronously to maintain object consistency.
 
 ### Overloading Constructors
 
@@ -849,27 +600,6 @@ MakeEntity<constructor>(Name:string) := entity:
 Enemy1 := MakeEntity("Goblin", 50, SpawnPoint)
 Enemy2 := MakeEntity("Guard", PatrolPoint)
 NPC := MakeEntity("Shopkeeper")
-```
-
-### Named and Unnamed Parameters
-
-Constructor functions support both named and unnamed parameters, following the same rules as regular functions:
-
-```verse
-character := class:
-    Name:string
-    var Health:int
-    var Mana:int
-
-# Constructor with optional named parameters
-MakeCharacter<constructor>(Name:string, ?Health:int, ?Mana:int) := character:
-    Name := Name
-    Health := Health
-    Mana := Mana
-
-# Call with named parameters
-Mage := MakeCharacter("Wizard", ?Health := 75, ?Mana := 200)
-Warrior := MakeCharacter("Knight", ?Health := 150, ?Mana := 50)
 ```
 
 ### Delegating Constructors
@@ -924,125 +654,6 @@ NewPlayer := MakeNewPlayer("Alice")
 
 When delegating to a constructor of the same class, the delegation replaces all field initialization—any fields you initialize before the delegation are ignored. When delegating to a parent class constructor, your subclass field initializations are preserved, and the parent constructor initializes the parent fields.
 
-### Parametric Constructors
-
-Constructor functions can be parametric, accepting type parameters to create instances of parametric classes. This enables type inference where the constructor determines type parameters from the arguments passed. For comprehensive coverage of parametric classes and their constructors, see the [Parametric Classes](#parametric-classes) section.
-
-### Blocks and Let Expressions in Construction
-
-Both archetype expressions and constructor functions can use `block` and `let` expressions to perform computations during construction:
-
-```verse
-transform := class:
-    Position:vector3
-    Scale:float
-
-# Using let for intermediate calculations
-Origin := transform:
-    let:
-        DefaultScale := 1.0
-    Position := vector3{X := 0.0, Y := 0.0, Z := 0.0}
-    Scale := DefaultScale
-
-# Using block for side effects during construction
-MakeLoggingTransform<constructor>(Pos:vector3) := transform:
-    block:
-        Print("Creating transform at {Pos}")
-    Position := Pos
-    Scale := 1.0
-```
-
-**The let: Clause Keyword:**
-
-The `let:` clause introduces temporary variable bindings that are available to subsequent field initializers. Variables defined in a `let:` block exist only during construction and cannot be accessed after the object is created:
-
-```verse
-player := class:
-    Health:int
-    MaxHealth:int
-    HealthPercent:float
-
-CreatePlayer(Level:int) := player:
-    let:
-        BaseHealth := 100 + (Level * 10)
-    MaxHealth := BaseHealth
-    Health := BaseHealth
-    HealthPercent := 1.0  # BaseHealth is visible here
-    # BaseHealth no longer exists after construction
-```
-
-**Multiple Let Blocks:**
-
-You can use multiple `let:` blocks within a single constructor. Each block defines variables that become available to subsequent code:
-
-<!--verse
-component := class:
-    X:int
-    Y:int
-    Z:int
--->
-```verse
-MakeComponent<constructor>(Base:int) := component:
-    let:
-        DoubledBase := Base * 2
-    X := DoubledBase
-
-    let:
-        TripleX := X * 3  # Can reference previously initialized field
-    Y := TripleX
-    Z := X + Y
-```
-
-**Restrictions on Let Blocks:**
-
-The `let:` clause has several important restrictions:
-
-1. **Only one variable per line:** You cannot use comma-separated variable lists:
-
-<!--NoCompile-->
-```verse
-# ERROR: Cannot use comma-separated variables
-BadConstructor := my_class:
-    let:
-        X := 1, Y := 2  # Compile error 3552
-    Field := X + Y
-```
-
-Instead, define each variable on its own line:
-
-```verse
-# OK: Each variable on separate line
-GoodConstructor := my_class:
-    let:
-        X := 1
-        Y := 2
-    Field := X + Y
-```
-
-2. **Must contain bindings:** A `let:` block must define at least one variable, not just arbitrary expressions:
-
-<!--NoCompile-->
-```verse
-# ERROR: let: must contain bindings
-BadConstructor := my_class:
-    let:
-        1 + 1  # Compile error 3560 - not a binding
-    Field := 2
-```
-
-3. **Only valid in construction context:** The `let:` keyword can only be used within class or struct construction:
-
-<!--NoCompile-->
-```verse
-# ERROR: let: outside construction
-BadFunction():void =
-    let:  # Compile error 3502
-        X := 1
-    Print("{X}")
-```
-
-Use regular bindings or `block:` expressions in non-construction contexts.
-
 ### Order of Execution
 
 Understanding execution order is crucial for correct initialization:
@@ -1078,11 +689,9 @@ Instance := MakeDerived(10, 20)
 
 For classes with mutable fields, initialization sets starting values that can change during the object's lifetime. Immutable fields must be initialized during construction and cannot be modified afterward. This distinction makes the construction phase critical for establishing invariants that will hold throughout the object's existence.
 
-## Name Shadowing and Qualification
+## Shadowing and Qualification
 
 Verse has strict rules about name shadowing to prevent ambiguity and maintain code clarity. Understanding these rules and the qualification syntax is essential for working with inheritance hierarchies, multiple interfaces, and nested modules.
-
-### Error 3532 - Shadowing Prohibition
 
 In most contexts, you **cannot redefine names** that already exist in an enclosing scope. This applies to functions, variables, classes, interfaces, and modules:
 
@@ -1117,8 +726,6 @@ This prohibition extends across various contexts:
 
 The shadowing prohibition exists **regardless of definition order** - it doesn't matter whether the outer name is defined before or after the inner scope.
 
-### Class-Qualified Method Names
-
 To define methods with the same name in different contexts, use **qualified names** with the syntax `(ClassName:)MethodName`:
 
 ```verse
@@ -1141,56 +748,7 @@ c80{}.(c80:)F80(10)  # Returns 12
 
 The `(c80:)` qualifier indicates this `F80` is defined specifically in the `c80` class context, distinguishing it from the module-level `F80`. This allows the same name to coexist without shadowing errors.
 
-### Override Qualifier Rules
-
-When overriding methods in inheritance hierarchies, you must use the **defining class or interface** as the qualifier, not an intermediate class:
-
-**Error 3523, 3591 - Must use defining class:**
-
-```verse
-# ERROR: Using wrong qualifier
-c0 := class<abstract> { F(X:int):int }
-c1 := class(c0):
-    F<override>(X:int):int = X + 1
-# c2 := class(c1):
-#     (c1:)F<override>(X:int):int = X + 2  # ERROR 3591, 3523
-#     # F was defined in c0, not c1!
-```
-
-**Correct: Use the defining class:**
-
-```verse
-c20 := class<abstract> { F(X:int):int }
-c21 := class(c20):
-    F<override>(X:int):int = X + 1
-c22 := class(c21):
-    (c20:)F<override>(X:int):int = X + 2  # OK - c20 is where F was defined
-
-o22 := c22{}
-o22.F(10)  # Returns 12
-o22.(c20:)F(20)  # Returns 22 (explicit qualification)
-```
-
-The qualifier must reference the class or interface where the method was **originally declared**, not where it was previously overridden.
-
-**With interfaces:**
-
-```verse
-# ERROR: Wrong qualifier
-# i0 := interface { F(X:int):int }
-# i1 := interface(i0) {}
-# c := class(i1):
-#     (i1:)F<override>(X:int):int = X + 2  # ERROR 3523, 3591
-#     # F was defined in i0, not i1!
-
-# CORRECT:
-i0 := interface { F(X:int):int }
-i1 := interface(i0) {}
-c := class(i1):
-    (i0:)F<override>(X:int):int = X + 2  # OK
-```
-
-### Multiple Methods with the Same Name
+### Methods with Same Name
 
 Using qualifiers, you can define **new methods** with the same name as inherited methods, creating multiple distinct methods in the same class:
 
@@ -1214,12 +772,13 @@ o52.(c52:)F(10)  # Returns 12 (new method in c52)
 ```
 
 **Key distinction:**
+
 - `F<override>` without qualifier: Overrides the inherited `F`
 - `(c52:)F` without `<override>`: Defines a **new** `F` specific to `c52`
 
 This allows a class to have multiple methods with the same name, differentiated by their qualifiers, each serving different purposes in the class hierarchy.
 
-### Using `(super:)` with Qualified Names
+### `(super:)` Qualified
 
 The `(super:)` qualifier works with qualified method names to call the parent class's implementation:
 
@@ -1242,7 +801,7 @@ o62.(c61:)F(10)  # Returns 212 (200 + c61's 12)
 
 `(super:)F(X)` within the qualified method calls the parent class's implementation of that same qualified method. This enables you to extend behavior for multiple method variants independently.
 
-### Interface Method Collisions
+### Interface Collisions
 
 When implementing multiple interfaces with methods of the same name, qualifiers disambiguate which interface's method you're implementing:
 
@@ -1321,9 +880,7 @@ TopLevel.module_a.module_a.Function(1) # Returns 101
 
 Nested modules can have the same simple name (e.g., both `module_a`) when qualified with their full path, allowing hierarchical organization without naming conflicts.
 
-### Qualifier Restrictions and Errors
-
-**Error 3612 - Wrong qualifier context:**
+### Restrictions
 
 Qualifiers can only be used in appropriate contexts. You cannot use class qualifiers for local variables:
 
@@ -1333,8 +890,6 @@ Qualifiers can only be used in appropriate contexts. You cannot use class qualif
 #     f():void =
 #         (C:)X:int = 0  # ERROR - wrong context
 ```
-
-**Error 3506 - Unsupported qualifiers:**
 
 Certain qualifiers are not supported. Function qualifiers for local variables are not allowed:
 
@@ -1354,8 +909,6 @@ Similarly, using module function paths as qualifiers is not supported:
 #         (M.f:)X:int = 0  # ERROR
 ```
 
-**Error 3588 - Local variable shadowing member:**
-
 Local variables cannot shadow class members:
 
 ```verse
@@ -1369,7 +922,7 @@ Local variables cannot shadow class members:
 
 Currently, there is no `(local:)` qualifier to disambiguate, so this pattern is not supported. You must use different names for local variables and members.
 
-### External Package Shadowing Rules
+### External Package Shadowing
 
 Shadowing rules are **relaxed for external packages** (those marked with `?Role:=External`), except when two symbols shadow each other in the same scope:
 
@@ -1403,62 +956,9 @@ This relaxation allows external packages to have internal naming conflicts witho
 # }
 ```
 
-### Shadowing vs Assignment Error Hints
-
-When you accidentally shadow a variable that looks like you meant to assign to it, the compiler provides helpful error messages:
-
-```verse
-# ERROR 3547, 3532: Suggests using 'set'
-# c := class {
-#     var A:int = 0
-#     A := 1  # ERROR - looks like you meant: set A = 1
-# }
-
-# ERROR 3532: Regular shadowing
-# F():void = {
-#     A:int = 0
-#     A := 1  # ERROR - can't redefine
-# }
-
-# ERROR 3532: Attempting to redefine immutable
-# F():void = {
-#     A:int = 0
-#     A:int = 1  # ERROR - shadowing, not reassignment
-# }
-```
-
-The error message for mutable fields specifically suggests using `set` instead of `:=`, helping catch common mistakes where shadowing was unintentional.
-
-### Summary of Qualification Syntax
-
-Verse supports several qualification patterns:
-
-| Qualifier | Usage | Example |
-|-----------|-------|---------|
-| `(ClassName:)` | Class-specific method | `(c80:)F(X:int):int` |
-| `(InterfaceName:)` | Interface member | `(i60:)F<override>(X:int):int` |
-| `(ModuleName:)` | Module member | `(my_module:)Value` |
-| `(EnumName:)` | Enum enumerator | `(direction:)North` |
-| `(super:)` | Parent implementation | `(super:)F(X)` |
-
-**Key rules:**
-
-1. **Shadowing is generally prohibited** (Error 3532) at module/class scope
-2. **Qualifiers allow same names** in different contexts without shadowing
-3. **Overrides must use defining class** as qualifier (Error 3523, 3591)
-4. **Multiple methods possible** with same name using qualifiers
-5. **Interface collisions** resolved through qualification
-6. **`(super:)` works** with qualified method names
-7. **External packages** have relaxed shadowing (except same scope)
-8. **Local shadowing members** not supported (would need `(local:)`)
-
-Understanding these rules enables you to work with complex class hierarchies, multiple interface implementations, and nested module structures while maintaining clarity about which definition is being referenced.
-
 ## Parametric Classes
 
 Parametric classes, also known as generic classes, allow you to define classes that work with any type. Rather than writing separate container classes for integers, strings, players, and every other type, you write one parametric class that accepts a type parameter.
-
-### Defining Parametric Classes
 
 A parametric class takes one or more type parameters in its definition:
 
@@ -1509,7 +1009,7 @@ optional_container(t:type) := class:
 
 Methods automatically know about the type parameter from the class definition—you don't redeclare it in method signatures.
 
-### Type Instantiation and Identity
+### Instantiation and Identity
 
 When you instantiate a parametric class with specific type arguments, Verse creates a concrete type. Critically, **multiple instantiations with the same type arguments produce the same type**:
 
@@ -1539,6 +1039,7 @@ C2 := container(int){Value := 2}
 The instantiation process is **deterministic and memoized**. The first time you write `container(int)`, Verse generates a concrete type. Every subsequent use of `container(int)` refers to that same type, not a new copy.
 
 This matters for:
+
 - **Type compatibility**: Two values of `container(int)` can be used interchangeably
 - **Memory efficiency**: Not creating duplicate type definitions
 - **Semantic correctness**: Same type arguments always mean the same type
@@ -1555,8 +1056,6 @@ Types[1] = Types[2]  # Same type
 Types[2] = Types[3]  # Same type
 ```
 
-### Different Instantiations Are Different Types
-
 While the same type arguments always produce the same type, different type arguments produce distinct, incompatible types:
 
 ```verse
@@ -1572,13 +1071,11 @@ StringContainer := container(string){Value := "text"}
 
 `container(int)` and `container(string)` are completely different types, with no subtype relationship. They happen to share the same structure (both defined from `container`), but that doesn't make them compatible.
 
-### Variance: When Different Instantiations Are Compatible
-
 While different instantiations of a parametric class are distinct types, Verse allows certain instantiations to be used in place of others based on **variance**. Variance determines when `parametric_class(subtype)` can be used where `parametric_class(supertype)` is expected (or vice versa).
 
 The variance of a parametric type depends on how the type parameter is used within the class definition:
 
-#### Covariant: Return Types Only
+#### Covariant
 
 When a type parameter appears only in **return positions** (method return types, field types being read), the parametric class is **covariant** in that parameter (see [Types](07_types.md#understanding-subtyping) for details on variance). This means instantiations follow the same subtyping direction as their type arguments:
 
@@ -1609,7 +1106,7 @@ Result := ProcessProducer(PlayerProducer)  # Works!
 
 **Direction:** `producer(player)` → `producer(entity)` ✓ (follows subtype direction)
 
-#### Contravariant: Parameter Types Only
+#### Contravariant
 
 When a type parameter appears only in **parameter positions** (method parameters being consumed), the parametric class is **contravariant** in that parameter (see [Types](07_types.md#understanding-subtyping) for details on variance). This means instantiations follow the **opposite** subtyping direction:
 
@@ -1639,7 +1136,7 @@ ProcessPlayers(EntityConsumer)  # Works!
 
 **Direction:** `consumer(entity)` → `consumer(player)` ✓ (opposite of subtype direction)
 
-#### Invariant: Both Positions
+#### Invariant
 
 When a type parameter appears in **both parameter and return positions**, the parametric class is **invariant** in that parameter. No subtyping relationship exists between different instantiations:
 
@@ -1667,7 +1164,7 @@ PlayerTransformer:transformer(player) = transformer(player){}
 
 **Direction:** No conversion allowed in either direction
 
-#### Bivariant: Unused Type Parameter
+#### Bivariant
 
 When a type parameter is not used in any method signatures (only in private implementation details or not at all), the parametric class is **bivariant**. Any instantiation can be converted to any other:
 
@@ -1693,93 +1190,10 @@ Y:container(player) = EntityContainer  # Also valid
 
 **Why this works:** Since the type parameter doesn't affect the observable behavior, the instantiations are interchangeable.
 
-#### Variance with Multiple Type Parameters
-
-Classes with multiple type parameters have variance independently for each parameter:
-
-```verse
-entity := class:
-    ID:int
-
-player := class(entity):
-    Name:string
-
-# Different variance for each parameter
-converter(input:type, output:type) := class:
-    Convert(In:input):output
-    # input is contravariant (parameter position)
-    # output is covariant (return position)
-
-# input contravariance: supertype → subtype ✓
-# output covariance: subtype → supertype ✓
-C1:converter(player, entity) = converter(entity, player){}
-# Accepts broader input (entity), returns more specific output (player)
-# Can be used where we need:
-#   - Input of player (entity can handle player since player is entity)
-#   - Output of entity (player is an entity)
-
-C2:converter(entity, player) = C1  # Valid!
-```
-
-<!-- #### Practical Implications
-
-Understanding variance is crucial for designing flexible, reusable parametric types:
-
-**Producer pattern (covariant):**
-```verse
-# Generators, repositories, factories - things that produce values
-data_source(t:type) := class:
-    Fetch():t
-    GetAll():[]t
-
-# Can use data_source(player) where data_source(entity) expected
-```
-
-**Consumer pattern (contravariant):**
-```verse
-# Handlers, validators, serializers - things that consume values
-validator(t:type) := class:
-    Validate(Item:t):logic
-
-# Can use validator(entity) where validator(player) expected
-```
-
-**Transformer pattern (invariant):**
-```verse
-# Codecs, converters, updaters - things that both consume and produce
-processor(t:type) := class:
-    Process(Item:t):t
-
-# Cannot substitute - must use exact type
-```
--->
-
-#### Variance and Inheritance
-
-Variance rules also apply when parametric types are inherited:
-
-```verse
-entity := class:
-    ID:int
-
-player := class(entity):
-    Name:string
-
-# Covariant base class
-producer_base(t:type) := class<abstract>:
-    Get():t
-
-# Inheriting preserves variance
-player_producer := class(producer_base(player)):
-    Get<override>():player = player{ID := 1, Name := "Test"}
-
-# Covariant subtyping works
-Base:producer_base(entity) = player_producer{}  # Valid
-```
-
 #### Common Pitfalls
 
 **Attempting invalid conversions:**
+
 ```verse
 # Invariant parameter - neither direction works
 ref(t:type) := class:
@@ -1794,6 +1208,7 @@ PlayerRef:ref(player) = ref(player){Value := player{ID := 1, Name := "Test"}}
 ```
 
 **Confusing variance direction:**
+
 ```verse
 # Common mistake: thinking contravariance works like covariance
 consumer(t:type) := class:
@@ -1808,7 +1223,7 @@ EntityConsumer := consumer(entity){}
 PlayerConsumer:consumer(player) = EntityConsumer  # Correct!
 ```
 
-### Constraints on Type Parameters
+### Parameter Constraints
 
 You can constrain type parameters to require certain properties:
 
@@ -1835,65 +1250,12 @@ IntList := sorted_list(int){}
 ```
 
 The `where` clause specifies requirements on the type parameter. Common constraints include:
+
 - `t:subtype(comparable)` - requires equality comparison
 - `t:subtype(SomeClass)` - requires inheriting from a specific class
 - `t:type` - any type (the default if no constraint specified)
 
-### Parametric Classes with Methods
-
-Methods in parametric classes can use the type parameters in sophisticated ways:
-
-```verse
-stack(t:type) := class:
-    var Items:[]t = array{}
-
-    Push(Item:t):void =
-        set Items = Items + array{Item}
-
-    Pop()<decides>:t =
-        Count := Items.Length
-        Count > 0
-        Item := Items[Count - 1]
-        set Items = Slice(Items, 0, Count - 1)
-        Item
-
-    Peek()<decides>:t =
-        Items.Length > 0
-        Items[Items.Length - 1]
-
-    IsEmpty():logic =
-        Items.Length = 0
-
-# Use with any type
-IntStack := stack(int){}
-IntStack.Push(10)
-IntStack.Push(20)
-if (Top := IntStack.Pop()):
-    # Top is 20
-```
-
-The methods automatically work with whatever type `t` is instantiated with. When you create `stack(int)`, `Push` accepts `int`, `Pop` returns `int`, and so on.
-
-### Parametric Constructors
-
-Constructor functions can be parametric, enabling type inference:
-
-```verse
-container(t:type) := class:
-    Value:t
-
-# Parametric constructor
-MakeContainer<constructor>(Value:t where t:type) := container(t):
-    Value := Value
-
-# Type inference determines t from the argument
-IntContainer := MakeContainer(42)         # container(int)
-StringContainer := MakeContainer("text")  # container(string)
-```
-
-The constructor infers the type parameter from the value passed, making usage more concise than explicitly writing `container(int){Value := 42}`.
-
-### Restrictions on Parametric Classes
+### Restrictions
 
 Parametric classes have certain limitations:
 
@@ -2053,62 +1415,9 @@ The current implementation treats parametric instantiation casts as compile-time
 
 While you can define parametric classes, making them persistable requires special consideration for how the type parameter is serialized. Specific instantiations with persistable types may work depending on the implementation.
 
-### Use Cases for Parametric Classes
-
-**Collections and containers:**
-
-```verse
-dynamic_array(t:type) := class:
-    var Items:[]t = array{}
-    var Capacity:int = 16
-
-    Add(Item:t):void = ...
-    Remove(Index:int)<decides>:t = ...
-    Get(Index:int)<decides>:t = ...
-```
-
-**Result and error wrappers:**
-
-```verse
-result(t:type, e:type) := class:
-    var Value:?t = false
-    var Error:?e = false
-
-    IsSuccess():logic = Value?
-    IsError():logic = Error?
-```
-
-**Generic data structures:**
-
-```verse
-tree_node(t:type) := class:
-    Value:t
-    var Left:?tree_node(t) = false
-    var Right:?tree_node(t) = false
-```
-
-Note how `tree_node` references itself with the same type parameter, creating a recursive generic structure.
-
-**Type-safe builders and factories:**
-
-```verse
-builder(t:type) := class:
-    var Config:[string]any = map{}
-
-    Set(Key:string, Value:any):builder(t) =
-        set Config[Key] = Value
-        Self
-
-    Build():t = ...
-```
-
-Parametric classes eliminate code duplication while maintaining type safety. Instead of copy-pasting container implementations for every type you need, write one parametric version that works universally.
-
 ### Recursive Parametric Types
 
 Parametric classes can reference themselves in their field types, enabling recursive generic data structures like linked lists, trees, and graphs. However, Verse imposes specific restrictions on how recursion can occur.
-
-#### Allowed: Same-Parameter Recursion
 
 The most common form of recursive parametric type is when a class references itself with **the same type parameter**:
 
@@ -2157,7 +1466,7 @@ Root := tree_node(int){
 
 **Why this works:** Each instantiation creates a complete, consistent type. `list_node(int)` always contains `int` values and references other `list_node(int)` nodes. The type system can verify this recursion is well-formed.
 
-#### Disallowed: Direct Type Alias Recursion
+**Disallowed: Direct Type Alias Recursion**
 
 You cannot define a parametric type that directly aliases to a structural type containing itself:
 
@@ -2193,7 +1502,7 @@ Tree := nested_list(int){
 }
 ```
 
-#### Disallowed: Polymorphic Recursion
+**Disallowed: Polymorphic Recursion**
 
 Polymorphic recursion occurs when a parametric type references itself with a **different type argument**:
 
@@ -2212,7 +1521,7 @@ Polymorphic recursion occurs when a parametric type references itself with a **d
 
 **Current limitation:** While polymorphic recursion is theoretically sound in some type systems, Verse currently does not support it to keep type checking tractable.
 
-#### Disallowed: Mutual Recursion
+**Disallowed: Mutual Recursion**
 
 Mutual recursion between multiple parametric types is not supported:
 
@@ -2243,7 +1552,7 @@ combined_node(t:type) := class:
     Next:?combined_node(t)
 ```
 
-#### Disallowed: Inheritance Recursion
+**Disallowed: Inheritance Recursion**
 
 You cannot inherit from a type variable or create recursive inheritance through parametric types:
 
@@ -2331,23 +1640,9 @@ Node1.AddEdge(Node2)  # Create edge A -> B
 ```
 -->
 
-#### Summary
-
-Recursive parametric types enable powerful data structures, but with clear limitations:
-
-- ✓ **Same-parameter recursion**: `list_node(t)` containing `?list_node(t)`
-- ✗ **Direct alias recursion**: `t(u:type) := []t(u)`
-- ✗ **Polymorphic recursion**: `my_type(t)` containing `my_type(?t)`
-- ✗ **Mutual recursion**: `t1(t)` and `t2(t)` referencing each other
-- ✗ **Inheritance recursion**: `t(u:type) := class(t(u))`
-
-These restrictions ensure the type system remains decidable and type checking stays tractable.
-
 ### Parametric Interfaces
 
 While parametric classes get most of the attention, interfaces can also be parametric, enabling abstract contracts that work with any type:
-
-#### Defining Parametric Interfaces
 
 ```verse
 # Generic equality interface
@@ -2360,8 +1655,6 @@ collection(t:type) := interface:
     Remove(Item:t)<decides>:void
     Contains(Item:t):logic
 ```
-
-#### Implementing Parametric Interfaces
 
 Classes implement parametric interfaces by providing concrete types for the parameters:
 
@@ -2384,8 +1677,6 @@ Eq := comparable_equivalence(int){}
 Eq.Equal[5, 5]  # Succeeds
 ```
 
-#### Variance in Parametric Interfaces
-
 Parametric interfaces follow the same variance rules as parametric classes:
 
 ```verse
@@ -2405,8 +1696,6 @@ player_producer := class(producer_interface(player)):
 # Covariant subtyping works
 EntityProducer:producer_interface(entity) = player_producer{}
 ```
-
-#### Specialized Interfaces
 
 You can create specialized (non-parametric) interfaces from parametric ones:
 
@@ -2452,32 +1741,9 @@ player_to_entity := class(converter_interface(player, entity)):
 C:converter_interface(entity, entity) = player_to_entity{}
 ```
 
-### Parametric Structs
+### Advanced Parametric Types
 
-Structs can also be parametric, providing lightweight generic value types:
-
-```verse
-# Generic pair
-pair(t:type, u:type) := struct:
-    First:t
-    Second:u
-
-# Usage
-Coordinate := pair(int, int){First := 10, Second := 20}
-NameAge := pair(string, int){First := "Alice", Second := 30}
-
-# With parametric function
-GetFirst(P:pair(t, u) where t:type, u:type):t = P.First
-
-X := GetFirst(Coordinate)  # Returns 10 (int)
-Y := GetFirst(NameAge)     # Returns "Alice" (string)
-```
-
-Parametric structs follow all the same rules as parametric classes regarding variance, recursion, and type parameters. They're useful for lightweight data holders that don't need identity or inheritance.
-
-### Advanced Parametric Type Features
-
-#### First-Class Parametric Types
+#### First-Class Parametrics
 
 Parametric type definitions can be used as first-class values, allowing dynamic type application:
 
@@ -2537,7 +1803,7 @@ else:
 Container := my_class(ChosenType){Property := ChosenType{}}
 ```
 
-#### Effects on Parametric Types
+#### Effects
 
 Parametric types can have effect specifiers that apply to all instantiations:
 
@@ -2558,6 +1824,7 @@ Y:transactional_container(int) = transactional_container(int){Property := 2}
 ```
 
 **Allowed effects:**
+
 - `<computes>` - Allows non-terminating computation
 - `<decides>` - Can fail
 - `<suspends>` - Can suspend execution
@@ -2567,6 +1834,7 @@ Y:transactional_container(int) = transactional_container(int){Property := 2}
 - `<allocates>` - Allocates resources
 
 **Not allowed:**
+
 - `<converges>` - Would conflict with parametric instantiation (error 3565)
 
 **Effect propagation:**
@@ -2583,7 +1851,7 @@ CreateInstance():my_type(int)<computes> =
 
 The effect becomes part of the type's contract—all code constructing or working with instances must account for these effects.
 
-#### Native Parametric Types
+#### Natives
 
 Parametric types can be marked `<native>` for implementation in the underlying platform:
 
@@ -2598,6 +1866,7 @@ native_container<native>(t:type) := class:
 ```
 
 Native parametric types enable:
+
 - Performance-critical generic containers
 - Platform-specific optimizations
 - Integration with existing native code
@@ -2613,7 +1882,7 @@ Value := Container.Get()  # Returns 42
 
 Native parametric types must be implemented by the runtime, but from Verse's perspective they work identically to regular parametric types.
 
-#### Type Aliases for Parametric Types
+#### Aliases
 
 You can create type aliases that simplify complex parametric type expressions:
 
@@ -2777,7 +2046,7 @@ game_state := class:
 
 Access specifiers apply to both fields and methods, controlling who can read fields and call methods. The default visibility is `internal`, restricting access to the same module. This encapsulation is crucial for maintaining class invariants and hiding implementation details.
 
-### The Concrete Specifier
+### Concrete
 
 The `<concrete>` specifier enforces that all fields have default values, allowing construction with an empty archetype:
 
@@ -2798,11 +2067,9 @@ A concrete class `C` can be constructed by writing `C{}`, that is to say with th
 
 A concrete class may have non-concrete subclasses.
 
-### The Unique Specifier
+### Unique
 
 The `<unique>` specifier creates classes and interfaces with reference semantics where each instance has a distinct identity. When a class or interface is marked as `<unique>`, instances become comparable using the equality operators (= and <>), with equality based on object identity rather than field values.
-
-#### Unique Classes
 
 Classes marked with `<unique>` compare by identity, not by value:
 
@@ -2839,7 +2106,7 @@ E1 = E3  # Succeeds - same instance
 
 Without `<unique>`, class instances cannot be compared for equality at all—the language prevents meaningless comparisons. With `<unique>`, you gain the ability to use instances as map keys, store them in sets, and perform identity checks, essential for tracking specific objects throughout their lifetime.
 
-#### Unique Interfaces
+#### Interfaces
 
 Interfaces can also be marked with `<unique>`, which makes all instances of classes implementing that interface comparable by identity:
 
@@ -2880,8 +2147,6 @@ C2 := player_component{}
 C1 <> C2  # true - comparable due to base_component being unique
 ```
 
-#### Mixed Interface Implementation
-
 When a class implements multiple interfaces, comparability is determined by whether ANY of the inherited interfaces is `<unique>`:
 
 ```verse
@@ -2903,36 +2168,7 @@ G1 <> G2  # true - comparable due to renderable interface
 
 Even if most interfaces are non-unique, a single `<unique>` interface in the hierarchy makes the entire class comparable.
 
-#### Parametric Unique Interfaces
-
-Parametric interfaces can be marked `<unique>`, and each concrete instantiation is independently comparable:
-
-```verse
-container(t:type) := interface<unique>:
-    Get():t
-    Set(Value:t):void
-
-int_container := class(container(int)):
-    var Value:int = 0
-    Get<override>():int = Value
-    Set<override>(NewValue:int):void = set Value = NewValue
-
-string_container := class(container(string)):
-    var Value:string = ""
-    Get<override>():string = Value
-    Set<override>(NewValue:string):void = set Value = NewValue
-
-# Each instantiation is separately comparable
-IC1 := int_container{}
-IC2 := int_container{}
-IC1 <> IC2  # true
-
-SC1 := string_container{}
-SC2 := string_container{}
-SC1 <> SC2  # true
-```
-
-#### Unique Instances in Default Values
+#### Unique in Default Values
 
 When a `<unique>` class appears in a field's default value, each containing object receives its own distinct instance. This guarantee applies even when the unique class is nested within complex parametric types:
 
@@ -2992,9 +2228,9 @@ R3.DefaultEntity <> R1.DefaultEntity  # true - even across different type parame
 
 This guarantee ensures that identity-based operations remain reliable. If you store objects in maps keyed by unique instances, or maintain sets of unique objects, each container genuinely owns distinct instances rather than sharing references. The language prevents subtle bugs where multiple objects might unexpectedly share the same identity.
 
-#### Overload Resolution and comparable
+#### Overload Resolution
 
-**Important:** Types marked with `<unique>` are subtypes of the built-in `comparable` type. This can create overload ambiguity:
+Types marked with `<unique>` are subtypes of the built-in `comparable` type. This can create overload ambiguity:
 
 ```verse
 # Valid: non-unique interface doesn't conflict with comparable
@@ -3014,11 +2250,12 @@ Handle(A:unique_interface, B:unique_interface):void = {}  # ERROR - ambiguous!
 
 Since `unique_interface` is a subtype of `comparable`, both overloads could match when called with `unique_interface` arguments, causing a compilation error. When designing overloaded functions, be aware that `<unique>` types participate in the `comparable` type hierarchy.
 
-#### Use Cases for Unique
+#### Use Cases
 
 The `<unique>` specifier is ideal for:
 
 **Game Entities:** Where each entity in the world must be distinguishable regardless of current state
+
 ```verse
 entity := class<unique>:
     var Health:int = 100
@@ -3029,6 +2266,7 @@ var ActiveEntities:[entity]logic = map{}
 ```
 
 **Component Interfaces:** Where you need identity-based equality for interface types
+
 ```verse
 component := interface<unique>:
     Owner:entity
@@ -3039,6 +2277,7 @@ var ComponentRegistry:[component]string = map{}
 ```
 
 **Session Objects:** Where identity matters more than current property values
+
 ```verse
 player_session := class<unique>:
     PlayerID:string
@@ -3049,6 +2288,7 @@ var ActiveSessions:[player_session]connection_info = map{}
 ```
 
 **Resource Handles:** Where you need to track specific instances rather than equivalent values
+
 ```verse
 texture_handle := class<unique>:
     ResourceID:int
@@ -3060,7 +2300,7 @@ var LoadedTextures:[texture_handle]gpu_resource = map{}
 
 The `<unique>` specifier enables these patterns by providing identity-based equality semantics, making it possible to use instances as map keys, maintain sets of unique objects, and distinguish between different instances even when their data is identical.
 
-### The Abstract Specifier
+### Abstract
 
 The `<abstract>` specifier marks classes that cannot be instantiated directly — they exist solely as base classes  for inheritance. When you declare a class with `<abstract>`, you're creating a template that defines structure and behavior for subclasses to inherit and implement.
 
@@ -3085,13 +2325,11 @@ Abstract classes serve as architectural foundations in a type hierarchy. They de
 
 Abstract methods within abstract classes have no implementation — they're pure declarations that establish what subclasses must provide. An abstract method creates a contract: any non-abstract subclass must override all abstract methods or the code won't compile.
 
-### The Castable Specifier
+### Castable
 
 The `<castable>` specifier enables runtime type checking and safe downcasting for classes. When a class is marked with `<castable>`, you can use dynamic type tests and casts to determine if an object is an instance of that class or its subclasses at runtime.
 
 Without `<castable>`, Verse's type system operates purely at compile time. The `<castable>` specifier adds runtime type information, allowing code to inspect and react to actual object types during execution. This bridges the gap between static type safety and dynamic polymorphism.
-
-#### Dynamic Casting Syntax
 
 Verse provides two forms of type casting: **fallible casts** (which can fail at runtime) and **infallible casts** (which are verified at compile time).
 
@@ -3224,7 +2462,7 @@ Once a class is published with `<castable>`, this decision becomes permanent. Yo
 
 This permanence is enforced through the versioning system—attempting to change the `<castable>` status of a published class will result in a compatibility error.
 
-### The Final Specifier
+### Final
 
 The `<final>` specifier prevents inheritance, creating a terminal point in a class hierarchy. When you mark a class  with `<final>`, no other class can inherit from it. For methods, `<final>` prevents overriding in subclasses, locking  the implementation at that level of the hierarchy.
 
@@ -3295,7 +2533,7 @@ This pattern is particularly valuable in component architectures where you want 
 
 This design enforces architectural discipline, preventing the "inheritance explosion" that can occur when every class becomes a potential base for further specialization. By limiting inheritance depth, these specifiers promote composition over deep inheritance, leading to more maintainable and understandable code structures.
 
-### The Persistable Specifier
+### Persistable
 
 The `<persistable>` specifier marks types that can be saved and restored across game sessions, enabling permanent storage of player progress, achievements, and game state. This specifier transforms ephemeral gameplay into  lasting progression, creating the foundation for meaningful player investment.
 
@@ -3398,7 +2636,7 @@ player_entity := class(entity_properties):
 
 When an interface field has a default value, implementing classes automatically inherit that default unless they override it. Fields without defaults must be provided either by the implementing class or through construction parameters.
 
-### Default Method Implementations
+### Default Implementations
 
 Interfaces can provide complete method implementations that implementing classes inherit automatically:
 
@@ -3422,7 +2660,7 @@ sprite := class(animated):
 
 Classes inherit these implementations without modification, allowing interfaces to provide reusable behavior. Implementing classes can override these methods if they need specialized behavior, but the interface provides a working default.
 
-### Overriding Interface Members
+### Overriding Members
 
 Classes can override both fields and methods from interfaces to provide specialized implementations:
 
@@ -3451,7 +2689,7 @@ mage := class(base_stats):
 
 Field overrides can provide different default values or specialize to subtypes. Method overrides replace the interface's implementation entirely. All overrides must maintain type compatibility—fields can only be overridden with subtypes, and method signatures must match exactly.
 
-### Multiple Interfaces with Shared Fields
+### Multiple Interfaces with Sharing
 
 When a class implements multiple interfaces that declare fields or methods with the same name, you must use qualified names to disambiguate:
 
@@ -3537,55 +2775,6 @@ The `external{}` keyword indicates the field has no direct storage—all access 
 
 **Important:** Fields with accessors defined in interfaces cannot be overridden in implementing classes. The accessor implementation is fixed by the interface.
 
-### Interface-Based Programming
-
-Interfaces enable programming to abstractions rather than concrete implementations:
-
-<!--NoCompile-->
-```verse
-# Function works with any damageable object
-ApplyDamageOverTime(Target:damageable, DamagePerSecond:int, Duration:float)<suspends>:void =
-    for (I := 0..Floor(Duration)):
-        if (Target.IsAlive()):
-            Target.TakeDamage(DamagePerSecond)
-            Sleep(1.0)
-
-# Function works with any healable object
-HealToFull(Target:healable):void =
-    MaxHealth := Target.GetMaxHealth()
-    CurrentHealth := Target.GetHealth()
-    Target.Heal(MaxHealth - CurrentHealth)
-```
-
-This approach creates loose coupling between different parts of your code. Functions operating on interface types work with any implementing class, promoting code reuse and flexibility. The interface defines what operations are available, while implementing classes determine how those operations execute.
-
-### Property Patterns
-
-A common pattern uses interfaces to package related properties that multiple classes can share:
-
-```verse
-# Interface defines shared state structure
-player_properties := class:
-    var PlayerHealth:float = 100.0
-    var PlayerXP:int = 0
-
-# Interface requires the property bundle
-has_player_properties := interface:
-    var PlayerProperties:player_properties = player_properties{}
-
-# Multiple classes can implement the same property interface
-game_mode := class(has_player_properties):
-    # Inherits PlayerProperties field
-
-player_tracker := class(has_player_properties):
-    # Also has PlayerProperties field
-
-    UpdateHealth(NewHealth:float):void =
-        set PlayerProperties.PlayerHealth = NewHealth
-```
-
-This pattern allows different systems to share common data structures without inheritance relationships, enabling composition-based designs where functionality is mixed in through interface implementation rather than class inheritance.
-
 ## Structs
 
 Structs provide lightweight data containers without the object-oriented features of classes. They're value types optimized for simple data aggregation, making them perfect for mathematical types, data transfer objects, and any scenario where you need a simple bundle of related values without behavior.
@@ -3617,7 +2806,7 @@ damage_info := struct:
 
 All struct fields are public and immutable by default. Structs cannot have methods, constructors, or participate in inheritance hierarchies. This simplicity makes them efficient and predictable.
 
-### Struct Construction and Usage
+### Construction
 
 Creating struct instances uses the same archetype syntax as classes:
 
@@ -3634,7 +2823,7 @@ NewPos := PlayerPos
 
 Since structs are value types, assigning a struct to a variable creates a copy of all its data. This differs from classes, which use reference semantics.
 
-### Struct Comparison
+### Comparison
 
 Structs with all comparable fields support equality comparison:
 
@@ -3674,17 +2863,9 @@ PlayerData : weak_map(player, player_stats) = map{}
 
 Once published, persistable structs cannot be modified, ensuring data compatibility across game updates.
 
-### When to Use Structs
-
-Structs excel in specific scenarios where their limitations become strengths. Use structs for simple data containers that group related values without behavior, like coordinates, colors, or configuration data. They're ideal for data transfer objects that move information between systems without needing methods. Mathematical types benefit from struct's value semantics and comparison capabilities. Persistable data that needs to remain stable across game updates fits naturally into structs.
-
-Avoid structs when you need methods, inheritance, mutable fields, or complex initialization logic—these scenarios call for classes instead.
-
 ## Enums
 
 Enums define types with a fixed set of named values, perfect for representing states, types, or any concept with a known, finite set of alternatives. They make code more readable by replacing magic numbers with meaningful names and provide compile-time safety by restricting values to the defined set.
-
-### Basic Syntax
 
 An enum lists all possible values for a type:
 
@@ -3715,8 +2896,6 @@ Each value in the enum becomes a named constant of that enum type. The compiler 
 placeholder := enum{}  # Valid but rarely useful
 ```
 
-### Types vs Values: A Critical Distinction
-
 Enums introduce both a type and a set of values, and it's crucial to distinguish between them:
 
 ```verse
@@ -3745,7 +2924,7 @@ set CurrentStatus = status.Inactive    # OK
 
 This distinction prevents confusion and ensures type safety. The enum type defines what values are possible, while enum values are the actual constants you use in your code.
 
-### Syntax Restrictions
+### Restrictions
 
 Enums have specific syntactic requirements that keep their usage clear and unambiguous:
 
@@ -3841,7 +3020,7 @@ weapon_type := enum<open>:
 
 **Open enums** allow new values to be added in future versions. This flexibility comes at a cost: case expressions cannot be exhaustive since future values might exist. Use open enums for extensible sets: item types, enemy types, damage types, or any content that may grow.
 
-### Case Exhaustiveness: Critical Rules
+### Exhaustiveness
 
 The interaction between enum types and case expressions follows sophisticated rules that prevent bugs while enabling both safety and flexibility. Understanding these rules is essential for working with enums effectively.
 
@@ -4026,28 +3205,6 @@ ProcessStatus(S:status):int =
 
 Use `@ignore_unreachable` sparingly, primarily during refactoring or when maintaining multiple code paths for testing purposes.
 
-### Namespace Isolation
-
-Enumerators in different enums exist in separate namespaces and never collide:
-
-```verse
-letters := enum:
-    A
-    B
-    C
-
-numbers := enum:
-    A      # OK - different namespace from letters
-    B
-    C
-
-# Qualify to distinguish
-LetterValue := letters.A
-NumberValue := numbers.A
-```
-
-This isolation means you can reuse meaningful names across different enums without conflicts. However, within a single scope, enum type names must be unique just like any other identifier.
-
 ### Explicit Qualification
 
 Enumerators can collide with identifiers in parent scopes. When this happens, you can use explicit qualification to disambiguate:
@@ -4128,7 +3285,7 @@ game_state := enum:
 
 Attributes must be marked with the appropriate scopes (`@attribscope_enum` for enum types, `@attribscope_enumerator` for individual values) or the compiler will reject them. This provides metadata capabilities for reflection, serialization, or custom tooling.
 
-### Enum Comparison
+### Comparison
 
 Enum values are fully comparable, meaning they support both equality (`=`) and inequality (`<>`) operators. This makes them ideal for state tracking and conditional logic:
 
@@ -4174,92 +3331,3 @@ FindState(States:[]game_state, Target:game_state)<decides>:int =
             return Index
     -1
 ```
-
-### Persistable Enums
-
-Enums can be made persistable for save systems:
-
-```verse
-player_class := enum<persistable>:
-    Warrior
-    Mage
-    Rogue
-    Cleric
-
-save_data := struct<persistable>:
-    SelectedClass : player_class = player_class.Warrior
-    Level : int = 1
-```
-
-Persistable enums maintain value compatibility across game updates, though open enums can have new values added.
-
-### Implementation Notes
-
-**Virtual Machine Limits:**
-
-Different Verse virtual machines have different capabilities. The Blueprint VM (BPVM) used in Unreal Engine has a limit of 256 enumerators per enum (values 0-255). Attempting to use enumerators beyond this range will cause a link error in BPVM environments:
-
-```verse
-# BPVM: OK for values 0-255
-small_enum := enum:
-    Value000
-    Value001
-    # ... up to ...
-    Value255  # Last valid value in BPVM
-
-# BPVM: ERROR for value 256+
-large_enum := enum:
-    Value000
-    # ... 255 more values ...
-    Value256  # Link error in BPVM
-```
-
-The native Verse VM has no practical limit and can handle enums with thousands of enumerators. If you're targeting BPVM, keep your enums under 256 values or split large enums into multiple smaller ones.
-
-**Language Evolution:**
-
-Enum semantics have evolved across Verse versions. In versions before 30.00 (Fortnite version 29.30), the compiler was more permissive:
-
-- Duplicate enumerators within an enum didn't error until referenced
-- Enumerators didn't collide with parent-scope symbols
-
-From version 30.00 onwards, these became compilation errors:
-
-- Duplicate enumerators are immediately flagged as errors
-- Enumerators that shadow parent-scope symbols cause errors (use explicit qualification to resolve)
-
-If you're maintaining code across versions, be aware that older code may have patterns that newer compilers reject. Use explicit qualification `(enum_name:)enumerator` to resolve naming conflicts that arise from the stricter rules.
-
-## Best Practices
-
-### Choosing the Right Type
-
-The choice between class, interface, struct, and enum shapes your program's architecture fundamentally. Classes excel when you need objects with identity, behavior, and state that changes over time. They support inheritance and polymorphism, making them ideal for game entities, systems, and anything requiring object-oriented design patterns.
-
-Interfaces shine when defining contracts that multiple unrelated classes might implement. They enable loose coupling and dependency inversion, crucial for testable, maintainable code. Use interfaces when you care about what an object can do, not what it is.
-
-Structs serve best as simple data containers without behavior. Their value semantics and immutability make them perfect for coordinates, colors, configuration data, and data transfer objects. The lack of methods and inheritance keeps them lightweight and predictable.
-
-Enums provide type-safe sets of named constants, eliminating magic numbers and making code self-documenting. They're invaluable for states, types, categories, and any fixed set of alternatives your game needs to distinguish.
-
-### Design Principles
-
-Follow the single responsibility principle by ensuring each type has one clear purpose. A class should represent one concept, an interface should define one cohesive contract, a struct should group one set of related data, and an enum should represent one category of values.
-
-Favor composition over inheritance when designing class hierarchies. Rather than deep inheritance trees, compose objects from smaller, focused components. This creates more flexible, maintainable systems that are easier to understand and modify.
-
-Use interfaces to define capabilities rather than identities. An interface named `shootable` is better than `enemy` because it describes what the object can do rather than what it is, enabling more flexible use.
-
-Keep structs simple and focused on data. If you find yourself wanting to add methods or complex validation to a struct, consider using a class instead. Structs should remain pure data containers.
-
-Make enums intention-revealing. Each enum value should be self-explanatory, eliminating the need for comments or external documentation to understand what it represents.
-
-**For enums specifically:**
-
-Choose closed enums (the default) whenever the set of values is truly fixed and will never grow. This enables exhaustive pattern matching and catches missing cases at compile time. Reserve open enums for extensible sets where new values are likely to be added in future updates.
-
-Design case expressions to leverage exhaustiveness checking. For closed enums with complete coverage, omit the wildcard to let the compiler verify all cases are handled. For open enums or partial matches, always provide either a wildcard or use a `<decides>` context to handle unknown values safely.
-
-Prefer descriptive enumerator names over terse abbreviations. `weapon_type.TwoHandedSword` is clearer than `weapon_type.THS`, even if longer. The extra clarity prevents misinterpretation and makes code self-documenting.
-
-Keep enums focused on a single concept. An enum named `entity_state` should only contain entity states, not mixed concerns like `Active`, `Dormant`, `PlayerControlled`, `EnemyType_Zombie`. Split mixed concerns into separate enums that each represent one category.
