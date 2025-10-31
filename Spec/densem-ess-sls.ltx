@@ -125,17 +125,17 @@ $$
 \multicolumn{3}{l}{\textbf{Theorems}}  \\
 \pomunit{\pomempty} \pomseq S & = & \pomunit{\pomempty} \\
 S \pomseq \pomunit{\pomempty} & = & \pomunit{\pomempty} \\
+S \pomseq (T \pomunion R) & = & (S \pomseq T) \pomunion (S \pomseq R) \\
+S \pomseq (T \pomcat R) & = & (S \pomseq T) \pomcat (S \pomseq R) \\
 
   \\
 \multicolumn{3}{l}{\text{\textbf{Alternative definitions of sequencing}}} \\
-    S \pomseq T & = & S \pombind (\lambda \EV_1.\, T \pombind (\lambda \EV_2. \,
-        \pomunit{\EV_1 \cap \EV_2})) \\
-        & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 \pomelem S, \; \EV_2 \pomelem T \pomcompR \\[1mm]
+S \pomseq T & = & \pomcompL \EV_1 \cap \EV_2 \vb \EV_1 \pomelem S, \; \EV_2 \pomelem T \pomcompR \\
+   & = & S \pombind (\lambda \EV_1.\, T \pombind (\lambda \EV_2. \,
+        \pomunit{\EV_1 \cap \EV_2})) \\[2mm]
 
 \multicolumn{3}{l}{\text{\textbf{Disjunction (or, union)}}} \\
 (\pomor) & : & \pomENV \rightarrow \pomENV \rightarrow \pomENV \\
- \pomempty \pomor S & = & S \\
- S \pomor \pomempty & = & S \\
  S \pomor T & = & \pomcompL \EV_1 \cup \EV_2 \vb \EV_1 \pomelem S,\; \EV_2 \pomelem T \pomcompR \\[1mm]
 
 \multicolumn{3}{l}{\text{\textbf{Negation (or, complement)}}} \\
@@ -293,45 +293,57 @@ $$
 $$
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
-  & \semess{E}{h}{f}{|t|} & : & \pomENV  \\
+                & \semess{E}{h}{f}{|t|} & : & \pomENV  \\
+  \rulename{sfun} &
+   \semess{E}{h}{f}{|functionOCX q t_0 fx t_1|}
+    & = &  \semFUN{\semess{E}{c}{d}{|t_0|}}{\semap{I}{t_0},q,|fx|}{cd}{hf}{|t_1|}
+   \hspace{1cm} \hfill c,d, \not\in \freevars{t_0,t_1,h,f} \\
+   & \multicolumn{3}{l}{\hspace{6mm}\textbf{where}} \\
+   & \multicolumn{3}{l}{\hspace{1cm}
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
 
-\multicolumn{2}{@@{}l}{\rulename{sfun} \; \hfill \semess{E}{h}{f}{|function t_0 t_1|}}
-& = &  \semFUN{\semess{E}{p}{q}{t_0}}{\semap{I}{t_0}}{pq}{hf}{t_1}
-\hfill p,q, \not\in \freevars{t_0,t_1,h,f} \\[2mm]
+  xs & = & \semap{I}{t_0} \\[1mm]
+  \semFUN{\_}{xs,q,|fx|}{cd}{hf}{t_1} & : & \pomENV \rightarrow \pomENV \\
+% &  \semFUN{\pomempty}{xs}{cd}{hf}{t_1} & = & \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\[1mm]
+% &  \semFUN{S \pomunion T}{xs}{cd}{hf}{t_1 } & = & \semFUN{S}{xs}{cd}{hf}{t_1} \pomunion \semFUN{T}{xs}{cd}{hf}{t_1} \\[1mm]
 
-&  \semFUN{\_}{xs}{pq}{hf}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\[1mm]
-% &  \semFUN{\pomempty}{xs}{pq}{hf}{t_1} & = & \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\[1mm]
-% &  \semFUN{S \pomunion T}{xs}{pq}{hf}{t_1 } & = & \semFUN{S}{xs}{pq}{hf}{t_1} \pomunion \semFUN{T}{xs}{pq}{hf}{t_1} \\[1mm]
-
-&  \semFUN{S \pomunion T}{xs}{pq}{hf}{t_1}
+  \semFUN{S \pomunion T}{xs,q,|fx|}{cd}{hf}{t_1}
                    & = & \pomunit{\conBrack{h=h_1 \fununion h_2, f=f_1 \fununion f_2}}
-                   \hspace{3mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
-  &&&  \pomseq \semFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \semFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
-  &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
+                   \hspace{6mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
+              &&  \pomseq \semFUN{S}{xs,q,|fx|}{cd}{h_1f_1}{t_1} \\
+              &&  \pomseq \semFUN{T}{xs,q,|fx|}{cd}{h_2f_2}{t_1} \\
+              && \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
 
-&  \semFUN{S \pomcat T}{xs}{pq}{hf}{t_1}
+  \semFUN{S \pomcat T}{xs,q,|fx|}{cd}{hf}{t_1}
                    & = & \pomunit{\conBrack{h=h_1 \funcat h_2, f=f_1 \funcat f_2}}
                    \hspace{3mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
-  &&&  \pomseq \semFUN{S}{xs}{pq}{h_1f_1}{t_1} \pomseq \semFUN{T}{xs}{pq}{h_2f_2}{t_1} \\
-  &&& \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
-&  \semFUN{\pomunit{\EV_0}}{xs}{pq}{hf}{t_1}
-                   &  = & \pomunit{ \begin{array}[t]{@@{}l@@{\;}l}
-                       \{ & \rho \in \Env \\
-                       \vb & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{p,q,xs\}) \\
-                       , & \Fun{\pomunit{\hh}} = \rho(h) \;\;\hfill \text{(binds $hh$)} \\
-                       , & \dom(\hh) = \envlk{\EV'}{q} \\
-                       , & \pomunit{\EV_1} = \pomunit{\EV'} \pomseq \conBrack{ \fpr{q}{u} \in hh } \pomseq \semess{E}{u}{v}{|t_1|}  \hspace{6mm} \hfill \text{(binds $\EV'$)} \\
-                       , & |let|\; \ff = \{ \fpr{\rho(p)}{\rho(v)} \vb \rho \in \EV_1 \} \\
-                       , & isFunction(\ff) \\
-                       , & \Fun{\pomunit{\ff}} = \rho(f)  \\
-                       , & \dom(\ff) = \envlk{\EV'}{p} \\
-                       \} }
-                       \end{array}
-
-% We have gotten rid of the  NOT case for unit(D)
-%  &&&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE \{p,q,xs\}) \pomseq \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\
-
+              &&  \pomseq \semFUN{S}{xs,q,|fx|}{cd}{h_1f_1}{t_1} \\
+              && \pomseq \semFUN{T}{xs,q,|fx|}{cd}{h_2f_2}{t_1} \\
+              && \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
+  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+  &  = & \pomunit{
+  \begin{array}[t]{@@{}l@@{\;}ll}
+     \{ & \rho \in \Env \\
+     \vb & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{c,d,xs\}) & \rulename{(f1)} \\
+     , & \Fun{\pomunit{\hh}} = \rho(h)  & \rulename{(f2)}\;\text{binds $hh$} \\
+     , & |if fx = eff succeeds|  & \rulename{(f3)} \\
+      & \hspace{2mm} |then| \; \dom(\hh) = \envlk{\EV'}{d} \\
+      & \hspace{2mm} |else| \; \dom(\hh) \subseteq \envlk{\EV'}{d}  \\
+     , & \pomunit{\EV_1} = \pomunit{\EV' \cap \conBrack{ \fpr{d}{u} \in hh }}
+                 \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f4)} \; \text{binds $\EV_1$} \\
+     , & \pomempty = \pomunit{\EV' \cap \conBrack{ d \not\in \dom(hh) }}  \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f5)} \\
+     , & |let|\; \ff = \{ \fpr{\envlk{\rho}{c}}{\envlk{\rho}{v}} \vb \rho \in \EV_1 \} & \rulename{(f6)}\\
+     , & \dom(\ff) = \{ \envlk{\rho}{c} \vb \rho \in \EV', \envlk{\rho}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
+     , & isFunction(\ff) & \rulename{(f8)} \\
+     , & \Fun{\pomunit{\ff}} = \rho(f)  & \rulename{(f9)}
+     \} }
+  \end{array}
+\end{array}} \\
 \end{array}
+\\ \\
+\text{Note 1: for |eff succeeds|, \rulename{f5} is vacuously true } \\
+\text{Note 2: for |eff succeeds|, \rulename{f7} is equivalent to $\dom(\ff) = \envlk{\EV'}{c}$}
+
 \end{array}
 $$
 \caption{E-POM: denotational semantics of Essential Verse: functions}
