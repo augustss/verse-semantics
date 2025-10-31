@@ -724,11 +724,9 @@ NewPoint := Origin.Translate(Delta)  # Tuple expands to two arguments
 
 This works when the tuple type matches the parameter list.
 
-## Function Types and Lambdas
+## Lambdas
 
 Functions are first-class values; they can be stored in variables, passed as parameters, returned from other functions, and created anonymously. This enables powerful functional programming patterns including higher-order functions, callbacks, and composable operations.
-
-### Lambdas
 
 Lambda expressions create anonymous functions using the `=>` operator:
 
@@ -782,8 +780,6 @@ Triple(5)  # Returns 15
 
 The captured variables are bound when the lambda is created, not when it's called.
 
-### Function Types
-
 The arrow operator `->` declares function types explicitly:
 
 ```verse
@@ -810,8 +806,6 @@ Use `tuple()` for multiple parameters. Without it, `(int, int)` is a tuple value
 Good:tuple(int, int)->string = (X:int, Y:int) => "{X}, {Y}"
 ```
 
-### Functions as Parameters
-
 Functions accepting other functions enable higher-order programming:
 
 ```verse
@@ -823,17 +817,7 @@ Map(Items:[]int, Transform(:int):int):[]int =
 Numbers := array{1, 2, 3, 4, 5}
 Doubled := Map(Numbers, (X:int) => X * 2)
 # Returns array{2, 4, 6, 8, 10}
-
-# Filter function
-Filter(Items:[]int, Predicate(:int)<decides>:void):[]int =
-    for (Item:Items, Predicate[Item]):
-        Item
-
-Evens := Filter(Numbers, (X:int) => X % 2 = 0)
-# Returns array{2, 4}
 ```
-
-### Precedence and Parentheses
 
 The `:=` operator has higher precedence than `=>`, so you must use parentheses when assigning lambdas:
 
@@ -848,13 +832,13 @@ G := (I:int => I*I)
 H:int->int = I:int => I*I
 ```
 
-### Function Variance
+### Types, Variance and Effects
 
-Function types follow specific subtyping rules based on **variance**:
+Function types follow specific subtyping rules based on *variance*:
 
-**Parameters are contravariant**: A function accepting more general types can substitute for one accepting specific types.
+- *Parameters are contravariant*: A function accepting more general types can substitute for one accepting specific types.
 
-**Returns are covariant**: A function returning more specific types can substitute for one returning general types.
+- *Returns are covariant*: A function returning more specific types can substitute for one returning general types.
 
 ```verse
 animal := class:
@@ -880,15 +864,9 @@ ProcessDog = F3  # OK: tuple(dog)->dog <: tuple(dog)->animal
 # Invalid: F2 returns animal but parameter is not contravariant enough
 # ProcessDog = F2  # ERROR: tuple(dog)->animal </: tuple(dog)->animal
 #                  # (same parameters, same return - no variance issue here)
-
-# Invalid: Would require accepting animal where dog expected
-ProcessAnimal:type{_(:animal):animal}
-# ProcessAnimal = F3  # ERROR: tuple(dog)->dog </: tuple(animal)->animal
 ```
 
-### Effects and Function Types
-
-Effects are part of the function type and must match **exactly** - effects are **invariant**:
+Effects are part of the function type and must match *exactly* - effects are **invariant**:
 
 ```verse
 Pure():int = 42
@@ -911,8 +889,6 @@ UseSuspendable(Suspendable)  # OK
 
 There is no subtyping relationship between functions with different effects, even if one seems "weaker" than another.
 
-### Type Joining of Functions
-
 When you assign different functions conditionally, Verse finds the least upper bound (join) of their types:
 
 ```verse
@@ -927,13 +903,13 @@ G := if(true?) {F1} else {F2}
 G().Value  # Can access base members
 ```
 
-### Mutable and Optional Functions
+### Replacing Member Functions
 
 Unlike regular variables, function members in classes can be mutable or optional using special syntax:
 
 <!-- TODO REALL? -->
 
-**Mutable function members** (declared without a body):
+Mutable function members are declared without a body:
 
 ```verse
 callback_handler := class:
@@ -941,16 +917,14 @@ callback_handler := class:
     OnUpdate(DeltaTime:float):void
 
     # Must be initialized when constructing
-Handler := callback_handler{
-    OnUpdate := (DT:float) => Print("Update: {DT}")
-}
+Handler := callback_handler{ OnUpdate := (DT:float) => Print("Update: {DT}") }
 
 # Can be reassigned
 set Handler.OnUpdate = (DT:float) => Print("New: {DT}")
 Handler.OnUpdate(0.016)
 ```
 
-**Optional function members** (using `?` suffix):
+Optional function members use `?` suffix:
 
 ```verse
 event_system := class:
@@ -970,8 +944,6 @@ System2 := event_system{OnEvent := (E:string) => Print("Custom: {E}")}
 System2.Trigger("test")  # Uses custom
 ```
 
-### Overriding Functions in Constructors
-
 You can override function implementations when constructing instances:
 
 ```verse
@@ -979,22 +951,16 @@ processor := class:
     Process(X:int):string = "Default: {X}"
 
 # Override in constructor
-Custom := processor{
-    Process(X:int):string = {"Custom: {X}"}
-}
-
-Custom.Process(42)  # Returns "Custom: 42"
+Custom := processor{  Process(X:int):string = {"Custom: {X}"} }
 ```
 
 This works with lambdas too:
 
 ```verse
-Custom2 := processor{
-    Process := (X:int) => "Lambda: {X}"
-}
+Custom2 := processor{ Process := (X:int) => "Lambda: {X}" }
 ```
 
-**Cannot override `<final>` functions**:
+But not  `<final>` functions:
 
 ```verse
 locked := class<final>:
@@ -1004,65 +970,9 @@ locked := class<final>:
 # Instance := locked{Process := () => {}}
 ```
 
-### Higher-Order Function Patterns
-
-**Map-Filter-Reduce**:
-
-```verse
-# Generic map
-Map(Items:[]t, F(:t):u where t:type, u:type):[]u =
-    for (Item:Items):
-        F(Item)
-
-# Generic filter
-Filter(Items:[]t, Pred(:t)<decides>:void where t:type):[]t =
-    for (Item:Items, Pred[Item]):
-        Item
-
-# Generic fold/reduce
-Fold(Items:[]t, Initial:u, F(:u, :t):u where t:type, u:type):u =
-    var Acc:u = Initial
-    for (Item:Items):
-        set Acc = F(Acc, Item)
-    Acc
-
-# Usage
-Numbers := array{1, 2, 3, 4, 5}
-Squared := Map[Numbers, (X:int) => X * X]
-Evens := Filter[Numbers, (X:int) => X % 2 = 0]
-Sum := Fold[Numbers, 0, (Acc:int, X:int) => Acc + X]
-```
-
-**Function composition**:
-
-```verse
-Compose(F(:b):c, G(:a):b where a:type, b:type, c:type):type{_(:a):c} =
-    (X:a) => F(G(X))
-
-Add1 := (X:int) => X + 1
-Double := (X:int) => X * 2
-
-# Compose: first doubles, then adds 1
-DoubleThenIncrement := Compose[Add1, Double]
-DoubleThenIncrement(5)  # Returns 11 (5*2 + 1)
-```
-
-**Partial application**:
-
-```verse
-Partial(F(:a, :b):c, X:a where a:type, b:type, c:type):type{_(:b):c} =
-    (Y:b) => F(X, Y)
-
-Add := (X:int, Y:int) => X + Y
-Add5 := Partial[Add, 5]
-Add5(3)  # Returns 8
-```
-
 ### Using `type{}`
 
-The `type{_(...):...}` syntax declares function types with full detail. This is Verse's primary mechanism for creating precise function type signatures that include parameter types, return types, and effects.
-
-The `type{}` construct uses an underscore `_` as a placeholder for the function name, emphasizing that it describes a signature, not a specific function:
+The `type{_(...):...}` syntax declares function types with full detail. This is the mechanism for creating function type signatures that include parameter types, return types, and effects. Underscore `_` is a placeholder for the function name, emphasizing that it describes a signature, not a specific function:
 
 ```verse
 # Function type variable
@@ -1079,7 +989,7 @@ Process(F:type{_(:int):int}, Value:int):int =
 Process((X:int) => X * 2, 5)  # Returns 10
 ```
 
-The `type{}` construct **exclusively declares function type signatures**. It cannot be used for general type expressions or to extract types from values:
+The `type{}` construct *exclusively declares function type signatures*. It cannot be used for general type expressions or to extract types from values:
 
 ```verse
 ValidType1 := type{_():int}
@@ -1087,19 +997,7 @@ ValidType2 := type{_(:string, :int):float}
 ValidType3 := type{_()<transacts><decides>:void}
 ```
 
-Within `type{}`, function declarations must have return types but **cannot have bodies**:
-
-```verse
-# VALID: Declaration with return type, no body
-C := class:
-    Handler:type{_():void}
-
-# INVALID: Declaration with body (ERROR 3552)
-# C := class:
-#     Handler:type{_():void={}}
-```
-
-This restriction ensures that `type{}` describes signatures, not implementations.
+Within `type{}`, function declarations must have return types but *cannot have bodies*.
 
 Function types work as field types in classes:
 
@@ -1167,27 +1065,59 @@ SumFunctions(Functions:[]type{_():int}):int =
 SumFunctions(array{GetZero, GetOne, GetTwo})  # Returns 3
 ```
 
-Function types can include effect specifications, ensuring type safety with effects:
+### Examples
+
+**Map-Filter-Reduce**:
 
 ```verse
-PureCompute(X:int)<computes>:int = X + 1
-MayFail(X:int)<computes><decides>:int =
-    if (X > 0):
-        X
-    else:
-        X  # Would fail if negative
+# Generic map
+Map(Items:[]t, F(:t):u where t:type, u:type):[]u =
+    for (Item:Items):
+        F(Item)
 
-# Type with computes effect
-F1:type{_(:int)<computes>:int} = PureCompute
+# Generic filter
+Filter(Items:[]t, Pred(:t)<decides>:void where t:type):[]t =
+    for (Item:Items, Pred[Item]):
+        Item
 
-# Type with computes and decides effects
-F2:type{_(:int)<computes><decides>:int} = MayFail
+# Generic fold/reduce
+Fold(Items:[]t, Initial:u, F(:u, :t):u where t:type, u:type):u =
+    var Acc:u = Initial
+    for (Item:Items):
+        set Acc = F(Acc, Item)
+    Acc
 
-# Can assign less-effectful to more-effectful type
-F3:type{_(:int)<transacts>:int} = PureCompute  # OK
+# Usage
+Numbers := array{1, 2, 3, 4, 5}
+Squared := Map[Numbers, (X:int) => X * X]
+Evens := Filter[Numbers, (X:int) => X % 2 = 0]
+Sum := Fold[Numbers, 0, (Acc:int, X:int) => Acc + X]
 ```
 
-See the Effects chapter for complete details on effect subtyping.
+**Function composition**:
+
+```verse
+Compose(F(:b):c, G(:a):b where a:type, b:type, c:type):type{_(:a):c} =
+    (X:a) => F(G(X))
+
+Add1 := (X:int) => X + 1
+Double := (X:int) => X * 2
+
+# Compose: first doubles, then adds 1
+DoubleThenIncrement := Compose[Add1, Double]
+DoubleThenIncrement(5)  # Returns 11 (5*2 + 1)
+```
+
+**Partial application**:
+
+```verse
+Partial(F(:a, :b):c, X:a where a:type, b:type, c:type):type{_(:b):c} =
+    (Y:b) => F(X, Y)
+
+Add := (X:int, Y:int) => X + Y
+Add5 := Partial[Add, 5]
+Add5(3)  # Returns 8
+```
 
 ## Nested Functions
 
@@ -1214,9 +1144,7 @@ Outer(5)  # Returns 10
 
 Nested functions are only visible within their enclosing function's scope. They cannot be accessed from outside.
 
-### Capturing Variables from Outer Scope
-
-Nested functions can capture (close over) variables from any enclosing scope, just like lambdas:
+Nested functions capture (close over) variables from any enclosing scope, just like lambdas:
 
 <!--verse
 F():void={
@@ -1240,58 +1168,6 @@ SayHi()  # Returns "Hello, Bob!"
 -->
 
 Each call to `MakeGreeter` creates a new closure with its own captured `Name` value.
-
-### Multiple Nesting Levels
-
-Nested functions can access variables from any level of the enclosing scope chain:
-
-<!--verse
-F():void={
--->
-```verse
-Outer(A:int):int =
-    Middle(B:int):int =
-        Inner(C:int):int =
-            # Inner can access A, B, and C
-            A + B + C
-        Inner(B + 1)
-    Middle(A + 1)
-
-Outer(1)  # Returns 1 + 2 + 3 = 6
-```
-<!--verse
-}
--->
-
-The inner-most function has access to all variables from all enclosing scopes.
-
-### Recursive Nested Functions
-
-Nested functions can call themselves recursively:
-
-<!--verse
-F():void={
--->
-```verse
-Factorial(N:int):int =
-    # Recursive nested function
-    FactorialHelper(X:int):int =
-        if (X <= 1):
-            1
-        else:
-            X * FactorialHelper(X - 1)  # Recursive call
-
-    FactorialHelper(N)
-
-Factorial(5)  # Returns 120
-```
-<!--verse
-}
--->
-
-The nested function can reference itself by name within its body.
-
-### Overloading in Nested Functions
 
 Nested functions support overloading by parameter types:
 
@@ -1318,7 +1194,7 @@ Process(1)  # Returns "Int: 42, Float: 3.14"
 
 Overload resolution works the same as for top-level functions.
 
-### Closures with Mutable State
+### Closures with State
 
 Nested functions can capture `var` variables and mutate them, creating stateful closures:
 
@@ -1353,33 +1229,7 @@ GetValue()        # Returns 2
 
 This pattern creates a closure that maintains private mutable state.
 
-### Accessing Fields Through Captured References
-
-Nested functions can access class instance fields through captured references:
-
-<!--verse
-player_data := class:
-    Name:string = "Player"
-    var Score:int = 0
-F():void={
--->
-```verse
-ProcessPlayer(Player:player_data):string =
-    # Nested function accesses Player's fields
-    GetInfo():string = "Player: {Player.Name}, Score: {Player.Score}"
-
-    GetInfo()
-
-P := player_data{Name := "Alice", Score := 100}
-ProcessPlayer(P)  # Returns "Player: Alice, Score: 100"
-```
-<!--verse
-}
--->
-
-The nested function captures the class instance and can access its members.
-
-### Nested Functions in Class Methods
+### In Class Methods
 
 When nested functions are defined inside class methods, they can access `Self`:
 
@@ -1404,89 +1254,15 @@ Obj.ProcessDamage(10)  # Returns "Health: 100"
 
 The nested function inherits access to `Self` from the enclosing method.
 
-### Type Parameters in Nested Functions
-
-Nested functions can use type parameters from their enclosing function:
-
-<!--verse
-F():void={
--->
-```verse
-Transform<T, U>(X:T, Converter:type{_(:T):U} where T:type, U:type):U =
-    # Nested function uses T and U from outer scope
-    Apply(Value:T):U = Converter(Value)
-
-    Apply(X)
-
-# Call with type parameters inferred
-Result := Transform(42, (N:int) => "{N}")  # Returns "42"
-```
-<!--verse
-}
--->
-
-The nested function `Apply` can reference the type parameters `T` and `U` from `Transform`.
-
-### Default Values with Captured Variables
-
-Default parameter values in nested functions can reference captured variables:
-
-<!--verse
-F():void={
--->
-```verse
-Configure(BaseValue:int):int =
-    # Default references captured BaseValue
-    ApplyMultiplier(?Multiplier:int = BaseValue):int =
-        Multiplier * 2
-
-    ApplyMultiplier()  # Uses BaseValue as default
-
-Configure(5)  # Returns 10 (5 * 2)
-```
-<!--verse
-}
--->
-
-The default value is evaluated using the captured variable's value.
-
-### Block Scopes with Nested Functions
-
-Nested functions can be defined in block scopes and capture from multiple levels:
-
-<!--verse
-F():void={
--->
-```verse
-Process(X:int):int =
-    Y := 10
-
-    Outer():int = X + Y
-
-    block:
-        Z := 5
-        # Inner captures X, Y, and Z
-        Inner():int = X + Y + Z
-
-        Outer() + Inner()
-
-Process(1)  # Returns (1 + 10) + (1 + 10 + 5) = 27
-```
-<!--verse
-}
--->
-
-Functions in inner blocks can access variables from all enclosing scopes.
-
-## Restrictions on Nested Functions
+### Restrictions
 
 Nested functions have several important restrictions that distinguish them from top-level functions:
 
-Nested functions **cannot** have access specifiers like `<public>`, `<internal>`, or `<private>`:
+- Nested functions **cannot** have access specifiers like `<public>`, `<internal>`, or `<private>`:
 
-Nested functions are always private to their enclosing function.
+- Nested functions are always private to their enclosing function.
 
-You cannot define classes inside functions (nested or otherwise):
+- You cannot define classes inside functions (nested or otherwise):
 
 ```verse
 # ERROR 3502: Cannot define classes in local scope
@@ -1500,9 +1276,7 @@ F():void =
     Instance := my_class{}  # OK - can use class
 ```
 
-Classes must be defined at module or package scope.
-
-Nested functions cannot reference variables or other nested functions defined later in the same scope:
+- Nested functions cannot reference variables or other nested functions defined later in the same scope (this also means mutually recursive nested functions are not allowed):
 
 ```verse
 # ERROR 3506: G used before defined
@@ -1516,25 +1290,7 @@ F():void =
     X := G()     # OK: G is defined
 ```
 
-This also means **mutually recursive nested functions are not allowed**:
-
-```verse
-# ERROR 3506: G and H cannot be mutually recursive
-F():int =
-    G(N:int):int =
-        if (N = 0):
-            0
-        else:
-            H(N - 1)  # ERROR: H not yet defined
-
-    H(N:int):int = G(N)  # Can't call G from before its definition completes
-
-    G(5)
-```
-
-Only single-function recursion is supported (a function calling itself).
-
-The `(super:)` syntax for calling parent class methods **cannot** be used in nested functions:
+- The `(super:)` syntax for calling parent class methods **cannot** be used in nested functions:
 
 ```verse
 # ERROR 3612: super not allowed in nested function
@@ -1555,8 +1311,6 @@ derived_class := class(base_class):
         G()
 ```
 
-Super calls must appear directly in the overriding method body.
-
 ## Parametric Functions
 
 Parametric functions (also called generic functions) allow you to write code that works with multiple types while maintaining complete type safety. Rather than writing separate functions for each type, you define a single function with type parameters that adapt to whatever types you use them with.
@@ -1566,11 +1320,9 @@ A parametric function declares type parameters using a `where` clause that speci
 ```verse
 # Simple identity function - works with any type
 Identity(X:t where t:type):t = X
-
 # Usage - type parameter inferred automatically
 Identity(42)        # t inferred as int, returns 42
 Identity("hello")   # t inferred as string, returns "hello"
-Identity(true)      # t inferred as logic, returns true
 ```
 
 The `where t:type` clause declares `t` as a type parameter with the constraint `type`, meaning it can be any Verse type. The function signature `(X:t):t` means "takes a value of type `t` and returns a value of that same type `t`."
@@ -1579,14 +1331,14 @@ The `where t:type` clause declares `t` as a type parameter with the constraint `
 FunctionName(Parameters where TypeParameter:Constraint, ...):ReturnType = Body
 ```
 
-- **Type parameters** appear in the `where` clause
-- **Constraints** specify requirements (e.g., `type`, `subtype(comparable)`)
-- **Multiple type parameters** are comma-separated in the `where` clause
+- *Type parameters* appear in the `where` clause
+- *Constraints* specify requirements (e.g., `type`, `subtype(comparable)`)
+- *Multiple type parameters* are comma-separated in the `where` clause
 
 Verse automatically infers type parameters from the arguments you pass, eliminating the need for explicit type annotations in most cases:
 
 ```verse
-# Function with two type parameters
+# Function with two type par qameters
 Pair(X:t, Y:u where t:type, u:type):tuple(t, u) = (X, Y)
 
 # All type parameters inferred
@@ -1594,7 +1346,7 @@ Pair(1, "one")        # t = int, u = string, returns (1, "one")
 Pair(true, 3.14)      # t = logic, u = float, returns (true, 3.14)
 ```
 
-**Inference with collections:**
+Inference with collections:
 
 ```verse
 # Generic first element function
@@ -1603,8 +1355,6 @@ First(Items:[]t where t:type)<decides>:t = Items[0]?
 Numbers := array{1, 2, 3}
 First(Numbers)  # t inferred as int from []int
 ```
-
-**Tuple conversion:**
 
 When you pass multiple values to a parametric function expecting a single type parameter, Verse can infer either a tuple or an array:
 
@@ -1623,16 +1373,12 @@ Result2:[]int = Identity(1, 2)  # t = []int via conversion
 
 Type constraints restrict which types can be used with type parameters, enabling operations that require specific capabilities.
 
-**The `type` constraint:**
-
-The most permissive constraint - accepts any Verse type:
+The most permissive constraint accepts any type:
 
 ```verse
 # Works with absolutely any type
 Store(Value:t where t:type):t = Value
 ```
-
-**The `subtype` constraint:**
 
 Restricts to types that are subtypes of a specified type:
 
@@ -1651,13 +1397,10 @@ ProcessVehicle(V:t where t:subtype(vehicle)):t =
 
 # Valid calls
 ProcessVehicle(vehicle{})      # t = vehicle
-ProcessVehicle(car{})           # t = car (subtype of vehicle)
-
-# Invalid - int is not a subtype of vehicle
-# ProcessVehicle(42)  # ERROR 3509
+ProcessVehicle(car{})          # t = car (subtype of vehicle)
 ```
 
-**Key insight:** The function returns type `t`, not the base type. This preserves the specific type:
+The function returns type `t`, not the base type. This preserves the specific type:
 
 ```verse
 MyCar := car{NumDoors := 4, Speed := 60.0}
@@ -1665,9 +1408,7 @@ Result := ProcessVehicle(MyCar)  # Result has type car, not vehicle
 Result.NumDoors  # Can access car-specific fields
 ```
 
-**The `subtype(comparable)` constraint:**
-
-Enables equality comparisons:
+The `subtype(comparable)` constraint enables equality comparisons:
 
 ```verse
 # Can use = and <> operators on t
@@ -1678,69 +1419,15 @@ FindInArray(Items:[]t, Target:t where t:subtype(comparable))<decides>:int =
     -1
 ```
 
-**Related type parameters:**
-
 Type parameters can reference each other in constraints:
 
 ```verse
 # u must be a subtype of t
-Convert(Base:t, Derived:u where t:type, u:subtype(t)):t =
-    Base
-
+Convert(Base:t, Derived:u where t:type, u:subtype(t)):t = Base
 # This ensures type safety across related types
 ```
 
-**Type parameters in function types:**
-
-```verse
-# F is a function from t to u
-Apply(F:type{_(:t):u}, X:t where t:type, u:type):u = F(X)
-
-# Usage
-Double := (N:int) => N * 2
-Apply(Double, 21)  # t = int, u = int, returns 42
-```
-
-### Higher-Order Parametric Functions
-
-Parametric functions can accept other functions as parameters, with type parameters flowing through the composition:
-
-```verse
-# Map over an array with a transforming function
-Map(Items:[]t, Transform(:t):u where t:type, u:type):[]u =
-    for (Item : Items):
-        Transform(Item)
-
-Numbers := array{1, 2, 3}
-Strings := Map[Numbers, (N:int) => "{N}"]  # []string
-```
-
-**Function composition:**
-
-```verse
-# Compose two functions: (F ∘ G)(x) = F(G(x))
-Compose(F(:b):c, G(:a):b where a:type, b:type, c:type):type{_(:a):c} =
-    (X:a) => F(G(X))
-
-Add1 := (X:int) => X + 1
-Double := (X:int) => X * 2
-DoubleThenAdd := Compose[Add1, Double]
-DoubleThenAdd(5)  # Returns 11 (5 * 2 + 1)
-```
-
-**Partial application:**
-
-```verse
-# Fix the first argument of a two-argument function
-Partial(F(:a, :b):c, X:a where a:type, b:type, c:type):type{_(:b):c} =
-    (Y:b) => F(X, Y)
-
-Add := (X:int, Y:int) => X + Y
-Add5 := Partial[Add, 5]
-Add5(3)  # Returns 8
-```
-
-### Member Access on Parametric Types
+### Member Access
 
 When using subtype constraints, you can access members that exist on the base type:
 
@@ -1761,7 +1448,7 @@ Info := GetInfo(P)  # Returns (player instance, "Alice", 100)
 # Info(0) has type player, not entity - type preserved!
 ```
 
-**Method calls work too:**
+Method calls work too:
 
 ```verse
 entity := class:
@@ -1770,45 +1457,6 @@ entity := class:
 # Call methods on parametrically-typed values
 CheckStatus(E:t where t:subtype(entity)):string =
     E.GetStatus()  # Method call through type parameter
-```
-
-### Effects and Parametric Functions
-
-Parametric functions can have effects like `<decides>`, `<transacts>`, and `<suspends>`:
-
-**Failable parametric functions:**
-
-```verse
-# Identity that can fail
-FallableIdentity(X:t where t:type)<decides>:t = X
-
-# Called with square bracket syntax
-Result := FallableIdentity[42]  # Succeeds with 42
-```
-
-### Type Parameters in Extension Methods
-
-Extension methods support type parameters:
-
-```verse
-# Generic map for arrays
-(Items:[]t).Map(Transform(:t):u where t:type, u:type):[]u =
-    for (Item : Items):
-        Transform(Item)
-
-# Usage
-array{1, 2, 3}.Map((N:int) => N * 2)  # Returns array{2, 4, 6}
-```
-
-**Constrained extension methods:**
-
-```verse
-# Only works with comparable types
-(Items:[]t).Contains(Target:t where t:subtype(comparable))<decides>:logic =
-    for (Item : Items):
-        if (Item = Target):
-            return true
-    false
 ```
 
 ### Polarity and Variance
@@ -1826,9 +1474,7 @@ Type parameters must be used consistently according to variance rules. This ensu
 - Function parameter types
 - Map key types
 
-**The polarity check:**
-
-Verse validates that type parameters appear only in positions compatible with their intended use:
+**The polarity check:** Verse validates that type parameters appear only in positions compatible with their intended use:
 
 ```verse
 # Valid: t appears covariantly (return type)
@@ -1851,190 +1497,14 @@ Apply(F:type{_(:t):t}, X:t where t:type):t = F(X)
 
 The error occurs because `c(t)` contains a mutable field of type `t`, making it invariant - neither covariant nor contravariant. Returning such a type from a parametric function is unsafe.
 
-**Map polarity:**
-
-Maps are contravariant in keys and covariant in values:
+**Map polarity:** Maps are contravariant in keys and covariant in values:
 
 ```verse
 # Valid: contravariant key, covariant value
 ProcessMap(M:[t]u where t:subtype(comparable), u:type):[t]u = M
 ```
 
-### Type Parameters in Nested Functions
-
-Nested functions can reference type parameters from their enclosing function:
-
-```verse
-Transform(X:t, Converter:type{_(:t):u} where t:type, u:type):u =
-    # Nested function uses t and u from outer scope
-    Apply(Value:t):u = Converter(Value)
-
-    Apply(X)
-
-Result := Transform(42, (N:int) => "{N}")  # Returns "42"
-```
-
-The nested function `Apply` inherits the type parameters `t` and `u` from `Transform`.
-
-<!-- ### Practical Patterns
-
-**Option mapping:**
-
-```verse
-# Map a function over an optional value
-OptionMap(F(:t):u, X:?t where t:type, u:type):?u =
-    if (Value := X?):
-        option{F(Value)}
-    else:
-        false
-
-MaybeNumber:?int = option{42}
-MaybeString := OptionMap[(N:int) => "{N}", MaybeNumber]  # option{"42"}
-```
-
-**Array utilities:**
-
-```verse
-# Generic filter
-Filter(Items:[]t, Predicate(:t)<decides>:void where t:type):[]t =
-    for (Item : Items, Predicate[Item]):
-        Item
-
-# Generic fold/reduce
-Fold(Items:[]t, Initial:u, Combine(:u, :t):u where t:type, u:type):u =
-    var Acc:u = Initial
-    for (Item : Items):
-        set Acc = Combine(Acc, Item)
-    Acc
-
-Numbers := array{1, 2, 3, 4, 5}
-Evens := Filter[Numbers, (N:int) => N % 2 = 0]
-Sum := Fold[Numbers, 0, (Acc:int, N:int) => Acc + N]
-```
-
-**Generic containers:**
-
-```verse
-# Stack data structure
-stack(element_type:type) := class:
-    var Items:[]element_type = array{}
-
-    Push(Item:element_type):void =
-        set Items += array{Item}
-
-    Pop()<decides>:element_type =
-        Last := Items[Items.Length - 1]?
-        set Items = Items.Slice(0, Items.Length - 1)
-        Last
-
-# Usage
-IntStack := stack(int){}
-IntStack.Push(42)
-```
-
-**Type-safe builders:**
-
-```verse
-# Builder pattern with parametric validation
-builder(t where t:type) := class:
-    var Current:?t = false
-
-    With(Modifier:type{_(t):t}):builder(t) =
-        if (Value := Current?):
-            set Current = option{Modifier(Value)}
-        Self
-
-    Build()<decides>:t = Current?
-```
--->
-
-### Restrictions
-
-**Cannot reference super-qualified functions:**
-
-```verse
-# ERROR 3502: Cannot store reference to super: qualified method
-# base := class:
-#     F():void = {}
-# derived := class(base):
-#     F<override>():void =
-#         SuperF := (super:)F  # ERROR
-```
-
-You can call `(super:)F` directly but cannot store a reference to it.
-
-**Type parameters must satisfy polarity:**
-
-Type parameters appearing in mutable fields or other invariant positions cannot be used as return types from parametric functions.
-
-**No undefined type parameters:**
-
-Every type parameter declared in the `where` clause must be used in the function signature (parameters or constrained return positions).
-
-### Best Practices
-
-**Use descriptive type parameter names when clarity helps:**
-
-```verse
-# Generic: uses conventional t, u
-Map(Items:[]t, F(:t):u where t:type, u:type):[]u = ...
-
-# Domain-specific: uses meaningful names
-ProcessRecords(Records:[]record_type,
-               Handler:type{_(:record_type):result_type}
-               where record_type:type, result_type:type):[]result_type = ...
-```
-
-**Prefer constraints that enable operations:**
-
-```verse
-# Too permissive - can't do much with t:type
-Process(X:t where t:type):void = {}
-
-# Better - constraint enables comparison
-FindDuplicate(Items:[]t where t:subtype(comparable)):?t =
-    # Can use = operator due to comparable constraint
-```
-
-**Type parameters for reusability, not premature generalization:**
-
-Write parametric functions when you have actual use cases for multiple types, not speculatively.
-
-**Let inference work:**
-
-```verse
-# Users rarely need to specify type parameters explicitly
-Identity(42)  # Inference works
-# Identity(int)(42)  # Unnecessary explicit type argument
-```
-
-## Return Values
-
-Functions return the value of the last executed expression, which often eliminates the need for explicit return statements. This design choice leads to more concise code:
-
-```verse
-GetStatus(Score:int):string =
-    if (Score >= 90):
-        "Excellent"
-    else if (Score >= 70):
-        "Good"
-    else:
-        "Needs Improvement"
-```
-
-However, when you need to exit a function early or when the control flow becomes complex, explicit return statements provide clarity:
-
-```verse
-FindFirstNegative(Numbers:[]int):?int =
-    for (Number : Numbers):
-        if (Number < 0):
-            return option{Number}
-    false  # No negative found
-```
-
-Functions with void return types are special - they always return the value `false`, regardless of what expressions appear in their body. This consistent behavior simplifies the handling of void functions in logical contexts.
-
-## Function Overloading
+## Overloading
 
 Function overloading allows you to define multiple functions with the same name but different parameter types. The compiler selects the correct version based on the types of the arguments provided at the call site.
 
@@ -2054,51 +1524,7 @@ Process("hello")   # Returns "String: hello"
 
 The compiler determines which overload to call based on the argument types. Each overload must have a distinct parameter type signature.
 
-### Overloading Across Scopes
-
-Overloading works across different scopes, allowing you to extend existing functions:
-
-**Nested functions can overload:**
-
-```verse
-f():void = {}
-
-g(f(x:int):void):void =
-    f()      # Calls outer f
-    f(42)    # Calls nested f
-```
-
-**Class methods can overload:**
-
-```verse
-f():void = {}
-
-C := class:
-    f(x:int):void = {}
-
-    CallBoth():void =
-        f()      # Calls module-level f
-        f(10)    # Calls class method f
-```
-
-**Across modules:**
-
-```verse
-# Module A
-vmodule(A):
-    f<public>():void = {}
-
-# Module B
-vmodule(B):
-    using{A}
-    f(x:int):void = {}
-
-    g():void =
-        f()      # Calls A.f
-        f(0)     # Calls B.f
-```
-
-### Cannot Capture Overloaded Functions
+### Capture
 
 You cannot take a reference to an overloaded function name:
 
@@ -2113,7 +1539,7 @@ f(x:float):void = {}
 
 This restriction exists because the compiler cannot determine which overload you mean without seeing the call site with arguments.
 
-### Effects and Overloading
+### Effects
 
 You can overload functions with different effects, but only if the parameter types are also different:
 
@@ -2137,32 +1563,7 @@ f(x:int)<transacts><decides>:void = {}  # ERROR
 
 Effects alone don't create distinctness - you need different parameter types.
 
-### Overloaded Class Methods
-
-Classes can have overloaded methods, and subclasses can override them:
-
-```verse
-base_class := class:
-    Process(x:int):int = x
-    Process(x:float):float = x
-
-derived_class := class(base_class):
-    Y:int = 10
-    Z:float = 5.0
-
-    Process<override>(x:int):int = x + Y
-    Process<override>(x:float):float = x + Z
-
-B := base_class{}
-B.Process(2)     # Returns 2
-B.Process(2.0)   # Returns 2.0
-
-D := derived_class{}
-D.Process(2)     # Returns 12 (2 + 10)
-D.Process(2.0)   # Returns 7.0 (2.0 + 5.0)
-```
-
-### Adding Overloads in Subclasses
+### Overloads in Subclasses
 
 Subclasses can add new overloads to methods:
 
@@ -2304,7 +1705,7 @@ f(x:float)<suspends>:void = {}
 # g():void = spawn{f(1)}  # ERROR - int version not suspends
 ```
 
-## Types and Overloading
+### Types 
 
 Every function has a type that captures its parameters, effects, and return value. The type syntax uses an underscore as a placeholder for the function name:
 
@@ -2336,11 +1737,7 @@ Result3 := Transform("Hello")   # Calls string version
 
 However, overloading has strict limitations based on **type distinctness**. Two types are considered "distinct" for overload purposes only if there is no possible value that could match both types. This restriction prevents ambiguity and ensures that function calls can always be resolved unambiguously at compile time.
 
-### Overload Distinctness Rules
-
 Verse uses precise rules to determine whether two parameter types are distinct enough to allow overloading. Understanding these rules is critical for designing clear APIs.
-
-#### Types That Are NOT Distinct
 
 The following type pairs are **not distinct** and cannot be used to overload functions:
 
@@ -2549,8 +1946,6 @@ Apply(Square, 10)  # Returns 100
 
 Local function variables are always immutable - you cannot reassign them after binding.
 
-### Function Variables with `var`
-
 You **cannot** use `var` to create mutable function-valued variables:
 
 ```verse
@@ -2563,8 +1958,6 @@ You **cannot** use `var` to create mutable function-valued variables:
 ```
 
 The `var` keyword is not supported for function-typed variables. This maintains stability around function references and their contracts.
-
-### Alternative: Mutable Containers
 
 If you need changeable behavior, store function references in mutable containers:
 
@@ -2592,44 +1985,7 @@ multi_callback := class:
             Handler()
 ```
 
-### Alternative: Mutable Function Members
-
 While `var` doesn't work for functions, classes support **mutable function members** using special syntax. See the [Function Types and Lambdas](#function-types-and-lambdas) section for details on mutable and optional function members declared without bodies.
-
-### Alternative: Interface-Based Polymorphism
-
-For dynamic dispatch, use interfaces with method overriding:
-
-```verse
-# Interface-based approach
-event_handler := interface:
-    Handle():void
-
-default_handler := class(event_handler):
-    Handle<override>():void =
-        Print("Default handling")
-
-special_handler := class(event_handler):
-    Handle<override>():void =
-        Print("Special handling")
-
-# Manager can switch between implementations
-event_manager := class:
-    var Handler:event_handler = default_handler{}
-
-    SetHandler(H:event_handler):void =
-        set Handler = H
-
-    Process():void =
-        Handler.Handle()
-
-Manager := event_manager{}
-Manager.Process()  # Prints "Default handling"
-Manager.SetHandler(special_handler{})
-Manager.Process()  # Prints "Special handling"
-```
-
-This approach provides changeable behavior through polymorphism rather than mutable function references.
 
 ## Publishing Functions and Transparency
 
