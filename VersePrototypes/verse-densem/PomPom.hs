@@ -463,7 +463,7 @@ fUN tt apt xs d@(Unit dd) t1 p q h f =
                           ]
             ]
 --      , trace ("poss=" ++ show poss) True
-      , let poss' = Set.filterSet (not . Set.isEmpty . snd) poss
+      , let poss' = poss -- Set.filterSet (not . Set.isEmpty . snd) poss
 --      , trace ("poss'=" ++ show poss') True
       , let
           -- 

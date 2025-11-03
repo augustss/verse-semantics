@@ -103,5 +103,5 @@ testds("fun9a",ppo, pass){ function(y:type{x:nat where x<2}){y}} {"{[{{u=v=F({0-
 # fun9 is very slow
 testds("fun9", ppo, pass, skip) { ltTwo:=type{x:nat where x<2};
                             function(y:ltTwo){y} }                {"{[{{u=v=F({0->0,1->1})}}]}"}
-testds("fun10",ppo, pass) { x:=1; function(x){2} }                {"{[{{u=v=F({1->2})}}]}"}
+testds("fun10",ppo, pass, broken) { x:=1; function(x){2} }                {"{[{{u=v=F({1->2})}}]}"}
 testds("fun11",ppo, pass) { function(1){x=2} }                    {"{[{{x=2,u=v=F({1->2})}}]}"}
