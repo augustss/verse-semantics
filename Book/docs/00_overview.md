@@ -37,9 +37,9 @@ Traditional programming languages carry decades of historical baggage and design
 - Backward compatibility is not optional but essential
 - The boundary between compile-time and runtime is fluid
 
-Ready to dive in? Start with [Built-in Types](02_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](01_expressions.md) to see how everything in Verse computes values.
+Ready to dive in? Start with [Built-in Types](02_primitives.md) to understand Verse's fundamental data types, or jump to [Expressions](01_expressions.md) to see how everything in Verse computes values.
 
-For experienced programmers coming from other languages, the [Failure System](06_failure.md) and [Effects](10_effects.md) sections highlight some of Verse's distinctive features.
+For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](13_effects.md) sections highlight some of Verse's distinctive features.
 
 ## Key Features
 
@@ -81,11 +81,11 @@ ProcessData[Data]
 } }
 -->
 
-See [Failure](06_failure.md) for complete details on failable expressions and failure contexts, and [Control Flow](05_control.md) for if expressions.
+See [Failure](08_failure.md) for complete details on failable expressions and failure contexts, and [Control Flow](07_control.md) for if expressions.
 
 **Strong Static Typing with Inference**
 
-Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference. See [Types](07_types.md) for complete details on the type system and subtyping.
+Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference. See [Types](11_types.md) for complete details on the type system and subtyping.
 
 <!--verse
 M():={
@@ -116,7 +116,7 @@ UpdateGame()<transacts>:void = set Score += 10 # Can read, write, allocate
 }
 -->
 
-See [Effects](10_effects.md) for complete details on the effect system.
+See [Effects](13_effects.md) for complete details on the effect system.
 
 **Built-in Concurrency**
 
@@ -395,7 +395,7 @@ The code begins with `using` statements that import functionality from other mod
 
 **Immutable by Default**
 
-Data structures are immutable unless explicitly marked with `var`. This eliminates large classes of bugs and makes concurrent programming safer. When we do need mutation, it's explicit and tracked by the effect system. See [Mutability](09_mutability.md) for complete details on `var` and `set`.
+Data structures are immutable unless explicitly marked with `var`. This eliminates large classes of bugs and makes concurrent programming safer. When we do need mutation, it's explicit and tracked by the effect system. See [Mutability](05_mutability.md) for complete details on `var` and `set`.
 
 ## Naming Conventions
 

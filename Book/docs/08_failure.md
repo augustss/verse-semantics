@@ -99,7 +99,7 @@ The function body is a failure context, allowing failable expressions throughout
 
 ## Speculative Execution
 
-When you execute code in a failure context, changes to mutable variables are provisional—they only become permanent if the entire context succeeds. Functions that modify state in failure contexts must use the `<transacts>` effect specifier (see [Effects](10_effects.md)):
+When you execute code in a failure context, changes to mutable variables are provisional—they only become permanent if the entire context succeeds. Functions that modify state in failure contexts must use the `<transacts>` effect specifier (see [Effects](13_effects.md)):
 
 <!-- TODO MUTABLE PARAMETERS ARE NOT YET IMPLMENTED -->
 

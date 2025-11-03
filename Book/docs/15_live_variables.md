@@ -19,7 +19,7 @@ set live X = Y  # X now tracks Y
 set Y = 5       # X automatically becomes 5
 ```
 
-Live variables extend the regular mutable variable system (see [Mutability](09_mutability.md)) with automatic dependency tracking. The key insight is that Verse tracks which variables the target expression reads during evaluation. When any of those variables change, the target is re-evaluated, and if the result differs from the current value, the variable updates automatically.
+Live variables extend the regular mutable variable system (see [Mutability](05_mutability.md)) with automatic dependency tracking. The key insight is that Verse tracks which variables the target expression reads during evaluation. When any of those variables change, the target is re-evaluated, and if the result differs from the current value, the variable updates automatically.
 
 ### Declaration Forms
 
@@ -128,7 +128,7 @@ set Y.Contents = X.Contents * 2
 }
 -->
 
-The guard expression must have effects `<reads><computes><decides>` (see [Effects](10_effects.md))—it can read and compute but cannot write or allocate. This ensures re-evaluation is side-effect free.
+The guard expression must have effects `<reads><computes><decides>` (see [Effects](13_effects.md))—it can read and compute but cannot write or allocate. This ensures re-evaluation is side-effect free.
 
 ### The upon Expression
 
@@ -151,7 +151,7 @@ The `upon` expression evaluates its guard immediately and records the variables 
 
 This one-shot behavior makes `upon` perfect for state transitions and event notifications. When a threshold is crossed, when a resource becomes available, when a timer expires—these scenarios naturally map to `upon`'s "fire once when condition becomes true" semantics.
 
-The body must have the `<transacts>` effect (see [Effects](10_effects.md)), allowing it to read and write variables (including other live variables), with execution guaranteed to be atomic with respect to notifications.
+The body must have the `<transacts>` effect (see [Effects](13_effects.md)), allowing it to read and write variables (including other live variables), with execution guaranteed to be atomic with respect to notifications.
 
 ### The when Expression
 

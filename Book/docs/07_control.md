@@ -96,7 +96,7 @@ Control flow expressions are how you shape the behavior of your program, making 
 
 ### The If Expression
 
-The `if` expression uses success and failure to drive decisions (see [Failure](06_failure.md) for details on failable expressions). When an expression in the condition succeeds, the corresponding branch executes:
+The `if` expression uses success and failure to drive decisions (see [Failure](08_failure.md) for details on failable expressions). When an expression in the condition succeeds, the corresponding branch executes:
 
 <!--verse
 player:=class{
@@ -185,7 +185,7 @@ Empty conditions are also not allowed—every `if` must test something.
 
 **Speculative Execution and Rollback:**
 
-If any expression in the condition fails, control flow proceeds to the `else` branch if present. Any effects performed while evaluating the condition are automatically rolled back (see [Failure](06_failure.md#speculative-execution) for details on transactional semantics):
+If any expression in the condition fails, control flow proceeds to the `else` branch if present. Any effects performed while evaluating the condition are automatically rolled back (see [Failure](08_failure.md#speculative-execution) for details on transactional semantics):
 
 ```verse
 var Counter:int = 0

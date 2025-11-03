@@ -844,7 +844,7 @@ Map keys must be comparable types. Most comparable types can be used as map keys
 - Maps with comparable keys and values: `[k]v`
 - Structs with comparable fields
 
-Note that while `float` can be used as a map key, floating-point special values have specific equality semantics (see [Map documentation](02_builtins.md#floating-point-keys) for details on `NaN` and zero handling).
+Note that while `float` can be used as a map key, floating-point special values have specific equality semantics (see [Map documentation](02_primitives.md#floating-point-keys) for details on `NaN` and zero handling).
 
 There is currently no way to make a regular class comparable by writing a custom comparison method. Only the `<unique>` specifier enables class comparability through identity equality.
 

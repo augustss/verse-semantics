@@ -14,34 +14,22 @@ Verse has three core principles:
 
 ## Documentation Sections
 
-### Getting Started
-
 - [Language Overview](00_overview.md) - Introduction to Verse philosophy and features
-
-### Foundation
-
 - [Expressions](01_expressions.md) - Everything is an expression paradigm
-- [Built-in Data Types](02_builtins.md) - Integers, floats, rationals, logic, strings, and container types
-- [Operators](03_operators.md) - Arithmetic, comparison, logical, and assignment operators with precedence
-
-### Program Structure
-
-- [Functions](04_functions.md) - Open-world vs closed-world functions, parameters, and return values
-- [Control Flow](05_control.md) - If/else, loops, code blocks, and comments
-- [Failure System](06_failure.md) - First-class failure, failable expressions, and speculative execution
-
-### Type System
-
-- [Types and Type System](07_types.md) - Types as functions and type checking
-- [Composite Types](08_composites.md) - Classes, interfaces, structs, and enums
-- [Mutability](09_mutability.md) - Mutable variables, references, and state management
-
-### Advanced Features
-
-- [Effects](10_effects.md) - Effect families, specifiers, and capability declarations
-- [Concurrency](11_concurrency.md) - Structured concurrency with sync, race, rush, branch, and spawn
-- [Live Variables](12_live_variables.md) - Reactive values that automatically update
-- [Modules and Paths](13_modules.md) - Code organization and the global namespace
-- [Access Specifiers](14_access.md) - Public, private, and protected visibility
-- [Persistable Types](15_persistable.md) - Types that can be saved and loaded
-- [Code Evolution](16_evolution.md) - Versioning and backward compatibility
+- [Primitives](02_primitives.md) - Integers, floats, rationals, logic, strings, and special types
+- [Containers](03_containers.md) - Optionals, tuples, arrays, maps, and weak maps
+- [Operators](04_operators.md) - Arithmetic, comparison, logical, and assignment operators with precedence
+- [Mutability](05_mutability.md) - Mutable variables, references, and state management
+- [Functions](06_functions.md) - Open-world vs closed-world functions, parameters, and return values
+- [Control Flow](07_control.md) - If/else, loops, code blocks, and comments
+- [Failure System](08_failure.md) - First-class failure, failable expressions, and speculative execution
+- [Structs & Enums](09_structs_enums.md) - Value types and fixed sets of named values
+- [Classes & Interfaces](10_classes_interfaces.md) - Object-oriented programming with inheritance and contracts
+- [Types and Type System](11_types.md) - Types as functions and type checking
+- [Access Specifiers](12_access.md) - Public, private, and protected visibility
+- [Effects](13_effects.md) - Effect families, specifiers, and capability declarations
+- [Concurrency](14_concurrency.md) - Structured concurrency with sync, race, rush, branch, and spawn
+- [Live Variables](15_live_variables.md) - Reactive values that automatically update
+- [Modules and Paths](16_modules.md) - Code organization and the global namespace
+- [Persistable Types](17_persistable.md) - Types that can be saved and loaded
+- [Code Evolution](18_evolution.md) - Versioning and backward compatibility
