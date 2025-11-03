@@ -27,7 +27,7 @@ This index provides quick access to key concepts, language features, and importa
 - **enum** - named values: [Overview](00_overview.md), [Enums - Enums](09_structs_enums.md#enums)
 
 ### Type Features
-- **subtype** relationships: [Type System](11_types.md)
+- **subtyping** - type relationships: [Type System - Understanding Subtyping](11_types.md#understanding-subtyping)
 - **comparable** - equality testing: [Type System](11_types.md)
 - **parametric types** - generics: [Classes - Parametric Classes](10_classes_interfaces.md#parametric-classes), [Type System](11_types.md)
 - **type{}** - type expressions: [Expressions](01_expressions.md), [Primitives - Type type](02_primitives.md#type-type), [Type System](11_types.md)
@@ -104,10 +104,10 @@ This index provides quick access to key concepts, language features, and importa
 - **spawn** - independent tasks: [Overview](00_overview.md), [Effects](13_effects.md), [Concurrency](14_concurrency.md)
 - **task** - concurrent execution: [Concurrency](14_concurrency.md)
 - **async expressions** - time-taking operations: [Concurrency](14_concurrency.md)
-- **Sleep()** - pause execution: [Concurrency](14_concurrency.md)
 - **cancellation** - stopping tasks: [Concurrency](14_concurrency.md)
 
 ### Timing Functions
+- **Sleep()** - pause execution: [Concurrency](14_concurrency.md)
 - **Await()** - suspend for task completion: [Concurrency](14_concurrency.md)
 - **NextTick()** - defer to next update: [Concurrency](14_concurrency.md)
 - **GetSecondsSinceEpoch** - get current time: [Concurrency](14_concurrency.md)
@@ -250,7 +250,6 @@ This index provides quick access to key concepts, language features, and importa
 ### Utility Functions
 - **Print()** - output text: [Overview](00_overview.md), [Effects](13_effects.md)
 - **ToString()** - convert to string: [Primitives - ToString()](02_primitives.md#tostring)
-- **Sleep()** - pause execution: [Concurrency](14_concurrency.md)
 - **GetSession()** - current session: [Modules and Paths](16_modules.md)
 
 ### Array Methods
