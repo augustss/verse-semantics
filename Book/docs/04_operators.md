@@ -1,46 +1,39 @@
 # Operators
 
-Operators are special functions that perform actions on their operands. They provide concise syntax for common operations like arithmetic, comparison, logical operations, and assignment.
+Operators are functions that perform actions on their operands. They provide concise syntax for common operations like arithmetic, comparison, logical operations, and assignment.
 
 ## Operator Formats
 
 Verse operators come in three formats based on their position relative to their operands:
 
-### Prefix Operators
+**Prefix Operators**
 
 Prefix operators appear before their single operand:
 
 - `not Expression` - Logical negation
-  
 - `-Value` - Numeric negation
-
 - `+Value` - Numeric positive (for alignment)
 
-### Infix Operators
+**Infix Operators**
 
 Infix operators appear between their two operands:
 
 - `A + B` - Addition
-
 - `A * B` - Multiplication
-
 - `A = B` - Equality comparison
-
 - `A and B` - Logical AND
 
-### Postfix Operators
+**Postfix Operators**
 
 Postfix operators appear after their single operand:
 
 - `Value?` - Query operator for logic values
 
-## Operator Precedence
+## Precedence
 
 When multiple operators appear in the same expression, they are evaluated according to their precedence level. Higher precedence operators are evaluated first. Operators with the same precedence are evaluated left to right (except for assignment and unary operators which are right-associative).
 
-### Complete Precedence Table (Based on Parser Implementation)
-
-From the Verse parser implementation, the precedence levels from highest to lowest are:
+The precedence levels from highest to lowest are:
 
 | Precedence | Operators | Category | Format | Associativity |
 |------------|-----------|----------|--------|---------------|
@@ -95,7 +88,7 @@ FloatValue:float = IntValue * 1.0  # Converts to 42.0
 }
 -->
 
-### Compound Assignment Operators
+### Compound Assignments
 
 Compound assignment operators combine an arithmetic operation with assignment:
 
@@ -121,59 +114,6 @@ set Health /= 2.0  # Health is now 50.0
 # Note: set /= doesn't work with integers due to failable division
 # var IntValue:int = 10
 # set IntValue /= 2  # Compile error!
-```
-<!--verse
-}
--->
-
-### Special Behaviors
-
-#### String and Array Concatenation
-
-The `+` operator concatenates strings and arrays:
-
-<!--verse
-F():void={
--->
-```verse
-# String concatenation
-Greeting := "Hello, " + "World!"  # "Hello, World!"
-var Message:string = "Score: "
-set Message += "100"  # "Score: 100"
-
-# Array concatenation
-Array1 := array{1, 2, 3}
-Array2 := array{4, 5, 6}
-Combined := Array1 + Array2  # array{1, 2, 3, 4, 5, 6}
-```
-<!--verse
-}
--->
-
-#### Integer Division and Rationals
-
-Integer division with `/` is unique in Verse:
-
-- It's failable (can fail if dividing by zero)
-- It returns a `rational` type, not an `int`
-- You must use `Floor()` or `Ceil()` to convert to `int`
-
-<!--verse
-using { /Verse.org/VerseCLR }
-F():void={
--->
-```verse
-# Integer division workflow
-if (Ratio := 7 / 2):
-    Lower := Floor(Ratio)  # 3
-    Upper := Ceil(Ratio)   # 4
-
-# Division by zero fails gracefully
-if (Result := 10 / 0):
-    # This block never executes
-    Print("Impossible!")
-else:
-    Print("Division by zero detected")
 ```
 <!--verse
 }
@@ -220,19 +160,17 @@ if (Level >= 10 and Score > 1000):
     UnlockAchievement()
 ```
 
-### Comparable Types
+The following types support equality comparison operations (`=` and `<>`):
 
-The following types support comparison operations:
-
-- Numeric types: `int`, `float`, `rational`
+- Numeric types: `int`, `nat`, `float`, `rational`
 - Boolean: `logic`
 - Text: `string`, `char`, `char32`
-- Enumerations: `enum` types
-- Collections: `array`, `map`, `tuple` (if elements are comparable)
-- Structs: If all fields are comparable (V1 feature)
-- Classes: Only with `=` and `<>` if they contain at least one `var` member
+- Enumerations: All `enum` types
+- Collections: `array`, `map`, `tuple`, `option` (if elements are comparable)
+- Structs: If all fields are comparable
+- Unique classes: Classes marked with `<unique>` (identity equality only)
 
-Note: Comparisons between different types generally fail:
+Comparisons between different types generally fail:
 
 <!--verse
 F()<decides>:void={
@@ -251,7 +189,7 @@ Logical operators work with failable expressions and control the flow of success
 
 ### Query Operator (`?`)
 
-The query operator checks if a `logic` value is `true`:
+The query operator checks if a `logic` value is `true` (see [Failure](08_failure.md#failable-expressions) for how `?` works with other types):
 
 <!--verse
 StartGame():void={}
@@ -321,7 +259,9 @@ if (QuickCheck() or ExpensiveCheck()):
     ProcessResult()
 ```
 
-### Truth Table for Logical Operators
+### Truth Table
+
+Consider two expressions `P` and `Q` which may either succeed or fail, the following table shows the result of logical operators applied to them:
 
 | Expression P | Expression Q | P and Q | P or Q | not P |
 |--------------|--------------|---------|---------|-------|
@@ -330,9 +270,7 @@ if (QuickCheck() or ExpensiveCheck()):
 | Fails | Succeeds | Fails | Succeeds (Q's value) | Succeeds |
 | Fails | Fails | Fails | Fails | Succeeds |
 
-## Assignment and Initialization Operators
-
-### Variable Initialization (`:=`)
+## Assignment and Initialization
 
 The `:=` operator initializes constants and variables:
 
@@ -349,8 +287,6 @@ var Score:int = 0
 # Type inference
 AutoTyped := 42  # Inferred as int
 ```
-
-### Variable Assignment (`set =`)
 
 The `set =` operator updates variable values:
 
@@ -369,34 +305,14 @@ set Position = vector3{X := 10.0, Y := 20.0, Z := 0.0}
 }
 -->
 
-### Assignment in Failure Context
-
-Assignment can be used in failure contexts, making it failable:
-
-<!--verse
-using {/Verse.org/VerseCLR}
-F():void={
--->
-```verse
-var MyArray:[]int = array{1, 2, 3}
-if (set MyArray[10] = 5):
-    # This won't execute because index 10 is out of bounds
-    Print("Set succeeded")
-else:
-    Print("Assignment failed")
-```
-<!--verse
-}
--->
-
 ## Special Operators
 
-### Indexing Operator (`[]`)
+### Indexing
 
-Used for multiple purposes in Verse:
+The square bracket operator is used for multiple purposes in Verse:
 
 1. **Array/Map indexing** - Access elements in collections
-2. **Function calls** (Verse-style) - Call functions with bracket syntax
+2. **Function calls** - Call functions which may fail
 3. **Computed member access** - Access object members dynamically
 
 <!--verse
@@ -429,9 +345,9 @@ EmptyCall := MyFunction2[]                 # and optional values
 }
 -->
 
-### Member Access Operator (`.`)
+### Member Access
 
-Accesses fields and methods of objects:
+The dot operator accesses fields and methods of objects:
 
 <!--NoCompile-->
 ```verse
@@ -446,9 +362,9 @@ LongExpression := MyObject.
     SecondMethod()
 ```
 
-### Range Operator (`..`)
+### Range
 
-Creates ranges for iteration:
+The range operator creates ranges for iteration:
 
 <!--verse
 using { /Verse.org/VerseCLR }
@@ -463,9 +379,9 @@ for (I := 0..4):
 }
 -->
 
-### Object Construction Operator (`{}`)
+### Object Construction
 
-Used to construct objects when placed after an identifier:
+Curly braces are used to construct objects when placed after a type:
 
 <!--verse
 point:=struct{X:int, Y:int}
@@ -494,9 +410,9 @@ Config := game_config{
 }
 -->
 
-### Tuple Access Operator (`()`)
+### Tuple Access
 
-When used with a single argument after an expression, accesses tuple elements:
+Round braces when used with a single argument after a tuple expression, accesses tuple elements:
 
 <!--verse
 F():void={
@@ -510,9 +426,7 @@ SecondElement := MyTuple(1)  # Access second element
 }
 -->
 
-## Type Conversion and Operators
-
-### Implicit Conversions
+## Type Conversions
 
 Verse has limited implicit type conversion. Most conversions must be explicit:
 
@@ -534,8 +448,6 @@ Message:string = "Score: {Score}"  # OK: string interpolation
 }
 -->
 
-### Mixed Type Operations
-
 When operators work with mixed types, specific rules apply:
 
 <!--verse
@@ -554,6 +466,162 @@ if (5.0 = 5.0): # OK
 }
 -->
 
+<!-- TODO CHECK THIS
 ## Operator Overloading
 
-Verse does not support custom operator overloading.
+Verse features operator overloading for arithmetic operators.
+
+### Overloadable Operators
+
+You can overload the following operators by defining specially-named functions:
+
+**Arithmetic binary operators:**
+
+- `operator'+'(L:type, R:type):result` - Addition
+- `operator'-'(L:type, R:type):result` - Subtraction
+- `operator'*'(L:type, R:type):result` - Multiplication
+- `operator'/'(L:type, R:type):result` - Division
+
+**Unary operators:**
+
+- `prefix'-'(V:type):result` - Negation
+
+### Basic Example
+
+```verse
+# Define a 2D vector type
+vec2i := struct{X:int, Y:int}
+
+# Overload unary negation
+prefix'-'(V:vec2i):vec2i =
+    vec2i{X := -V.X, Y := -V.Y}
+
+# Overload addition
+operator'+'(L:vec2i, R:vec2i):vec2i =
+    vec2i{X := L.X + R.X, Y := L.Y + R.Y}
+
+# Overload subtraction
+operator'-'(L:vec2i, R:vec2i):vec2i =
+    vec2i{X := L.X - R.X, Y := L.Y - R.Y}
+
+# Use the overloaded operators
+V1 := vec2i{X := 3, Y := 4}
+V2 := vec2i{X := 5, Y := 6}
+
+Negated := -V1                # vec2i{X := -3, Y := -4}
+Sum := V1 + V2                # vec2i{X := 8, Y := 10}
+Difference := V1 - V2         # vec2i{X := -2, Y := -2}
+```
+
+### Multiple Overloads
+
+You can provide multiple overloads for the same operator with different parameter types:
+
+```verse
+# Scalar multiplication - vector * int
+operator'*'(L:vec2i, R:int):vec2i =
+    vec2i{X := L.X * R, Y := L.Y * R}
+
+# Scalar multiplication - int * vector
+operator'*'(L:int, R:vec2i):vec2i =
+    vec2i{X := L * R.X, Y := L * R.Y}
+
+# Use both forms
+V := vec2i{X := 11, Y := 12}
+Result1 := V * 2    # vec2i{X := 22, Y := 24}
+Result2 := 3 * V    # vec2i{X := 33, Y := 36}
+```
+
+### Operators with Effects
+
+Operator overloads can have effects like `<decides>` or `<transacts>`:
+
+```verse
+# Division that can fail
+operator'/'(L:vec2i, R:int)<transacts><decides>:vec2i =
+    if (R <> 0):
+        vec2i{X := Floor(L.X / R), Y := Floor(L.Y / R)}
+    else:
+        false
+
+# Use with failure handling
+V := vec2i{X := 15, Y := 16}
+
+if (Result := V / 2):
+    # Result is vec2i{X := 7, Y := 8}
+
+if (Bad := V / 0):
+    # Never executes - division by zero fails
+```
+
+### Operators and Type Classes
+
+When working with type classes like `comparable`, you need to be careful. Custom operators don't automatically make types comparable:
+
+```verse
+vec2i := struct{X:int, Y:int}
+operator'+'(L:vec2i, R:vec2i):vec2i = vec2i{X := L.X + R.X, Y := L.Y + R.Y}
+
+# vec2i is NOT automatically comparable
+# You would need to make it <unique> or define comparison operators (not yet supported)
+```
+
+### Operators in Pure Contexts
+
+Intrinsic (built-in) operators can be used in `<computes>` contexts without restriction:
+
+```verse
+# Valid: built-in + in computes context
+C := class{X:int = 1 + 2}  # OK
+```
+
+However, custom operator overloads require explicit effect annotations to use in pure contexts:
+
+```verse
+# Custom operator without <computes>
+MyType := class<computes>{}
+operator'+'(L:MyType, R:MyType):MyType = MyType{}
+
+# ERROR 3582: Custom operator not allowed in computes context
+# D := class<computes>{Value:MyType = MyType{} + MyType{}}
+
+# To fix, add <computes> to operator
+operator'+'(L:MyType, R:MyType)<computes>:MyType = MyType{}
+D := class<computes>{Value:MyType = MyType{} + MyType{}}  # OK
+```
+
+### Restrictions
+
+**Cannot overload comparison operators (yet):**
+
+The following operators cannot be overloaded in current Verse:
+
+- Comparison: `<`, `<=`, `>`, `>=`, `=`, `<>`
+- Mutation: `+=`, `-=`, `*=`, `/=` (not supported because non-unique pointers aren't available yet)
+- Indexing: `operator'()'` - error 3514
+
+```verse
+# ERROR 3514: Cannot overload indexing
+# operator'()'(V:vec2i, I:int):int = if (I = 0) {V.X} else {V.Y}
+```
+
+**Cannot overload built-in array/map indexing:**
+
+```verse
+# ERROR 3514, 3518, 3532: Cannot override built-in indexing
+# operator'()'(A:[]int, I:int):int = 42
+```
+
+**Internal operators not visible externally:**
+
+Operators marked `<internal>` are only visible within their defining module:
+
+```verse
+# In module A
+c := class{}
+operator'+'<internal>(Lhs:c, Rhs:c):c = c{}
+
+# In module B using A
+# Result := c{} + c{}  # ERROR 3509 - internal operator not visible
+```
+-->

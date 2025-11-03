@@ -3,7 +3,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-module Verse.Core.Eval
+module Verse.Eval
   ( eval
   ) where
 
@@ -32,9 +32,9 @@ import Fix
 import Loc
 import Ref
 
-import Verse.Core.Exp
-import Verse.Core.Val (Val)
-import Verse.Core.Val qualified as Val
+import Verse.Eval.Val (Val)
+import Verse.Eval.Val qualified as Val
+import Verse.Exp
 import Verse.Fun (Fun)
 import Verse.Fun qualified as Fun
 import Verse.Monad (Stream (..), VerseT, runVerseT)
@@ -128,9 +128,7 @@ eval' s1 s2 = wrap $ \ case
     s3 <- freshS
     var1 <- eval' s1 s3 e1
     var2 <- eval' s3 s2 e2
-    i <- addStack
-    unifyVar var1 var2
-    removeStack i
+    bracketStack $ unifyVar var1 var2
     pure var1
   e1 :| e2 -> do
     var <- freshVar
@@ -183,8 +181,7 @@ eval' s1 s2 = wrap $ \ case
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      unifyChoiceFree s1 s2
-      unifyStoreFree s1 s2
+      unifyS s1 s2
     pure var
   For e1 x e2 -> do
     let
@@ -212,8 +209,7 @@ eval' s1 s2 = wrap $ \ case
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
-      unifyChoiceFree s1 s2
-      unifyStoreFree s1 s2
+      unifyS s1 s2
     pure var
   If e1 x e2 e3 -> do
     var <- freshVar
@@ -237,8 +233,7 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
     var <- asum $ zip [0 ..] xs <&> \ (i, var1) -> do
       unifyVar var2 <=< newVar $ Val.Int i
       pure var1
-    unifyChoiceFree s1 s2
-    unifyStoreFree s1 s2
+    unifyS s1 s2
     pure var
   Val.Fun f -> evalAppFun s1 s2 f var2
   Val.Ptr _ -> stuck
@@ -335,19 +330,19 @@ evalPlus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalPlus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
-  newInteger $ x1 + x2
+  newInteger $! x1 + x2
 
 evalMinus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalMinus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
-  newInteger $ x1 - x2
+  newInteger $! x1 - x2
 
 evalLess :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalLess s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
-  guard $ x1 < x2
+  guard $! x1 < x2
   pure var1
 
 evalAppMap :: MonadRef m => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)
@@ -356,8 +351,7 @@ evalAppMap s1 s2 k xs = do
   var <- case IntMap.lookup k xs of
     Nothing -> empty
     Just xs -> asum $ pure <$> xs
-  unifyChoiceFree s1 s2
-  unifyStoreFree s1 s2
+  unifyS s1 s2
   pure var
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))
@@ -546,7 +540,7 @@ supply = do
   put s { label = s.label + 1 }
   pure s.label
 
-insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
+insert :: Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
 insert k = IntMap.insertWith (++) k . (:[])
 
 infixr 3 ***

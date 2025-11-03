@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -13,7 +12,7 @@ module Pos
 import Data.Text.Unsafe qualified as Unsafe
 
 import Text (Text)
-import Text qualified as Text
+import Text qualified
 
 import Prettyprinter
 import Prettyprinter.Render.Terminal

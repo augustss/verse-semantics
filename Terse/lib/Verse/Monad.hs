@@ -30,7 +30,6 @@ module Verse.Monad
   ) where
 
 import Control.Applicative
-import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Reader.Class
 import Control.Monad.IO.Class
@@ -43,14 +42,9 @@ import Data.Functor.Compose
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Kind
 import Data.Monoid (Ap (..), Sum (..))
-
-import GHC.Exts (Any)
-
-import Unsafe.Coerce (unsafeCoerce)
+import Data.Tuple
 
 import Fix
-import IntMap (IntMap)
-import IntMap qualified
 import Ref
 
 newtype VerseT (m :: Type -> Type) a = VerseT
@@ -454,8 +448,20 @@ instance Vars Integer m where
 instance Vars () m where
   vars _ = pure
 
+instance Vars a m => Vars (Solo a) m where
+  vars f = traverse (vars f)
+
 instance (Vars a m, Vars b m) => Vars (a, b) m where
-  vars f (x, y) = (,) <$> vars f x <*> vars f y
+  vars f (a, b) =
+    (,) <$> vars f a <*> vars f b
+
+instance (Vars a m, Vars b m, Vars c m) => Vars (a, b, c) m where
+  vars f (a, b, c) =
+    (,,) <$> vars f a <*> vars f b <*> vars f c
+
+instance (Vars a m, Vars b m, Vars c m, Vars d m) => Vars (a, b, c, d) m where
+  vars f (a, b, c, d) =
+    (,,,) <$> vars f a <*> vars f b <*> vars f c <*> vars f d
 
 instance Vars a m => Vars (Maybe a) m where
   vars f = \ case
@@ -519,12 +525,12 @@ instance ZipVars_ (f (Fix f)) m => ZipVars_ (Fix f) m where
 
 data VarState m a
   = Unbound !(Unbound m a)
-  | Bound !(Bound a)
+  | Bound !(Bound m a)
   | Link !(Var m a)
 
 data Root m a
   = UnboundR !(Unbound m a)
-  | BoundR !(Bound a)
+  | BoundR !(Bound m a)
 
 data Unbound m a = MkUnbound
   { label :: {-# UNPACK #-} !Label
@@ -532,12 +538,13 @@ data Unbound m a = MkUnbound
   , susp :: !(Var m a -> Ap (VerseT m) ())
   }
 
-data Bound a = MkBound
-  { label :: {-# UNPACK #-} !Label
+data Bound m a = MkBound
+  { visited :: !(Ref m (Maybe (Var m a)))
+  , label :: {-# UNPACK #-} !Label
   , binding :: !a
   }
 
-instance ZipVars_ a m => ZipVars_ (Bound a) m where
+instance ZipVars_ a m => ZipVars_ (Bound m a) m where
   zipVars_ f x y
     | x.label == y.label = pure ()
     | otherwise = zipVars_ f x.binding y.binding
@@ -557,24 +564,23 @@ newVar :: MonadRef m => a -> VerseT m (Var m a)
 newVar = lift . fmap Var . newRef . Bound <=< newBound
 
 newVar' :: MonadRef m => a -> Label -> m (Var m a, Label)
-newVar' binding label =
-  let
-    !label' = label + 1
-  in
-    fmap ((, label') . Var) . newRef $ Bound MkBound {..}
+newVar' binding label = do
+  visited <- newRef Nothing
+  let !label' = label + 1
+  newRef (Bound MkBound {..}) <&> \ ref -> (Var ref, label')
 
-newBound :: a -> VerseT m (Bound a)
-newBound !binding = VerseT $ \ _r s _env Mem {..} _yk sk ->
+newBound :: MonadRef m => a -> VerseT m (Bound m a)
+newBound !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek -> do
+  !visited <- newRef Nothing
   let
     !mem = Mem { label = label + 1, .. }
     !x = MkBound {..}
-  in
-    sk s mem x
+  sk s mem x fk ek
 
 readVar :: MonadRef m => Var m a -> VerseT m a
 readVar = fmap (.binding) . readBound
 
-readBound :: MonadRef m => Var m a -> VerseT m (Bound a)
+readBound :: MonadRef m => Var m a -> VerseT m (Bound m a)
 readBound var@(Var ref) = lift (readRef ref) >>= \ case
   Link var -> readBound var
   Bound x -> pure x
@@ -651,37 +657,30 @@ newtype FindT m a = FindT
 data In = In
   { level :: {-# UNPACK #-} !Level
   , label :: {-# UNPACK #-} !Label
-  , visited :: !(IntMap Any)
   }
 
-data Out a = Err | Out !a {-# UNPACK #-} !Label !(IntMap Any)
+data Out a = Err | Out !a {-# UNPACK #-} !Label
 
 instance Functor m => Functor (FindT m) where
   fmap f x = FindT $ \ s -> unFindT x s <&> \ case
     Err -> Err
-    Out x label visited -> Out (f x) label visited
+    Out x label -> Out (f x) label
 
 instance Monad m => Applicative (FindT m) where
-  pure x = FindT $ \ In {..} -> pure $! Out x label visited
+  pure x = FindT $ \ In {..} -> pure $! Out x label
   f <*> x = FindT $ \ s@In {..} -> unFindT f s >>= \ case
     Err -> pure Err
-    Out f label visited -> unFindT x In {..} <&> \ case
+    Out f label -> unFindT x In {..} <&> \ case
       Err -> Err
-      Out x label visited -> Out (f x) label visited
+      Out x label -> Out (f x) label
 
 instance Monad m => Monad (FindT m) where
   x >>= f = FindT $ \ s@In {..} -> unFindT x s >>= \ case
     Err -> pure Err
-    Out x label visited -> unFindT (f x) In {..}
+    Out x label -> unFindT (f x) In {..}
 
 instance MonadTrans FindT where
-  lift m = FindT $ \ In {..} -> m <&> \ x -> Out x label visited
-
-instance (Monad m, a ~ Any) => MonadState (IntMap a) (FindT m) where
-  get = FindT $ \ In {..} -> pure $! Out visited label visited
-  put visited = FindT $ \ In { label } -> pure $! Out () label visited
-  state f = FindT $ \ In {..} -> case f visited of
-    (x, visited) -> pure $! Out x label visited
+  lift m = FindT $ \ In {..} -> m <&> \ x -> Out x label
 
 instance MonadRef m => MonadRef (FindT m) where
   type Ref (FindT m) = Ref m
@@ -692,9 +691,7 @@ instance MonadRef m => MonadRef (FindT m) where
 runFindT :: Functor m => FindT m a -> Level -> Label -> m (Maybe (a, Label))
 runFindT m level label = unFindT m In {..} <&> \ case
   Err -> Nothing
-  Out x label _ -> Just (x, label)
-  where
-    !visited = mempty
+  Out x label -> Just (x, label)
 
 findVars :: (MonadRef m, Vars a m) => a -> FindT m a
 findVars = vars findVar
@@ -704,18 +701,14 @@ findVar var@(Var ref) = readRef ref >>= \ case
   Link var ->
     findVar var
   Unbound x -> FindT $ \ In {..} ->
-    pure $! if level >= x.level then Out var label visited else Err
-  Bound x -> get >>= lookupInsertA x freshVar' >>= \ case
-    (var, Nothing) ->
+    pure $! if level >= x.level then Out var label else Err
+  Bound x -> readRef x.visited >>= \ case
+    Just var -> pure var
+    Nothing -> do
+      var@(Var ref) <- freshVar'
+      bracket (writeRef x.visited $ Just var) (writeRef x.visited Nothing) $
+        writeRef ref . Bound =<< newBound' =<< findVars x.binding
       pure var
-    (var@(Var ref), Just s) -> do
-      put s
-      writeRef ref . Bound =<< newBound' =<< findVars x.binding
-      pure var
-  where
-    lookupInsertA k x =
-      fmap (first unsafeCoerce) .
-      IntMap.lookupInsertA k.label (unsafeCoerce <$> x)
 
 freshVar' :: MonadRef m => FindT m (Var m a)
 freshVar' = FindT $ \ In {..} ->
@@ -723,11 +716,17 @@ freshVar' = FindT $ \ In {..} ->
     !susp = const $ pure ()
     !x = Unbound MkUnbound {..}
   in
-    newRef x <&> \ ref -> Out (Var ref) (label + 1) visited
+    newRef x <&> \ ref -> Out (Var ref) (label + 1)
 
-newBound' :: Applicative m => a -> FindT m (Bound a)
-newBound' !binding = FindT $ \ In {..} ->
-  pure $! Out MkBound {..} (label + 1) visited
+newBound' :: MonadRef m => a -> FindT m (Bound m a)
+newBound' !binding = FindT $ \ In {..} -> do
+  visited <- newRef Nothing
+  pure $! Out MkBound {..} (label + 1)
+
+bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
+bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
+  Err -> y $> Err
+  Out z label -> y $> Out z label
 
 data VarsRef m a = VarsRef {-# UNPACK #-} !Label !(Ref m a)
 

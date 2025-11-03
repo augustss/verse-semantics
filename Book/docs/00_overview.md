@@ -2,7 +2,7 @@
 
 ## Overview
 
-Verse is a functional logic programming language developed by Epic Games for creating gameplay in Unreal Editor for Fortnite and building experiences in the metaverse. It represents a departure from traditional programming languages, designed not just for today's needs but with a vision spanning decades or even centuries into the future.
+Verse is a multi-paradigm programming language developed by Epic Games for creating gameplay in Unreal Editor for Fortnite and building experiences in the metaverse. Drawing from functional, logic, and imperative traditions, Verse represents a departure from traditional programming languages, designed not just for today's needs but with a vision spanning decades or even centuries into the future.
 
 Verse is built on three fundamental principles:
 
@@ -37,9 +37,9 @@ Traditional programming languages carry decades of historical baggage and design
 - Backward compatibility is not optional but essential
 - The boundary between compile-time and runtime is fluid
 
-Ready to dive in? Start with [Built-in Types](01_builtins.md) to understand Verse's fundamental data types, or jump to [Expressions](05_expressions.md) to see how everything in Verse computes values.
+Ready to dive in? Start with [Built-in Types](02_primitives.md) to understand Verse's fundamental data types, or jump to [Expressions](01_expressions.md) to see how everything in Verse computes values.
 
-For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](09_effects.md) sections highlight Verse's most distinctive features.
+For experienced programmers coming from other languages, the [Failure System](08_failure.md) and [Effects](13_effects.md) sections highlight some of Verse's distinctive features.
 
 ## Key Features
 
@@ -64,7 +64,7 @@ Multiply := for (X : Array) { X * 42 }
 
 **Failure as Control Flow**
 
-Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), and this failure propagates naturally through the program.
+Instead of boolean conditions and exceptions, Verse uses failure as a primary control flow mechanism. Expressions can succeed (producing a value) or fail (producing no value), enabling natural control flow patterns:
 
 <!--verse
 ValidateInput(x:string)<computes><decides>:void= {}
@@ -75,15 +75,17 @@ myclass := class {
 -->
 ```verse
 ValidateInput[Data] # Proceeds only if validation succeeds
-ProcessData(Data)
+ProcessData[Data]
 ```
 <!--verse
 } }
 -->
 
+See [Failure](08_failure.md) for complete details on failable expressions and failure contexts, and [Control Flow](07_control.md) for if expressions.
+
 **Strong Static Typing with Inference**
 
-Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference.
+Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference. See [Types](11_types.md) for complete details on the type system and subtyping.
 
 <!--verse
 M():={
@@ -98,7 +100,7 @@ Name := "Verse"            # Type inferred as string
 
 **Effect Tracking**
 
-The language tracks side effects through its effect system, making it clear what a function can do beyond computing its return value.
+Functions declare their side effects through specifiers like `<computes>`, `<reads>`, `<writes>`, `<transacts>`, `<decides>`, and `<suspends>`. These effect specifiers make it immediately clear what a function can do beyond computing its return value:
 
 <!--verse
 x := class {
@@ -107,12 +109,14 @@ x := class {
 -->
 ```verse
 PureCompute()<computes>:int = 2 + 2           # No side effects
-ReadState()<reads>:int = GetCurrentValue()     # Can read memory
-UpdateGame()<transacts>:void = set Score += 10 # Full transactional effects
+ReadState()<reads>:int = GetCurrentValue()    # Can read mutable state
+UpdateGame()<transacts>:void = set Score += 10 # Can read, write, allocate
 ```
 <!--verse
 }
 -->
+
+See [Effects](13_effects.md) for complete details on the effect system.
 
 **Built-in Concurrency**
 
@@ -173,7 +177,7 @@ var Damage:int = 0
 var live Health:int = MaxHealth - Damage
 
 # Health automatically updates when dependencies change
-set Damage = 20  # Health becomes 80
+set Damage = 20      # Health becomes 80
 set MaxHealth = 150  # Health becomes 130
 
 # Reactive constructs for event handling
@@ -186,9 +190,9 @@ when(Health < 25):
 
 Welcome to Verse—a language built not just for today's games, but for tomorrow's metaverse.
 
-## Example: a Game Inventory System
+## Example: Game Inventory
 
-Let's explore Verse through a comprehensive example that demonstrates its key features. We'll build an inventory management system for a game, showing how Verse's unique features come together to create robust, maintainable code.
+Let's explore the language with an example that demonstrates its key features. We'll build an inventory management system for a game, showing how Verse's unique constructs come together to create robust, maintainable code.
 
 ```verse
 # Module declaration - start by importing utility functions
@@ -223,7 +227,7 @@ game_item := class<final><persistable>:
             item_rarity.uncommon => 1.5
             item_rarity.rare => 2.0
             item_rarity.epic => 3.0
-            _ => false  # Fails if the item is legenday
+            _ => false  # Fails if the item is legenday or unexpected
     
     # Computed property using closed-world function
     GetEffectiveValue()<transacts><decides> :int=
@@ -356,25 +360,21 @@ The above has some superfluous <transacts> due to <no_rollback>, in some cases t
 Also methods that have an empty return type have weird behavior in some cases. Easily fixed by typing them.
 
 -->
-This example showcases nearly every major feature of Verse in a practical context. Let's explore what makes this code uniquely Verse:
+This example showcases many feature of Verse in a practical context. Let's explore what makes this code uniquely Verse:
 
 **Type System and Data Modeling**
 
-The example begins with Verse's rich type system. The `item_rarity` enum provides type-safe constants without the boilerplate of traditional enumerations. The `item_stats` struct marked as `<persistable>` can be saved and loaded from persistent storage, essential for game saves. The `game_item` class uses `<unique>` to ensure reference equality semantics and `<persistable>` for save game support.
-
-Notice how types flow naturally through the code. There's no need for explicit type annotations in most places because Verse's type inference is sophisticated enough to deduce them. When we do specify types, like `Items:[]game_item`, it's to document intent rather than satisfy the compiler.
+The example begins with Verse's rich type system. Types flow naturally through the code; many type annotations are omitted as they can be infered. When we do specify types, like `Items:[]game_item`, they document intent rather than just satisfy the compiler. The `item_rarity` enum provides type-safe constants without the boilerplate of traditional enumerations. The `item_stats` struct marked as `<persistable>` can be saved and loaded from persistent storage, essential for game saves. The `game_item` class uses `<unique>` to ensure reference equality semantics.  
 
 **Failure as Control Flow**
 
 Throughout the code, failure drives control flow rather than exceptions or error codes. The `<decides>` effect marks functions that can fail, and failure propagates naturally through expressions. When `GetRarityMultiplier()` encounters an unknown rarity, it doesn't throw an exception or return a sentinel value - it simply fails, and the calling code handles this gracefully.
-
-The `AddItem` method demonstrates how failure creates elegant validation. The expression `NewWeight <= MaxWeight` either succeeds (allowing execution to continue) or fails (preventing the item from being added). There's no if statement, no explicit control flow - just a declarative assertion of what must be true.
+The `AddItem` method demonstrates how failure creates elegant validation. The expression `NewWeight <= MaxWeight` either succeeds (allowing execution to continue) or fails (preventing the item from being added). There's no explicit control flow - just a declarative assertion of what must be true.
 
 **Transactional Semantics and Speculative Execution**
 
 Methods marked with `<transacts>` provide automatic rollback on failure. In `PurchaseItem`, we deduct gold from the player, then try to add the item. If adding fails (perhaps due to weight limits), the gold deduction is automatically rolled back. This eliminates entire categories of bugs related to partial state updates.
-
-This transactional behavior extends to complex operations. When multiple changes need to succeed or fail together, Verse ensures consistency without manual transaction management.
+This transactional behavior extends to complex operations. When multiple changes need to succeed or fail together, Verse ensures consistency without need for manual clean up.
 
 **Functions as First-Class Values**
 
@@ -387,7 +387,6 @@ The inventory removal logic uses optional types (`?game_item`) to represent valu
 **Pattern Matching and Control Flow**
 
 The `case` expression in `GetRarityMultiplier` demonstrates pattern matching. Unlike a switch statement, `case` is an expression that produces a value. The underscore `_` provides a catch-all pattern, though in this example it leads to failure.
-
 The `if` expression similarly produces values and can bind variables in its condition. The compound conditions show how multiple operations can be chained with automatic failure propagation.
 
 **Module System and Access Control**
@@ -396,13 +395,13 @@ The code begins with `using` statements that import functionality from other mod
 
 **Immutable by Default**
 
-Data structures are immutable unless explicitly marked with `var`. This eliminates large classes of bugs and makes concurrent programming safer. When we do need mutation, it's explicit and tracked by the effect system.
+Data structures are immutable unless explicitly marked with `var`. This eliminates large classes of bugs and makes concurrent programming safer. When we do need mutation, it's explicit and tracked by the effect system. See [Mutability](05_mutability.md) for complete details on `var` and `set`.
 
 ## Naming Conventions
 
 Verse has a set of naming conventions that make code readable and predictable. While the language doesn't enforce these conventions, following them ensures your code integrates well with the broader Verse ecosystem and is immediately familiar to other Verse developers.
 
-Verse uses PascalCase (CamelCase starting with uppercase) for most identifiers:
+Idnetifiers should be in PascalCase (CamelCase starting with uppercase):
 
 <!--verse
 PlayerDatabase(id:int)<decides>:player_character=player_character{Name:="", Level:=1}
@@ -437,7 +436,7 @@ game_state := enum:
     game_over
 ```
 
-Generic type parameters typically use single lowercase letters or short descriptive names:
+Generic type parameters use single lowercase letters or short descriptive names:
 
 ```verse
 # Single letter for simple generics
@@ -467,8 +466,6 @@ Class and struct fields use PascalCase, and methods follow the same PascalCase c
 player := class:
     Name:string          # PascalCase for fields
     var Health:float= 0.0
-    MaxHealth:float
-    CurrentLevel:int
 
     # Methods use PascalCase like functions
     TakeDamage(Amount:float):void =
@@ -480,9 +477,9 @@ player := class:
 
 ## Code Formatting
 
-Verse code follows consistent formatting patterns that emphasize readability:
+Verse code follows consistent formatting patterns to emphasize readability.
 
-Verse uses 4-space indentation for code blocks. The colon introduces a block, with subsequent lines indented:
+Use 4-space indentation for code blocks. The colon introduces a block, with subsequent lines indented:
 
 <!--NoCompile-->
 ```verse
@@ -556,9 +553,7 @@ CalculateReward(
 
 ## Comments
 
-Comments are the programmer's way of leaving notes in the code, explaining not just what the code does, but why it does it. In Verse, comments are ignored during execution but are invaluable for understanding and maintaining code.
-
-Verse offers several styles of comments to suit different documentation needs. The simplest is the single-line comment, which begins with `#` and continues to the end of the line:
+Comments are ignored during execution but are valuable for understanding and maintaining code. Verse offers several styles of comments to suit different documentation needs. The simplest is the single-line comment, which begins with `#` and continues to the end of the line:
 
 <!--NoCompile-->
 ```verse
@@ -572,7 +567,7 @@ When you need to document something within a line of code without breaking it up
 Result := BaseValue <# original amount #> * Multiplier <# scaling factor #> + Bonus
 ```
 
-For more extensive documentation, multi-line block comments span across multiple lines, making them ideal for explaining complex algorithms or providing detailed context:
+The same can be used to write multi-line block comments, making them ideal for explaining complex algorithms or providing detailed context:
 
 <!--NoCompile-->
 ```verse
@@ -584,7 +579,7 @@ CalculateFalloffDamage(Distance:float, MaxDamage:float):float =
     # Implementation here
 ```
 
-One of Verse's elegant features is nested block comments, which allow you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
+Block comments nest, which allows you to temporarily disable code that already contains comments without having to remove or modify existing documentation:
 
 <!--NoCompile-->
 ```verse
@@ -594,7 +589,7 @@ One of Verse's elegant features is nested block comments, which allow you to tem
 #>
 ```
 
-Verse also supports indented comments, a unique feature that begins with `<#>` on its own line. Everything indented by four spaces on subsequent lines becomes part of the comment:
+Indented comments begin with a `<#>` on its own line; everything indented by four spaces on subsequent lines becomes part of the comment:
 
 <!--NoCompile-->
 ```verse
@@ -607,9 +602,9 @@ DoSomething()  # This is not part of the indented comment
 
 ## Syntactic Styles
 
-Verse offers flexible syntax to accommodate different programming styles and situations. The same logic can be expressed using braces, indentation, or inline forms, allowing you to choose the clearest representation for each context.
+Verse offers flexible syntax to accommodate different programming styles. The same logic can be expressed using braces, indentation, or inline forms, allowing you to choose the clearest representation for each context.
 
-**Braced Style:** The braced style uses curly braces to delimit blocks, familiar to programmers from C-family languages:
+The braced style uses curly braces to delimit blocks, familiar from C-family languages:
 
 <!--NoCompile-->
 ```verse
@@ -622,7 +617,6 @@ Result := if (Score > 90) {
 }
 ```
 
-**Indented Style:**
 The indented style uses colons and indentation to define structure, similar to Python:
 
 <!--NoCompile-->
@@ -635,7 +629,6 @@ else:
     "needs improvement"
 ```
 
-**Inline Style:**
 For simple expressions, the inline style keeps everything on one line:
 
 <!--NoCompile-->
@@ -643,7 +636,6 @@ For simple expressions, the inline style keeps everything on one line:
 Result := if (Score > 90) then "excellent" else if (Score > 70) then "good" else "needs improvement"
 ```
 
-**Dotted Style:**
 The dotted style uses a period to introduce the expression:
 
 <!--NoCompile-->
@@ -651,8 +643,7 @@ The dotted style uses a period to introduce the expression:
 Result := if (Score > 90). "excellent" else. "needs improvement"
 ```
 
-**Mixed Styles:**
-You can even mix styles when it makes sense. The colon-based indented form is particularly useful for the condition while keeping the branches inline:
+You can even mix styles when it makes sense:
 
 <!--NoCompile-->
 ```verse
@@ -663,4 +654,4 @@ Result := if:
 then { "condition met" } ese { "condition not met" }
 ```
 
-All these forms are semantically equivalent—they produce the same result. The choice between them is about readability and context. Use braces when working with existing brace-heavy code, indentation for cleaner vertical layouts, and inline forms for simple expressions. This flexibility lets you write code that reads naturally.
+All these forms produce the same result. The choice between them is about readability and context. Use braces when working with existing brace-heavy code, indentation for cleaner vertical layouts, and inline forms for simple expressions. This flexibility lets you write code that reads naturally.

@@ -30,17 +30,19 @@ library
     Ref
     Text
     Verse
-    Verse.Core.Eval
-    Verse.Core.Exp
-    Verse.Core.Parse
-    Verse.Core.Val
-    Verse.CPS.Convert
-    Verse.CPS.Eval
-    Verse.CPS.Exp
-    Verse.CPS.Val
+    Verse.Comp
+    Verse.Comp.Internal
+    Verse.Eval
+    Verse.Eval.Val
+    Verse.Exp
+    Verse.Parse
     Verse.Fun
     Verse.Monad
     Verse.Name
+    Verse.Run
+    Verse.Run.S
+    Verse.Run.Val
+    Verse.TH
     Verse.Token
   build-depends:
     base,
@@ -48,6 +50,7 @@ library
     mtl,
     prettyprinter,
     prettyprinter-ansi-terminal,
+    template-haskell,
     text,
     transformers,
     unordered-containers

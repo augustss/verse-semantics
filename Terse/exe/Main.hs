@@ -22,16 +22,16 @@ import System.Environment
 import System.FilePath
 import System.IO
 
+import Parser
 import Pos
 import Loc
 import Text (Text)
 import Text qualified
 
 import Verse qualified
-import Verse.Core.Exp qualified as Verse
-import Verse.Core.Eval qualified as Verse
-import Verse.Core.Parse qualified as Parse
-import Verse.Core.Parse qualified as Verse (parse')
+import Verse.Exp qualified as Verse
+import Verse.Eval qualified as Verse
+import Verse.Parse qualified as Verse
 
 main :: IO ()
 main = getArgs >>= \ case
@@ -85,9 +85,9 @@ parseWith
 parseWith m = loop . Verse.parse'
   where
     loop = \ case
-      Parse.Yield f -> case f mempty of
-        Parse.Empty {} -> loop . f =<< m
-        Parse.Yield f -> loop . f =<< m
-        Parse.Pure x input -> pure (input, Right x)
-      Parse.Pure x input -> pure (input, Right x)
-      Parse.Empty input pos -> pure (input, Left pos)
+      Yield f -> case f mempty of
+        Empty {} -> loop . f =<< m
+        Yield f -> loop . f =<< m
+        Pure x input -> pure (input, Right x)
+      Pure x input -> pure (input, Right x)
+      Empty input pos -> pure (input, Left pos)

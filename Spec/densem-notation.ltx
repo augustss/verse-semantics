@@ -108,7 +108,7 @@ $$
   \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
   \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \}
       \hspace{4mm} \text{...and similarly other $relops$} \\
-  \sembrack{ \fpr{a}{b} \in h } & = & \{ \rho \in \Env \vb \fpr{\rho(a)}{\rho(b)} \in h \}
+  \sembrack{ \conBrack{\fpr{a}{b} \in h} } & = & \{ \rho \in \Env \vb \fpr{\rho(a)}{\rho(b)} \in h \}
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -130,7 +130,7 @@ $$
 \semapp{A}{|a_1| \tupcat |a_2|}\rho & = & \Fun(\pomtupcat(r_1,r_2))
     & \text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
                       $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
-\semapp{A}{|emptytup|}\rho & = & \Fun( \pomempty) \\
+\semapp{A}{|emptytup|}\rho & = & \Fun(\pomunit{ \pomempty } ) \\
 \semapp{A}{|arr (a_0, xdots, a_n)|}\rho
   & = & \multicolumn{2}{@@{}l}{\Fun ( \; \pomunit{ \{ \fpr{0}{\semapp{A}{a_0}\rho} \}} \pomcat \ldots \pomcat
             \pomunit{ \{ \fpr{n}{\semapp{A}{a_n}\rho} \}} \; )} \\

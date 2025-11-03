@@ -33,14 +33,11 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 
 import Prelude
-  ( Bool
-  , Integer
+  ( Integer
   , Integral
   , Num
   , ($)
-  , (&&)
   , (.)
-  , (<=)
   , (+)
   , (*)
   , (-)
@@ -132,13 +129,10 @@ alpha = satisfy isAlpha
 
 decimal :: Integral a => Parser a
 decimal = do
-  z <- fromIntegral . (subtract 48) . ord <$> satisfy isDecimal
-  Text.foldl' f z <$> takeWhile isDecimal
+  z <- fromIntegral . subtract 48 . ord <$> satisfy isDigit
+  Text.foldl' f z <$> takeWhile isDigit
   where
     f z x = z * 10 + fromIntegral (ord x - 48)
-
-isDecimal :: Char -> Bool
-isDecimal x = '0' <= x && x <= '9'
 
 signed :: Num a => Parser a -> Parser a
 signed m =

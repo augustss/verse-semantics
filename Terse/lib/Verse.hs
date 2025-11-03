@@ -15,14 +15,13 @@ import Loc
 import Pos
 import Text (Text)
 
-import Verse.Core.Eval
-import Verse.Core.Parse
-import Verse.Core.Val
+import Verse.Eval
+import Verse.Eval.Val
+import Verse.Parse
 
 run :: Text -> IO (Either (Doc AnsiStyle) [Fix (Val Identity)])
 run input = case parse input of
-  Left pos ->
-    pure . Left $ prettyParseError input pos
+  Left pos -> pure . Left $ prettyParseError input pos
   Right x -> eval x <&> \ case
     Right xs -> Right xs
     Left xs -> Left $ prettyStuckError input xs

@@ -39,20 +39,22 @@ nav:
   - Home: index.md
   - Overview: 00_overview.md
   - Expressions: 01_expressions.md
-  - Built-in Types: 02_builtins.md
-  - Operators: 03_operators.md
-  - Functions: 04_functions.md
-  - Control Flow: 05_control.md
-  - Failure: 06_failure.md
-  - Type System: 07_types.md
-  - Composite Types: 08_composites.md
-  - Mutability: 09_mutability.md
-  - Effects: 10_effects.md
-  - Concurrency: 11_concurrency.md
-  - Modules and Paths: 12_modules.md
-  - Access Specifiers: 13_access.md
-  - Persistable Types: 14_persistable.md
-  - Code Evolution: 15_evolution.md
-  - Live Variables: 16_live_variables.md
+  - Primitives types: 02_primitives.md
+  - Containers types: 03_containers.md
+  - Operators: 04_operators.md
+  - Mutability: 05_mutability.md
+  - Functions: 06_functions.md
+  - Control Flow: 07_control.md
+  - Failure: 08_failure.md
+  - Structs & Enums: 09_structs_enums.md
+  - Classes & Interfaces: 10_classes_interfaces.md
+  - Type System: 11_types.md
+  - Access Specifiers: 12_access.md
+  - Effects: 13_effects.md
+  - Concurrency: 14_concurrency.md
+  - Live Variables: 15_live_variables.md
+  - Modules and Paths: 16_modules.md
+  - Persistable Types: 17_persistable.md
+  - Code Evolution: 18_evolution.md
   - "📚 Concept Index": concept_index.md
 
