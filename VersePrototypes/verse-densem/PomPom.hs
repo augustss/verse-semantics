@@ -210,7 +210,7 @@ dE t@(ApplyD t0 t1)                 i x =
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
-dE t@(Function aprt t0 _ t1) i x = fUN t aprt (bvs t0) (dE t0 p q) t1 p q i x
+dE t@(Function aprt t0 _ t1) i x = fUN (getAllBinders t) aprt (bvs t0) (dE t0 p q) t1 p q i x
   where (p, q) = fresh2 ("p", "q") [i, x] t
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
@@ -219,28 +219,13 @@ dF f a r =
   [ d
   | fp <- mkPomSetList allFUNs
   , h <- fp
-  , let d = f .= Fun fp /\ bigUnion [ a .= u /\ r .= v
-                                | u <- allValues  -- list
-                                , Just v <- [applyPF h u]
-                                ]
+  , let d = f .= Fun fp /\ funHasPair a r h
   , d /= E.empty
   ]
-{-
-  uncanon $
-  [ [ f .= Fun hs /\ bigUnion [ a .= u /\ r .= v
-                              | u <- allValues  -- list
-                              , Just v <- [applyPF h u]
-                              ]
-    | h <- hs -- list
-    ]
-  | hs <- Set.mkSetUnsafe allFUNs -- set
-  ] `Set.union`
-  [ [ f .= tt /\ a .= Int u /\ r .= (vs !! u)
-    | u <- [0 .. length vs - 1] -- list
-    ]
-  | tt@(Tuple vs) <- Set.mkSetUnsafe allTuples -- set
-  ]
--}
+
+-- The constraint {{ (x => y) `elem` h }}
+funHasPair :: Ident -> Ident -> PartialFun -> ENV
+funHasPair x y h = bigUnion [ x .= u /\ y .= v | u <- allValues, Just v <- [applyPF h u] ]
 
 i=Ident noLoc "i"
 j=Ident noLoc "j"
@@ -370,6 +355,11 @@ fresh2 (sx, sy) is t = (x, y)
         y = fresh sy (x:vs)
         vs = is ++ getAllBinders t
 
+fresh2' :: (String, String) -> [Ident] -> (Ident, Ident)
+fresh2' (sx, sy) is = (x, y)
+  where x = fresh sx is
+        y = fresh sy (x:is)
+
 bvs :: SrcEssential -> [Ident]
 bvs = getVisibleBinders
 
@@ -384,14 +374,14 @@ den t = canon $
 -------
 
 -- The first argument to fUN is only used to make sure we make fresh variables
-fUN :: SrcEssential -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN :: [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
 fUN _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
-fUN tt apt xs (s :\/ t) t1 p q h f =
+fUN used apt xs (s :\/ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN tt apt xs s t1 p q h1 f1
-        funb = fUN tt apt xs t t1 p q h2 f2
-        (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
-        (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
+  where funa = fUN used apt xs s t1 p q h1 f1
+        funb = fUN used apt xs t t1 p q h2 f2
+        (h1, f1) = fresh2' ("h1","f1") (h:f:used)
+        (h2, f2) = fresh2' ("h2","f2") (h:f:used)
         sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
                            h1 .= th1 /\ h2 .= th2 /\ f1 .= tf1 /\ f2 .= tf2
                          | th1 <- allValuesOf h1 funa
@@ -401,12 +391,12 @@ fUN tt apt xs (s :\/ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funUnion g h)
         ufun _ _ = undefined
-fUN tt apt xs (s :++ t) t1 p q h f =
+fUN used apt xs (s :++ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN tt apt xs s t1 p q h1 f1
-        funb = fUN tt apt xs t t1 p q h2 f2
-        (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
-        (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
+  where funa = fUN used apt xs s t1 p q h1 f1
+        funb = fUN used apt xs t t1 p q h2 f2
+        (h1, f1) = fresh2' ("h1","f1") (h:f:used)
+        (h2, f2) = fresh2' ("h2","f2") (h:f:used)
         sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
                            h1 .= th1 /\ h2 .= th2 /\ f1 .= tf1 /\ f2 .= tf2
                          | th1 <- allValuesOf h1 funa
@@ -416,13 +406,13 @@ fUN tt apt xs (s :++ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funConcat g h)
         ufun _ _ = undefined
-fUN tt apt xs d@(Unit dd) t1 p q h f =
+fUN used apt xs d@(Unit dd) t1 p q h f =
 --trace ("fUN dd=" ++ show dd ++ " t1=" ++ show t1 ++ " (p,q,h,f)=" ++ show(p,q,h,f) ++ "xs=" ++ show xs) $
   (d *** unit sings >>> (p:q:xs))
   `union`
   (nOT (d >>> (p:q:xs)) *** unit (h .= Fun Empty /\ f .= Fun Empty))
   where
-    (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) tt
+    (x, y) = fresh2' ("x", "y") (p:q:h:f:used)
     et1 = dE t1 x y
     sings :: ENV
     sings = bigUnion
