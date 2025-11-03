@@ -210,7 +210,7 @@ dE t@(ApplyD t0 t1)                 i x =
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
-dE t@(Function aprt t0 _ t1) i x = fUN aprt (bvs t0) (dE t0 p q) t1 p q i x
+dE t@(Function aprt t0 _ t1) i x = fUN t aprt (bvs t0) (dE t0 p q) t1 p q i x
   where (p, q) = fresh2 ("p", "q") [i, x] t
 dE e                               _ _ = error $ "dE: unimplemented " ++ show e
 
@@ -297,6 +297,9 @@ tlt  x y = ApplyD (EPrim Lt)  (Array [x, y])
 tfun01 = Function Closed k0 effSucceeds k1
 tfunho = Function Closed tfun01 effSucceeds k2
 
+tfunx2 = Function Closed (Variable xx) effSucceeds k2
+xx=Ident noLoc "x"
+
 {-
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
@@ -380,12 +383,13 @@ den t = canon $
 
 -------
 
-fUN :: Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
-fUN _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
-fUN apt xs (s :\/ t) t1 p q h f =
+-- The first argument to fUN is only used to make sure we make fresh variables
+fUN :: SrcEssential -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
+fUN tt apt xs (s :\/ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN apt xs s t1 p q h1 f1
-        funb = fUN apt xs t t1 p q h2 f2
+  where funa = fUN tt apt xs s t1 p q h1 f1
+        funb = fUN tt apt xs t t1 p q h2 f2
         (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
         (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
         sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
@@ -397,10 +401,10 @@ fUN apt xs (s :\/ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funUnion g h)
         ufun _ _ = undefined
-fUN apt xs (s :++ t) t1 p q h f =
+fUN tt apt xs (s :++ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN apt xs s t1 p q h1 f1
-        funb = fUN apt xs t t1 p q h2 f2
+  where funa = fUN tt apt xs s t1 p q h1 f1
+        funb = fUN tt apt xs t t1 p q h2 f2
         (h1, f1) = fresh2 ("h1","f1") (h:f:xs) t1
         (h2, f2) = fresh2 ("h2","f2") (h:f:xs) t1
         sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
@@ -412,12 +416,13 @@ fUN apt xs (s :++ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funConcat g h)
         ufun _ _ = undefined
-fUN apt xs d@(Unit dd) t1 p q h f =
+fUN tt apt xs d@(Unit dd) t1 p q h f =
+--trace ("fUN dd=" ++ show dd ++ " t1=" ++ show t1 ++ " (p,q,h,f)=" ++ show(p,q,h,f) ++ "xs=" ++ show xs) $
   (d *** unit sings >>> (p:q:xs))
   `union`
   (nOT (d >>> (p:q:xs)) *** unit (h .= Fun Empty /\ f .= Fun Empty))
   where
-    (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) t1
+    (x, y) = fresh2 ("x", "y") (p:q:h:f:xs) tt
     et1 = dE t1 x y
     sings :: ENV
     sings = bigUnion
@@ -434,15 +439,14 @@ fUN apt xs d@(Unit dd) t1 p q h f =
             [ (pv, ves)
             | pv <- allValuesSet
             , let qvs = valsOf q (dd /\ p .= pv)  -- possible values for q
---          , trace ("qvs=" ++ show qvs ++ ", dd=" ++ show dd ++ ", p=" ++ show pv) True
+--          , trace ("qvs=" ++ show qvs ++ ", dd=" ++ show dd ++ ", pv=" ++ show pv) True
 --          , qv <- allValuesSet  -- could use this
             , qv <- qvs                           -- try the q values
+--          , trace("try hh[qv] hh=" ++ show hh ++ ", qv=" ++ show qv ++ " hh[qv]=" ++ show (applyPF hh qv)) True
             , let ves =
---                  trace("try hh[qv] hh=" ++ show hh ++ ", qv=" ++ show qv ++ " = " ++ show (applyPF hh qv)) $
                     case applyPF hh qv of
                       Nothing -> Set.empty            -- h[q] failed
                       Just hq -> 
---                      trace ("(qv,r,envss)=" ++ show (qv,r, singSeq (dE t1 x y *** Unit (x .= r)))) $
                         -- Possible range environments for this p=pv
                         let
                           et0 = Unit (dd /\ p .= pv /\ q .= qv) >>> [p, q]
@@ -450,12 +454,7 @@ fUN apt xs d@(Unit dd) t1 p q h f =
                           yrs :: Set ENV
                           yrs = singSeqChk (et0 *** et1 *** res)
                         in
-{-
-                          trace ("dd="++show dd) $
-                          trace ("pv="++show pv++", qv="++show qv++", r="++show r) $
-                          trace ("et0="++show et0++", et1=" ++ show et1 ++ ", res=" ++ show res ++ ", yrs=" ++ show yrs) $
-                          trace ("et0***et1=" ++ show (et0***et1)) $
--}
+--                        trace ("ok pv=" ++ show pv ++ " qv=" ++ show qv ++ " hh[qv]=" ++ show hq ++ " et0=" ++ show et0 ++ " et1*res=" ++ show (et1 *** res)) $
                           [ (yv, qv, (x:y:p:q:xs) `hides` r)
                           | yr <- yrs
                           , yv <- valsOf y yr  -- allValuesSet
@@ -463,18 +462,20 @@ fUN apt xs d@(Unit dd) t1 p q h f =
                           , r /= empty
                           ]
             ]
-               
---               , trace ("poss=" ++ show poss) True
+--      , trace ("poss=" ++ show poss) True
+      , let poss' = Set.filterSet (not . Set.isEmpty . snd) poss
+--      , trace ("poss'=" ++ show poss') True
       , let
           -- 
           sets :: [ [ ((Value, Value), Value, ENV) ] ]
           sets = traverse (\ (x, yes) -> [ ((x, y), q, e) | (y, q, e) <- Set.toList yes ])
-                          (Set.toList poss)
+                          (Set.toList poss')
           sets' :: [ (PartialFun, Set Value, ENV) ]
           sets' = [ (mkPFList xys, Set.mkSet qs, bigIntersect es)
                   | xyeqs <- sets
                   , let (xys, qs, es) = unzip3 xyeqs
                   ]
+--    , trace ("sets=" ++ show sets) True
 --    , trace ("sets'=" ++ show sets') True
       , (ff, qs, env) <- sets'
       , apt /= Closed || domPF hh == qs
