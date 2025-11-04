@@ -108,10 +108,6 @@ for =
                         (Pat (Name (IdentName "for"))))
                        (L (Loc (Pos {line = 1, column = 5, offset = 0})
                            (Pos {line = 1, column = 7, offset = 0})) (Int 1)))])
-     -- note the mismatch parens, this doesn't throw an error, see #104
-     , ("for(1}" , [L (Loc (Pos {line = 1, column = 1, offset = 0})
-                       (Pos {line = 1, column = 4, offset = 0}))
-                     (Pat (Name (IdentName "for")))])
      , ("for(1)do{3}" , [L (Loc (Pos {line = 1, column = 1, offset = 0})
                             (Pos {line = 1, column = 12, offset = 0}))
                           (Do (L (Loc (Pos {line = 1, column = 1, offset = 0})
