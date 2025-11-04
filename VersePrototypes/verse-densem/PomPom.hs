@@ -285,6 +285,8 @@ tfunho = Function Closed tfun01 effSucceeds k2
 tfunx2 = Function Closed (Variable xx) effSucceeds k2
 xx=Ident noLoc "x"
 
+uChoice t0 t1 = ApplyD (Variable (Ident noLoc "operator'|||'")) (Array [t0, t1])
+
 {-
 ix :: [ ENV ] -> Int -> ENV
 ix es i | i >= 0 && i < length es = es !! i
