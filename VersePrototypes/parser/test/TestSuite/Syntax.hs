@@ -42,6 +42,7 @@ import Test.Tasty
 unitTests :: TestTree
 unitTests = testGroup "parser/test_data/syntax.verse"
   [ fixnums
+  , for
   , chars
   , strings
   , identifiers
@@ -89,9 +90,41 @@ fixnums =
      , ("20m/s"   , Units -- parser as '20m' / s, where s is an identifier
          (L (Loc (Pos {line = 1, column = 1, offset = 0}) (Pos {line = 1, column = 4, offset = 0}))
           (Int 20))
-         (L (Loc (Pos {line = 1, column = 3, offset = 0}) (Pos {line = 1, column = 4, offset = 0})) "m")
+         (L (Loc (Pos {line = 1, column = 3, offset = 0})
+             (Pos {line = 1, column = 4, offset = 0})) "m")
        )
      ]
+
+for :: TestTree
+for =
+  let passes = makeTest pList
+  in testGroup "for" $
+     passes <$>
+     [ ("for(1)" , [L (Loc (Pos {line = 1, column = 1, offset = 0})
+                       (Pos {line = 1, column = 7, offset = 0}))
+                     (ParenInvoke
+                      (L (Loc (Pos {line = 1, column = 1, offset = 0})
+                          (Pos {line = 1, column = 4, offset = 0}))
+                        (Pat (Name (IdentName "for"))))
+                       (L (Loc (Pos {line = 1, column = 5, offset = 0})
+                           (Pos {line = 1, column = 7, offset = 0})) (Int 1)))])
+     -- note the mismatch parens, this doesn't throw an error, see #104
+     , ("for(1}" , [L (Loc (Pos {line = 1, column = 1, offset = 0})
+                       (Pos {line = 1, column = 4, offset = 0}))
+                     (Pat (Name (IdentName "for")))])
+     , ("for(1)do{3}" , [L (Loc (Pos {line = 1, column = 1, offset = 0})
+                            (Pos {line = 1, column = 12, offset = 0}))
+                          (Do (L (Loc (Pos {line = 1, column = 1, offset = 0})
+                                  (Pos {line = 1, column = 7, offset = 0}))
+                                (ParenInvoke (L (Loc (Pos {line = 1, column = 1, offset = 0})
+                                                 (Pos {line = 1, column = 4, offset = 0}))
+                                               (Pat (Name (IdentName "for"))))
+                                  (L (Loc (Pos {line = 1, column = 5, offset = 0})
+                                      (Pos {line = 1, column = 7, offset = 0})) (Int 1))))
+                            (L (Loc (Pos {line = 1, column = 10, offset = 0})
+                                (Pos {line = 1, column = 12, offset = 0})) (Int 3)))])
+     ]
+
 
 chars :: TestTree
 chars =
