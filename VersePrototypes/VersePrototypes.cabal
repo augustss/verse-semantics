@@ -419,3 +419,4 @@ test-suite verse-parser-test
                  , tasty-expected-failure
                  , text
                  , verse-parser
+                 , verse-libs

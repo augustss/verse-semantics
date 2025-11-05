@@ -204,7 +204,7 @@ parseWithRewrite
 parseWithRewrite p path bs = fmap extract $ parseWithLocRewrite p path bs
 
 -- | Parse directly to FrontEnd.Expr. This is the general purpose parser used in
--- the tester for arbritrary expressions
+-- the repl for arbritrary expressions
 parseToSrcExpr :: String -> ByteString -> Src.SrcExpr
 parseToSrcExpr = (PC.expToSrcExpr .) . go_parse (pcExpr <* eof)
   where
@@ -1163,18 +1163,19 @@ pFun' e =
 
 -- | top level parse an expression
 pcExpr :: Parser (L (Exp SimpleName))
-pcExpr = do
-  pcUniExpr
-    <|> pcSemiExpr
+pcExpr =
+    P.try (spaces *> pcUniExpr <* spaces)
+    <|> P.try (spaces *> pcSemiExpr <* spaces)
     <|> P.try (spaces *> pNum   <* spaces)
     <|> P.try (spaces *> pParen <* spaces)
-    <|> P.try (pExpr) -- this try is necessary or else pExpr throws exceptions
-                      -- on literal numbers
+    <|> P.try (spaces *> pExpr <* spaces) -- this try is necessary or else pExpr
+                                          -- throws exceptions on literal
+                                          -- numbers
 
 
 -- | parse a unification expression: 'f = g'
 pcUniExpr :: Parser (L (Exp SimpleName))
-pcUniExpr = P.try $ do
+pcUniExpr = do
   l <- P.try pExpr
   _ <- match '='
   r <- P.try pExpr
@@ -1188,7 +1189,7 @@ pcUniExpr = P.try $ do
 
 -- | parse a sequential composition expression: 'f;g'
 pcSemiExpr :: Parser (L (Exp SimpleName))
-pcSemiExpr = P.try $ do
+pcSemiExpr = do
   es <- P.sepBy1 pExpr (lexeme pSemi)
   let start = loc $ head es
       end   = loc $ last es
