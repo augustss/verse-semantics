@@ -6,6 +6,7 @@ import Control.Applicative
 import Control.Monad
 import qualified Set
 import Set(Set)
+import GHC.Stack
 
 default ()
 
@@ -66,8 +67,10 @@ instance Alternative P where
   empty = Empty
   (<|>) = union
 
+{-
 cONC :: [P a] -> P a
 cONC = foldr (+++) Empty
+-}
 
 canon :: P a -> Set [a]
 canon Empty = Set.empty
@@ -81,9 +84,12 @@ canon p = canon' p
     canon' ((s :++ t) :++ r) = canon' (s :++ (t :++ r))
     canon' (Empty :++ _) = error "cannot happen"
 
-uncanon :: Ord a => Set [a] -> P a
+uncanon :: (HasCallStack, Ord a) => Set [a] -> P a
 uncanon s | Set.isEmpty s = Empty
-uncanon s = Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
+uncanon s = -- Set.foldSet union [ foldr (+++) Empty (map unit xs) | xs <- s ]
+  foldr1 (:\/) (map f (Set.toList s))
+  where f [] = error "uncanon: [] sequence"
+        f xs = foldl1 (:++) (map Unit xs)
 
 -- Return all the leaves of a pomset
 allLeaves :: P a -> [a]

@@ -205,7 +205,7 @@ parseWithRewrite p path bs = fmap extract $ parseWithLocRewrite p path bs
 -- | Parse directly to FrontEnd.Expr. This is the general purpose parser used in
 -- the tester for arbritrary expressions
 parseToSrcExpr :: String -> ByteString -> Src.SrcExpr
-parseToSrcExpr = (PC.expToSrcExpr .) . go_parse pcExpr
+parseToSrcExpr = (PC.expToSrcExpr .) . go_parse (pcExpr <* eof)
   where
     go_parse :: Parser (L (Exp SimpleName)) -> String -> ByteString -> L (R.Exp L Ident)
     go_parse p path content =
@@ -1156,6 +1156,7 @@ pcExpr = do
     <|> P.try (spaces *> pParen <* spaces)
     <|> P.try (pExpr) -- this try is necessary or else pExpr throws exceptions
                       -- on literal numbers
+
 
 -- | parse a unification expression: 'f = g'
 pcUniExpr :: Parser (L (Exp SimpleName))
