@@ -151,6 +151,7 @@ import Text.Parsec.Error qualified as PE
 import Text.Parsec.Pos qualified as PPos
 import Text.Parsec.Prim qualified as PPrim
 import Text.Parsec.Combinator (optionMaybe,eof)
+import Prettyprinter (pretty)
 
 import Prelude hiding (exp, minBound)
 
@@ -210,7 +211,7 @@ parseToSrcExpr = (PC.expToSrcExpr .) . go_parse (pcExpr <* eof)
     go_parse :: Parser (L (Exp SimpleName)) -> String -> ByteString -> L (R.Exp L Ident)
     go_parse p path content =
       case parseWithLocRewrite p path content of
-        Left err -> error $ show err
+        Left err -> error $ show $ pretty err
         Right x  -> x
 
 -- | The general purpose parser entry point
@@ -223,7 +224,8 @@ parse p path content = runIdentity $ P.runParserT p beginPS path (WS content)
 parseDie :: Parser a -> String -> ByteString -> a
 parseDie p path content =
   case parse p path content of
-    Left err -> error $ show err
+    Left err -> error $ show err -- This error is Parsec internal, not E.Error
+                                 -- so we do not define a pretty instance for it
     Right x  -> x
 
 parseNoLoc :: Comonad w => Parser (w a) -> String -> ByteString -> a
