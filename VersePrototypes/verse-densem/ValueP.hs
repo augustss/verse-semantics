@@ -127,7 +127,7 @@ fun = foldr (+++) Empty . map unit
 -----------------------------
 
 numInt :: Z
-numInt = 4
+numInt = 3
 
 allInts' :: [Int]
 allInts' = [0 .. fromIntegral numInt - 1 ]
@@ -278,11 +278,13 @@ allTupleElems = --[Int 0, Int 1]
 
 -- concatenate tuples represented as functions.
 tupConcat :: FUN -> FUN -> FUN
-tupConcat x y = uncanon [ appTup xs ys | xs <- ne $ canon x, ys <- ne $ canon y ]
+tupConcat x y = uncanon' [ appTup xs ys | xs <- canon' x, ys <- canon' y ]
   where appTup :: [PartialFun] -> [PartialFun] -> [PartialFun]
         appTup xs ys = xs ++ map (shiftPF (length xs)) ys
-        ne s | Set.isEmpty s = Set.singleton []
-             | otherwise = s
+        canon' Empty = Set.singleton []
+        canon' s     = canon s
+        uncanon' s | s == Set.singleton [] = Empty
+                   | otherwise = uncanon s
 
 {-
 shift :: Int -> FUN -> FUN
