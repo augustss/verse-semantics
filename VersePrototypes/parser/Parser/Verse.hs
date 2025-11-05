@@ -239,9 +239,21 @@ parseWithLoc p path bytestring =
     Left err -> Left $ E.OtherError (toPos $ PE.errorPos err) (showWithoutPos err)
     Right x -> Right x
   where
+    -- Parsec uses PE.Message for error messages which are all data constructors
+    -- that take a String. This means that our ByteString streams are output as
+    -- ASCII code (.e.g., 41 instead of ')'). This function fixes up the output
+    -- to something human friendly.
+    fixup_msgs :: PE.Message -> PE.Message
+    fixup_msgs (PE.SysUnExpect s) = PE.SysUnExpect (s)
+    fixup_msgs (PE.UnExpect s)    = PE.UnExpect    ((:[]) . w2c $ (read s :: Word8))
+    fixup_msgs (PE.Expect s)      = PE.Expect      (s)
+    fixup_msgs (PE.Message s)     = PE.Message     (s)
+
     -- Copied from Parsec.Error, but without position since it's reported separately
     showWithoutPos err =
-      PE.showErrorMessages "or" "unknown parse error"  "expecting" "unexpected" "end of input" (PE.errorMessages err)
+      PE.showErrorMessages
+      "or" "unknown parse error" "expecting" "unexpected" "end of input"
+      (fmap fixup_msgs $ PE.errorMessages err)
 
 parseWithLocRewrite
   :: Parser (L (Exp SimpleName))
