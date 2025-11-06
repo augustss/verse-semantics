@@ -1,4 +1,5 @@
 exists false;
+false = ();
 
 exists ToRevList;
 ToRevList = fun(Arg) {

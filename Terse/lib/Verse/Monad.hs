@@ -268,127 +268,76 @@ split m = split' m 0
 split'
   :: (MonadRef m, Vars a m)
   => VerseT m a -> Int -> VerseT m (Stream m a)
-split' m count = splitS m count >>= \ case
-  YieldS i f s mem f_s m_f m_e -> do
-    tell mem.forward mem.backward
-    tell' mem.backward'
-    putLabel mem.label
-    level <- getLevel
-    if i > level then
-      stuck
-    else
-      yield i $ \ k ->
-      f $ \ m -> k $ split' (alt (m >>= f_s) m_f m_e) s.count
-  SucceedS s mem x m_f _m_e -> do
-    tell mem.forward mem.backward
-    tell' mem.backward'
-    if s.count == 0 then do
-      level <- getLevel
-      lift (runFindT (findVars x) level mem.label) >>= \ case
-        Nothing -> do
-          putLabel mem.label
-          stuck
-        Just (x, label) -> do
-          putLabel label
-          pure . Step x $ split m_f
-    else do
-      putLabel mem.label
-      stuck
-  FailS mem -> do
-    tell mem.forward mem.backward
-    tell' mem.backward'
-    putLabel mem.label
-    pure Done
-
-data Stream m a = Done | Step a (VerseT m (Stream m a))
-
-splitS :: Monad m => VerseT m a -> Int -> VerseT m (Split m a)
-splitS m !count = VerseT $ \ r s env mem@Mem { label } _yk sk fk ek ->
+split' m count = VerseT $ \ r s env mem@Mem { label } yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
     !mem' = Mem {..}
   in
-    unVerseT m r' s' env mem' yieldS succeedS failS emptyS >>= \ x ->
-    sk s mem x fk ek
+    unVerseT m r' s' env mem' yieldS succeedS failS emptyS >>= \ m ->
+    unVerseT m r s env mem yk sk fk ek
   where
     !s' = S { count }
     !forward = pure ()
     !backward = pure ()
     !backward' = pure ()
 
-yieldS :: Monad m => Yield (Split m a) m
-yieldS = Yield $ \ i f s mem sk fk ek ->
-  pure $
-  YieldS i f s mem
-  (liftS sk >=> reflectS)
-  (liftF fk >>= reflectS)
-  (liftE ek >>= reflectS)
+yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
+yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
+  tell mem.forward mem.backward
+  tell' mem.backward'
+  putLabel mem.label
+  level <- getLevel
+  if i > level then
+    stuck
+  else
+    let
+      f_s = liftSucceedS sk >=> reflectS
+      m_f = liftFail fk >>= reflectS
+      m_e = liftEmpty ek >>= reflectS
+    in
+      yield i $ \ k -> f $ \ m -> k $ split' (alt (m >>= f_s) m_f m_e) s.count
 
-succeedS :: Monad m => Succeed (Split m a) m a
-succeedS s mem x fk ek =
-  pure $
-  SucceedS s mem x
-  (liftF fk >>= reflectS)
-  (liftE ek >>= reflectS)
-
-failS :: Applicative m => Fail (Split m a) m
-failS _env = pure . FailS
-
-emptyS :: Applicative m => Empty (Split m a) m
-emptyS = pure . FailS
-
-reflectS :: Split m a -> VerseT m a
+reflectS :: Stream m a -> VerseT m a
 reflectS = \ case
-  FailS mem ->
-    reflectFailS mem
-  SucceedS s mem x m_f m_e ->
-    reflectSucceedS s mem x m_f m_e
-  YieldS i f s mem f_s m_f m_e -> do
-    putS s
-    putMem mem
-    alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
+  Done -> empty
+  Step x m -> pure x <|> (m >>= reflectS)
 
-reflectSucceedS :: S -> Mem m -> a -> VerseT m a -> VerseT m a -> VerseT m a
-reflectSucceedS s mem x m_f m_e = do
-  putS s
-  putMem mem
-  alt (pure x) m_f m_e
+succeedS :: (MonadRef m, Vars a m) => Succeed (VerseT m (Stream m a)) m a
+succeedS s mem x fk _ek = pure $ do
+  tell mem.forward mem.backward
+  tell' mem.backward'
+  if s.count == 0 then do
+    level <- getLevel
+    lift (runFindT (findVars x) level mem.label) >>= \ case
+      Nothing -> do
+        putLabel mem.label
+        stuck
+      Just (x, label) -> do
+        putLabel label
+        pure . Step x $ liftFail fk
+  else do
+    putLabel mem.label
+    stuck
 
-reflectFailS :: Mem m -> VerseT m a
-reflectFailS mem = do
-  putMem mem
-  empty
+failS :: Applicative m => Fail (VerseT m (Stream m a)) m
+failS _env = emptyS
 
-liftS :: Monad m => Succeed (Split m a) m b -> b -> VerseT m (Split m a)
-liftS f x = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  f s mem x failS emptyS >>= \ x -> sk s mem x fk ek
+emptyS :: Applicative m => Empty (VerseT m (Stream m a)) m
+emptyS mem = pure $ do
+  tell mem.forward mem.backward
+  tell' mem.backward'
+  putLabel mem.label
+  pure Done
 
-liftF :: Monad m => Fail (Split m a) m -> VerseT m (Split m a)
-liftF f = VerseT $ \ _r s env mem _yk sk fk ek ->
-  f env mem >>= \ x -> sk s mem x fk ek
+liftSucceedS
+  :: Monad m
+  => Succeed (VerseT m (Stream m b)) m a -> a -> VerseT m (Stream m b)
+liftSucceedS sk x = do
+  s <- getS
+  mem <- getMem
+  join . lift $ sk s mem x failS emptyS
 
-liftE :: Monad m => Empty (Split m a) m -> VerseT m (Split m a)
-liftE f = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  f mem >>= \ x -> sk s mem x fk ek
-
-data Split m a
-  = forall b .
-    YieldS
-    {-# UNPACK #-} !Level
-    !(Handler m b)
-    {-# UNPACK #-} !S
-    !(Mem m)
-    !(b -> VerseT m a)
-    !(VerseT m a)
-    !(VerseT m a)
-  | SucceedS
-    {-# UNPACK #-} !S
-    !(Mem m)
-    !a
-    !(VerseT m a)
-    !(VerseT m a)
-  | FailS
-    !(Mem m)
+data Stream m a = Done | Step a (VerseT m (Stream m a))
 
 fork :: Monad m => VerseT m () -> VerseT m ()
 fork m = VerseT $ \ r s env mem yk sk fk ek ->
@@ -402,8 +351,8 @@ yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
   level <- getLevel
   let
     f_s = liftSucceedF sk
-    m_f = liftFailF fk
-    m_e = liftEmptyF ek
+    m_f = liftFail fk
+    m_e = liftEmpty ek
   if i < level then
     alt (yield i (\ k -> f $ \ m -> k . fork $ m >>= f_s)) m_f m_e
   else do
@@ -414,7 +363,7 @@ succeedF :: Monad m => Succeed (VerseT m ()) m ()
 succeedF s mem () fk ek = pure $ do
   putS s
   putMem mem
-  alt (pure ()) (liftFailF fk) (liftEmptyF ek)
+  alt (pure ()) (liftFail fk) (liftEmpty ek)
 
 failF :: Applicative m => Fail (VerseT m ()) m
 failF _env mem = pure $ do
@@ -432,14 +381,14 @@ liftSucceedF sk x = do
   mem <- getMem
   join . lift $ sk s mem x failF emptyF
 
-liftFailF :: Monad m => Fail (VerseT m ()) m -> VerseT m ()
-liftFailF fk = do
+liftFail :: Monad m => Fail (VerseT m a) m -> VerseT m a
+liftFail fk = do
   env <- ask
   mem <- getMem
   join . lift $ fk env mem
 
-liftEmptyF :: Monad m => Empty (VerseT m ()) m -> VerseT m ()
-liftEmptyF ek = do
+liftEmpty :: Monad m => Empty (VerseT m a) m -> VerseT m a
+liftEmpty ek = do
   mem <- getMem
   join . lift $ ek mem
 
