@@ -195,6 +195,10 @@ getLevel :: VerseT m Level
 getLevel = VerseT $ \ r s _env mem _yk sk ->
   sk s mem r.level
 
+getS :: VerseT m S
+getS = VerseT $ \ _r s _env mem _yk sk ->
+  sk s mem s
+
 putS :: S -> VerseT m ()
 putS !s = VerseT $ \ _r _s _env mem _yk sk ->
   sk s mem ()
@@ -205,6 +209,10 @@ modifyS f = VerseT $ \ _r s _env mem _yk sk ->
     !s' = f s
   in
     sk s' mem ()
+
+getMem :: VerseT m (Mem m)
+getMem = VerseT $ \ _r s _env mem _yk sk ->
+  sk s mem mem
 
 putMem :: Mem m -> VerseT m ()
 putMem mem = VerseT $ \ _r s _env _mem _yk sk ->
@@ -351,45 +359,6 @@ reflectFailS mem = do
   putMem mem
   empty
 
-fork :: Monad m => VerseT m () -> VerseT m ()
-fork m = forkS m >>= reflectF
-
-forkS :: Monad m => VerseT m () -> VerseT m (Split m ())
-forkS m = VerseT $ \ r s env mem _yk sk fk ek ->
-  unVerseT m r s env mem yieldF succeedF failS emptyS >>= \ x ->
-  sk s mem x fk ek
-
-reflectF :: Monad m => Split m () -> VerseT m ()
-reflectF = \ case
-  FailS mem ->
-    reflectFailS mem
-  SucceedS s mem () m_f m_e ->
-    reflectSucceedS s mem () m_f m_e
-  YieldS i f s mem f_s m_f m_e -> do
-    putMem mem
-    level <- getLevel
-    if i < level then do
-      putS s
-      alt (yield i (\ k -> f $ \ m -> k . fork $ m >>= f_s)) m_f m_e
-    else do
-      putS $ succS s
-      alt (f $ \ m -> modifyS predS >> fork (m >>= f_s)) m_f m_e
-
-yieldF :: Monad m => Yield (Split m ()) m
-yieldF = Yield $ \ i f s mem sk fk ek ->
-  pure $
-  YieldS i f s mem
-  (liftS sk >=> reflectS)
-  (liftF fk >>= reflectF)
-  (liftE ek >>= reflectF)
-
-succeedF :: Monad m => Succeed (Split m ()) m ()
-succeedF s mem () fk ek =
-  pure $
-  SucceedS s mem ()
-  (liftF fk >>= reflectF)
-  (liftE ek >>= reflectF)
-
 liftS :: Monad m => Succeed (Split m a) m b -> b -> VerseT m (Split m a)
 liftS f x = VerseT $ \ _r s _env mem _yk sk fk ek ->
   f s mem x failS emptyS >>= \ x -> sk s mem x fk ek
@@ -420,6 +389,59 @@ data Split m a
     !(VerseT m a)
   | FailS
     !(Mem m)
+
+fork :: Monad m => VerseT m () -> VerseT m ()
+fork m = VerseT $ \ r s env mem yk sk fk ek ->
+  unVerseT m r s env mem yieldF succeedF failF emptyF >>= \ m ->
+  unVerseT m r s env mem yk sk fk ek
+
+yieldF :: Monad m => Yield (VerseT m ()) m
+yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
+  putS s
+  putMem mem
+  level <- getLevel
+  let
+    f_s = liftSucceedF sk
+    m_f = liftFailF fk
+    m_e = liftEmptyF ek
+  if i < level then
+    alt (yield i (\ k -> f $ \ m -> k . fork $ m >>= f_s)) m_f m_e
+  else do
+    modifyS succS
+    alt (f $ \ m -> modifyS predS >> fork (m >>= f_s)) m_f m_e
+
+succeedF :: Monad m => Succeed (VerseT m ()) m ()
+succeedF s mem () fk ek = pure $ do
+  putS s
+  putMem mem
+  alt (pure ()) (liftFailF fk) (liftEmptyF ek)
+
+failF :: Applicative m => Fail (VerseT m ()) m
+failF _env mem = pure $ do
+  putMem mem
+  empty
+
+emptyF :: Applicative m => Empty (VerseT m ()) m
+emptyF mem = pure $ do
+  putMem mem
+  empty
+
+liftSucceedF :: Monad m => Succeed (VerseT m ()) m a -> a -> VerseT m ()
+liftSucceedF sk x = do
+  s <- getS
+  mem <- getMem
+  join . lift $ sk s mem x failF emptyF
+
+liftFailF :: Monad m => Fail (VerseT m ()) m -> VerseT m ()
+liftFailF fk = do
+  env <- ask
+  mem <- getMem
+  join . lift $ fk env mem
+
+liftEmptyF :: Monad m => Empty (VerseT m ()) m -> VerseT m ()
+liftEmptyF ek = do
+  mem <- getMem
+  join . lift $ ek mem
 
 stuck :: VerseT m a
 stuck = VerseT $ \ r s _env mem yk ->
