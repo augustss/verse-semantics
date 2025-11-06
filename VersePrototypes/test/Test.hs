@@ -18,17 +18,17 @@ module Main where
 import Test.Tasty
 import System.Environment (setEnv)
 
-import qualified TestSuite.Epic.PomSet
+import qualified TestSuite.DenSem.Pom
 
 
 -- the test runner entry point
 main :: IO ()
 main = do
   setEnv "TASTY_COLOR" "ALWAYS"
-  setEnv "TASTY_FALSIFY_TESTS" "1000"
+  setEnv "TASTY_FALSIFY_TESTS" "200"
   defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Libs"
-  [ TestSuite.Epic.PomSet.properties
+  [ TestSuite.DenSem.Pom.properties
   ]

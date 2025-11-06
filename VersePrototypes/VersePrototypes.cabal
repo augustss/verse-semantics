@@ -329,6 +329,8 @@ test-suite verse-libs-test
     other-modules: Paths_VersePrototypes
                  -- , Utils
                  , TestSuite.Epic.PomSet
+                 , TestSuite.FrontEnd.Expr
+                 , TestSuite.DenSem.Pom
     build-depends: base
                  , bytestring
                  , containers
@@ -340,6 +342,7 @@ test-suite verse-libs-test
                  , falsify
                  , text
                  , verse-libs
+                 , verse-densem
 
 
 -- shared parser for various verse implementations and experiments
