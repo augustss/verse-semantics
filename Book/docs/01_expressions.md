@@ -221,7 +221,7 @@ if (IsComplete = true):
     ShowResults()
 ```
 
-The `logic{}` expression creates boolean values from failable expressions (see [Failure](06_failure.md) for details on failable expressions):
+The `logic{}` expression creates boolean values from failable expressions (see [Failure](08_failure.md) for details on failable expressions):
 
 ```verse
 # Converts <decides> expression to logic value
@@ -620,7 +620,7 @@ for (I := 0..Count):  # Must use := syntax, not :
 #>
 -->
 
-Ranges are not first-class values. They cannot be stored in variables or used outside of `for` loop iteration clauses. See the [Range Operator Restrictions](05_control.md#range-operator-restrictions) section for details.
+Ranges are not first-class values. They cannot be stored in variables or used outside of `for` loop iteration clauses. See the [Range Operator Restrictions](07_control.md#range-operator-restrictions) section for details.
 
 ### Logical Operations
 

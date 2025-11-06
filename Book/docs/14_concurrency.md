@@ -26,7 +26,7 @@ Async expressions naturally align with this update cycle. When an async expressi
 
 ### The `suspends` Effect
 
-Concurrent operations require the `<suspends>` effect specifier (see [Effects](10_effects.md)). Functions marked with `<suspends>` can use concurrency expressions, call other suspending functions, and cooperatively yield execution:
+Concurrent operations require the `<suspends>` effect specifier (see [Effects](13_effects.md)). Functions marked with `<suspends>` can use concurrency expressions, call other suspending functions, and cooperatively yield execution:
 
 <!--verse
 using {/Verse.org/VerseCLR}

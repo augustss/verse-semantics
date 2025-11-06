@@ -151,6 +151,7 @@ import Text.Parsec.Error qualified as PE
 import Text.Parsec.Pos qualified as PPos
 import Text.Parsec.Prim qualified as PPrim
 import Text.Parsec.Combinator (optionMaybe,eof)
+import Prettyprinter (pretty)
 
 import Prelude hiding (exp, minBound)
 
@@ -203,14 +204,14 @@ parseWithRewrite
 parseWithRewrite p path bs = fmap extract $ parseWithLocRewrite p path bs
 
 -- | Parse directly to FrontEnd.Expr. This is the general purpose parser used in
--- the tester for arbritrary expressions
+-- the repl for arbritrary expressions
 parseToSrcExpr :: String -> ByteString -> Src.SrcExpr
-parseToSrcExpr = (PC.expToSrcExpr .) . go_parse pcExpr
+parseToSrcExpr = (PC.expToSrcExpr .) . go_parse (pcExpr <* eof)
   where
     go_parse :: Parser (L (Exp SimpleName)) -> String -> ByteString -> L (R.Exp L Ident)
     go_parse p path content =
       case parseWithLocRewrite p path content of
-        Left err -> error $ show err
+        Left err -> error $ show $ pretty err
         Right x  -> x
 
 -- | The general purpose parser entry point
@@ -223,7 +224,8 @@ parse p path content = runIdentity $ P.runParserT p beginPS path (WS content)
 parseDie :: Parser a -> String -> ByteString -> a
 parseDie p path content =
   case parse p path content of
-    Left err -> error $ show err
+    Left err -> error $ show err -- This error is Parsec internal, not E.Error
+                                 -- so we do not define a pretty instance for it
     Right x  -> x
 
 parseNoLoc :: Comonad w => Parser (w a) -> String -> ByteString -> a
@@ -237,9 +239,21 @@ parseWithLoc p path bytestring =
     Left err -> Left $ E.OtherError (toPos $ PE.errorPos err) (showWithoutPos err)
     Right x -> Right x
   where
+    -- Parsec uses PE.Message for error messages which are all data constructors
+    -- that take a String. This means that our ByteString streams are output as
+    -- ASCII code (.e.g., 41 instead of ')'). This function fixes up the output
+    -- to something human friendly.
+    fixup_msgs :: PE.Message -> PE.Message
+    fixup_msgs (PE.SysUnExpect s) = PE.SysUnExpect (s)
+    fixup_msgs (PE.UnExpect s)    = PE.UnExpect    ((:[]) . w2c $ (read s :: Word8))
+    fixup_msgs (PE.Expect s)      = PE.Expect      (s)
+    fixup_msgs (PE.Message s)     = PE.Message     (s)
+
     -- Copied from Parsec.Error, but without position since it's reported separately
     showWithoutPos err =
-      PE.showErrorMessages "or" "unknown parse error"  "expecting" "unexpected" "end of input" (PE.errorMessages err)
+      PE.showErrorMessages
+      "or" "unknown parse error" "expecting" "unexpected" "end of input"
+      (fmap fixup_msgs $ PE.errorMessages err)
 
 parseWithLocRewrite
   :: Parser (L (Exp SimpleName))
@@ -1149,17 +1163,19 @@ pFun' e =
 
 -- | top level parse an expression
 pcExpr :: Parser (L (Exp SimpleName))
-pcExpr = do
-  pcUniExpr
-    <|> pcSemiExpr
+pcExpr =
+    P.try (spaces *> pcUniExpr <* spaces)
+    <|> P.try (spaces *> pcSemiExpr <* spaces)
     <|> P.try (spaces *> pNum   <* spaces)
     <|> P.try (spaces *> pParen <* spaces)
-    <|> P.try (pExpr) -- this try is necessary or else pExpr throws exceptions
-                      -- on literal numbers
+    <|> P.try (spaces *> pExpr <* spaces) -- this try is necessary or else pExpr
+                                          -- throws exceptions on literal
+                                          -- numbers
+
 
 -- | parse a unification expression: 'f = g'
 pcUniExpr :: Parser (L (Exp SimpleName))
-pcUniExpr = P.try $ do
+pcUniExpr = do
   l <- P.try pExpr
   _ <- match '='
   r <- P.try pExpr
@@ -1173,7 +1189,7 @@ pcUniExpr = P.try $ do
 
 -- | parse a sequential composition expression: 'f;g'
 pcSemiExpr :: Parser (L (Exp SimpleName))
-pcSemiExpr = P.try $ do
+pcSemiExpr = do
   es <- P.sepBy1 pExpr (lexeme pSemi)
   let start = loc $ head es
       end   = loc $ last es

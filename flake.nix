@@ -7,6 +7,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        py-pkgs = pkgs.python313Packages;
         texEnv = (pkgs.texlive.combine {
           inherit (pkgs.texlive)
 
@@ -56,6 +57,38 @@
           pkgs.haskell.packages."ghc967"; # need to match Stackage LTS version
                                           # from stack.yaml snapshot
 
+        pygments-verse = py-pkgs.buildPythonPackage {
+          pname = "pygments-verse";
+          version = "0.1.0";
+          src = ./Book/libs;
+          format = "setuptools";
+          doCheck = false;
+
+          # If you want “editable” mode (nixpkgs ≥ 24.05):
+          editable = false;
+
+          propagatedBuildInputs = with py-pkgs; [
+          mkdocs mkdocs-material pygments pymdown-extensions
+          ];
+        };
+
+        verse-lexer = py-pkgs.buildPythonPackage {
+          pname = "verse-lexer";
+          version = "1.0.0";
+          src = ./Book;
+          format = "setuptools";
+          doCheck = false;
+
+          # If you want “editable” mode (nixpkgs ≥ 24.05):
+          editable = false;
+
+          propagatedBuildInputs = with py-pkgs; [
+          mkdocs mkdocs-material pygments pymdown-extensions
+          pygments-verse
+          ];
+        };
+
+
         devTools = [
           hPkgs.ghc                     # GHC compiler in the desired version (will be available on PATH)
           hPkgs.ghcid                   # Continuous terminal Haskell compile checker
@@ -69,6 +102,10 @@
           texEnv                        # the latex packages
           stack-wrapped
           pkgs.zlib # External C library needed by some Haskell packages
+
+          ## python deps for verse book
+          pkgs.python313
+          verse-lexer
         ];
 
         # Wrap Stack to work with our Nix integration. We don't want to modify

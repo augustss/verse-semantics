@@ -81,11 +81,11 @@ coll (a :++ b) = coll a \/ coll b
 coll (Unit e)  = e
 
 fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
-fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
+fOR _  Empty     _ i x = mkUnit (i .= nil /\ x .= nil)
 fOR xs d@Unit{}  t i x =
-  (d *** unit sings *** dB t p q >>> (p:q:xs))
+  (d *** mkUnit sings *** dB t p q >>> (p:q:xs))
   `union`
-  (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
+  (nOT (d >>> xs) *** mkUnit (i .= nil /\ x .= nil))
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
         sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
                          | ip <- allInts
@@ -96,16 +96,16 @@ fOR xs d@Unit{}  t i x =
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
 fOR xs (a :\/ b) t i x =
-  (unit ca *** fOR xs a t i x) `union`
-  (unit cb *** fOR xs b t i x)
-  `union` (unit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
---  `union` (nOT (ab >>> xs) *** unit (i .= nil /\ x .= nil))
+  (mkUnit ca *** fOR xs a t i x) `union`
+  (mkUnit cb *** fOR xs b t i x)
+  `union` (mkUnit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
+--  `union` (nOT (ab >>> xs) *** mkUnit (i .= nil /\ x .= nil))
   where ca = coll (a >>> xs)
         cb = coll (b >>> xs)
 
 fOR xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
-  (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
+  (mkUnit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
   where fora = fOR xs a t u1 v1
         forb = fOR xs b t u2 v2
         (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
@@ -128,14 +128,14 @@ allValuesOf x (Unit d) = extractVar d x
 
 dE :: SrcEssential -> Ident -> Ident -> P ENV
 -- The denotational semantics itself (Fig 10)
-dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
-dE (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
-dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
-dE (Variable v) i x | isSrcUnderscore v = unit $ i .=. x
-                    | otherwise         = unit $ i .=. x /\ x .=. v
-dE (DefineE y t)                    i x = unit (x .=. y) *** dE t i x
-dE (DefineIE y t)                   i x = unit (i .=. y) *** dE t i x
-dE (DefineV y)                      i x = unit $ i .=. x /\ x .=. y
+dE (Lit (LInt k))                   i x = mkUnit $ i .=. x /\ x .= Int (fromIntegral k)
+dE (EPrim p)                        i x = mkUnit $ i .=. x /\ x .= Fun (dP p)
+dE (Variable (Ident _ "xf"))        i x = mkUnit $ i .=. x /\ x .= Fun funXF -- hack for testing
+dE (Variable v) i x | isSrcUnderscore v = mkUnit $ i .=. x
+                    | otherwise         = mkUnit $ i .=. x /\ x .=. v
+dE (DefineE y t)                    i x = mkUnit (x .=. y) *** dE t i x
+dE (DefineIE y t)                   i x = mkUnit (i .=. y) *** dE t i x
+dE (DefineV y)                      i x = mkUnit $ i .=. x /\ x .=. y
 dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
 dE (Choice t0 t1)                   i x = dB t0 i x +++ dB t1 i x
 dE (Seq t0 t1)                      i x = dC t0     *** dE t1 i x
@@ -153,7 +153,7 @@ dE (If3 t0 t1 t2)                   i x =
         s0 = oNE xs (dC t0)
 dE (For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
 dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
-  dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
+  dE t0 a l *** dE t1 b h *** mkUnit (i .=. x) ***
   (let
     mkSequ :: Int -> Int -> [ENV]
     mkSequ lo hi = [ x .= Int v /\ l .= Int lo /\ h .= Int hi | v <- [ lo .. hi ] ]
@@ -174,19 +174,19 @@ dE t@(Array ts)                     i x =
         xs = take n $ freshList "x" used
         es = zipWith3 dE ts is xs
         tupvals = allTuplesLen n
-        et = unit $ bigUnion [ i .= Tuple ivals /\
+        et = mkUnit $ bigUnion [ i .= Tuple ivals /\
                                x .= Tuple xvals /\
                                bigIntersect (zipWith (.=) is ivals) /\
                                bigIntersect (zipWith (.=) xs xvals)
                              | ivals <- tupvals, xvals <- tupvals
                              ]
 -- A speedup for x:int
-dE (Range (EPrim IsInt))            i x = unit (bigUnion [ i .= v /\ x .= v | v <- allInts ])
+dE (Range (EPrim IsInt))            i x = mkUnit (bigUnion [ i .= v /\ x .= v | v <- allInts ])
 dE (Range t)                        i x =
   dE t j y *** dF y i x >>> [j,y]
     where (j, y) = fresh2 ("j", "y") [i, x] t
 dE t@(ApplyD t0 t1)                 i x =
-  dE t0 h f *** dE t1 j y *** dF f y x *** unit (i .=. x) >>> [h,f,j,y]
+  dE t0 h f *** dE t1 j y *** dF f y x *** mkUnit (i .=. x) >>> [h,f,j,y]
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 

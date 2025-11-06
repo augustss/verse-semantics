@@ -16,7 +16,7 @@
 
 module Utils
   ( makeTest
-  , prettyTest, prettyTest_
+  , prettyTest, prettyTest_, prettyTestEP
   , roundTrip
   , broken
   , patName
@@ -36,9 +36,15 @@ import Prettyprinter             (Pretty, pretty)
 import Prettyprinter.Render.Text (renderStrict)
 import Prettyprinter             (defaultLayoutOptions, layoutPretty)
 
+import FrontEnd.Expr (SrcExpr)
+import qualified Epic.Print as EP
+
 
 dummy_file :: FilePath
 dummy_file = "<parser test suite>"
+
+verse_parser_ep :: Parser SrcExpr -> Text -> SrcExpr
+verse_parser_ep p inp = parseDie p dummy_file (encodeUtf8 inp)
 
 verse_parser :: Comonad w => Parser (w a) -> Text -> a
 verse_parser p inp = parseNoLoc p dummy_file (encodeUtf8 inp)
@@ -55,6 +61,16 @@ makeTest
   => Parser (w a) -> (Text, a) -> TestTree
 makeTest p (desc, result) = testCase cleaned_desc $ verse_parser p desc @=? result
   where
+    escape_newlines = concatMap (\c -> if c == '\n' then "\\n" else [c])
+    cleaned_desc    = escape_newlines $ unpack desc
+
+-- the Epic.Print version of pretty test. Needed because the FrontEnd uses
+-- pretty instead of prettyprinter.
+prettyTestEP :: Parser SrcExpr -> (Text, Text) -> TestTree
+prettyTestEP p (desc, result) =
+  testCase cleaned_desc $ (render (verse_parser_ep p  desc)) @=? (unpack result)
+  where
+    render          = EP.render . EP.pPrint
     escape_newlines = concatMap (\c -> if c == '\n' then "\\n" else [c])
     cleaned_desc    = escape_newlines $ unpack desc
 

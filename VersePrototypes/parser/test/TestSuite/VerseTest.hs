@@ -111,7 +111,11 @@ sequences =
                   ]
            )
 
-  , passes (" 3 ", Int 3)
+  , passes (" 3 ", List [L
+                         (Loc
+                          (Pos {line = 1, column = 2, offset = 0})
+                          (Pos {line = 1, column = 3, offset = 0}))
+                          (Int 3)])
   , passes' ("1|2;3|4",    "(1 | 2)\n(3 | 4)")
   , passes' ("1|2; 3|||4", "(1 | 2)\n(3 ||| 4)")
   , passes' ("1|||2; 3|4", "(1 ||| 2)\n(3 | 4)")
