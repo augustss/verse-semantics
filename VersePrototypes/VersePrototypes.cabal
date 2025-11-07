@@ -327,10 +327,11 @@ test-suite verse-libs-test
     ghc-options:      -Wall -Wno-name-shadowing
 
     other-modules: Paths_VersePrototypes
-                 -- , Utils
+                 , TestSuite.Utils
                  , TestSuite.Epic.PomSet
                  , TestSuite.FrontEnd.Expr
-                 , TestSuite.DenSem.Pom
+                 , TestSuite.DenSem.PomPom
+                 , TestSuite.DenSem.Properties
     build-depends: base
                  , bytestring
                  , containers

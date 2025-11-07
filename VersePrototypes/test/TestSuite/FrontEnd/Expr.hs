@@ -165,7 +165,9 @@ genPrimOp = EPrim <$> gen_prim
       ]
 
 genIf3 :: Int ->  Gen SrcExpr
-genIf3 n = If3 <$> genExpr n <*> genExpr n <*> genExpr n
+genIf3 n = let n3 = n `div` 3 -- we always gen a smaller condition than a branch
+               n2 = n `div` 2 -- to keep generated ASTs reasonable
+           in If3 <$> genExpr n3 <*> genExpr n2 <*> genExpr n2
 
 genEff :: Gen Eff
 genEff = Eff <$> c_eff <*> pure SComputes -- only gen pure functions for now
@@ -184,12 +186,16 @@ genExpr n' =
     $ NE.fromList
     [ genVariable
     , genDefineE n
-    , genApplyD n
-    , genArray n
-    , genSeq n
-    , genChoice n
-    , genUnify n
+    , genApplyD  n
+    , genArray   n
+    , genSeq     n
+    , genChoice  n
+    , genUnify   n
     , genPrimOp
-    , genIf3 n
-    , genFun n
+    , genIf3     n
+    , genFun     n
     ]
+
+-- we ANF means generate variables, literals, and lambdas
+-- genANFAtom :: Int -> Gen SrcExpr
+-- genANFAtom 0 = genDone
