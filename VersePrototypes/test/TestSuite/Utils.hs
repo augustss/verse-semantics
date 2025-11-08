@@ -16,9 +16,17 @@ module TestSuite.Utils
   , ENV
   , module Epic.Print
   , module FrontEnd.Expr
+  , exprTrace
   ) where
 
 import Set(Set)
 import ENVP (ENV)
 import Epic.Print
 import FrontEnd.Expr
+
+import Debug.Trace (trace)
+
+-- | convience function for printing generated ASTs. A good place to put it is in
+-- the call to assert
+exprTrace :: SrcExpr -> a -> a
+exprTrace e = trace (show $ pPrint e)

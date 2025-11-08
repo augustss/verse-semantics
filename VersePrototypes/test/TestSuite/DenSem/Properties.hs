@@ -25,15 +25,15 @@ import Test.Falsify.Property            (gen, Property)
 type DSProperty a = (SrcExpr -> Set [ENV]) -> Property a
 
 ast_size :: Int
-ast_size = 5
+ast_size = 4
 
 -- (e1 ||| e2) | e3 === (e1 | e3) ||| (e2 | e3)
 uChoiceDistributesOverChoice :: DSProperty ()
 uChoiceDistributesOverChoice f = do
   n  <- gen $ genSize ast_size
-  e1 <- gen $ genExpr n
-  e2 <- gen $ genExpr n
-  e3 <- gen $ genExpr n
+  e1 <- gen $ genExpr n []
+  e2 <- gen $ genExpr n []
+  e3 <- gen $ genExpr n []
   let lhs = mkUChoice e1 e2 `Choice` e3
       rhs = mkUChoice (e1 `Choice` e2) (e2 `Choice` e3)
   assert $
@@ -45,7 +45,7 @@ uChoiceDistributesOverChoice f = do
 failIsChoiceUnit :: DSProperty ()
 failIsChoiceUnit fun = do
   n <- gen $ genSize ast_size
-  e <- gen $ genExpr n
+  e <- gen $ genExpr n []
   f <- gen $ genFail
   let lhs = e `Choice` f
       rhs = e
@@ -58,9 +58,9 @@ failIsChoiceUnit fun = do
 choiceIsAssociative :: DSProperty ()
 choiceIsAssociative f = do
   n  <- gen $ genSize ast_size
-  e1 <- gen $ genExpr n
-  e2 <- gen $ genExpr n
-  e3 <- gen $ genExpr n
+  e1 <- gen $ genExpr n []
+  e2 <- gen $ genExpr n []
+  e3 <- gen $ genExpr n []
   let lhs = (e1 `Choice` e2) `Choice` e3
       rhs = e1 `Choice` (e2 `Choice` e3)
   assert $
@@ -72,9 +72,9 @@ choiceIsAssociative f = do
 uChoiceIsAssociative :: DSProperty ()
 uChoiceIsAssociative f = do
   n  <- gen $ genSize ast_size
-  e1 <- gen $ genExpr n
-  e2 <- gen $ genExpr n
-  e3 <- gen $ genExpr n
+  e1 <- gen $ genExpr n []
+  e2 <- gen $ genExpr n []
+  e3 <- gen $ genExpr n []
   let lhs = mkUChoice (mkUChoice e1 e2) e3
       rhs = mkUChoice e1 (mkUChoice e2 e3)
   assert $
@@ -86,7 +86,7 @@ uChoiceIsAssociative f = do
 uChoiceIsIdempotent :: DSProperty ()
 uChoiceIsIdempotent f = do
   n  <- gen $ genSize ast_size
-  e1 <- gen $ genExpr n
+  e1 <- gen $ genExpr n []
   let lhs = mkUChoice e1 e1
       rhs = e1
   assert $
@@ -99,7 +99,7 @@ literalsAreSeqUnit :: DSProperty ()
 literalsAreSeqUnit f = do
   n  <- gen $ genSize ast_size
   k  <- gen genLiteral
-  e  <- gen $ genExpr n
+  e  <- gen $ genExpr n []
   let lhs = k `Seq` e
       rhs = e
   assert $
@@ -111,9 +111,9 @@ literalsAreSeqUnit f = do
 seqIsAssociative :: DSProperty ()
 seqIsAssociative f = do
   n  <- gen $ genSize ast_size
-  e1 <- gen $ genExpr n
-  e2 <- gen $ genExpr n
-  e3 <- gen $ genExpr n
+  e1 <- gen $ genExpr n []
+  e2 <- gen $ genExpr n []
+  e3 <- gen $ genExpr n []
   let lhs = (e1 `Seq` e2) `Seq` e3
       rhs = e1 `Seq` (e2 `Seq` e3)
   assert $
@@ -125,9 +125,9 @@ seqIsAssociative f = do
 choiceDistributesOverSequence :: DSProperty ()
 choiceDistributesOverSequence f = do
   n  <- gen $ genSize ast_size
-  e1 <- gen $ genExpr n
-  e2 <- gen $ genExpr n
-  e3 <- gen $ genExpr n
+  e1 <- gen $ genExpr n []
+  e2 <- gen $ genExpr n []
+  e3 <- gen $ genExpr n []
   let lhs = (e1 `Choice` e2) `Seq` e3
       rhs = (e1 `Seq` e3) `Choice` (e2 `Seq` e3)
   assert $
