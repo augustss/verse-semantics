@@ -47,21 +47,22 @@ genNat = Gen.inRange (Range.between (0,2))
 genInteger :: Gen Integer
 genInteger = fromIntegral <$> Gen.inRange (Range.between (-1024 :: Int,1024 :: Int))
 
+genAlphaNum :: Gen Char
+genAlphaNum = Gen.elem . NE.fromList $ [ 'a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+
 genAlpha :: Gen Char
-genAlpha = Gen.elem . NE.fromList $ [ 'a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+genAlpha = Gen.elem . NE.fromList $ [ 'a'..'z'] ++ ['A'..'Z']
 
 genString :: Gen String
-genString = Gen.list (Range.between (1, 10)) genAlpha -- only gen string up to 10 chars
+genString = Gen.list (Range.between (1, 4)) genAlpha -- only gen string up to 4 chars
 
 genScientific :: Gen Scientific
 genScientific = scientific <$> coeff <*> expnt
   where
     -- avoid type defaults
-    ten :: Int
-    ten = 10
-    twelve :: Int
-    twelve = 12
-    ten_to_twelve :: Int
+    ten, twelve, ten_to_twelve :: Int
+    ten           = 10
+    twelve        = 12
     ten_to_twelve = ten ^ twelve
 
     coeff :: Gen Integer
@@ -93,10 +94,10 @@ genFail = pure Fail
 -- but are being tested in the den sem work
 -----------------------------------------------
 
-genUChoice :: Int -> Gen SrcExpr
-genUChoice n = do
-  l <- genExpr n
-  r <- genExpr n
+genUChoice :: Int -> [Ident] -> Gen SrcExpr
+genUChoice n env = do
+  l <- genExpr n env
+  r <- genExpr n env
   return $ mkUChoice l r
 
 mkUChoice :: SrcExpr -> SrcExpr -> SrcExpr
@@ -114,37 +115,50 @@ genSize n = Gen.inRange $ Range.between (0,n)
 genIdent :: Gen Ident
 genIdent = Ident noLoc <$> genString
 
-genVariable :: Gen SrcExpr
-genVariable = Variable <$> genIdent
+genLitOrVar :: [Ident] -> Gen SrcExpr
+genLitOrVar env = Gen.choose genLiteral (genVariable env)
+
+-- | Gen a variable, 'is' is a list of bound idents. When 'is' is empty,
+-- randomly gen a variable, when 'is' is not empty preferentially pick a bound
+-- Ident to create a reference. There is no handling for collisions
+-- (accidentally generating the same Ident twice). But this is not important,
+-- its the non-empty case!
+genVariable :: [Ident] -> Gen SrcExpr
+genVariable [] = Variable <$> genIdent
+genVariable (fmap pure . NE.fromList -> is) = -- [Ident] -> [Gen Ident]
+  Variable
+  <$> Gen.frequency [ (1, genIdent)      -- 1/3rd of the time gen random
+                    , (2, Gen.oneof is)  -- 2/3rd of the time use a bound var
+                    ]
 
 genDone :: Gen SrcExpr
 genDone = pure $ Lit (LInt 0)
 
 -- i := e
-genDefineE :: Int -> Gen SrcExpr
-genDefineE n = DefineE <$> genIdent <*> genExpr n
+genDefineE :: Int -> [Ident] -> Gen SrcExpr
+genDefineE n env = DefineE <$> genIdent <*> genExpr n env
 
 -- f[e]
-genApplyD :: Int -> Gen SrcExpr
-genApplyD n = ApplyD <$> genExpr n <*> genExpr n
+genApplyD :: Int -> [Ident] -> Gen SrcExpr
+genApplyD n env = ApplyD <$> genExpr n [] <*> genExpr n env
 
 -- array{e1;e2...}
-genArray :: Int -> Gen SrcExpr
-genArray n = do
+genArray :: [Ident] -> Gen SrcExpr
+genArray env = do
   l <- Gen.inRange (Range.between (0,2)) -- only gen arrays up to 2 elements
-  Array <$> replicateM l (genExpr n)
+  Array <$> replicateM l (genLitOrVar env)
 
 -- e1;e2
-genSeq :: Int -> Gen SrcExpr
-genSeq n = Seq <$> genExpr n <*> genExpr n
+genSeq :: Int -> [Ident] -> Gen SrcExpr
+genSeq n env = Seq <$> genExpr n env <*> genExpr n env
 
 -- e1|e2
-genChoice :: Int -> Gen SrcExpr
-genChoice n = Choice <$> genExpr n <*> genExpr n
+genChoice :: Int -> [Ident] -> Gen SrcExpr
+genChoice n env = Choice <$> genExpr n env <*> genExpr n env
 
 -- e1 = e2
-genUnify :: Int -> Gen SrcExpr
-genUnify n = Unify <$> genExpr n <*> genExpr n
+genUnify :: Int -> [Ident] -> Gen SrcExpr
+genUnify n env = Unify <$> genExpr n env <*> genExpr n env
 
 genPrimOp :: Gen SrcExpr
 genPrimOp = EPrim <$> gen_prim
@@ -164,32 +178,44 @@ genPrimOp = EPrim <$> gen_prim
       , Lt
       ]
 
-genIf3 :: Int ->  Gen SrcExpr
-genIf3 n = If3 <$> genExpr n <*> genExpr n <*> genExpr n
+genIf3 :: Int -> [Ident] -> Gen SrcExpr
+genIf3 n env =
+  let n2 = n `div` 2 -- to keep generated ASTs reasonable
+   in If3 <$> genExpr n2 env <*> genExpr n2 env <*> genExpr n2 env
 
 genEff :: Gen Eff
 genEff = Eff <$> c_eff <*> pure SComputes -- only gen pure functions for now
   where
     c_eff = Gen.inRange $ Range.enum (CFails, CIterates)
 
-genFun :: Int -> Gen SrcExpr
-genFun n = Function <$> pure Closed <*> genExpr n <*> genEff <*> genExpr n
+genFun :: Int -> [Ident] -> Gen SrcExpr
+genFun n env = do
+  aperture <- pure Closed
+  eff      <- genEff
+  domain   <- genExpr n env
+  let !bndrs = getVisibleBinders domain
+  range    <- genExpr n (bndrs ++ env)
+  return $ Function aperture domain eff range
 
-genExpr :: Int -> Gen SrcExpr
-genExpr 0 = genDone
-genExpr n' =
+genExpr :: Int -> [Ident] -> Gen SrcExpr
+genExpr 0 env = genVariable env
+genExpr n' env =
   let n = n' - 1
    in
     Gen.oneof
     $ NE.fromList
-    [ genVariable
-    , genDefineE n
-    , genApplyD n
-    , genArray n
-    , genSeq n
-    , genChoice n
-    , genUnify n
+    [ genVariable  env
+    , genDefineE n env
+    , genApplyD  n env
+    , genArray     env
+    , genSeq     n env
+    , genChoice  n env
+    , genUnify   n env
     , genPrimOp
-    , genIf3 n
-    , genFun n
+    , genIf3     n env
+    , genFun     n env
     ]
+
+-- we ANF means generate variables, literals, and lambdas
+-- genANFAtom :: Int -> Gen SrcExpr
+-- genANFAtom 0 = TODO:
