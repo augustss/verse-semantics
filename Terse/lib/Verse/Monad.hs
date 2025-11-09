@@ -134,12 +134,6 @@ instance Alternative (VerseT m) where
     (\ env mem -> unVerseT y r s env mem yk sk fk $ fk env)
     (\ mem -> unVerseT y r s env mem yk sk fk ek)
 
-alt :: VerseT m a -> VerseT m a -> VerseT m a -> VerseT m a
-alt x y z = VerseT $ \ r s env mem yk sk fk ek ->
-  unVerseT x r s env mem yk sk
-  (\ env mem -> unVerseT y r s env mem yk sk fk $ fk env)
-  (\ mem -> unVerseT z r s env mem yk sk fk ek)
-
 instance Monad (VerseT m) where
   x >>= f = VerseT $ \ r s env mem yk sk ->
     unVerseT x r s env mem yk $ \ s mem x ->
@@ -206,10 +200,6 @@ modifyS f = VerseT $ \ _r s _env mem _yk sk ->
   in
     sk s' mem ()
 
-getMem :: VerseT m (Mem m)
-getMem = VerseT $ \ _r s _env mem _yk sk ->
-  sk s mem mem
-
 putMem :: Mem m -> VerseT m ()
 putMem mem = VerseT $ \ _r s _env _mem _yk sk ->
   sk s mem ()
@@ -271,10 +261,10 @@ split''
   -> Fail (VerseT m (Stream m b)) m
   -> Empty (VerseT m (Stream m b)) m
   -> VerseT m (Stream m b)
-split'' m s' sk' fk' ek' = VerseT $ \ r s env mem@Mem { label } yk sk fk ek ->
+split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
-    !mem' = splitMem label
+    !mem' = splitMem mem.label
   in
     unVerseT m r' s' env mem' yieldS sk' fk' ek' >>= \ m ->
     unVerseT m r s env mem yk sk fk ek
@@ -318,17 +308,16 @@ emptyS mem = pure $ do
   pure Done
 
 liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
-liftFailS fk = do
-  env <- ask
-  !Mem { label } <- getMem
-  join . lift . fk env $ splitMem label
+liftFailS fk' = VerseT $ \ r s env mem yk sk fk ek -> do
+  m <- fk' env $ splitMem mem.label
+  unVerseT m r s env mem yk sk fk ek
 
 splitMem :: Applicative m => Label -> Mem m
 splitMem label = Mem {..}
   where
-    !forward = pure ()
-    !backward = pure ()
-    !backward' = pure ()
+    forward = pure ()
+    backward = pure ()
+    backward' = pure ()
 
 data Stream m a = Done | Step a (VerseT m (Stream m a))
 
@@ -345,20 +334,17 @@ yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
   putS s
   putMem mem
   level <- getLevel
-  let
-    m_f = liftFailF fk
-    m_e = liftEmptyF ek
   if i < level then
-    alt (yield i (\ k -> f $ \ m -> k $ fork' m sk)) m_f m_e
+    altF (yield i (\ k -> f $ \ m -> k $ fork' m sk)) fk ek
   else do
     modifyS succS
-    alt (f $ \ m -> modifyS predS *> fork' m sk) m_f m_e
+    altF (f $ \ m -> modifyS predS *> fork' m sk) fk ek
 
 succeedF :: Monad m => Succeed (VerseT m ()) m ()
 succeedF s mem () fk ek = pure $ do
   putS s
   putMem mem
-  alt (pure ()) (liftFailF fk) (liftEmptyF ek)
+  altF (pure ()) fk ek
 
 failF :: Applicative m => Fail (VerseT m ()) m
 failF _env mem = pure $ do
@@ -370,16 +356,16 @@ emptyF mem = pure $ do
   putMem mem
   empty
 
-liftFailF :: Monad m => Fail (VerseT m a) m -> VerseT m a
-liftFailF fk = do
-  env <- ask
-  mem <- getMem
-  join . lift $ fk env mem
-
-liftEmptyF :: Monad m => Empty (VerseT m a) m -> VerseT m a
-liftEmptyF ek = do
-  mem <- getMem
-  join . lift $ ek mem
+altF
+  :: Monad m
+  => VerseT m ()
+  -> Fail (VerseT m ()) m
+  -> Empty (VerseT m ()) m
+  -> VerseT m ()
+altF m fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
+  unVerseT m r s env mem yk sk
+  (\ env mem -> fk' env mem >>= \ m -> unVerseT m r s env mem yk sk fk $ fk env)
+  (\ mem -> ek' mem >>= \ m -> unVerseT m r s env mem yk sk fk ek)
 
 stuck :: VerseT m a
 stuck = VerseT $ \ r s _env mem yk ->
