@@ -327,8 +327,11 @@ test-suite verse-libs-test
     ghc-options:      -Wall -Wno-name-shadowing
 
     other-modules: Paths_VersePrototypes
-                 -- , Utils
+                 , TestSuite.Utils
                  , TestSuite.Epic.PomSet
+                 , TestSuite.FrontEnd.Expr
+                 , TestSuite.DenSem.PomPom
+                 , TestSuite.DenSem.Properties
     build-depends: base
                  , bytestring
                  , containers
@@ -340,6 +343,7 @@ test-suite verse-libs-test
                  , falsify
                  , text
                  , verse-libs
+                 , verse-densem
 
 
 -- shared parser for various verse implementations and experiments
@@ -419,3 +423,4 @@ test-suite verse-parser-test
                  , tasty-expected-failure
                  , text
                  , verse-parser
+                 , verse-libs

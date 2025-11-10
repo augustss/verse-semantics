@@ -67,6 +67,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString    as B
 import qualified Data.ByteString.Char8 as BC
 
+
 -----------------------------------------------
 --
 --    Main progam
@@ -765,8 +766,8 @@ pTestDenSem file =
     tId <- V.lexeme $ V.pParens (pTestInfo file)
     let pAnyString = (Src.Lit . LStr) <$> do
           _ <- V.match '"'
-          V.lexeme $ V.manyTill (V.anySingleBut '"') (V.match '"')
-        ds_expr    = V.lexeme $ V.pBraces (PC.toSrcExpr <$> V.pcExpr)
+          V.manyTill (V.anySingleBut '"') (V.match '"')
+        ds_expr    = V.lexeme $ V.pcBraces (PC.toSrcExpr <$> V.pcExpr)
     TestDenSem tId <$> ds_expr <*> V.pBraces pAnyString
 
 pTestInfo :: FilePath -> V.Parser TestInfo

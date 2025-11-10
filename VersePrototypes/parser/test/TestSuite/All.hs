@@ -489,7 +489,7 @@ to =
 
 markup :: TestTree
 markup =
-  let passes = prettyTest pExpr
+  let passes = prettyTest pcExpr
   in testGroup "markup" $
   [ passes ("x;", "x")
   , passes ("0", "0")

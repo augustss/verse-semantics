@@ -24,6 +24,7 @@ module TestSuite.Compat
 import Utils
 
 import Parser.Verse
+import Parser.Compat
 
 import Test.Tasty
 
@@ -35,8 +36,9 @@ import Test.Tasty
 -----------------------------------------------
 
 unitTests :: TestTree
-unitTests = testGroup "parser/test_data/all.verse"
+unitTests = testGroup "parser/compat"
   [ exists
+  , applications
   ]
 
 exists :: TestTree
@@ -45,4 +47,15 @@ exists =
   in testGroup "exists" $
   [ passes ("exists a b c { a = 1 }",  "[exists [a, b, c]{ a = 1 }]")
   , passes ("exists aC    { aC = 1 }", "[exists [aC]{ aC = 1 }]")
+  ]
+
+applications :: TestTree
+applications =
+  let passes = prettyTest pcExpr
+      passes' = prettyTestEP (toSrcExpr <$> pcExpr)
+  in testGroup "applications" $
+  [ passes  ("   ((1,2) ||| (1,0))[0]  ", "((1, 2) ||| (1, 0))[0]")
+  , passes' ("  ((1,2) ||| (1,0))[0]   ", "((1, 2) ||| (1, 0))[0]")
+  , passes  ("  ((1,2) ||| (1,0))  [0]   ", "((1, 2) ||| (1, 0))[0]")
+  , passes' ("  ((1,2) ||| (1,0))  [0]   ", "((1, 2) ||| (1, 0))[0]")
   ]

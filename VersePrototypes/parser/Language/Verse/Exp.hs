@@ -225,6 +225,7 @@ instance ( Pretty a
     Paren e -> lparen <> pretty e <> rparen
     Brace e -> lbrace <> pretty e <> rbrace
     PrefixPlus x -> "+" <+> pretty x
+    PrefixDotDot e -> ".." <> pretty e
     e :+: x -> pretty e <+> "+" <+> pretty x
     PrefixMinus x -> "-" <+> pretty x
     e :-: x -> pretty e <+> "-" <+> pretty x
