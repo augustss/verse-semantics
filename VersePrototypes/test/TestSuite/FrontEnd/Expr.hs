@@ -14,26 +14,69 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE UndecidableInstances #-} -- only for MonadGen
 {-# OPTIONS_GHC -Wall -Werror  #-}
 
 module TestSuite.FrontEnd.Expr where
 
 import FrontEnd.Expr
+import TestSuite.Utils
 
-import Test.Tasty.Falsify (Gen)
-
-import qualified Test.Falsify.Generator as Gen
-import qualified Test.Falsify.Range     as Range
+import Hedgehog hiding (Gen)
+import qualified Hedgehog       as Gen (Gen)
+import qualified Hedgehog.Gen   as Gen
+import qualified Hedgehog.Range as Range
 
 import Control.Monad (replicateM)
 import Data.Scientific (Scientific, scientific)
-import qualified Data.List.NonEmpty as NE
+import Data.Char (toLower)
+import Control.Monad.State.Strict
 
---------------------------------------------------------------------------------
+-----------------------------------------------
 --
---              Generators
+--              Utilities
 --
---------------------------------------------------------------------------------
+-----------------------------------------------
+
+sample :: IO SrcExpr
+sample = Gen.sample . runGen $
+  do
+  s <- genSize 4
+  genExpr s
+
+samplePretty :: IO String
+samplePretty = (show . pPrint) <$> sample
+
+gen :: (Monad m, Show a) => Gen a -> PropertyT m a
+gen = forAll . runGen
+
+-----------------------------------------------
+--
+--              Types
+--
+-----------------------------------------------
+
+newtype Gen a = Gen { runGen' :: StateT Env Gen.Gen a }
+  deriving (Functor, Applicative, Monad, MonadState Env)
+
+deriving newtype instance MonadGen Gen
+
+runGen :: Gen a -> Gen.Gen a
+runGen = (flip evalStateT) emptyEnv . runGen'
+
+data Env = Env { vars :: [Ident] }
+  deriving (Eq, Ord, Show)
+
+emptyEnv :: Env
+emptyEnv = Env { vars = [] }
+
+remember :: Ident -> Gen ()
+remember i = modify' (\s -> s { vars = i : (vars s) })
+
+bulkRemember :: [Ident] -> Gen ()
+bulkRemember i = modify' (\s -> s { vars = i ++ (vars s) })
+
 
 -----------------------------------------------
 --
@@ -42,44 +85,32 @@ import qualified Data.List.NonEmpty as NE
 -----------------------------------------------
 
 genNat :: Gen Int
-genNat = Gen.inRange (Range.between (0,2))
+genNat = Gen.enum 0 2 -- only gen three ints
 
 genInteger :: Gen Integer
-genInteger = fromIntegral <$> Gen.inRange (Range.between (-1024 :: Int,1024 :: Int))
-
-genAlphaNum :: Gen Char
-genAlphaNum = Gen.elem . NE.fromList $ [ 'a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
-
-genAlpha :: Gen Char
-genAlpha = Gen.elem . NE.fromList $ [ 'a'..'z'] ++ ['A'..'Z']
+genInteger = Gen.enum 0 1024 -- TODO: only gen positives for now
 
 genString :: Gen String
-genString = Gen.list (Range.between (1, 4)) genAlpha -- only gen string up to 4 chars
+genString = map toLower <$> Gen.string (Range.singleton 2) Gen.alpha -- always gen strings length 2
 
 genScientific :: Gen Scientific
 genScientific = scientific <$> coeff <*> expnt
   where
-    -- avoid type defaults
-    ten, twelve, ten_to_twelve :: Int
-    ten           = 10
-    twelve        = 12
-    ten_to_twelve = ten ^ twelve
-
     coeff :: Gen Integer
-    coeff = fromIntegral <$> Gen.inRange (Range.between (ten_to_twelve,ten_to_twelve))
+    coeff = genInteger
 
     expnt :: Gen Int
-    expnt = Gen.inRange (Range.between (-12,12))
+    expnt = Gen.enum 0 10
 
 genLit :: Gen Lit
-genLit = Gen.oneof $
-  NE.fromList [ LInt  <$> genInteger
-              -- , LPath . Path  <$> genString
-              -- , LPtr  <$> genNat
-              -- , LChar <$> genAlpha
-              -- , LStr  <$> genString
-              -- , LRat  <$> genScientific <*> genString -- unsure what the string is for
-              ]
+genLit = Gen.choice $
+   [ LInt  <$> genInteger
+   -- , LPath . Path  <$> genString
+   -- , LPtr  <$> genNat
+   -- , LChar <$> genAlpha
+   -- , LStr  <$> genString
+   -- , LRat  <$> genScientific <*> genString -- unsure what the string is for
+   ]
 
 genLiteral :: Gen SrcExpr
 genLiteral = Lit <$> genLit
@@ -94,10 +125,10 @@ genFail = pure Fail
 -- but are being tested in the den sem work
 -----------------------------------------------
 
-genUChoice :: Int -> [Ident] -> Gen SrcExpr
-genUChoice n env = do
-  l <- genExpr n env
-  r <- genExpr n env
+genUChoice :: Int -> Gen SrcExpr
+genUChoice n = do
+  l <- genExpr n
+  r <- genExpr n
   return $ mkUChoice l r
 
 mkUChoice :: SrcExpr -> SrcExpr -> SrcExpr
@@ -110,64 +141,67 @@ mkUChoice l r = ApplyD (Variable (Ident noLoc "operator'|||'")) (Array [l, r])
 -----------------------------------------------
 
 genSize :: Int -> Gen Int
-genSize n = Gen.inRange $ Range.between (0,n)
+genSize = Gen.constant -- limit the size to 4 for gen'd ASTs
 
 genIdent :: Gen Ident
-genIdent = Ident noLoc <$> genString
+genIdent = do
+  s <- Ident noLoc <$> genString
+  remember s
+  return s
 
-genLitOrVar :: [Ident] -> Gen SrcExpr
-genLitOrVar env = Gen.choose genLiteral (genVariable env)
+genLitOrVar :: Gen SrcExpr
+genLitOrVar = Gen.choice [genLiteral, genVariable]
 
 -- | Gen a variable, 'is' is a list of bound idents. When 'is' is empty,
 -- randomly gen a variable, when 'is' is not empty preferentially pick a bound
 -- Ident to create a reference. There is no handling for collisions
 -- (accidentally generating the same Ident twice). But this is not important,
 -- its the non-empty case!
-genVariable :: [Ident] -> Gen SrcExpr
-genVariable [] = Variable <$> genIdent
-genVariable (fmap pure . NE.fromList -> is) = -- [Ident] -> [Gen Ident]
-  Variable
-  <$> Gen.frequency [ (1, genIdent)      -- 1/3rd of the time gen random
-                    , (2, Gen.oneof is)  -- 2/3rd of the time use a bound var
-                    ]
+genVariable :: Gen SrcExpr
+genVariable = do
+  env <- gets vars
+  if null env
+    then Variable <$> genIdent
+    else Variable
+    <$> Gen.frequency [ (2, genIdent)        -- 1/2th of the time gen random
+                      , (2, Gen.element env) -- 1/2th of the time use a bound var
+                      ]
 
 genDone :: Gen SrcExpr
 genDone = pure $ Lit (LInt 0)
 
 -- i := e
-genDefineE :: Int -> [Ident] -> Gen SrcExpr
-genDefineE n env = DefineE <$> genIdent <*> genExpr n env
+genDefineE :: Int -> Gen SrcExpr
+genDefineE n = DefineE <$> genIdent <*> genExpr n
 
 -- f[e]
-genApplyD :: Int -> [Ident] -> Gen SrcExpr
-genApplyD n env = ApplyD <$> genExpr n [] <*> genExpr n env
+genApplyD :: Int -> Gen SrcExpr
+genApplyD n = ApplyD <$> genExpr n <*> genExpr n
 
 -- array{e1;e2...}
-genArray :: [Ident] -> Gen SrcExpr
-genArray env = do
-  l <- Gen.inRange (Range.between (0,2)) -- only gen arrays up to 2 elements
-  Array <$> replicateM l (genLitOrVar env)
+genArray :: Gen SrcExpr
+genArray = do
+  l <- Gen.integral $ Range.linearFrom 0 0 2 -- only gen arrays up to 2 elements
+  Array <$> replicateM l genLitOrVar
 
 -- e1;e2
-genSeq :: Int -> [Ident] -> Gen SrcExpr
-genSeq n env = Seq <$> genExpr n env <*> genExpr n env
+genSeq :: Int -> Gen SrcExpr
+genSeq n = Seq <$> genExpr n <*> genExpr n
 
 -- e1|e2
-genChoice :: Int -> [Ident] -> Gen SrcExpr
-genChoice n env = Choice <$> genExpr n env <*> genExpr n env
+genChoice :: Int -> Gen SrcExpr
+genChoice n = Choice <$> genExpr n <*> genExpr n
 
 -- e1 = e2
-genUnify :: Int -> [Ident] -> Gen SrcExpr
-genUnify n env = Unify <$> genExpr n env <*> genExpr n env
+genUnify :: Int -> Gen SrcExpr
+genUnify n = Unify <$> genExpr n <*> genExpr n
 
 genPrimOp :: Gen SrcExpr
 genPrimOp = EPrim <$> gen_prim
   where
     gen_prim :: Gen PrimOp
-    -- gen_prim = Gen.inRange (Range.enum (Add, IsAny))
-    gen_prim = Gen.oneof
-      $ NE.fromList
-      $ pure <$>
+    -- gen_prim = Gen.enum (Add, IsAny)
+    gen_prim = Gen.element
       [ Add
       , Sub
       , Mul
@@ -178,44 +212,53 @@ genPrimOp = EPrim <$> gen_prim
       , Lt
       ]
 
-genIf3 :: Int -> [Ident] -> Gen SrcExpr
-genIf3 n env =
+genIf3 :: Int -> Gen SrcExpr
+genIf3 n =
   let n2 = n `div` 2 -- to keep generated ASTs reasonable
-   in If3 <$> genExpr n2 env <*> genExpr n2 env <*> genExpr n2 env
+   in If3 <$> genExpr n2 <*> genExpr n2 <*> genExpr n2
 
 genEff :: Gen Eff
 genEff = Eff <$> c_eff <*> pure SComputes -- only gen pure functions for now
   where
-    c_eff = Gen.inRange $ Range.enum (CFails, CIterates)
+    c_eff = Gen.enum CFails CIterates
 
-genFun :: Int -> [Ident] -> Gen SrcExpr
-genFun n env = do
+genFun :: Int -> Gen SrcExpr
+genFun n = do
+  domain   <- genExpr n
+  range    <- genExpr n
+  genFun' domain range
+
+genFun' :: SrcExpr -> SrcExpr -> Gen SrcExpr
+genFun' domain range = do
   aperture <- pure Closed
   eff      <- genEff
-  domain   <- genExpr n env
   let !bndrs = getVisibleBinders domain
-  range    <- genExpr n (bndrs ++ env)
+  bulkRemember bndrs
   return $ Function aperture domain eff range
 
-genExpr :: Int -> [Ident] -> Gen SrcExpr
-genExpr 0 env = genVariable env
-genExpr n' env =
+genExpr :: Int -> Gen SrcExpr
+genExpr 0  = genLitOrVar
+genExpr n' =
   let n = n' - 1
    in
-    Gen.oneof
-    $ NE.fromList
-    [ genVariable  env
-    , genDefineE n env
-    , genApplyD  n env
-    , genArray     env
-    , genSeq     n env
-    , genChoice  n env
-    , genUnify   n env
+    Gen.choice
+    [ genVariable
+    , genDefineE n
+    , genApplyD  n
+    , genArray
+    , genSeq     n
+    , genChoice  n
+    , genUnify   n
     , genPrimOp
-    , genIf3     n env
-    , genFun     n env
+    , genIf3     n
+    , genFun     n
     ]
 
+genLam :: Int -> Gen SrcExpr
+genLam n = Lam <$> genIdent <*> genExpr n
+
 -- we ANF means generate variables, literals, and lambdas
--- genANFAtom :: Int -> Gen SrcExpr
--- genANFAtom 0 = TODO:
+genANFAtom :: Int -> Gen SrcExpr
+genANFAtom _n = Gen.choice [ -- genLam n : TODO: PomPom does not implement yet
+                            genLitOrVar
+                           ]
