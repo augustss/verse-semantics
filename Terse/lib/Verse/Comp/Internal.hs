@@ -5,7 +5,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Verse.Comp.Internal
-  ( Comp
+  ( CompT
   , Env
   , runCompT
   , comp'
@@ -29,8 +29,7 @@ import Data.Set qualified as Vars
 import Data.Traversable
 
 import Language.Haskell.TH
-  ( Q
-  , Quote
+  ( Quote
   , integerL
   , listE
   , litE
@@ -49,8 +48,8 @@ import Verse.Name
 import Verse.Run
 import Verse.Run.Val qualified as Val
 
-newtype Comp a = Comp
-  { unComp :: ReaderT R (WriterT Vars Q) a
+newtype CompT m a = CompT
+  { unCompT :: ReaderT R (WriterT Vars m) a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -58,8 +57,11 @@ newtype Comp a = Comp
              , MonadWriter Vars
              )
 
-instance Quote Comp where
-  newName = Comp . lift . lift . TH.newName
+instance MonadTrans CompT where
+  lift = CompT . lift . lift
+
+instance Quote m => Quote (CompT m) where
+  newName = lift . TH.newName
 
 data R = R
   { env :: !Env
@@ -70,15 +72,15 @@ type Env = HashMap Name TH.Name
 
 type Vars = Set TH.Name
 
-runCompT :: Comp a -> Env -> Q a
-runCompT m env = evalRWT (unComp m) R {..}
+runCompT :: Functor m => CompT m a -> Env -> m a
+runCompT m env = evalRWT (unCompT m) R {..}
   where
     stack = mempty
 
 evalRWT :: (Monoid w, Functor m) => ReaderT r (WriterT w m) a -> r -> m a
 evalRWT m = fmap fst . runWriterT . runReaderT m
 
-comp' :: TH.Name -> TH.Name -> LExp -> Comp TH.Exp
+comp' :: Quote m => TH.Name -> TH.Name -> LExp -> CompT m TH.Exp
 comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
     Nothing -> [| fork stuck *> Val.freshVar |]
@@ -228,25 +230,22 @@ comp' s1 s2 = wrap $ \ case
       $(comp' s1 s2 e3)
     pure var |]
 
-freeVars :: Comp a -> Comp (a, Map TH.Name TH.Name)
+freeVars :: Quote m => CompT m a -> CompT m (a, Map TH.Name TH.Name)
 freeVars m = do
   r <- ask
   (xs, env) <- mapAccumM (\ xs x -> do
     y <- TH.newName "var"
     pure (Map.insert y x xs, y)) mempty r.env
-  (x, w) <- liftQ $ runRWT (unComp m) r { env }
+  (x, w) <- lift $ runRWT (unCompT m) r { env }
   let ys = Map.restrictKeys xs w
   for_ ys $ tell . Vars.singleton
   pure (x, ys)
 
-localEnv :: (Env -> Env) -> Comp a -> Comp a
+localEnv :: Monad m => (Env -> Env) -> CompT m a -> CompT m a
 localEnv f = local (\ r -> r { env = f r.env })
 
 runRWT :: Monoid w => ReaderT r (WriterT w m) a -> r -> m (a, w)
 runRWT m = runWriterT . runReaderT m
 
-liftQ :: Q a -> Comp a
-liftQ = Comp . lift . lift
-
-wrap :: (ExpF LExp -> Comp a) -> LExp -> Comp a
+wrap :: Monad m => (ExpF LExp -> CompT m a) -> LExp -> CompT m a
 wrap f (L i x) = local (\ r -> r { stack = i:r.stack }) $ f x

@@ -17,8 +17,8 @@ import Data.IntMap.Strict qualified as IntMap
 
 import Prettyprinter
 
+import Verse.Eval.Fun (Fun)
 import Verse.Exp (LExp)
-import Verse.Fun (Fun)
 import Verse.Monad
 import Verse.Name
 

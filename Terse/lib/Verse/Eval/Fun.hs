@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Verse.Fun
+module Verse.Eval.Fun
   ( Fun (..)
   ) where
 

@@ -20,7 +20,6 @@ library
   exposed-modules:
     AnsiStyle
     Fix
-    IntMap
     List
     Loc
     Parser
@@ -33,10 +32,10 @@ library
     Verse.Comp
     Verse.Comp.Internal
     Verse.Eval
+    Verse.Eval.Fun
     Verse.Eval.Val
     Verse.Exp
     Verse.Parse
-    Verse.Fun
     Verse.Monad
     Verse.Name
     Verse.Run
@@ -56,7 +55,19 @@ library
     unordered-containers
   default-language: GHC2021
 
-executable terse
+executable tersec
+  import:           warnings
+  main-is:          Main.hs
+  build-depends:
+    base,
+    filepath,
+    template-haskell,
+    terse,
+    text
+  hs-source-dirs:   c
+  default-language: GHC2021
+
+executable tersei
   import:           warnings
   main-is:          Main.hs
   build-depends:
@@ -70,5 +81,5 @@ executable terse
     terse,
     text,
     transformers
-  hs-source-dirs:   exe
+  hs-source-dirs:   i
   default-language: GHC2021

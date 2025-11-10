@@ -32,11 +32,11 @@ import Fix
 import Loc
 import Ref
 
+import Verse.Eval.Fun (Fun)
+import Verse.Eval.Fun qualified as Fun
 import Verse.Eval.Val (Val)
 import Verse.Eval.Val qualified as Val
 import Verse.Exp
-import Verse.Fun (Fun)
-import Verse.Fun qualified as Fun
 import Verse.Monad (Stream (..), VerseT, runVerseT)
 import Verse.Monad qualified as Monad
 import Verse.Name

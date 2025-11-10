@@ -16,7 +16,7 @@ import Language.Haskell.TH (Q, runIO)
 import Language.Haskell.TH qualified as TH
 import Language.Haskell.TH.Quote (QuasiQuoter, pattern QuasiQuoter)
 import Language.Haskell.TH.Quote qualified as TH
-import Language.Haskell.TH.Syntax (addDependentFile)
+import Language.Haskell.TH.Syntax (Quasi, addDependentFile)
 
 import Pos
 
@@ -42,7 +42,7 @@ verseFile = QuasiQuoter
   , TH.quoteDec
   }
 
-parseQ :: Text -> Q LExp
+parseQ :: Quasi m => Text -> m LExp
 parseQ input = case parse input of
   Left pos -> fail . show $ prettyParseError input pos
   Right x -> pure x
