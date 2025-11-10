@@ -6,6 +6,7 @@ module Verse.Run.S
   , freshS
   , newS
   , unifyS
+  , readS
   , readChoiceFree
   , readStoreFree
   , unifyChoiceFree
@@ -43,6 +44,9 @@ newS = do
 
 unifyS :: MonadRef m => S m -> S m -> VerseT m ()
 unifyS s1 s2 = unifyChoiceFree s1 s2 *> unifyStoreFree s1 s2
+
+readS :: MonadRef m => S m -> VerseT m ()
+readS s = readChoiceFree s *> readStoreFree s
 
 readChoiceFree :: MonadRef m => S m -> VerseT m ()
 readChoiceFree = readVar . (.choiceFree)

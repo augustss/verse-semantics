@@ -187,7 +187,7 @@ comp' s1 s2 = wrap $ \ case
       Val.unifyVar var <=< Val.newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
-        local (const heap) $(comp' 's1 's2 e)
+        local (const heap) $(comp' 's1 's2 e) <* readS s2
       unifyS $(varE s1) $(varE s2)
     pure var |]
   For e1 x e2 -> [| do
@@ -207,7 +207,7 @@ comp' s1 s2 = wrap $ \ case
       split $ do
         s1 <- newS
         s2 <- freshS
-        local (const heap) $(comp' 's1 's2 e1)
+        local (const heap) $(comp' 's1 's2 e1) <* readS s2
     pure var |]
   One e -> [| do
     var <- Val.freshVar
@@ -216,7 +216,7 @@ comp' s1 s2 = wrap $ \ case
       Val.unifyVar var <=< one $ do
         s1 <- newS
         s2 <- freshS
-        local (const heap) $(comp' 's1 's2 e)
+        local (const heap) $(comp' 's1 's2 e) <* readS s2
       unifyS $(varE s1) $(varE s2)
     pure var |]
   If e1 x e2 e3 -> [| do
@@ -225,7 +225,7 @@ comp' s1 s2 = wrap $ \ case
     fork $ Val.unifyVar var =<< if'
       (do s1 <- newS
           s2 <- freshS
-          local (const heap) $(comp' 's1 's2 e1))
+          local (const heap) $(comp' 's1 's2 e1) <* readS s2)
       (\ var -> $(localEnv (Env.insert x 'var) $ comp' s1 s2 e2))
       $(comp' s1 s2 e3)
     pure var |]

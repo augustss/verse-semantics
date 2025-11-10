@@ -38,6 +38,5 @@ comp e = [| runVerseT $ do
     , ("Print", 'print)
     , ("operator'-'", 'minus)
     ])
-  readChoiceFree s2
-  readStoreFree s2
+  readS s2
   pure x |]
