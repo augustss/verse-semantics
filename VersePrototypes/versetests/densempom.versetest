@@ -108,3 +108,6 @@ testds("fun9", ppo, pass, skip) { ltTwo:=type{x:nat where x<2};
                             function(y:ltTwo){y} }                {"{[{{u=v=F({0->0,1->1})}}]}"}
 testds("fun10",ppo, pass, broken) { x:=1; function(x){2} }                {"{[{{u=v=F({1->2})}}]}"}
 testds("fun11",ppo, pass) { function(1){x=2} }                    {"{[{{x=2,u=v=F({1->2})}}]}"}
+
+# what should this be?
+#testds("mfun1", pom, pass) { f:=((1,2) ||| (1,0)); f[0] }         {"{[{{u=v=1}}]}"}

@@ -34,9 +34,18 @@ mkUnit d | d == E.empty = Empty
 -- Sequencing
 infixl 8 ***
 (***) :: P ENV -> P ENV -> P ENV
+{-
 s1 *** s2 = do { d1 <- s1
                ; d2 <- s2
                ; mkUnit (d1 /\ d2) }
+-}
+Empty     *** _ = Empty
+(s :\/ t) *** r         = (s *** r) `union` (t *** r)
+(s :++ t) *** r         = (s *** r) +++     (t *** r)
+Unit _    *** Empty     = Empty
+Unit d    *** (s :\/ t) = (Unit d *** s) `union` (Unit d *** t)
+Unit d    *** (s :++ t) = (Unit d *** s) +++     (Unit d *** t)
+Unit d1   *** Unit d2   = mkUnit (d1 /\ d2)
 
 -- Disjunction
 disj :: P ENV -> P ENV -> P ENV
@@ -111,9 +120,9 @@ fOR xs (a :\/ b) t i x =
                          , consistent tv1 tv2
                          ]
         utup (Fun g) (Fun h) = Fun (funUnion g h)
-        utup _ _ = undefined
+        utup _ _ = error "utup"
         consistent (Fun g) (Fun h) = Set.isEmpty (funDomain g `Set.intersect` funDomain h)
-        consistent _ _ = undefined
+        consistent _ _ = error "consistent"
 {-
   (unit ca *** fOR xs a t i x) `union`
   (unit cb *** fOR xs b t i x)
@@ -138,7 +147,7 @@ fOR xs (a :++ b) t i x =
                          , tv2 <- allValuesOf v2 forb
                          ]
         app (Fun g) (Fun h) = Fun (tupConcat g h)
-        app _ _ = undefined
+        app _ _ = error "app"
 
 allValuesOf :: Ident -> P ENV -> [Value]
 allValuesOf _ Empty = []
@@ -286,6 +295,10 @@ tfunx2 = Function Closed (Variable xx) effSucceeds k2
 xx=Ident noLoc "x"
 
 uChoice t0 t1 = ApplyD (Variable (Ident noLoc "operator'|||'")) (Array [t0, t1])
+dotDot t0 t1 = ApplyD (EPrim DotDot) (Array [t0, t1])
+
+td = dotDot k1 (Variable n) `Choice` k1
+tdf = For2 (DefineE x td) (Variable x)
 
 {-
 ix :: [ ENV ] -> Int -> ENV
@@ -392,7 +405,7 @@ fUN used apt xs (s :\/ t) t1 p q h f =
                          , tf2 <- allValuesOf f2 funb
                          ]
         ufun (Fun g) (Fun h) = Fun (funUnion g h)
-        ufun _ _ = undefined
+        ufun _ _ = error "ufun-1"
 fUN used apt xs (s :++ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
   where funa = fUN used apt xs s t1 p q h1 f1
@@ -407,7 +420,7 @@ fUN used apt xs (s :++ t) t1 p q h f =
                          , tf2 <- allValuesOf f2 funb
                          ]
         ufun (Fun g) (Fun h) = Fun (funConcat g h)
-        ufun _ _ = undefined
+        ufun _ _ = error "ufun-2"
 fUN used apt xs d@(Unit dd) t1 p q h f =
 --trace ("fUN dd=" ++ show dd ++ " t1=" ++ show t1 ++ " (p,q,h,f)=" ++ show(p,q,h,f) ++ "xs=" ++ show xs) $
   (d *** unit sings >>> (p:q:xs))
