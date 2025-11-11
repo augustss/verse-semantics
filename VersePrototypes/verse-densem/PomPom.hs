@@ -96,15 +96,18 @@ fOR xs d@Unit{}  t i x =
   `union`
   (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
+        allV = allInts ++ allTuples
         sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
-                         | ip <- allInts
-                         , iq <- allInts
+                         | ip <- allV
+                         , iq <- allV
                          ]
 --fOR xs (a :\/ b) t i x = fOR xs a t i x `union` fOR xs b t i x
 --fOR xs (a :\/ b) t i x = fOR xs a t i x +++ fOR xs b t i x
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
-fOR xs (a :\/ b) t i x =
+fOR xs (a :\/ b) t i x
+ | ()/=() =
+-- This is ⊎
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
   where fora = fOR xs a t u1 v1
         forb = fOR xs b t u2 v2
@@ -132,8 +135,20 @@ fOR xs (a :\/ b) t i x =
         cb = coll (b >>> xs)
 -}
 
+fOR xs (a :\/ b) t i x
+ | useSEM1 =
+ -- SEM1
+ -- This is ⋓
+  fOR xs a t i x `uu` fOR xs b t i x
+
+fOR xs (a :\/ b) t i x
+ | not useSEM1 =
+ -- SEM2
+ -- This is U
+  fOR xs a t i x `union` fOR xs b t i x
+
 fOR xs (a :++ b) t i x =
---  trace ("FOR " ++ show (fOR xs a t u1 v1, fOR xs b t u2 v2)) $
+--  trace ("FOR " ++ show (a, b, t, i, x, fora, forb, sings)) $
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
   where fora = fOR xs a t u1 v1
         forb = fOR xs b t u2 v2
@@ -149,6 +164,14 @@ fOR xs (a :++ b) t i x =
         app (Fun g) (Fun h) = Fun (tupConcat g h)
         app _ _ = error "app"
 
+fOR _ _ _ _ _ = undefined
+
+useSEM1 :: Bool
+useSEM1 = False
+
+uu :: PENV -> PENV -> PENV
+uu xs ys = [ x \/ y | x <- xs, y <- ys ]
+  
 allValuesOf :: Ident -> P ENV -> [Value]
 allValuesOf _ Empty = []
 allValuesOf x (a :++ b) = allValuesOf x a `L.union` allValuesOf x b
@@ -202,7 +225,7 @@ dE t@(Array ts)                     i x =
         is = take n $ freshList "i" used
         xs = take n $ freshList "x" used
         es = zipWith3 dE ts is xs
-        tupvals = allTuplesLen n
+        tupvals = [ vs | Tuple vs <- allTuples, length vs == n ]
         et = unit $ bigUnion [ i .= Tuple ivals /\
                                x .= Tuple xvals /\
                                bigIntersect (zipWith (.=) is ivals) /\
