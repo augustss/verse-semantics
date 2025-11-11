@@ -75,7 +75,7 @@ eval commands s line =
       case dropWhile isSpace line of
         ':' : line' | null line'' -> pure (False, s)
                     | otherwise -> do
-                      let isLegalCmd c = isAlpha c || c == '-' -- matches :foo and :foo-bar
+                      let isLegalCmd c = isAlphaNum c || c == '-' -- matches :foo and :foo-bar
                       let (w, rest) = span isLegalCmd line''
                       case filter (\ c -> w `isPrefixOf` cmd_string c) $ c_commands commands of
                         [] -> do

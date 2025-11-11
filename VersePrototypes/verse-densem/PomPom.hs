@@ -15,6 +15,15 @@ import Debug.Trace
 --pfilter :: (a -> Bool) -> P a -> P a
 --pfilter p s = [ y | x <- s, y <- if p x then Unit x else Empty ]
 
+-- A Config is pass down everywhere to pick various semantic variations.
+data Config = Config
+  { forUnionMode :: ForUnionMode
+  }
+  deriving (Show)
+
+data ForUnionMode = FUMSem1 | FUMSem2 | FUMSemBadOld
+  deriving (Eq, Ord, Show)
+
 ----------------------------------------------------
 --
 --            Functions over PENV = P ENV
@@ -89,10 +98,10 @@ coll (a :\/ b) = coll a \/ coll b
 coll (a :++ b) = coll a \/ coll b
 coll (Unit e)  = e
 
-fOR :: [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
-fOR _  Empty     _ i x = unit (i .= nil /\ x .= nil)
-fOR xs d@Unit{}  t i x =
-  (d *** unit sings *** dB t p q >>> (p:q:xs))
+fOR :: Config -> [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
+fOR _ _  Empty     _ i x = unit (i .= nil /\ x .= nil)
+fOR cfg xs d@Unit{}  t i x =
+  (d *** unit sings *** dB cfg t p q >>> (p:q:xs))
   `union`
   (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
   where (p, q) = fresh2 ("p", "q") (i:x:xs) t
@@ -105,12 +114,12 @@ fOR xs d@Unit{}  t i x =
 --fOR xs (a :\/ b) t i x = fOR xs a t i x +++ fOR xs b t i x
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
-fOR xs (a :\/ b) t i x
- | ()/=() =
+fOR cfg xs (a :\/ b) t i x
+ | forUnionMode cfg == FUMSemBadOld =
 -- This is ⊎
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
-  where fora = fOR xs a t u1 v1
-        forb = fOR xs b t u2 v2
+  where fora = fOR cfg xs a t u1 v1
+        forb = fOR cfg xs b t u2 v2
         (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
         (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
         sings = bigUnion [ i .= tu1 `utup` tu2 /\ x .= tv1 `utup` tv2 /\
@@ -135,23 +144,23 @@ fOR xs (a :\/ b) t i x
         cb = coll (b >>> xs)
 -}
 
-fOR xs (a :\/ b) t i x
- | useSEM1 =
+fOR cfg xs (a :\/ b) t i x
+ | forUnionMode cfg == FUMSem1 =
  -- SEM1
  -- This is ⋓
-  fOR xs a t i x `uu` fOR xs b t i x
+  fOR cfg xs a t i x `uu` fOR cfg xs b t i x
 
-fOR xs (a :\/ b) t i x
- | not useSEM1 =
+fOR cfg xs (a :\/ b) t i x
+ | forUnionMode cfg == FUMSem2 =
  -- SEM2
  -- This is U
-  fOR xs a t i x `union` fOR xs b t i x
+  fOR cfg xs a t i x `union` fOR cfg xs b t i x
 
-fOR xs (a :++ b) t i x =
+fOR cfg xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (a, b, t, i, x, fora, forb, sings)) $
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
-  where fora = fOR xs a t u1 v1
-        forb = fOR xs b t u2 v2
+  where fora = fOR cfg xs a t u1 v1
+        forb = fOR cfg xs b t u2 v2
         (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
         (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
         sings = bigUnion [ i .= tu1 `app` tu2 /\ x .= tv1 `app` tv2 /\
@@ -164,7 +173,7 @@ fOR xs (a :++ b) t i x =
         app (Fun g) (Fun h) = Fun (tupConcat g h)
         app _ _ = error "app"
 
-fOR _ _ _ _ _ = undefined
+fOR _ _ _ _ _ _ = undefined
 
 useSEM1 :: Bool
 useSEM1 = False
@@ -178,34 +187,34 @@ allValuesOf x (a :++ b) = allValuesOf x a `L.union` allValuesOf x b
 allValuesOf x (a :\/ b) = allValuesOf x a `L.union` allValuesOf x b
 allValuesOf x (Unit d) = extractVar d x
 
-dE :: SrcEssential -> Ident -> Ident -> P ENV
+dE :: Config -> SrcEssential -> Ident -> Ident -> P ENV
 -- The denotational semantics itself (Fig 10)
-dE (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
-dE (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
---dE (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
-dE (Variable v) i x | isSrcUnderscore v = unit $ i .=. x
-                    | otherwise         = unit $ i .=. x /\ x .=. v
-dE (DefineE y t)                    i x = unit (x .=. y) *** dE t i x      -- y := t
-dE (DefineIE y t)                   i x = unit (i .=. y) *** dE t i x      -- y ~> _ := t
-dE (DefineV y)                      i x = unit $ i .=. x /\ x .=. y
-dE (Unify t0 t1)                    i x = dE t0 i x *** dE t1 i x
-dE (Choice t0 t1)                   i x = dB t0 i x +++ dB t1 i x
-dE (Seq t0 t1)                      i x = dC t0     *** dE t1 i x
-dE (Where t0 t1)                    i x = dE t0 i x *** dC t1
-dE (Block t)                        i x = dB t i x
-dE Fail                             _ _ = Empty
-dE (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
-  dE t0 i x `union` dE t1 i x
-dE (If3 t0 t1 t2)                   i x =
-  (s0 *** dB t1 i x >>> xs)
+dE _   (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
+dE _   (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
+--dE cfg (Variable (Ident _ "xf"))        i x = unit $ i .=. x /\ x .= Fun funXF -- hack for testing
+dE _   (Variable v) i x | isSrcUnderscore v = unit $ i .=. x
+                         | otherwise         = unit $ i .=. x /\ x .=. v
+dE cfg (DefineE y t)                    i x = unit (x .=. y) *** dE cfg t i x      -- y := t
+dE cfg (DefineIE y t)                   i x = unit (i .=. y) *** dE cfg t i x      -- y ~> _ := t
+dE _   (DefineV y)                      i x = unit $ i .=. x /\ x .=. y
+dE cfg (Unify t0 t1)                    i x = dE cfg t0 i x *** dE cfg t1 i x
+dE cfg (Choice t0 t1)                   i x = dB cfg t0 i x +++ dB cfg t1 i x
+dE cfg (Seq t0 t1)                      i x = dC cfg t0     *** dE cfg t1 i x
+dE cfg (Where t0 t1)                    i x = dE cfg t0 i x *** dC cfg t1
+dE cfg (Block t)                        i x = dB cfg t i x
+dE _   Fail                             _ _ = Empty
+dE cfg (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
+  dE cfg t0 i x `union` dE cfg t1 i x
+dE cfg (If3 t0 t1 t2)                   i x =
+  (s0 *** dB cfg t1 i x >>> xs)
   `union`
   -- +++
-  (nOT (s0 >>> xs) *** dB t2 i x)
+  (nOT (s0 >>> xs) *** dB cfg t2 i x)
   where xs = bvs t0
-        s0 = oNE xs (dC t0)
-dE (For2 t0 t1) i x = fOR (bvs t0) (dC t0) t1 i x
-dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
-  dE t0 a l *** dE t1 b h *** unit (i .=. x) ***
+        s0 = oNE xs (dC cfg t0)
+dE cfg (For2 t0 t1) i x = fOR cfg (bvs t0) (dC cfg t0) t1 i x
+dE cfg t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
+  dE cfg t0 a l *** dE cfg t1 b h *** unit (i .=. x) ***
   (let
     mkSequ :: Int -> Int -> [ENV]
     mkSequ lo hi = [ x .= Int v /\ l .= Int lo /\ h .= Int hi | v <- [ lo .. hi ] ]
@@ -218,13 +227,13 @@ dE t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x =
   ) >>> [a,l,b,h]
     where (a, l) = fresh2 ("a", "l") [i, x] t
           (b, h) = fresh2 ("b", "h") [i, x] t
-dE t@(Array ts)                     i x =
+dE cfg t@(Array ts)                     i x =
   foldl1 (***) (et : es) >>> (is ++ xs)
   where n = length ts
         used = i:x:getFree t
         is = take n $ freshList "i" used
         xs = take n $ freshList "x" used
-        es = zipWith3 dE ts is xs
+        es = zipWith3 (dE cfg) ts is xs
         tupvals = [ vs | Tuple vs <- allTuples, length vs == n ]
         et = unit $ bigUnion [ i .= Tuple ivals /\
                                x .= Tuple xvals /\
@@ -233,18 +242,18 @@ dE t@(Array ts)                     i x =
                              | ivals <- tupvals, xvals <- tupvals
                              ]
 -- A speedup for x:int
-dE (Range (EPrim IsInt))            i x = unit (bigUnion [ i .= v /\ x .= v | v <- allInts ])
-dE (Range t)                        i x =
-  dE t j y *** dF y i x >>> [j,y]
+dE _   (Range (EPrim IsInt))            i x = unit (bigUnion [ i .= v /\ x .= v | v <- allInts ])
+dE cfg (Range t)                        i x =
+  dE cfg t j y *** dF y i x >>> [j,y]
     where (j, y) = fresh2 ("j", "y") [i, x] t
-dE t@(ApplyD t0 t1)                 i x =
-  dE t0 h f *** dE t1 j y *** dF f y x *** unit (i .=. x) >>> [h,f,j,y]
+dE cfg t@(ApplyD t0 t1)                 i x =
+  dE cfg t0 h f *** dE cfg t1 j y *** dF f y x *** unit (i .=. x) >>> [h,f,j,y]
     where (h, f) = fresh2 ("h", "f") [i, x] t
           (j, y) = fresh2 ("j", "y") [i, x] t
 
-dE t@(Function aprt t0 _ t1) i x = fUN (getAllBinders t) aprt (bvs t0) (dE t0 p q) t1 p q i x
+dE cfg t@(Function aprt t0 _ t1) i x = fUN cfg (getAllBinders t) aprt (bvs t0) (dE cfg t0 p q) t1 p q i x
   where (p, q) = fresh2 ("p", "q") [i, x] t
-dE e                               _ _ = error $ "dE: unimplemented " ++ show e
+dE _   e                               _ _ = error $ "dE cfg: unimplemented " ++ show e
 
 dF :: Ident -> Ident -> Ident -> P ENV
 dF f a r =
@@ -332,11 +341,11 @@ conc :: [Value] -> Value
 conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
 -}
 
-dB :: SrcEssential -> Ident -> Ident -> P ENV
-dB e i x = dE e i x >>> bvs e
+dB :: Config -> SrcEssential -> Ident -> Ident -> P ENV
+dB cfg e i x = dE cfg e i x >>> bvs e
 
-dC :: SrcEssential -> P ENV
-dC e = dE e i x >>> [i,x]  where (i, x) = fresh2 ("i", "x") [] e
+dC :: Config -> SrcEssential -> P ENV
+dC cfg e = dE cfg e i x >>> [i,x]  where (i, x) = fresh2 ("i", "x") [] e
 
 dP :: PrimOp -> FUN
 dP Neg = fun[funNegate]
@@ -403,21 +412,25 @@ bvs = getVisibleBinders
 
 -------
 
-den :: SrcEssential -> Set [ENV]
-den t = canon $
-        dE (Block t) i x -- `remv` [i]
+denS :: ForUnionMode -> SrcEssential -> Set [ENV]
+denS m t = canon $
+             dE cfg (Block t) i x -- `remv` [i]
   where (i, x) = fresh2 ("u", "v") [] t
         -- res = Ident noLoc "res"
+        cfg = Config{ forUnionMode = m }
+
+den :: SrcEssential -> Set [ENV]
+den = denS FUMSem2
 
 -------
 
 -- The first argument to fUN is only used to make sure we make fresh variables
-fUN :: [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
-fUN _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
-fUN used apt xs (s :\/ t) t1 p q h f =
+fUN :: Config -> [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN _ _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
+fUN cfg used apt xs (s :\/ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN used apt xs s t1 p q h1 f1
-        funb = fUN used apt xs t t1 p q h2 f2
+  where funa = fUN cfg used apt xs s t1 p q h1 f1
+        funb = fUN cfg used apt xs t t1 p q h2 f2
         (h1, f1) = fresh2' ("h1","f1") (h:f:used)
         (h2, f2) = fresh2' ("h2","f2") (h:f:used)
         sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
@@ -429,10 +442,10 @@ fUN used apt xs (s :\/ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funUnion g h)
         ufun _ _ = error "ufun-1"
-fUN used apt xs (s :++ t) t1 p q h f =
+fUN cfg used apt xs (s :++ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
-  where funa = fUN used apt xs s t1 p q h1 f1
-        funb = fUN used apt xs t t1 p q h2 f2
+  where funa = fUN cfg used apt xs s t1 p q h1 f1
+        funb = fUN cfg used apt xs t t1 p q h2 f2
         (h1, f1) = fresh2' ("h1","f1") (h:f:used)
         (h2, f2) = fresh2' ("h2","f2") (h:f:used)
         sings = bigUnion [ h .= th1 `ufun` th2 /\ f .= tf1 `ufun` tf2 /\
@@ -444,14 +457,14 @@ fUN used apt xs (s :++ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funConcat g h)
         ufun _ _ = error "ufun-2"
-fUN used apt xs d@(Unit dd) t1 p q h f =
+fUN cfg used apt xs d@(Unit dd) t1 p q h f =
 --trace ("fUN dd=" ++ show dd ++ " t1=" ++ show t1 ++ " (p,q,h,f)=" ++ show(p,q,h,f) ++ "xs=" ++ show xs) $
   (d *** unit sings >>> (p:q:xs))
   `union`
   (nOT (d >>> (p:q:xs)) *** unit (h .= Fun Empty /\ f .= Fun Empty))
   where
     (x, y) = fresh2' ("x", "y") (p:q:h:f:used)
-    et1 = dE t1 x y
+    et1 = dE cfg t1 x y
     sings :: ENV
     sings = bigUnion
       [ h .= Fun (Unit hh) /\ f .= Fun (Unit ff) /\ env

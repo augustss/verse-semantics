@@ -31,7 +31,7 @@ import SExpC(srcExprToExp)
 import qualified TimE (den)
 import qualified SLS (den)
 import qualified Pom (den)
-import qualified PomPom (den)
+import qualified PomPom (denS, ForUnionMode(..))
 import ENVDesugar (envDesugar)
 
 -- Epic libraries
@@ -220,7 +220,9 @@ theCommandSet = CommandSet
       , Cmd "tim-densem [EXPR]"    "Evaluate [last] expression"            cTimDensem
       , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
       , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
-      , Cmd "ppom-densem [EXPR]"   "Evaluate [last] expression"            cPomPomDensem
+      , Cmd "pp1 [EXPR]"           "Evaluate [last] expression"            cPomPomDensem1
+      , Cmd "pp2 [EXPR]"           "Evaluate [last] expression"            cPomPomDensem2
+      , Cmd "ppO [EXPR]"           "Evaluate [last] expression"            cPomPomDensemOld
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -548,14 +550,21 @@ cPomDensem
 -}
        ; return () }
 
-cPomPomDensem :: CmdRunner CState
-cPomPomDensem
+cPomPomDensem1 :: CmdRunner CState
+cPomPomDensem1 =  cPomPomDensem PomPom.FUMSem1
+cPomPomDensem2 :: CmdRunner CState
+cPomPomDensem2 =  cPomPomDensem PomPom.FUMSem2
+cPomPomDensemOld :: CmdRunner CState
+cPomPomDensemOld =  cPomPomDensem PomPom.FUMSemBadOld
+
+cPomPomDensem :: PomPom.ForUnionMode -> CmdRunner CState
+cPomPomDensem m
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- eSlsDesugar e_ess
-       ; let res = PomPom.den e_ds
+       ; let res = PomPom.denS m e_ds
        ; let den_sem = addHeader "PomPom Den-sem" $ text $ show res
        ; displayDoc den_sem
        ; return () }
