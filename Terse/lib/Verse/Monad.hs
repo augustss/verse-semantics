@@ -582,8 +582,10 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
     else do
       writeVar var2 $ Link var1
       getAp $ x2.susp var1
-  ((_var1, BoundR x1), (_var2, BoundR x2)) ->
-    zipVars_ unifyVar x1 x2
+  ((var1, BoundR x1), (_var2, BoundR x2)) ->
+    when (x1.label /= x2.label) $ do
+      zipVars_ unifyVar x1 x2
+      writeVar var1 $ Bound x2
 
 writeVar :: MonadRef m => Var m a -> VarState m a -> VerseT m ()
 writeVar (Var ref) x = do
