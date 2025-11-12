@@ -92,15 +92,10 @@ comp' s1 s2 = wrap $ \ case
     s4 <- TH.newName "s2"
     var <- TH.newName "var"
     (e, xs) <- freeVars . localEnv (Env.insert x var) $ comp' s3 s4 e
-    let
-      (freeVarsP, freeVarsE)
-        = tupP *** tupE
-        $ unzip
-        $ fmap (varP *** varE)
-        $ Map.toList xs
+    let (fvsP, fvsE) = tupP *** tupE $ unzip $ (varP *** varE) <$> Map.toList xs
     [| do
       unifyS $(varE s1) $(varE s2)
-      Val.newLam $freeVarsE $ \ $freeVarsP $(varP s3) $(varP s4) $(varP var) ->
+      Val.newLam $fvsE $ \ $fvsP $(varP s3) $(varP s4) $(varP var) ->
         $(pure e) |]
   App e1 e2 -> [| do
     s3 <- freshS
