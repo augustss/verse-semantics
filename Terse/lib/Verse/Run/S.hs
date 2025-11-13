@@ -31,39 +31,49 @@ data S m = S
 type Heap m = Var m ()
 
 freshS :: MonadRef m => VerseT m (S m)
+{-# INLINE freshS #-}
 freshS = do
   choiceFree <- freshVar
   storeFree <- freshVar
   pure S {..}
 
 newS :: MonadRef m => VerseT m (S m)
+{-# INLINE newS #-}
 newS = do
   choiceFree <- newVar ()
   storeFree <- newVar ()
   pure S {..}
 
 unifyS :: MonadRef m => S m -> S m -> VerseT m ()
+{-# INLINE unifyS #-}
 unifyS s1 s2 = unifyChoiceFree s1 s2 *> unifyStoreFree s1 s2
 
 readS :: MonadRef m => S m -> VerseT m ()
+{-# INLINE readS #-}
 readS s = readChoiceFree s *> readStoreFree s
 
 readChoiceFree :: MonadRef m => S m -> VerseT m ()
+{-# INLINE readChoiceFree #-}
 readChoiceFree = readVar . (.choiceFree)
 
 readStoreFree :: MonadRef m => S m -> VerseT m ()
+{-# INLINE readStoreFree #-}
 readStoreFree = readVar . (.storeFree)
 
 unifyChoiceFree :: MonadRef m => S m -> S m -> VerseT m ()
+{-# INLINE unifyChoiceFree #-}
 unifyChoiceFree s1 s2 = unifyVar s1.choiceFree s2.choiceFree
 
 unifyStoreFree :: MonadRef m => S m -> S m -> VerseT m ()
+{-# INLINE unifyStoreFree #-}
 unifyStoreFree s1 s2 = unifyVar s1.storeFree s2.storeFree
 
 freshHeap :: MonadRef m => VerseT m (Heap m)
+{-# INLINE freshHeap #-}
 freshHeap = freshVar
 
 newHeap :: MonadRef m => S m -> VerseT m (Heap m)
+{-# INLINABLE newHeap #-}
 newHeap s1 = do
   heap <- freshHeap
   fork $ do
@@ -72,7 +82,9 @@ newHeap s1 = do
   pure heap
 
 readHeap :: MonadRef m => VerseT m ()
+{-# INLINE readHeap #-}
 readHeap = readVar =<< ask
 
 unifyHeap :: MonadRef m => Heap m -> Heap m -> VerseT m ()
+{-# INLINE unifyHeap #-}
 unifyHeap = unifyVar

@@ -115,26 +115,32 @@ type Fail r m = Env m -> Mem m -> m r
 type Empty r m = Mem m -> m r
 
 instance Functor (VerseT m) where
+  {-# INLINE fmap #-}
   fmap f m = VerseT $ \ r s env mem yk sk ->
     unVerseT m r s env mem yk $ \ s mem -> sk s mem . f
 
 instance Applicative (VerseT m) where
+  {-# INLINE pure #-}
   pure x = VerseT $ \ _r s _env mem _yk sk ->
     sk s mem x
+  {-# INLINABLE (<*>) #-}
   f <*> x = VerseT $ \ r s env mem yk sk ->
     unVerseT f r s env mem yk $ \ s mem f ->
     unVerseT x r s env mem yk $ \ s mem x ->
     sk s mem $ f x
 
 instance Alternative (VerseT m) where
+  {-# INLINE empty #-}
   empty = VerseT $ \ _r _s _env mem _yk _sk _fk ek ->
     ek mem
+  {-# INLINABLE (<|>) #-}
   x <|> y = VerseT $ \ r s env mem yk sk fk ek ->
     unVerseT x r s env mem yk sk
     (\ env mem -> unVerseT y r s env mem yk sk fk $ fk env)
     (\ mem -> unVerseT y r s env mem yk sk fk ek)
 
 instance Monad (VerseT m) where
+  {-# INLINE (>>=) #-}
   x >>= f = VerseT $ \ r s env mem yk sk ->
     unVerseT x r s env mem yk $ \ s mem x ->
     unVerseT (f x) r s env mem yk sk
@@ -142,58 +148,74 @@ instance Monad (VerseT m) where
 instance MonadPlus (VerseT m)
 
 instance MonadTrans VerseT where
+  {-# INLINE lift #-}
   lift m = VerseT $ \ _r s _env mem _yk sk fk ek ->
     m >>= \ x -> sk s mem x fk ek
 
 instance MonadIO m => MonadIO (VerseT m) where
+  {-# INLINE liftIO #-}
   liftIO = lift . liftIO
 
 instance MonadReader (Var m ()) (VerseT m) where
+  {-# INLINE ask #-}
   ask = VerseT $ \ _r s env mem _yk sk ->
     sk s mem env
+  {-# INLINE local #-}
   local f m = VerseT $ \ r s env mem yk sk fk ek ->
     unVerseT m r s (f env) mem yk sk fk ek
+  {-# INLINE reader #-}
   reader f = VerseT $ \ _r s env mem _yk sk ->
     sk s mem $ f env
 
 instance MonadState s m => MonadState s (VerseT m) where
+  {-# INLINE get #-}
   get = lift get
+  {-# INLINE put #-}
   put = lift . put
+  {-# INLINE state #-}
   state = lift . state
 
 liftPut :: Monad m => m () -> m () -> VerseT m ()
+{-# INLINE liftPut #-}
 liftPut forward backward = do
   lift forward
   tell forward backward
 
 tell :: Applicative m => m () -> m () -> VerseT m ()
+{-# INLINABLE tell #-}
 tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
   sk s (appendMem mem forward backward) ()
   (\ env mem -> backward *> fk env (appendMem mem backward forward))
   (\ mem -> backward *> ek (appendMem mem backward forward))
 
 liftPut' :: Monad m => m () -> m () -> VerseT m ()
+{-# INLINE liftPut' #-}
 liftPut' forward backward' = do
   lift forward
   tell' backward'
 
 tell' :: Applicative m => m () -> VerseT m ()
+{-# INLINABLE tell' #-}
 tell' backward' = VerseT $ \ _r s _env mem _yk sk fk ek ->
   sk s (appendMem' mem backward') () fk (\ mem -> backward' *> ek mem)
 
 yield :: Level -> Handler m a -> VerseT m a
+{-# INLINE yield #-}
 yield i f = VerseT $ \ _r s _env mem yk ->
   unYield yk i f s mem
 
 getLevel :: VerseT m Level
+{-# INLINE getLevel #-}
 getLevel = VerseT $ \ r s _env mem _yk sk ->
   sk s mem r.level
 
 putS :: S -> VerseT m ()
+{-# INLINE putS #-}
 putS !s = VerseT $ \ _r _s _env mem _yk sk ->
   sk s mem ()
 
 modifyS :: (S -> S) -> VerseT m ()
+{-# INLINE modifyS #-}
 modifyS f = VerseT $ \ _r s _env mem _yk sk ->
   let
     !s' = f s
@@ -201,14 +223,17 @@ modifyS f = VerseT $ \ _r s _env mem _yk sk ->
     sk s' mem ()
 
 putMem :: Mem m -> VerseT m ()
+{-# INLINE putMem #-}
 putMem mem = VerseT $ \ _r s _env _mem _yk sk ->
   sk s mem ()
 
 putLabel :: Label -> VerseT m ()
+{-# INLINE putLabel #-}
 putLabel label = VerseT $ \ _r s _env Mem { label = _, .. } _yk sk ->
   sk s Mem {..} ()
 
 runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
+{-# INLINABLE runVerseT #-}
 runVerseT m = do
   let
     sk s mem x fk _ek
@@ -227,6 +252,7 @@ runVerseT m = do
     ek _mem = pure $ Just []
 
 all' :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m [a]
+{-# INLINABLE all' #-}
 all' = split >=> loop
   where
     loop = \ case
@@ -234,6 +260,7 @@ all' = split >=> loop
       Step x m -> (x:) <$> (m >>= loop)
 
 one :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m a
+{-# INLINABLE one #-}
 one = split >=> \ case
   Done -> empty
   Step x _m -> pure x
@@ -241,16 +268,19 @@ one = split >=> \ case
 if'
   :: (MonadRef m, Vars a m)
   => VerseT m a -> (a -> VerseT m b) -> VerseT m b -> VerseT m b
+{-# INLINABLE if' #-}
 if' m f n = split m >>= \ case
   Done -> n
   Step x _m -> f x
 
 split :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m (Stream m a)
+{-# INLINE split #-}
 split m = split' m S { count = 0 }
 
 split'
   :: (MonadRef m, Vars a m)
   => VerseT m a -> S -> VerseT m (Stream m a)
+{-# INLINE split' #-}
 split' m s = split'' m s succeedS failS emptyS
 
 split''
@@ -261,6 +291,7 @@ split''
   -> Fail (VerseT m (Stream m b)) m
   -> Empty (VerseT m (Stream m b)) m
   -> VerseT m (Stream m b)
+{-# INLINABLE split'' #-}
 split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
@@ -270,6 +301,7 @@ split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
     unVerseT m r s env mem yk sk fk ek
 
 yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
+{-# INLINABLE yieldS #-}
 yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
   tell mem.forward mem.backward
   tell' mem.backward'
@@ -281,6 +313,7 @@ yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
     yield i $ \ k -> f $ \ m -> k $ split'' m s sk fk ek
 
 succeedS :: (MonadRef m, Vars a m) => Succeed (VerseT m (Stream m a)) m a
+{-# INLINABLE succeedS #-}
 succeedS s mem x fk _ek = pure $ do
   tell mem.forward mem.backward
   tell' mem.backward'
@@ -298,9 +331,11 @@ succeedS s mem x fk _ek = pure $ do
     stuck
 
 failS :: Applicative m => Fail (VerseT m (Stream m a)) m
+{-# INLINE failS #-}
 failS _env = emptyS
 
 emptyS :: Applicative m => Empty (VerseT m (Stream m a)) m
+{-# INLINABLE emptyS #-}
 emptyS mem = pure $ do
   tell mem.forward mem.backward
   tell' mem.backward'
@@ -308,11 +343,13 @@ emptyS mem = pure $ do
   pure Done
 
 liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
+{-# INLINABLE liftFailS #-}
 liftFailS fk' = VerseT $ \ r s env mem yk sk fk ek -> do
   m <- fk' env $ splitMem mem.label
   unVerseT m r s env mem yk sk fk ek
 
 splitMem :: Applicative m => Label -> Mem m
+{-# INLINE splitMem #-}
 splitMem label = Mem {..}
   where
     forward = pure ()
@@ -322,14 +359,17 @@ splitMem label = Mem {..}
 data Stream m a = Done | Step a (VerseT m (Stream m a))
 
 fork :: Monad m => VerseT m () -> VerseT m ()
+{-# INLINE fork #-}
 fork m = fork' m succeedF
 
 fork' :: Monad m => VerseT m a -> Succeed (VerseT m ()) m a -> VerseT m ()
+{-# INLINABLE fork' #-}
 fork' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
   unVerseT m r s env mem yieldF sk' failF emptyF >>= \ m ->
   unVerseT m r s env mem yk sk fk ek
 
 yieldF :: Monad m => Yield (VerseT m ()) m
+{-# INLINABLE yieldF #-}
 yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
   putS s
   putMem mem
@@ -341,17 +381,20 @@ yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
     altF (f $ \ m -> modifyS predS *> fork' m sk) fk ek
 
 succeedF :: Monad m => Succeed (VerseT m ()) m ()
+{-# INLINABLE succeedF #-}
 succeedF s mem () fk ek = pure $ do
   putS s
   putMem mem
   altF (pure ()) fk ek
 
 failF :: Applicative m => Fail (VerseT m ()) m
+{-# INLINE failF #-}
 failF _env mem = pure $ do
   putMem mem
   empty
 
 emptyF :: Applicative m => Empty (VerseT m ()) m
+{-# INLINE emptyF #-}
 emptyF mem = pure $ do
   putMem mem
   empty
@@ -362,12 +405,14 @@ altF
   -> Fail (VerseT m ()) m
   -> Empty (VerseT m ()) m
   -> VerseT m ()
+{-# INLINABLE altF #-}
 altF m fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   unVerseT m r s env mem yk sk
   (\ env mem -> fk' env mem >>= \ m -> unVerseT m r s env mem yk sk fk $ fk env)
   (\ mem -> ek' mem >>= \ m -> unVerseT m r s env mem yk sk fk ek)
 
 stuck :: VerseT m a
+{-# INLINE stuck #-}
 stuck = VerseT $ \ r s _env mem yk ->
   unYield yk r.level (const $ pure ()) s mem
 
@@ -496,6 +541,7 @@ instance ZipVars_ a m => ZipVars_ (Bound m a) m where
     | otherwise = zipVars_ f x.binding y.binding
 
 freshVar :: MonadRef m => VerseT m (Var m a)
+{-# INLINE freshVar #-}
 freshVar = VerseT $ \ r s _env Mem {..} _yk sk fk ek ->
   let
     !mem = Mem { label = label + 1, .. }
@@ -507,9 +553,11 @@ freshVar = VerseT $ \ r s _env Mem {..} _yk sk fk ek ->
     sk s mem (Ref ref) fk ek
 
 newVar :: MonadRef m => a -> VerseT m (Var m a)
+{-# INLINE newVar #-}
 newVar = fmap Bound .  newBound
 
 newVar' :: a -> Label -> (Var m a, Label)
+{-# INLINE newVar' #-}
 newVar' binding label =
   let
     !label' = label + 1
@@ -517,16 +565,20 @@ newVar' binding label =
     (Bound MkBound {..}, label')
 
 newBound :: a -> VerseT m (Bound m a)
-newBound !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek -> do
+{-# INLINE newBound #-}
+newBound !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
   let
     !mem = Mem { label = label + 1, .. }
     !x = MkBound {..}
-  sk s mem x fk ek
+  in
+    sk s mem x fk ek
 
 readVar :: MonadRef m => Var m a -> VerseT m a
+{-# INLINE readVar #-}
 readVar = fmap (.binding) . readBound
 
 readBound :: MonadRef m => Var m a -> VerseT m (Bound m a)
+{-# INLINABLE readBound #-}
 readBound var = case var of
   Ref ref -> lift (readRef ref) >>= \ case
     Link var -> readBound var
@@ -534,6 +586,7 @@ readBound var = case var of
   Bound x -> pure x
 
 readRefBinding :: MonadRef m => Ref m (RefState m a) -> VerseT m a
+{-# INLINABLE readRefBinding #-}
 readRefBinding ref = lift (readRef ref) >>= fmap (.binding) . \ case
   Link var -> readBound var
   Unbound x -> readBound =<< readRefLink ref x
@@ -543,6 +596,7 @@ readRefLink
   => Ref m (RefState m a)
   -> Unbound m a
   -> VerseT m (Var m a)
+{-# INLINE readRefLink #-}
 readRefLink ref x = yield x.level $ \ f ->
   let
     !label = x.label
@@ -552,6 +606,7 @@ readRefLink ref x = yield x.level $ \ f ->
     writeRefState ref $ Unbound MkUnbound {..}
 
 unifyVar :: (MonadRef m, ZipVars_ a m) => Var m a -> Var m a -> VerseT m ()
+{-# INLINABLE unifyVar #-}
 unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
   ((var1, UnboundR ref1 x1), (var2, UnboundR ref2 x2)) ->
     when (x1.label /= x2.label) $ do
@@ -600,11 +655,13 @@ writeRefState
   => Ref m (RefState m a)
   -> RefState m a
   -> VerseT m ()
+{-# INLINABLE writeRefState #-}
 writeRefState ref x = do
   y <- lift $ readRef ref
   liftPut (writeRef ref x) (writeRef ref y)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
+{-# INLINABLE readRoot #-}
 readRoot var = case var of
   Ref ref -> lift (readRef ref) >>= \ case
     Link var -> readRoot var
@@ -623,12 +680,15 @@ data In = In
 data Out a = Err | Out !a {-# UNPACK #-} !Label
 
 instance Functor m => Functor (FindT m) where
+  {-# INLINE fmap #-}
   fmap f x = FindT $ \ s -> unFindT x s <&> \ case
     Err -> Err
     Out x label -> Out (f x) label
 
 instance Monad m => Applicative (FindT m) where
+  {-# INLINE pure #-}
   pure x = FindT $ \ In {..} -> pure $! Out x label
+  {-# INLINABLE (<*>) #-}
   f <*> x = FindT $ \ s@In {..} -> unFindT f s >>= \ case
     Err -> pure Err
     Out f label -> unFindT x In {..} <&> \ case
@@ -636,28 +696,36 @@ instance Monad m => Applicative (FindT m) where
       Out x label -> Out (f x) label
 
 instance Monad m => Monad (FindT m) where
+  {-# INLINE (>>=) #-}
   x >>= f = FindT $ \ s@In {..} -> unFindT x s >>= \ case
     Err -> pure Err
     Out x label -> unFindT (f x) In {..}
 
 instance MonadTrans FindT where
+  {-# INLINE lift #-}
   lift m = FindT $ \ In {..} -> m <&> \ x -> Out x label
 
 instance MonadRef m => MonadRef (FindT m) where
   type Ref (FindT m) = Ref m
+  {-# INLINE newRef #-}
   newRef = lift . newRef
+  {-# INLINE readRef #-}
   readRef = lift . readRef
+  {-# INLINE writeRef #-}
   writeRef = (lift .) . writeRef
 
 runFindT :: Functor m => FindT m a -> Level -> Label -> m (Maybe (a, Label))
+{-# INLINE runFindT #-}
 runFindT m level label = unFindT m In {..} <&> \ case
   Err -> Nothing
   Out x label -> Just (x, label)
 
 findVars :: (MonadRef m, Vars a m) => a -> FindT m a
+{-# INLINE findVars #-}
 findVars = vars findVar
 
 findVar :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
+{-# INLINABLE findVar #-}
 findVar var = case var of
   Ref ref -> readRef ref >>= \ case
     Link var -> findVar var
@@ -666,6 +734,7 @@ findVar var = case var of
   Bound x -> fmap Bound . newBound' =<< findVars x.binding
 
 newBound' :: Applicative m => a -> FindT m (Bound m a)
+{-# INLINE newBound' #-}
 newBound' !binding = FindT $ \ In {..} ->
   pure $! Out MkBound {..} (label + 1)
 
@@ -677,10 +746,13 @@ bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
 data VarsRef m a = VarsRef {-# UNPACK #-} !Label !(Ref m a)
 
 instance Eq (VarsRef m a) where
+  {-# INLINE (==) #-}
   VarsRef x _ == VarsRef y _ = x == y
+  {-# INLINE (/=) #-}
   VarsRef x _ /= VarsRef y _ = x /= y
 
 newVarsRef :: MonadRef m => a -> VerseT m (VarsRef m a)
+{-# INLINE newVarsRef #-}
 newVarsRef x = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
   let
     !mem = Mem { label = label + 1, .. }
@@ -689,9 +761,11 @@ newVarsRef x = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
     sk s mem (VarsRef label ref) fk ek
 
 readVarsRef :: MonadRef m => VarsRef m a -> VerseT m a
+{-# INLINE readVarsRef #-}
 readVarsRef (VarsRef _ ref) = lift $ readRef ref
 
 writeVarsRef :: MonadRef m => VarsRef m a -> a -> VerseT m ()
+{-# INLINABLE writeVarsRef #-}
 writeVarsRef (VarsRef _ ref) x = do
   y <- lift $ readRef ref
   liftPut' (writeRef ref x) (writeRef ref y)

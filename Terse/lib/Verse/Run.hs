@@ -46,6 +46,7 @@ import Prelude (Num (..), ($!))
 app
   :: MonadRef m
   => Val.Var m -> S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE app #-}
 app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
   Val.Int _ -> stuck
   Val.Char _ -> stuck
@@ -62,6 +63,7 @@ app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
 alloc
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE alloc #-}
 alloc s1 s2 x = do
   unifyChoiceFree s1 s2
   readStoreFree s1
@@ -73,6 +75,7 @@ alloc s1 s2 x = do
 read
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE read #-}
 read s1 s2 x = Val.readVar x >>= \ case
   Val.Ptr x -> do
     unifyChoiceFree s1 s2
@@ -86,6 +89,7 @@ read s1 s2 x = Val.readVar x >>= \ case
 write
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE write #-}
 write s1 s2 x = do
   (x1, x2) <- one $ Val.readPair x <|> stuck
   Val.readVar x1 >>= \ case
@@ -101,6 +105,7 @@ write s1 s2 x = do
 getLine
   :: (MonadRef m, MonadIO m)
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE getLine #-}
 getLine s1 s2 x = do
   one $ (Val.unifyVar x =<< Val.newTup []) <|> stuck
   unifyChoiceFree s1 s2
@@ -113,6 +118,7 @@ getLine s1 s2 x = do
 readInt
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE readInt #-}
 readInt s1 s2 x = do
   x <- one $ Val.readString x <|> stuck
   unifyS s1 s2
@@ -121,6 +127,7 @@ readInt s1 s2 x = do
 print
   :: (MonadRef m, MonadIO m)
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE print #-}
 print s1 s2 x = do
   unifyChoiceFree s1 s2
   readStoreFree s1
@@ -132,6 +139,7 @@ print s1 s2 x = do
 plus
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE plus #-}
 plus s1 s2 x = do
   (x1, x2) <- one $ Val.readPair x <|> stuck
   plus' s1 s2 x1 x2
@@ -139,6 +147,7 @@ plus s1 s2 x = do
 plus'
   :: MonadRef m
   => S m -> S m -> Val.Var m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE plus' #-}
 plus' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   unifyS s1 s2
@@ -147,6 +156,7 @@ plus' s1 s2 var1 var2 = do
 minus
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE minus #-}
 minus s1 s2 x = do
   (x1, x2) <- one $ Val.readPair x <|> stuck
   minus' s1 s2 x1 x2
@@ -154,6 +164,7 @@ minus s1 s2 x = do
 minus'
   :: MonadRef m
   => S m -> S m -> Val.Var m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE minus' #-}
 minus' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   unifyS s1 s2
@@ -162,6 +173,7 @@ minus' s1 s2 var1 var2 = do
 less
   :: MonadRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE less #-}
 less s1 s2 x = do
   (x1, x2) <- one $ Val.readPair x <|> stuck
   less' s1 s2 x1 x2
@@ -169,6 +181,7 @@ less s1 s2 x = do
 less'
   :: MonadRef m
   => S m -> S m -> Val.Var m -> Val.Var m -> VerseT m (Val.Var m)
+{-# INLINABLE less' #-}
 less' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   unifyS s1 s2
@@ -177,4 +190,5 @@ less' s1 s2 var1 var2 = do
 
 infixr 3 ***
 (***) :: Monad m => (a -> m c) -> (b -> m d) -> (a, b) -> m (c, d)
+{-# INLINE (***) #-}
 (f *** g) (x, y) = (,) <$> f x <*> g y
