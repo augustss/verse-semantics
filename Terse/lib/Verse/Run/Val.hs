@@ -126,7 +126,7 @@ newTup = newVar . Tup
 
 newPair :: MonadRef m => Var m -> Var m -> VerseT m (Var m)
 {-# INLINE newPair #-}
-newPair x y = newVar $ Tup [x, y]
+newPair x y = newTup [x, y]
 
 readPair :: MonadRef m => Var m -> VerseT m (Var m, Var m)
 {-# INLINE readPair #-}

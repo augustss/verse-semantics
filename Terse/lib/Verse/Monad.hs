@@ -531,7 +531,7 @@ data Unbound m a = MkUnbound
   }
 
 data Bound m a = MkBound
-  { label :: !Label
+  { label :: {-# UNPACK #-} !Label
   , binding :: !a
   }
 
@@ -574,22 +574,16 @@ newBound !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
     sk s mem x fk ek
 
 readVar :: MonadRef m => Var m a -> VerseT m a
-{-# INLINE readVar #-}
-readVar = fmap (.binding) . readBound
-
-readBound :: MonadRef m => Var m a -> VerseT m (Bound m a)
-{-# INLINABLE readBound #-}
-readBound var = case var of
-  Ref ref -> lift (readRef ref) >>= \ case
-    Link var -> readBound var
-    Unbound x -> readBound =<< readRefLink ref x
-  Bound x -> pure x
+{-# INLINABLE readVar #-}
+readVar = \ case
+  Ref ref -> readRefBinding ref
+  Bound x -> pure x.binding
 
 readRefBinding :: MonadRef m => Ref m (RefState m a) -> VerseT m a
 {-# INLINABLE readRefBinding #-}
-readRefBinding ref = lift (readRef ref) >>= fmap (.binding) . \ case
-  Link var -> readBound var
-  Unbound x -> readBound =<< readRefLink ref x
+readRefBinding ref = lift (readRef ref) >>= \ case
+  Link var -> readVar var
+  Unbound x -> readVar =<< readRefLink ref x
 
 readRefLink
   :: MonadRef m
@@ -599,11 +593,9 @@ readRefLink
 {-# INLINE readRefLink #-}
 readRefLink ref x = yield x.level $ \ f ->
   let
-    !label = x.label
-    !level = x.level
     !susp = x.susp <> Ap . f . pure
   in
-    writeRefState ref $ Unbound MkUnbound {..}
+    writeRefState ref $ Unbound x { susp }
 
 unifyVar :: (MonadRef m, ZipVars_ a m) => Var m a -> Var m a -> VerseT m ()
 {-# INLINABLE unifyVar #-}

@@ -61,6 +61,7 @@ executable tersec
   build-depends:
     base,
     filepath,
+    prettyprinter,
     template-haskell,
     terse,
     text
