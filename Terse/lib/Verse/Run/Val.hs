@@ -116,7 +116,7 @@ newChar = newVar . Char
 
 readChar :: MonadRef m => Var m -> VerseT m Char
 {-# INLINE readChar #-}
-readChar= readVar >=> \ case
+readChar = readVar >=> \ case
   Char x -> pure x
   _ -> empty
 

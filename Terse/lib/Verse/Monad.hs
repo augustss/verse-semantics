@@ -264,7 +264,7 @@ all' = split >=> loop
       Step x m -> (x:) <$> (m >>= loop)
 
 one :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m a
-{-# INLINABLE one #-}
+{-# INLINE one #-}
 one = split >=> \ case
   Done -> empty
   Step x _m -> pure x
@@ -272,7 +272,7 @@ one = split >=> \ case
 if'
   :: (MonadRef m, Vars a m)
   => VerseT m a -> (a -> VerseT m b) -> VerseT m b -> VerseT m b
-{-# INLINABLE if' #-}
+{-# INLINE if' #-}
 if' m f n = split m >>= \ case
   Done -> n
   Step x _m -> f x
