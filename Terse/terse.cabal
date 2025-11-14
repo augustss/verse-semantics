@@ -52,7 +52,8 @@ library
     template-haskell,
     text,
     transformers,
-    unordered-containers
+    unordered-containers,
+    vector
   default-language: GHC2021
 
 executable tersec

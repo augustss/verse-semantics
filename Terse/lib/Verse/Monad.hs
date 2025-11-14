@@ -35,7 +35,9 @@ import Control.Monad.Reader.Class
 import Control.Monad.IO.Class
 import Control.Monad.State.Class
 import Control.Monad.Trans.Class
+import Control.Monad.Zip
 
+import Data.Foldable
 import Data.Function
 import Data.Functor
 import Data.Functor.Compose
@@ -43,6 +45,7 @@ import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Kind
 import Data.Monoid (Ap (..), Sum (..))
 import Data.Tuple
+import Data.Vector (Vector)
 
 import Fix
 import Ref
@@ -244,8 +247,8 @@ runVerseT m = do
       | otherwise = pure Nothing
   unVerseT m r s env (splitMem label) yk sk fk ek
   where
-    env = Bound 0 ()
-    label = 1
+    env = Bound ()
+    label = 0
     r = R { level = 1 }
     s = S { count = 0 }
     yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
@@ -418,8 +421,8 @@ stuck = VerseT $ \ r s _env mem yk ->
   unYield yk r.level (const $ pure ()) s mem
 
 data Var m a
-  = Ref !(Ref m (RefState m a))
-  | Bound {-# UNPACK #-} !Label !a
+  = Ref {-# UNPACK #-} !(Ref m (RefState m a))
+  | Bound !a
 
 class Vars a m where
   vars
@@ -463,9 +466,10 @@ instance Vars a m => Vars (Maybe a) m where
     Just x -> Just <$> vars f x
 
 instance Vars a m => Vars [a] m where
-  vars f = \ case
-    [] -> pure []
-    x:xs -> (:) <$> vars f x <*> vars f xs
+  vars f = traverse (vars f)
+
+instance Vars a m => Vars (Vector a) m where
+  vars f = traverse (vars f)
 
 instance Vars (f (g a)) m => Vars (Compose f g a) m where
   vars f = fmap Compose . vars f . getCompose
@@ -511,6 +515,11 @@ instance ZipVars_ a m => ZipVars_ [a] m where
     (x:xs, y:ys) -> zipVars_ f x y *> zipVars_ f xs ys
     _ -> empty
 
+instance ZipVars_ a m => ZipVars_ (Vector a) m where
+  zipVars_ f x y
+    | length x /= length y = empty
+    | otherwise = traverse_ (uncurry $ zipVars_ f) $ mzip x y
+
 instance ZipVars_ (f (g a)) m => ZipVars_ (Compose f g a) m where
   zipVars_ f = zipVars_ f `on` getCompose
 
@@ -523,7 +532,7 @@ data RefState m a
 
 data Root m a
   = UnboundR !(Ref m (RefState m a)) !(Unbound m a)
-  | BoundR {-# UNPACK #-} !Label !a
+  | BoundR !a
 
 data Unbound m a = MkUnbound
   { label :: {-# UNPACK #-} !Label
@@ -545,18 +554,13 @@ freshVar = VerseT $ \ r s _env Mem {..} _yk sk fk ek ->
 
 newVar :: MonadRef m => a -> VerseT m (Var m a)
 {-# INLINE newVar #-}
-newVar !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
-  let
-    !mem = Mem { label = label + 1, .. }
-    !x = Bound label binding
-  in
-    sk s mem x fk ek
+newVar = pure . Bound
 
 readVar :: MonadRef m => Var m a -> VerseT m a
 {-# INLINABLE readVar #-}
 readVar = \ case
   Ref ref -> readRefBinding ref
-  Bound _ binding -> pure binding
+  Bound binding -> pure binding
 
 readRefBinding :: MonadRef m => Ref m (RefState m a) -> VerseT m a
 {-# INLINABLE readRefBinding #-}
@@ -602,7 +606,7 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
       else do
         writeRefState ref1 $ Link var2
         getAp $ x1.susp var2
-  ((_var1, UnboundR ref1 x1), (var2, BoundR _label2 binding2)) -> do
+  ((_var1, UnboundR ref1 x1), (var2, BoundR binding2)) -> do
     level <- getLevel
     if x1.level < level then do
       binding1 <- readRefBinding ref1
@@ -610,7 +614,7 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
     else do
       writeRefState ref1 $ Link var2
       getAp $ x1.susp var2
-  ((var1, BoundR _label1 binding1), (_var2, UnboundR ref2 x2)) -> do
+  ((var1, BoundR binding1), (_var2, UnboundR ref2 x2)) -> do
     level <- getLevel
     if x2.level < level then do
       binding2 <- readRefBinding ref2
@@ -618,8 +622,8 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
     else do
       writeRefState ref2 $ Link var1
       getAp $ x2.susp var1
-  ((_var1, BoundR label1 binding1), (_var2, BoundR label2 binding2)) ->
-    when (label1 /= label2) $ zipVars_ unifyVar binding1 binding2
+  ((_var1, BoundR binding1), (_var2, BoundR binding2)) ->
+    zipVars_ unifyVar binding1 binding2
 
 writeRefState
   :: MonadRef m
@@ -637,7 +641,7 @@ readRoot var = case var of
   Ref ref -> lift (readRef ref) >>= \ case
     Link var -> readRoot var
     Unbound x -> pure (var, UnboundR ref x)
-  Bound label binding -> pure (var, BoundR label binding)
+  Bound binding -> pure (var, BoundR binding)
 
 newtype FindT m a = FindT
   { unFindT :: In -> m (Out a)
@@ -676,8 +680,9 @@ instance MonadTrans FindT where
   {-# INLINE lift #-}
   lift m = FindT $ \ In {..} -> m <&> \ x -> Out x label
 
+type instance World (FindT m) = World m
+
 instance MonadRef m => MonadRef (FindT m) where
-  type Ref (FindT m) = Ref m
   {-# INLINE newRef #-}
   newRef = lift . newRef
   {-# INLINE readRef #-}
@@ -702,12 +707,7 @@ findVar var = case var of
     Link var -> findVar var
     Unbound x -> FindT $ \ In {..} ->
       pure $! if level >= x.level then Out var label else Err
-  Bound _ binding -> newVar' =<< findVars binding
-
-newVar' :: Applicative m => a -> FindT m (Var m a)
-{-# INLINE newVar' #-}
-newVar' !binding = FindT $ \ In {..} ->
-  pure $! Out (Bound label binding) (label + 1)
+  Bound binding -> Bound <$> findVars binding
 
 bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
 bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
