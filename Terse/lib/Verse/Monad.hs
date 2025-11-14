@@ -241,7 +241,7 @@ runVerseT m = do
   let
     sk s mem x fk _ek
       | s.count == 0 =
-        runFindT (findVars x) 0 mem.label >>= \ case
+        runFindT (findVars' x) 0 mem.label >>= \ case
           Nothing -> pure Nothing
           Just (x, label) -> fmap (x:) <$> fk env (splitMem label)
       | otherwise = pure Nothing
@@ -323,7 +323,7 @@ succeedS s mem x fk _ek = pure $ do
   tell' mem.backward'
   if s.count == 0 then do
     level <- getLevel
-    lift (runFindT (findVars x) level mem.label) >>= \ case
+    lift (runFindT (findVars' x) level mem.label) >>= \ case
       Nothing -> do
         putLabel mem.label
         stuck
@@ -641,6 +641,50 @@ readRoot var = case var of
     Unbound x -> pure (var, UnboundR ref x)
   Bound binding -> pure (var, BoundR binding)
 
+data VarsRef m a = VarsRef {-# UNPACK #-} !Label !(Ref m a)
+
+instance Eq (VarsRef m a) where
+  {-# INLINE (==) #-}
+  VarsRef x _ == VarsRef y _ = x == y
+  {-# INLINE (/=) #-}
+  VarsRef x _ /= VarsRef y _ = x /= y
+
+newVarsRef :: MonadRef m => a -> VerseT m (VarsRef m a)
+{-# INLINE newVarsRef #-}
+newVarsRef x = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
+  let
+    !mem = Mem { label = label + 1, .. }
+  in
+    newRef x >>= \ ref ->
+    sk s mem (VarsRef label ref) fk ek
+
+readVarsRef :: MonadRef m => VarsRef m a -> VerseT m a
+{-# INLINE readVarsRef #-}
+readVarsRef (VarsRef _ ref) = lift $ readRef ref
+
+writeVarsRef :: (MonadRef m, Vars a m) => VarsRef m a -> a -> VerseT m ()
+{-# INLINABLE writeVarsRef #-}
+writeVarsRef (VarsRef _ ref) x = do
+  y <- lift $ readRef ref
+  x <- findVars x
+  liftPut' (writeRef ref x) (writeRef ref y)
+
+findVars :: (MonadRef m, Vars a m) => a -> VerseT m a
+{-# INLINE findVars #-}
+findVars = vars findVar
+
+findVar :: (MonadRef m, Vars a m) => Var m a -> VerseT m (Var m a)
+{-# INLINABLE findVar #-}
+findVar = \ case
+  var@(Ref ref) -> lift (readRef ref) >>= \ case
+    Link var -> findVar var
+    Unbound x -> do
+      level <- getLevel
+      if level > x.level
+        then pure var
+        else findVar =<< readRefLink ref x
+  Bound binding -> Bound <$> findVars binding
+
 newtype FindT m a = FindT
   { unFindT :: In -> m (Out a)
   }
@@ -694,47 +738,20 @@ runFindT m level label = unFindT m In {..} <&> \ case
   Err -> Nothing
   Out x label -> Just (x, label)
 
-findVars :: (MonadRef m, Vars a m) => a -> FindT m a
-{-# INLINE findVars #-}
-findVars = vars findVar
+findVars' :: (MonadRef m, Vars a m) => a -> FindT m a
+{-# INLINE findVars' #-}
+findVars' = vars findVar'
 
-findVar :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
-{-# INLINABLE findVar #-}
-findVar var = case var of
-  Ref ref -> readRef ref >>= \ case
-    Link var -> findVar var
+findVar' :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
+{-# INLINABLE findVar' #-}
+findVar' = \ case
+  var@(Ref ref) -> readRef ref >>= \ case
+    Link var -> findVar' var
     Unbound x -> FindT $ \ In {..} ->
       pure $! if level >= x.level then Out var label else Err
-  Bound binding -> Bound <$> findVars binding
+  Bound binding -> Bound <$> findVars' binding
 
 bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
 bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
   Err -> y $> Err
   Out z label -> y $> Out z label
-
-data VarsRef m a = VarsRef {-# UNPACK #-} !Label !(Ref m a)
-
-instance Eq (VarsRef m a) where
-  {-# INLINE (==) #-}
-  VarsRef x _ == VarsRef y _ = x == y
-  {-# INLINE (/=) #-}
-  VarsRef x _ /= VarsRef y _ = x /= y
-
-newVarsRef :: MonadRef m => a -> VerseT m (VarsRef m a)
-{-# INLINE newVarsRef #-}
-newVarsRef x = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
-  let
-    !mem = Mem { label = label + 1, .. }
-  in
-    newRef x >>= \ ref ->
-    sk s mem (VarsRef label ref) fk ek
-
-readVarsRef :: MonadRef m => VarsRef m a -> VerseT m a
-{-# INLINE readVarsRef #-}
-readVarsRef (VarsRef _ ref) = lift $ readRef ref
-
-writeVarsRef :: MonadRef m => VarsRef m a -> a -> VerseT m ()
-{-# INLINABLE writeVarsRef #-}
-writeVarsRef (VarsRef _ ref) x = do
-  y <- lift $ readRef ref
-  liftPut' (writeRef ref x) (writeRef ref y)
