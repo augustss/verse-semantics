@@ -244,7 +244,8 @@ runVerseT m = do
       | otherwise = pure Nothing
   unVerseT m r s env (splitMem label) yk sk fk ek
   where
-    (env, label) = newVar' () 0
+    env = Bound 0 ()
+    label = 1
     r = R { level = 1 }
     s = S { count = 0 }
     yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
@@ -418,7 +419,7 @@ stuck = VerseT $ \ r s _env mem yk ->
 
 data Var m a
   = Ref !(Ref m (RefState m a))
-  | Bound !(Bound m a)
+  | Bound {-# UNPACK #-} !Label !a
 
 class Vars a m where
   vars
@@ -522,23 +523,13 @@ data RefState m a
 
 data Root m a
   = UnboundR !(Ref m (RefState m a)) !(Unbound m a)
-  | BoundR !(Bound m a)
+  | BoundR {-# UNPACK #-} !Label !a
 
 data Unbound m a = MkUnbound
   { label :: {-# UNPACK #-} !Label
   , level :: {-# UNPACK #-} !Level
   , susp :: !(Var m a -> Ap (VerseT m) ())
   }
-
-data Bound m a = MkBound
-  { label :: {-# UNPACK #-} !Label
-  , binding :: !a
-  }
-
-instance ZipVars_ a m => ZipVars_ (Bound m a) m where
-  zipVars_ f x y
-    | x.label == y.label = pure ()
-    | otherwise = zipVars_ f x.binding y.binding
 
 freshVar :: MonadRef m => VerseT m (Var m a)
 {-# INLINE freshVar #-}
@@ -554,22 +545,10 @@ freshVar = VerseT $ \ r s _env Mem {..} _yk sk fk ek ->
 
 newVar :: MonadRef m => a -> VerseT m (Var m a)
 {-# INLINE newVar #-}
-newVar = fmap Bound .  newBound
-
-newVar' :: a -> Label -> (Var m a, Label)
-{-# INLINE newVar' #-}
-newVar' binding label =
-  let
-    !label' = label + 1
-  in
-    (Bound MkBound {..}, label')
-
-newBound :: a -> VerseT m (Bound m a)
-{-# INLINE newBound #-}
-newBound !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
+newVar !binding = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
   let
     !mem = Mem { label = label + 1, .. }
-    !x = MkBound {..}
+    !x = Bound label binding
   in
     sk s mem x fk ek
 
@@ -577,7 +556,7 @@ readVar :: MonadRef m => Var m a -> VerseT m a
 {-# INLINABLE readVar #-}
 readVar = \ case
   Ref ref -> readRefBinding ref
-  Bound x -> pure x.binding
+  Bound _ binding -> pure binding
 
 readRefBinding :: MonadRef m => Ref m (RefState m a) -> VerseT m a
 {-# INLINABLE readRefBinding #-}
@@ -623,24 +602,24 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
       else do
         writeRefState ref1 $ Link var2
         getAp $ x1.susp var2
-  ((_var1, UnboundR ref1 x1), (var2, BoundR x2)) -> do
+  ((_var1, UnboundR ref1 x1), (var2, BoundR _label2 binding2)) -> do
     level <- getLevel
     if x1.level < level then do
       binding1 <- readRefBinding ref1
-      zipVars_ unifyVar binding1 x2.binding
+      zipVars_ unifyVar binding1 binding2
     else do
       writeRefState ref1 $ Link var2
       getAp $ x1.susp var2
-  ((var1, BoundR x1), (_var2, UnboundR ref2 x2)) -> do
+  ((var1, BoundR _label1 binding1), (_var2, UnboundR ref2 x2)) -> do
     level <- getLevel
     if x2.level < level then do
       binding2 <- readRefBinding ref2
-      zipVars_ unifyVar x1.binding binding2
+      zipVars_ unifyVar binding1 binding2
     else do
       writeRefState ref2 $ Link var1
       getAp $ x2.susp var1
-  ((_var1, BoundR x1), (_var2, BoundR x2)) ->
-    when (x1.label /= x2.label) $ zipVars_ unifyVar x1 x2
+  ((_var1, BoundR label1 binding1), (_var2, BoundR label2 binding2)) ->
+    when (label1 /= label2) $ zipVars_ unifyVar binding1 binding2
 
 writeRefState
   :: MonadRef m
@@ -658,7 +637,7 @@ readRoot var = case var of
   Ref ref -> lift (readRef ref) >>= \ case
     Link var -> readRoot var
     Unbound x -> pure (var, UnboundR ref x)
-  Bound x -> pure (var, BoundR x)
+  Bound label binding -> pure (var, BoundR label binding)
 
 newtype FindT m a = FindT
   { unFindT :: In -> m (Out a)
@@ -723,12 +702,12 @@ findVar var = case var of
     Link var -> findVar var
     Unbound x -> FindT $ \ In {..} ->
       pure $! if level >= x.level then Out var label else Err
-  Bound x -> fmap Bound . newBound' =<< findVars x.binding
+  Bound _ binding -> newVar' =<< findVars binding
 
-newBound' :: Applicative m => a -> FindT m (Bound m a)
-{-# INLINE newBound' #-}
-newBound' !binding = FindT $ \ In {..} ->
-  pure $! Out MkBound {..} (label + 1)
+newVar' :: Applicative m => a -> FindT m (Var m a)
+{-# INLINE newVar' #-}
+newVar' !binding = FindT $ \ In {..} ->
+  pure $! Out (Bound label binding) (label + 1)
 
 bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
 bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
