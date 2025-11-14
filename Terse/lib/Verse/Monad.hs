@@ -224,12 +224,12 @@ modifyS f = VerseT $ \ _r s _env mem _yk sk ->
 
 putMem :: Mem m -> VerseT m ()
 {-# INLINE putMem #-}
-putMem mem = VerseT $ \ _r s _env _mem _yk sk ->
+putMem !mem = VerseT $ \ _r s _env _mem _yk sk ->
   sk s mem ()
 
 putLabel :: Label -> VerseT m ()
 {-# INLINE putLabel #-}
-putLabel label = VerseT $ \ _r s _env Mem { label = _, .. } _yk sk ->
+putLabel !label = VerseT $ \ _r s _env Mem { label = _, .. } _yk sk ->
   sk s Mem {..} ()
 
 runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
@@ -356,7 +356,7 @@ splitMem label = Mem {..}
     backward = pure ()
     backward' = pure ()
 
-data Stream m a = Done | Step a (VerseT m (Stream m a))
+data Stream m a = Done | Step !a (VerseT m (Stream m a))
 
 fork :: Monad m => VerseT m () -> VerseT m ()
 {-# INLINE fork #-}
@@ -648,7 +648,7 @@ writeRefState
   -> RefState m a
   -> VerseT m ()
 {-# INLINABLE writeRefState #-}
-writeRefState ref x = do
+writeRefState ref !x = do
   y <- lift $ readRef ref
   liftPut (writeRef ref x) (writeRef ref y)
 

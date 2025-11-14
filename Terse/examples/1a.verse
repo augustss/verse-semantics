@@ -1,5 +1,5 @@
 exists false;
-false = all{fail};
+false = ();
 
 exists Compose;
 Compose = fun(Arg) {
