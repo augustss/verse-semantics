@@ -393,9 +393,7 @@ succeedF s mem () fk ek = pure $ do
 
 failF :: Applicative m => Fail (VerseT m ()) m
 {-# INLINE failF #-}
-failF _env mem = pure $ do
-  putMem mem
-  empty
+failF _env = emptyF
 
 emptyF :: Applicative m => Empty (VerseT m ()) m
 {-# INLINE emptyF #-}

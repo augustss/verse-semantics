@@ -45,7 +45,7 @@ eval :: LExp -> IO (Either [[Loc]] [Fix (Val Identity)])
 eval e = fmap done . flip runStateT Mem {..} . runVerseT $ do
   s1 <- newS'
   s2 <- freshS'
-  freeze' <=< runEvalT $ eval' s1 s2 e
+  freeze' <=< runEvalT $ eval' s1 s2 e <* readS s2
   where
     label = 0
     stacks = mempty
@@ -180,7 +180,7 @@ eval' s1 s2 = wrap $ \ case
       bracketStack $ unifyVar var <=< newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
-        localHeap (const heap) $ eval' s1 s2 e
+        localHeap (const heap) (eval' s1 s2 e) <* readS s2
       unifyS s1 s2
     pure var
   For e1 x e2 -> do
@@ -190,7 +190,7 @@ eval' s1 s2 = wrap $ \ case
         split $ do
           s1 <- newS
           s2 <- freshS
-          localHeap (const heap) $ eval' s1 s2 e1
+          localHeap (const heap) (eval' s1 s2 e1) <* readS s2
       loop s1 = \ case
         Done -> unifyS s1 s2 $> []
         Step var1 m -> do
@@ -208,7 +208,7 @@ eval' s1 s2 = wrap $ \ case
       bracketStack . unifyVar var <=< one $ do
         s1 <- newS
         s2 <- freshS
-        localHeap (const heap) $ eval' s1 s2 e
+        localHeap (const heap) (eval' s1 s2 e) <* readS s2
       unifyS s1 s2
     pure var
   If e1 x e2 e3 -> do
@@ -493,6 +493,9 @@ newS' = do
 
 unifyS :: MonadRef m => S m -> S m -> EvalT m ()
 unifyS s1 s2 = unifyChoiceFree s1 s2 *> unifyStoreFree s1 s2
+
+readS :: MonadRef m => S m -> EvalT m ()
+readS s = readChoiceFree s *> readStoreFree s
 
 readChoiceFree :: MonadRef m => S m -> EvalT m ()
 readChoiceFree = lift . Monad.readVar . (.choiceFree)
