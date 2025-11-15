@@ -77,7 +77,7 @@ freshVar :: MonadRef m => VerseT m (Var m)
 {-# INLINE freshVar #-}
 freshVar = Fix . Compose <$> Monad.freshVar
 
-newVar :: MonadRef m => Val (Monad.VarsRef m) m (Var m) -> VerseT m (Var m)
+newVar :: Val (Monad.VarsRef m) m (Var m) -> VerseT m (Var m)
 {-# INLINE newVar #-}
 newVar = fmap (Fix . Compose) . Monad.newVar
 
@@ -100,7 +100,7 @@ freeze = readVar >=> fmap Fix . \ case
   Tup x -> Tup <$> traverse freeze x
   _ -> stuck
 
-newInt :: MonadRef m => Integer -> VerseT m (Var m)
+newInt :: Integer -> VerseT m (Var m)
 {-# INLINE newInt #-}
 newInt = newVar . Int
 
@@ -110,7 +110,7 @@ readInt = readVar >=> \ case
   Int x -> pure x
   _ -> empty
 
-newChar :: MonadRef m => Char -> VerseT m (Var m)
+newChar :: Char -> VerseT m (Var m)
 {-# INLINE newChar #-}
 newChar = newVar . Char
 
@@ -120,11 +120,11 @@ readChar = readVar >=> \ case
   Char x -> pure x
   _ -> empty
 
-newTup :: MonadRef m => [Var m] -> VerseT m (Var m)
+newTup :: [Var m] -> VerseT m (Var m)
 {-# INLINE newTup #-}
 newTup = newVar . Tup
 
-newPair :: MonadRef m => Var m -> Var m -> VerseT m (Var m)
+newPair :: Var m -> Var m -> VerseT m (Var m)
 {-# INLINE newPair #-}
 newPair x y = newTup [x, y]
 
@@ -134,7 +134,7 @@ readPair = readVar >=> \ case
   Tup [x1, x2] -> pure (x1, x2)
   _ -> empty
 
-newString :: MonadRef m => String -> VerseT m (Var m)
+newString :: String -> VerseT m (Var m)
 {-# INLINABLE newString #-}
 newString = newTup <=< traverse newChar
 
@@ -145,7 +145,7 @@ readString = readVar >=> \ case
   _ -> empty
 
 newLam
-  :: (Vars a m, MonadRef m)
+  :: Vars a m
   => a -> (a -> S m -> S m -> Var m -> VerseT m (Var m)) -> VerseT m (Var m)
 {-# INLINE newLam #-}
 newLam x f = newVar $ Lam x f

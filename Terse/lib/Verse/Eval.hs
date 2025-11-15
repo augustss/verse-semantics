@@ -77,14 +77,14 @@ data S m = S
 runEvalT :: (MonadIO m, MonadRef m) => EvalT m a -> VerseT m a
 runEvalT m = runReaderT m =<< newR'
 
-newR' :: MonadRef m => VerseT m (R m)
+newR' :: VerseT m (R m)
 newR' = do
   env <- newEnv'
   pure R {..}
   where
     stack = mempty
 
-newEnv' :: MonadRef m => VerseT m (Env m)
+newEnv' :: VerseT m (Env m)
 newEnv' =
   fmap Env.fromList .
   traverse (traverse (newVar' . Val.Fun)) $
@@ -356,22 +356,22 @@ evalAppMap s1 s2 k xs = do
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))
 
-newString :: MonadRef m => String -> EvalT m (Var m)
+newString :: String -> EvalT m (Var m)
 newString = newTup <=< traverse newChar
 
-newChar :: MonadRef m => Char -> EvalT m (Var m)
+newChar :: Char -> EvalT m (Var m)
 newChar = newInt . ord
 
-newInt :: MonadRef m => Int -> EvalT m (Var m)
+newInt :: Int -> EvalT m (Var m)
 newInt = newInteger . toInteger
 
-newInteger :: MonadRef m => Integer -> EvalT m (Var m)
+newInteger :: Integer -> EvalT m (Var m)
 newInteger = newVar . Val.Int
 
-newPair :: MonadRef m => (Var m, Var m) -> EvalT m (Var m)
+newPair :: (Var m, Var m) -> EvalT m (Var m)
 newPair (x, y) = newTup [x, y]
 
-newTup :: MonadRef m => [Var m] -> EvalT m (Var m)
+newTup :: [Var m] -> EvalT m (Var m)
 newTup = newVar . Val.Tup
 
 readString :: MonadRef m => Var m -> EvalT m String
@@ -458,10 +458,10 @@ stuck = lift Monad.stuck
 freshVar :: MonadRef m => EvalT m (Var m)
 freshVar = lift $ Fix . Compose <$> Monad.freshVar
 
-newVar :: MonadRef m => Val (Monad.VarsRef m) (Var m) -> EvalT m (Var m)
+newVar :: Val (Monad.VarsRef m) (Var m) -> EvalT m (Var m)
 newVar = lift . newVar'
 
-newVar' :: MonadRef m => Val (Monad.VarsRef m) (Var m) -> VerseT m (Var m)
+newVar' :: Val (Monad.VarsRef m) (Var m) -> VerseT m (Var m)
 newVar' = fmap (Fix . Compose) . Monad.newVar
 
 readVar :: MonadRef m => Var m -> EvalT m (Val (Monad.VarsRef m) (Var m))
@@ -482,10 +482,10 @@ freshS' = do
   storeFree <- Monad.freshVar
   pure S {..}
 
-newS :: MonadRef m => EvalT m (S m)
+newS :: EvalT m (S m)
 newS = lift newS'
 
-newS' :: MonadRef m => VerseT m (S m)
+newS' :: VerseT m (S m)
 newS' = do
   choiceFree <- Monad.newVar ()
   storeFree <- Monad.newVar ()

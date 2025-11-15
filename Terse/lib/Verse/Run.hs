@@ -103,7 +103,7 @@ write s1 s2 x = do
     _ -> stuck
 
 getLine
-  :: (MonadRef m, MonadIO m)
+  :: (MonadIO m, MonadRef m)
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE getLine #-}
 getLine s1 s2 x = do
@@ -125,7 +125,7 @@ readInt s1 s2 x = do
   Val.newTup <=< traverse (uncurry Val.newPair <=< Val.newInt *** Val.newString) $ reads x
 
 print
-  :: (MonadRef m, MonadIO m)
+  :: (MonadIO m, MonadRef m)
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE print #-}
 print s1 s2 x = do

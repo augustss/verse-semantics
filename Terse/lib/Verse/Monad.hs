@@ -70,9 +70,11 @@ type Level = Sum Int
 newtype S = S { count :: Int }
 
 succS :: S -> S
+{-# INLINE succS #-}
 succS !s = s { count = s.count + 1 }
 
 predS :: S -> S
+{-# INLINE predS #-}
 predS !s = s { count = s.count - 1 }
 
 type Env m = Var m ()
@@ -85,12 +87,14 @@ data Mem m = Mem
   }
 
 appendMem :: Applicative m => Mem m -> m () -> m () -> Mem m
+{-# INLINE appendMem #-}
 appendMem mem forward backward = mem
   { forward = mem.forward *> forward
   , backward = backward *> mem.backward
   }
 
 appendMem' :: Applicative m => Mem m -> m () -> Mem m
+{-# INLINE appendMem' #-}
 appendMem' mem backward' = mem
   { backward' = backward' *> mem.backward'
   }
@@ -550,7 +554,7 @@ freshVar = VerseT $ \ r s _env Mem {..} _yk sk fk ek ->
     newRef x >>= \ ref ->
     sk s mem (Ref ref) fk ek
 
-newVar :: MonadRef m => a -> VerseT m (Var m a)
+newVar :: a -> VerseT m (Var m a)
 {-# INLINE newVar #-}
 newVar = pure . Bound
 

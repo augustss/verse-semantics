@@ -37,7 +37,7 @@ freshS = do
   storeFree <- freshVar
   pure S {..}
 
-newS :: MonadRef m => VerseT m (S m)
+newS :: VerseT m (S m)
 {-# INLINE newS #-}
 newS = do
   choiceFree <- newVar ()
