@@ -44,7 +44,7 @@ import Verse.Run.Val qualified as Val
 import Prelude (Num (..), ($!))
 
 app
-  :: MonadRef m
+  :: MonadWeakRef m
   => Val.Var m -> S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE app #-}
 app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
@@ -61,7 +61,7 @@ app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
     pure var
 
 alloc
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE alloc #-}
 alloc s1 s2 x = do
@@ -73,7 +73,7 @@ alloc s1 s2 x = do
   pure var
 
 read
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE read #-}
 read s1 s2 x = Val.readVar x >>= \ case
@@ -87,7 +87,7 @@ read s1 s2 x = Val.readVar x >>= \ case
   _ -> stuck
 
 write
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE write #-}
 write s1 s2 x = do
@@ -103,7 +103,7 @@ write s1 s2 x = do
     _ -> stuck
 
 getLine
-  :: (MonadIO m, MonadRef m)
+  :: (MonadIO m, MonadWeakRef m)
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE getLine #-}
 getLine s1 s2 x = do
@@ -116,7 +116,7 @@ getLine s1 s2 x = do
   pure var
 
 readInt
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE readInt #-}
 readInt s1 s2 x = do
@@ -125,7 +125,7 @@ readInt s1 s2 x = do
   Val.newTup <=< traverse (uncurry Val.newPair <=< Val.newInt *** Val.newString) $ reads x
 
 print
-  :: (MonadIO m, MonadRef m)
+  :: (MonadIO m, MonadWeakRef m)
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE print #-}
 print s1 s2 x = do
@@ -137,7 +137,7 @@ print s1 s2 x = do
   Val.newTup []
 
 plus
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE plus #-}
 plus s1 s2 x = do
@@ -145,7 +145,7 @@ plus s1 s2 x = do
   plus' s1 s2 x1 x2
 
 plus'
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE plus' #-}
 plus' s1 s2 var1 var2 = do
@@ -154,7 +154,7 @@ plus' s1 s2 var1 var2 = do
   Val.newInt $! x1 + x2
 
 minus
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE minus #-}
 minus s1 s2 x = do
@@ -162,7 +162,7 @@ minus s1 s2 x = do
   minus' s1 s2 x1 x2
 
 minus'
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE minus' #-}
 minus' s1 s2 var1 var2 = do
@@ -171,7 +171,7 @@ minus' s1 s2 var1 var2 = do
   Val.newInt $! x1 - x2
 
 less
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE less #-}
 less s1 s2 x = do
@@ -179,7 +179,7 @@ less s1 s2 x = do
   less' s1 s2 x1 x2
 
 less'
-  :: MonadRef m
+  :: MonadWeakRef m
   => S m -> S m -> Val.Var m -> Val.Var m -> VerseT m (Val.Var m)
 {-# INLINABLE less' #-}
 less' s1 s2 var1 var2 = do

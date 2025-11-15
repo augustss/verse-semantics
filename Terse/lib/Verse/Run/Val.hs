@@ -81,16 +81,16 @@ newVar :: Val (Monad.VarsRef m) m (Var m) -> VerseT m (Var m)
 {-# INLINE newVar #-}
 newVar = fmap (Fix . Compose) . Monad.newVar
 
-readVar :: MonadRef m => Var m -> VerseT m (Val (Monad.VarsRef m) m (Var m))
+readVar :: MonadWeakRef m => Var m -> VerseT m (Val (Monad.VarsRef m) m (Var m))
 {-# INLINE readVar #-}
 readVar = Monad.readVar . getCompose . getFix
 
-unifyVar :: MonadRef m => Var m -> Var m -> VerseT m ()
+unifyVar :: MonadWeakRef m => Var m -> Var m -> VerseT m ()
 {-# INLINE unifyVar #-}
 unifyVar = Monad.unifyVar `on` getCompose . getFix
 
 freeze
-  :: MonadRef m
+  :: MonadWeakRef m
   => Var m -> VerseT m (Fix (Val Identity m))
 {-# INLINABLE freeze #-}
 freeze = readVar >=> fmap Fix . \ case
@@ -104,7 +104,7 @@ newInt :: Integer -> VerseT m (Var m)
 {-# INLINE newInt #-}
 newInt = newVar . Int
 
-readInt :: MonadRef m => Var m -> VerseT m Integer
+readInt :: MonadWeakRef m => Var m -> VerseT m Integer
 {-# INLINE readInt #-}
 readInt = readVar >=> \ case
   Int x -> pure x
@@ -114,7 +114,7 @@ newChar :: Char -> VerseT m (Var m)
 {-# INLINE newChar #-}
 newChar = newVar . Char
 
-readChar :: MonadRef m => Var m -> VerseT m Char
+readChar :: MonadWeakRef m => Var m -> VerseT m Char
 {-# INLINE readChar #-}
 readChar = readVar >=> \ case
   Char x -> pure x
@@ -128,7 +128,7 @@ newPair :: Var m -> Var m -> VerseT m (Var m)
 {-# INLINE newPair #-}
 newPair x y = newTup [x, y]
 
-readPair :: MonadRef m => Var m -> VerseT m (Var m, Var m)
+readPair :: MonadWeakRef m => Var m -> VerseT m (Var m, Var m)
 {-# INLINE readPair #-}
 readPair = readVar >=> \ case
   Tup [x1, x2] -> pure (x1, x2)
@@ -138,7 +138,7 @@ newString :: String -> VerseT m (Var m)
 {-# INLINABLE newString #-}
 newString = newTup <=< traverse newChar
 
-readString :: MonadRef m => Var m -> VerseT m String
+readString :: MonadWeakRef m => Var m -> VerseT m String
 {-# INLINABLE readString #-}
 readString = readVar >=> \ case
   Tup xs -> traverse readChar xs

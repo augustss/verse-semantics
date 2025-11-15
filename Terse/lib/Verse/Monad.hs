@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -43,6 +44,7 @@ import Data.Functor
 import Data.Functor.Compose
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Kind
+import Data.Maybe (fromMaybe)
 import Data.Monoid (Ap (..), Sum (..))
 import Data.Tuple
 import Data.Vector (Vector)
@@ -98,6 +100,10 @@ appendMem' :: Applicative m => Mem m -> m () -> Mem m
 appendMem' mem backward' = mem
   { backward' = backward' *> mem.backward'
   }
+
+newWeakTrail :: MonadWeakRef m => Ref m a -> m () -> m (m ())
+{-# INLINABLE newWeakTrail #-}
+newWeakTrail ref = fmap (fromMaybe (pure ()) <=< readWeakRef) . newWeakRef ref
 
 type Label = Int
 
@@ -188,18 +194,12 @@ liftPut forward backward = do
   lift forward
   tell forward backward
 
-tell :: Applicative m => m () -> m () -> VerseT m ()
+tell :: Monad m => m () -> m () -> VerseT m ()
 {-# INLINABLE tell #-}
 tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
   sk s (appendMem mem forward backward) ()
   (\ env mem -> backward *> fk env (appendMem mem backward forward))
   (\ mem -> backward *> ek (appendMem mem backward forward))
-
-liftPut' :: Monad m => m () -> m () -> VerseT m ()
-{-# INLINE liftPut' #-}
-liftPut' forward backward' = do
-  lift forward
-  tell' backward'
 
 tell' :: Applicative m => m () -> VerseT m ()
 {-# INLINABLE tell' #-}
@@ -338,11 +338,11 @@ succeedS s mem x fk _ek = pure $ do
     putLabel mem.label
     stuck
 
-failS :: Applicative m => Fail (VerseT m (Stream m a)) m
+failS :: Monad m => Fail (VerseT m (Stream m a)) m
 {-# INLINE failS #-}
 failS _env = emptyS
 
-emptyS :: Applicative m => Empty (VerseT m (Stream m a)) m
+emptyS :: Monad m => Empty (VerseT m (Stream m a)) m
 {-# INLINABLE emptyS #-}
 emptyS mem = pure $ do
   tell mem.forward mem.backward
@@ -558,20 +558,20 @@ newVar :: a -> VerseT m (Var m a)
 {-# INLINE newVar #-}
 newVar = pure . Bound
 
-readVar :: MonadRef m => Var m a -> VerseT m a
+readVar :: MonadWeakRef m => Var m a -> VerseT m a
 {-# INLINABLE readVar #-}
 readVar = \ case
   Ref ref -> readRefBinding ref
   Bound binding -> pure binding
 
-readRefBinding :: MonadRef m => Ref m (RefState m a) -> VerseT m a
+readRefBinding :: MonadWeakRef m => Ref m (RefState m a) -> VerseT m a
 {-# INLINABLE readRefBinding #-}
 readRefBinding ref = lift (readRef ref) >>= \ case
   Link var -> readVar var
   Unbound x -> readVar =<< readRefLink ref x
 
 readRefLink
-  :: MonadRef m
+  :: MonadWeakRef m
   => Ref m (RefState m a)
   -> Unbound m a
   -> VerseT m (Var m a)
@@ -582,7 +582,7 @@ readRefLink ref x = yield x.level $ \ f ->
   in
     writeRefState ref $ Unbound x { susp }
 
-unifyVar :: (MonadRef m, ZipVars_ a m) => Var m a -> Var m a -> VerseT m ()
+unifyVar :: (MonadWeakRef m, ZipVars_ a m) => Var m a -> Var m a -> VerseT m ()
 {-# INLINABLE unifyVar #-}
 unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
   ((var1, UnboundR ref1 x1), (var2, UnboundR ref2 x2)) ->
@@ -628,14 +628,18 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
     zipVars_ unifyVar binding1 binding2
 
 writeRefState
-  :: MonadRef m
+  :: MonadWeakRef m
   => Ref m (RefState m a)
   -> RefState m a
   -> VerseT m ()
 {-# INLINABLE writeRefState #-}
-writeRefState ref !x = do
-  y <- lift $ readRef ref
-  liftPut (writeRef ref x) (writeRef ref y)
+writeRefState ref !x = uncurry tell <=< lift $ do
+  y <- readRef ref
+  let forward = writeRef ref x
+  forward
+  forward <- newWeakTrail ref forward
+  backward <- newWeakTrail ref $ writeRef ref y
+  pure (forward, backward)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 {-# INLINABLE readRoot #-}
@@ -666,18 +670,20 @@ readVarsRef :: MonadRef m => VarsRef m a -> VerseT m a
 {-# INLINE readVarsRef #-}
 readVarsRef (VarsRef _ ref) = lift $ readRef ref
 
-writeVarsRef :: (MonadRef m, Vars a m) => VarsRef m a -> a -> VerseT m ()
+writeVarsRef :: (MonadWeakRef m, Vars a m) => VarsRef m a -> a -> VerseT m ()
 {-# INLINABLE writeVarsRef #-}
 writeVarsRef (VarsRef _ ref) x = do
-  y <- lift $ readRef ref
   x <- findVars x
-  liftPut' (writeRef ref x) (writeRef ref y)
+  tell' <=< lift $ do
+    y <- readRef ref
+    writeRef ref x
+    newWeakTrail ref $ writeRef ref y
 
-findVars :: (MonadRef m, Vars a m) => a -> VerseT m a
+findVars :: (MonadWeakRef m, Vars a m) => a -> VerseT m a
 {-# INLINE findVars #-}
 findVars = vars findVar
 
-findVar :: (MonadRef m, Vars a m) => Var m a -> VerseT m (Var m a)
+findVar :: (MonadWeakRef m, Vars a m) => Var m a -> VerseT m (Var m a)
 {-# INLINABLE findVar #-}
 findVar = \ case
   var@(Ref ref) -> lift (readRef ref) >>= \ case

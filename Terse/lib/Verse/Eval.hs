@@ -74,7 +74,7 @@ data S m = S
   , storeFree :: !(Monad.Var m ())
   }
 
-runEvalT :: (MonadIO m, MonadRef m) => EvalT m a -> VerseT m a
+runEvalT :: (MonadIO m, MonadWeakRef m) => EvalT m a -> VerseT m a
 runEvalT m = runReaderT m =<< newR'
 
 newR' :: VerseT m (R m)
@@ -92,7 +92,7 @@ newEnv' =
   [minBound .. maxBound]
 
 eval'
-  :: (MonadIO m, MonadRef m, MonadState Mem m)
+  :: (MonadIO m, MonadWeakRef m, MonadState Mem m)
   => S m -> S m -> LExp -> EvalT m (Var m)
 eval' s1 s2 = wrap $ \ case
   Var x -> unifyS s1 s2 >> asks (Env.lookup x . (.env)) >>= \ case
@@ -223,7 +223,7 @@ eval' s1 s2 = wrap $ \ case
     pure var
 
 evalApp
-  :: (MonadIO m, MonadRef m, MonadState Mem m)
+  :: (MonadIO m, MonadWeakRef m, MonadState Mem m)
   => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
   Val.Int _ -> stuck
@@ -245,7 +245,7 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
     _ -> stuck
 
 evalAppFun
-  :: (MonadIO m, MonadRef m, MonadState Mem m)
+  :: (MonadIO m, MonadWeakRef m, MonadState Mem m)
   => S m -> S m -> Fun -> Var m -> EvalT m (Var m)
 evalAppFun s1 s2 f x = case f of
   Fun.Plus -> do
@@ -326,26 +326,34 @@ evalAppFun s1 s2 f x = case f of
 wrap :: (ExpF LExp -> EvalT m (Var m)) -> LExp -> EvalT m (Var m)
 wrap f (L i x) = local (\ r -> r { stack = i:r.stack }) $ f x
 
-evalPlus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
+evalPlus
+  :: MonadWeakRef m
+  => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalPlus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
   newInteger $! x1 + x2
 
-evalMinus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
+evalMinus
+  :: MonadWeakRef m
+  => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalMinus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
   newInteger $! x1 - x2
 
-evalLess :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
+evalLess
+  :: MonadWeakRef m
+  => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalLess s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
   guard $! x1 < x2
   pure var1
 
-evalAppMap :: MonadRef m => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)
+evalAppMap
+  :: MonadWeakRef m
+  => S m -> S m -> Int -> IntMap [Var m] -> EvalT m (Var m)
 evalAppMap s1 s2 k xs = do
   readChoiceFree s1
   var <- case IntMap.lookup k xs of
@@ -374,33 +382,33 @@ newPair (x, y) = newTup [x, y]
 newTup :: [Var m] -> EvalT m (Var m)
 newTup = newVar . Val.Tup
 
-readString :: MonadRef m => Var m -> EvalT m String
+readString :: MonadWeakRef m => Var m -> EvalT m String
 readString = readVar >=> \ case
   Val.Tup xs -> traverse readChar xs
   _ -> empty
 
-readChar :: MonadRef m => Var m -> EvalT m Char
+readChar :: MonadWeakRef m => Var m -> EvalT m Char
 readChar = fmap chr . readInt
 
-readInt :: MonadRef m => Var m -> EvalT m Int
+readInt :: MonadWeakRef m => Var m -> EvalT m Int
 readInt = readInteger >=> \ x -> do
   guard $ toInteger minInt <= x && x <= toInteger maxInt
   pure $ fromInteger x
 
-readInteger :: MonadRef m => Var m -> EvalT m Integer
+readInteger :: MonadWeakRef m => Var m -> EvalT m Integer
 readInteger = readVar >=> \ case
   Val.Int x -> pure x
   _ -> empty
 
-readPair :: MonadRef m => Var m -> EvalT m (Var m, Var m)
+readPair :: MonadWeakRef m => Var m -> EvalT m (Var m, Var m)
 readPair = readVar >=> \ case
   Val.Tup [x1, x2] -> pure (x1, x2)
   _ -> empty
 
-freeze :: MonadRef m => Var m -> EvalT m (Fix (Val Identity))
+freeze :: MonadWeakRef m => Var m -> EvalT m (Fix (Val Identity))
 freeze = lift . freeze'
 
-freeze' :: MonadRef m => Var m -> VerseT m (Fix (Val Identity))
+freeze' :: MonadWeakRef m => Var m -> VerseT m (Fix (Val Identity))
 freeze' = getFix >>> getCompose >>> Monad.readVar >=> fmap Fix . \ case
   Val.Int x -> pure $ Val.Int x
   Val.Lam r x e -> traverse freeze' r <&> \ r -> Val.Lam r x e
@@ -412,7 +420,7 @@ freeze' = getFix >>> getCompose >>> Monad.readVar >=> fmap Fix . \ case
 localEnv :: (Env m -> Env m) -> EvalT m a -> EvalT m a
 localEnv f = local (\ r -> r { env = f r.env })
 
-newHeap :: MonadRef m => S m -> EvalT m (Heap m)
+newHeap :: MonadWeakRef m => S m -> EvalT m (Heap m)
 newHeap s1 = do
   heap <- freshHeap
   fork $ do
@@ -420,7 +428,7 @@ newHeap s1 = do
     unifyHeap heap =<< askHeap
   pure heap
 
-readHeap :: MonadRef m => EvalT m ()
+readHeap :: MonadWeakRef m => EvalT m ()
 readHeap = lift $ Monad.readVar =<< ask
 
 askHeap :: EvalT m (Heap m)
@@ -464,10 +472,10 @@ newVar = lift . newVar'
 newVar' :: Val (Monad.VarsRef m) (Var m) -> VerseT m (Var m)
 newVar' = fmap (Fix . Compose) . Monad.newVar
 
-readVar :: MonadRef m => Var m -> EvalT m (Val (Monad.VarsRef m) (Var m))
+readVar :: MonadWeakRef m => Var m -> EvalT m (Val (Monad.VarsRef m) (Var m))
 readVar = lift . Monad.readVar . getCompose . getFix
 
-unifyVar :: MonadRef m => Var m -> Var m -> EvalT m ()
+unifyVar :: MonadWeakRef m => Var m -> Var m -> EvalT m ()
 unifyVar = (lift .) . Monad.unifyVar `on` getCompose . getFix
 
 freshS :: MonadRef m => EvalT m (S m)
@@ -491,28 +499,28 @@ newS' = do
   storeFree <- Monad.newVar ()
   pure S {..}
 
-unifyS :: MonadRef m => S m -> S m -> EvalT m ()
+unifyS :: MonadWeakRef m => S m -> S m -> EvalT m ()
 unifyS s1 s2 = unifyChoiceFree s1 s2 *> unifyStoreFree s1 s2
 
-readS :: MonadRef m => S m -> EvalT m ()
+readS :: MonadWeakRef m => S m -> EvalT m ()
 readS s = readChoiceFree s *> readStoreFree s
 
-readChoiceFree :: MonadRef m => S m -> EvalT m ()
+readChoiceFree :: MonadWeakRef m => S m -> EvalT m ()
 readChoiceFree = lift . Monad.readVar . (.choiceFree)
 
-readStoreFree :: MonadRef m => S m -> EvalT m ()
+readStoreFree :: MonadWeakRef m => S m -> EvalT m ()
 readStoreFree = lift . Monad.readVar . (.storeFree)
 
-unifyChoiceFree :: MonadRef m => S m -> S m -> EvalT m ()
+unifyChoiceFree :: MonadWeakRef m => S m -> S m -> EvalT m ()
 unifyChoiceFree s1 s2 = lift $ Monad.unifyVar s1.choiceFree s2.choiceFree
 
-unifyStoreFree :: MonadRef m => S m -> S m -> EvalT m ()
+unifyStoreFree :: MonadWeakRef m => S m -> S m -> EvalT m ()
 unifyStoreFree s1 s2 = lift $ Monad.unifyVar s1.storeFree s2.storeFree
 
 freshHeap :: MonadRef m => EvalT m (Heap m)
 freshHeap = lift Monad.freshVar
 
-unifyHeap :: MonadRef m => Heap m -> Heap m -> EvalT m ()
+unifyHeap :: MonadWeakRef m => Heap m -> Heap m -> EvalT m ()
 unifyHeap = (lift .) . Monad.unifyVar
 
 bracketStack :: MonadState Mem m => EvalT m a -> EvalT m a
