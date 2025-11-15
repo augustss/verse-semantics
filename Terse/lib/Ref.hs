@@ -62,7 +62,7 @@ instance MonadWeakRef IO where
   newWeakRef (STRef var) x = IO $ \ s ->
     case mkWeakNoFinalizer# var x s of
       (# s, x #) -> (# s, Weak x #)
-  {-# INILNE readWeakRef #-}
+  {-# INLINE readWeakRef #-}
   readWeakRef = deRefWeak
 
 type instance World (Strict.StateT s m) = World m
