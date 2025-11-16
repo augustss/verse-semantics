@@ -543,7 +543,7 @@ data Unbound m a = MkUnbound
   }
 
 freshVar :: MonadRef m => VerseT m (Var m a)
-{-# INLINE freshVar #-}
+{-# INLINABLE freshVar #-}
 freshVar = VerseT $ \ r s _env Mem {..} _yk sk fk ek ->
   let
     !mem = Mem { label = label + 1, .. }

@@ -6,7 +6,6 @@ module Ref
   ( Ref
   , World
   , MonadRef (..)
-  , WeakRef
   , MonadWeakRef (..)
   ) where
 
@@ -31,11 +30,10 @@ class Monad m => MonadRef m where
   readRef :: Ref m a -> m a
   writeRef :: Ref m a -> a -> m ()
 
-type WeakRef = Weak
-
 class MonadRef m => MonadWeakRef m where
-  newWeakRef :: Ref m a -> b -> m (WeakRef b)
-  readWeakRef :: WeakRef a -> m (Maybe a)
+  type WeakRef m :: Type -> Type
+  newWeakRef :: Ref m a -> b -> m (WeakRef m b)
+  readWeakRef :: WeakRef m a -> m (Maybe a)
 
 type instance World IO = RealWorld
 
@@ -58,6 +56,7 @@ instance MonadRef (ST s) where
   writeRef = writeSTRef
 
 instance MonadWeakRef IO where
+  type WeakRef IO = Weak
   {-# INLINE newWeakRef #-}
   newWeakRef (STRef var) x = IO $ \ s ->
     case mkWeakNoFinalizer# var x s of
@@ -76,6 +75,7 @@ instance MonadRef m => MonadRef (Strict.StateT s m) where
   writeRef = (lift .) . writeRef
 
 instance MonadWeakRef m => MonadWeakRef (Strict.StateT s m) where
+  type WeakRef (Strict.StateT s m) = WeakRef m
   {-# INLINE newWeakRef #-}
   newWeakRef = (lift .) . newWeakRef
   {-# INLINE readWeakRef #-}
