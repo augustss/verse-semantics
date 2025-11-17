@@ -8,7 +8,7 @@ module Verse.Comp
 
 import Control.Monad
 
-import Language.Haskell.TH (Q)
+import Language.Haskell.TH (Quote)
 import Language.Haskell.TH qualified as TH
 
 import Verse.Comp.Internal
@@ -18,7 +18,7 @@ import Verse.Run qualified as Run
 import Verse.Run.S
 import Verse.Run.Val qualified as Val
 
-comp :: LExp -> Q TH.Exp
+comp :: Quote m => LExp -> m TH.Exp
 comp e = [| runVerseT $ do
   alloc <- Val.newLam () $ const Run.alloc
   read <- Val.newLam () $ const Run.read
@@ -38,6 +38,5 @@ comp e = [| runVerseT $ do
     , ("Print", 'print)
     , ("operator'-'", 'minus)
     ])
-  readChoiceFree s2
-  readStoreFree s2
+  readS s2
   pure x |]

@@ -9,7 +9,7 @@ maintainer:         andy.sonnenburg@epicgames.com
 -- copyright:
 category:           Language
 build-type:         Simple
--- extra-source-files:
+extra-source-files: examples/1a.verse
 
 common warnings
   ghc-options: -Wall
@@ -20,7 +20,6 @@ library
   exposed-modules:
     AnsiStyle
     Fix
-    IntMap
     List
     Loc
     Parser
@@ -33,10 +32,10 @@ library
     Verse.Comp
     Verse.Comp.Internal
     Verse.Eval
+    Verse.Eval.Fun
     Verse.Eval.Val
     Verse.Exp
     Verse.Parse
-    Verse.Fun
     Verse.Monad
     Verse.Name
     Verse.Run
@@ -47,16 +46,31 @@ library
   build-depends:
     base,
     containers,
+    ghc-prim,
     mtl,
     prettyprinter,
     prettyprinter-ansi-terminal,
     template-haskell,
     text,
     transformers,
-    unordered-containers
+    unordered-containers,
+    vector
   default-language: GHC2021
 
-executable terse
+executable tersec
+  import:           warnings
+  main-is:          Main.hs
+  build-depends:
+    base,
+    filepath,
+    prettyprinter,
+    template-haskell,
+    terse,
+    text
+  hs-source-dirs:   c
+  default-language: GHC2021
+
+executable tersei
   import:           warnings
   main-is:          Main.hs
   build-depends:
@@ -70,5 +84,5 @@ executable terse
     terse,
     text,
     transformers
-  hs-source-dirs:   exe
+  hs-source-dirs:   i
   default-language: GHC2021

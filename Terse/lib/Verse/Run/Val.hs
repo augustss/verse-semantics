@@ -46,6 +46,7 @@ data Val f m a
   | forall b . Vars b m => Lam !b !(b -> S m -> S m -> Var m -> VerseT m (Var m))
 
 instance Vars a m => Vars (Val f m a) m where
+  {-# INLINABLE vars #-}
   vars f = \ case
     x@Int {} -> pure x
     x@Char {} -> pure x
@@ -54,6 +55,7 @@ instance Vars a m => Vars (Val f m a) m where
     Lam x y -> vars f x <&> \ x -> Lam x y
 
 instance (Eq (f a), ZipVars_ a m) => ZipVars_ (Val f m a) m where
+  {-# INLINABLE zipVars_ #-}
   zipVars_ f = curry $ \ case
     (Int x, Int y) -> guard $ x == y
     (Char x, Char y) -> guard $ x == y
@@ -72,20 +74,25 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f m a) where
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m) m))
 
 freshVar :: MonadRef m => VerseT m (Var m)
+{-# INLINE freshVar #-}
 freshVar = Fix . Compose <$> Monad.freshVar
 
-newVar :: MonadRef m => Val (Monad.VarsRef m) m (Var m) -> VerseT m (Var m)
+newVar :: Val (Monad.VarsRef m) m (Var m) -> VerseT m (Var m)
+{-# INLINE newVar #-}
 newVar = fmap (Fix . Compose) . Monad.newVar
 
-readVar :: MonadRef m => Var m -> VerseT m (Val (Monad.VarsRef m) m (Var m))
+readVar :: MonadWeakRef m => Var m -> VerseT m (Val (Monad.VarsRef m) m (Var m))
+{-# INLINE readVar #-}
 readVar = Monad.readVar . getCompose . getFix
 
-unifyVar :: MonadRef m => Var m -> Var m -> VerseT m ()
+unifyVar :: MonadWeakRef m => Var m -> Var m -> VerseT m ()
+{-# INLINE unifyVar #-}
 unifyVar = Monad.unifyVar `on` getCompose . getFix
 
 freeze
-  :: MonadRef m
+  :: MonadWeakRef m
   => Var m -> VerseT m (Fix (Val Identity m))
+{-# INLINABLE freeze #-}
 freeze = readVar >=> fmap Fix . \ case
   Int x -> pure $ Int x
   Char x -> pure $ Char x
@@ -93,42 +100,52 @@ freeze = readVar >=> fmap Fix . \ case
   Tup x -> Tup <$> traverse freeze x
   _ -> stuck
 
-newInt :: MonadRef m => Integer -> VerseT m (Var m)
+newInt :: Integer -> VerseT m (Var m)
+{-# INLINE newInt #-}
 newInt = newVar . Int
 
-readInt :: MonadRef m => Var m -> VerseT m Integer
+readInt :: MonadWeakRef m => Var m -> VerseT m Integer
+{-# INLINE readInt #-}
 readInt = readVar >=> \ case
   Int x -> pure x
   _ -> empty
 
-newChar :: MonadRef m => Char -> VerseT m (Var m)
+newChar :: Char -> VerseT m (Var m)
+{-# INLINE newChar #-}
 newChar = newVar . Char
 
-readChar :: MonadRef m => Var m -> VerseT m Char
-readChar= readVar >=> \ case
+readChar :: MonadWeakRef m => Var m -> VerseT m Char
+{-# INLINE readChar #-}
+readChar = readVar >=> \ case
   Char x -> pure x
   _ -> empty
 
-newTup :: MonadRef m => [Var m] -> VerseT m (Var m)
+newTup :: [Var m] -> VerseT m (Var m)
+{-# INLINE newTup #-}
 newTup = newVar . Tup
 
-newPair :: MonadRef m => Var m -> Var m -> VerseT m (Var m)
-newPair x y = newVar $ Tup [x, y]
+newPair :: Var m -> Var m -> VerseT m (Var m)
+{-# INLINE newPair #-}
+newPair x y = newTup [x, y]
 
-readPair :: MonadRef m => Var m -> VerseT m (Var m, Var m)
+readPair :: MonadWeakRef m => Var m -> VerseT m (Var m, Var m)
+{-# INLINE readPair #-}
 readPair = readVar >=> \ case
   Tup [x1, x2] -> pure (x1, x2)
   _ -> empty
 
-newString :: MonadRef m => String -> VerseT m (Var m)
+newString :: String -> VerseT m (Var m)
+{-# INLINABLE newString #-}
 newString = newTup <=< traverse newChar
 
-readString :: MonadRef m => Var m -> VerseT m String
+readString :: MonadWeakRef m => Var m -> VerseT m String
+{-# INLINABLE readString #-}
 readString = readVar >=> \ case
   Tup xs -> traverse readChar xs
   _ -> empty
 
 newLam
-  :: (Vars a m, MonadRef m)
+  :: Vars a m
   => a -> (a -> S m -> S m -> Var m -> VerseT m (Var m)) -> VerseT m (Var m)
+{-# INLINE newLam #-}
 newLam x f = newVar $ Lam x f
