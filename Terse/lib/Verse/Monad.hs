@@ -83,6 +83,7 @@ type Env m = Var m ()
 
 data Mem m = Mem
   { label :: {-# UNPACK #-} !Label
+  , choiceLabel :: {-# UNPACK #-} !Label
   , forward :: !(m ())
   , backward :: !(m ())
   , backward' :: !(m ())
@@ -148,7 +149,7 @@ instance Alternative (VerseT m) where
     ek mem
   {-# INLINABLE (<|>) #-}
   x <|> y = VerseT $ \ r s env mem yk sk fk ek ->
-    unVerseT x r s env mem yk sk
+    unVerseT x r s env mem { choiceLabel = mem.label } yk sk
     (\ env mem -> unVerseT y r s env mem yk sk fk $ fk env)
     (\ mem -> unVerseT y r s env mem yk sk fk ek)
 
@@ -229,30 +230,35 @@ modifyS f = VerseT $ \ _r s _env mem _yk sk ->
   in
     sk s' mem ()
 
+getChoiceLabel :: VerseT m Label
+{-# INLINE getChoiceLabel #-}
+getChoiceLabel = VerseT $ \ _r s _env mem _yk sk ->
+  sk s mem mem.choiceLabel
+
 putMem :: Mem m -> VerseT m ()
 {-# INLINE putMem #-}
 putMem !mem = VerseT $ \ _r s _env _mem _yk sk ->
   sk s mem ()
 
-putLabel :: Label -> VerseT m ()
-{-# INLINE putLabel #-}
-putLabel !label = VerseT $ \ _r s _env Mem { label = _, .. } _yk sk ->
-  sk s Mem {..} ()
+putLabels :: Label -> Label -> VerseT m ()
+{-# INLINE putLabels #-}
+putLabels !label !choiceLabel = VerseT $ \ _r s _env mem _yk sk ->
+  sk s mem { label, choiceLabel } ()
 
 runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
 {-# INLINABLE runVerseT #-}
 runVerseT m = do
   let
     sk s mem x fk _ek
-      | s.count == 0 =
-        runFindT (findVars' x) 0 mem.label >>= \ case
-          Nothing -> pure Nothing
-          Just (x, label) -> fmap (x:) <$> fk env (splitMem label)
+      | s.count == 0 = runFindT (findVars' x) 0 mem.label >>= \ case
+        Nothing -> pure Nothing
+        Just (x, label) -> fmap (x:) <$> fk env (splitMem label mem.choiceLabel)
       | otherwise = pure Nothing
-  unVerseT m r s env (splitMem label) yk sk fk ek
+  unVerseT m r s env (splitMem label choiceLabel) yk sk fk ek
   where
     env = Bound ()
     label = 0
+    choiceLabel = label
     r = R { level = 1 }
     s = S { count = 0 }
     yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
@@ -303,7 +309,7 @@ split''
 split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
-    !mem' = splitMem mem.label
+    !mem' = splitMem mem.label mem.choiceLabel
   in
     unVerseT m r' s' env mem' yieldS sk' fk' ek' >>= \ m ->
     unVerseT m r s env mem yk sk fk ek
@@ -313,7 +319,7 @@ yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
 yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
   tell mem.forward mem.backward
   tell' mem.backward'
-  putLabel mem.label
+  putLabels mem.label mem.choiceLabel
   level <- getLevel
   if i > level then
     stuck
@@ -329,13 +335,13 @@ succeedS s mem x fk _ek = pure $ do
     level <- getLevel
     lift (runFindT (findVars' x) level mem.label) >>= \ case
       Nothing -> do
-        putLabel mem.label
+        putLabels mem.label mem.choiceLabel
         stuck
       Just (x, label) -> do
-        putLabel label
+        putLabels label mem.choiceLabel
         pure . Step x $ liftFailS fk
   else do
-    putLabel mem.label
+    putLabels mem.label mem.choiceLabel
     stuck
 
 failS :: Monad m => Fail (VerseT m (Stream m a)) m
@@ -347,18 +353,18 @@ emptyS :: Monad m => Empty (VerseT m (Stream m a)) m
 emptyS mem = pure $ do
   tell mem.forward mem.backward
   tell' mem.backward'
-  putLabel mem.label
+  putLabels mem.label mem.choiceLabel
   pure Done
 
 liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
 {-# INLINABLE liftFailS #-}
 liftFailS fk' = VerseT $ \ r s env mem yk sk fk ek -> do
-  m <- fk' env $ splitMem mem.label
+  m <- fk' env $ splitMem mem.label mem.choiceLabel
   unVerseT m r s env mem yk sk fk ek
 
-splitMem :: Applicative m => Label -> Mem m
+splitMem :: Applicative m => Label -> Label -> Mem m
 {-# INLINE splitMem #-}
-splitMem label = Mem {..}
+splitMem label choiceLabel = Mem {..}
   where
     forward = pure ()
     backward = pure ()
@@ -561,8 +567,8 @@ newVar = pure . Bound
 readVar :: MonadWeakRef m => Var m a -> VerseT m a
 {-# INLINABLE readVar #-}
 readVar = \ case
-  Ref ref -> readRefBinding ref
   Bound binding -> pure binding
+  Ref ref -> readRefBinding ref
 
 readRefBinding :: MonadWeakRef m => Ref m (RefState m a) -> VerseT m a
 {-# INLINABLE readRefBinding #-}
@@ -580,7 +586,7 @@ readRefLink ref x = yield x.level $ \ f ->
   let
     !susp = x.susp <> Ap . f . pure
   in
-    writeRefState ref $ Unbound x { susp }
+    writeRefState ref x.label $ Unbound x { susp }
 
 unifyVar :: (MonadWeakRef m, ZipVars_ a m) => Var m a -> Var m a -> VerseT m ()
 {-# INLINABLE unifyVar #-}
@@ -597,16 +603,16 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
             var1 <- readRefLink ref1 x1
             unifyVar var1 var2
         else do
-          writeRefState ref2 $ Link var1
+          writeRefState ref2 x2.label $ Link var1
           getAp $ x2.susp var1
       else if x2.level < level then do
-        writeRefState ref1 $ Link var2
+        writeRefState ref1 x1.label $ Link var2
         getAp $ x1.susp var2
       else if x1.label < x2.label then do
-        writeRefState ref2 $ Link var1
+        writeRefState ref2 x2.label $ Link var1
         getAp $ x2.susp var1
       else do
-        writeRefState ref1 $ Link var2
+        writeRefState ref1 x1.label $ Link var2
         getAp $ x1.susp var2
   ((_var1, UnboundR ref1 x1), (var2, BoundR binding2)) -> do
     level <- getLevel
@@ -614,7 +620,7 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
       binding1 <- readRefBinding ref1
       zipVars_ unifyVar binding1 binding2
     else do
-      writeRefState ref1 $ Link var2
+      writeRefState ref1 x1.label $ Link var2
       getAp $ x1.susp var2
   ((var1, BoundR binding1), (_var2, UnboundR ref2 x2)) -> do
     level <- getLevel
@@ -622,7 +628,7 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
       binding2 <- readRefBinding ref2
       zipVars_ unifyVar binding1 binding2
     else do
-      writeRefState ref2 $ Link var1
+      writeRefState ref2 x2.label $ Link var1
       getAp $ x2.susp var1
   ((_var1, BoundR binding1), (_var2, BoundR binding2)) ->
     zipVars_ unifyVar binding1 binding2
@@ -630,49 +636,41 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
 writeRefState
   :: MonadWeakRef m
   => Ref m (RefState m a)
+  -> Label
   -> RefState m a
   -> VerseT m ()
 {-# INLINABLE writeRefState #-}
-writeRefState ref !x = uncurry tell <=< lift $ do
-  y <- readRef ref
-  let forward = writeRef ref x
-  forward
-  forward <- newWeakTrail ref forward
-  backward <- newWeakTrail ref $ writeRef ref y
-  pure (forward, backward)
+writeRefState ref label !x = (label >=) <$> getChoiceLabel >>= \ case
+  True -> lift $ writeRef ref x
+  False -> uncurry tell <=< lift $ do
+    y <- readRef ref
+    let forward = writeRef ref x
+    forward
+    forward <- newWeakTrail ref forward
+    backward <- newWeakTrail ref $ writeRef ref y
+    pure (forward, backward)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 {-# INLINABLE readRoot #-}
 readRoot var = case var of
+  Bound binding -> pure (var, BoundR binding)
   Ref ref -> lift (readRef ref) >>= \ case
     Link var -> readRoot var
     Unbound x -> pure (var, UnboundR ref x)
-  Bound binding -> pure (var, BoundR binding)
 
-data VarsRef m a = VarsRef {-# UNPACK #-} !Label !(Ref m a)
-
-instance Eq (VarsRef m a) where
-  {-# INLINE (==) #-}
-  VarsRef x _ == VarsRef y _ = x == y
-  {-# INLINE (/=) #-}
-  VarsRef x _ /= VarsRef y _ = x /= y
+newtype VarsRef m a = VarsRef { unVarsRef :: Ref m a } deriving Eq
 
 newVarsRef :: MonadRef m => a -> VerseT m (VarsRef m a)
 {-# INLINE newVarsRef #-}
-newVarsRef x = VerseT $ \ _r s _env Mem {..} _yk sk fk ek ->
-  let
-    !mem = Mem { label = label + 1, .. }
-  in
-    newRef x >>= \ ref ->
-    sk s mem (VarsRef label ref) fk ek
+newVarsRef = lift . fmap VarsRef . newRef
 
 readVarsRef :: MonadRef m => VarsRef m a -> VerseT m a
 {-# INLINE readVarsRef #-}
-readVarsRef (VarsRef _ ref) = lift $ readRef ref
+readVarsRef = lift . readRef . unVarsRef
 
 writeVarsRef :: (MonadWeakRef m, Vars a m) => VarsRef m a -> a -> VerseT m ()
 {-# INLINABLE writeVarsRef #-}
-writeVarsRef (VarsRef _ ref) x = do
+writeVarsRef (VarsRef ref) x = do
   x <- findVars x
   tell' <=< lift $ do
     y <- readRef ref
@@ -686,6 +684,7 @@ findVars = vars findVar
 findVar :: (MonadWeakRef m, Vars a m) => Var m a -> VerseT m (Var m a)
 {-# INLINABLE findVar #-}
 findVar = \ case
+  Bound binding -> Bound <$> findVars binding
   var@(Ref ref) -> lift (readRef ref) >>= \ case
     Link var -> findVar var
     Unbound x -> do
@@ -693,7 +692,6 @@ findVar = \ case
       if level > x.level
         then pure var
         else findVar =<< readRefLink ref x
-  Bound binding -> Bound <$> findVars binding
 
 newtype FindT m a = FindT
   { unFindT :: In -> m (Out a)
@@ -755,11 +753,11 @@ findVars' = vars findVar'
 findVar' :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
 {-# INLINABLE findVar' #-}
 findVar' = \ case
+  Bound binding -> Bound <$> findVars' binding
   var@(Ref ref) -> readRef ref >>= \ case
     Link var -> findVar' var
     Unbound x -> FindT $ \ In {..} ->
       pure $! if level >= x.level then Out var label else Err
-  Bound binding -> Bound <$> findVars' binding
 
 bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
 bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
