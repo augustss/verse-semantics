@@ -84,15 +84,17 @@ type Env m = Var m ()
 data Mem m = Mem
   { label :: {-# UNPACK #-} !Label
   , choiceLabel :: {-# UNPACK #-} !Label
+  , tellLabel :: {-# UNPACK #-} !Label
   , forward :: !(m ())
   , backward :: !(m ())
   , backward' :: !(m ())
   }
 
-appendMem :: Applicative m => Mem m -> m () -> m () -> Mem m
+appendMem :: Applicative m => Mem m -> Label -> m () -> m () -> Mem m
 {-# INLINE appendMem #-}
-appendMem mem forward backward = mem
-  { forward = mem.forward *> forward
+appendMem mem tellLabel forward backward = mem
+  { tellLabel = min mem.tellLabel tellLabel
+  , forward = mem.forward *> forward
   , backward = backward *> mem.backward
   }
 
@@ -193,14 +195,14 @@ liftPut :: Monad m => m () -> m () -> VerseT m ()
 {-# INLINE liftPut #-}
 liftPut forward backward = do
   lift forward
-  tell forward backward
+  tell minBound forward backward
 
-tell :: Monad m => m () -> m () -> VerseT m ()
+tell :: Monad m => Label -> m () -> m () -> VerseT m ()
 {-# INLINABLE tell #-}
-tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  sk s (appendMem mem forward backward) ()
-  (\ env mem -> backward *> fk env (appendMem mem backward forward))
-  (\ mem -> backward *> ek (appendMem mem backward forward))
+tell label forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
+  sk s (appendMem mem label forward backward) ()
+  (\ env mem -> backward *> fk env (appendMem mem label backward forward))
+  (\ mem -> backward *> ek (appendMem mem label backward forward))
 
 tell' :: Applicative m => m () -> VerseT m ()
 {-# INLINABLE tell' #-}
@@ -240,10 +242,10 @@ putMem :: Mem m -> VerseT m ()
 putMem !mem = VerseT $ \ _r s _env _mem _yk sk ->
   sk s mem ()
 
-putLabels :: Label -> Label -> VerseT m ()
-{-# INLINE putLabels #-}
-putLabels !label !choiceLabel = VerseT $ \ _r s _env mem _yk sk ->
-  sk s mem { label, choiceLabel } ()
+putLabel :: Label -> VerseT m ()
+{-# INLINE putLabel #-}
+putLabel !label = VerseT $ \ _r s _env Mem { label = _, .. } _yk sk ->
+  sk s Mem {..} ()
 
 runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
 {-# INLINABLE runVerseT #-}
@@ -252,13 +254,15 @@ runVerseT m = do
     sk s mem x fk _ek
       | s.count == 0 = runFindT (findVars' x) 0 mem.label >>= \ case
         Nothing -> pure Nothing
-        Just (x, label) -> fmap (x:) <$> fk env (splitMem label mem.choiceLabel)
+        Just (x, label) ->
+          fmap (x:) <$> fk env (splitMem label mem.choiceLabel tellLabel)
       | otherwise = pure Nothing
-  unVerseT m r s env (splitMem label choiceLabel) yk sk fk ek
+  unVerseT m r s env (splitMem label choiceLabel tellLabel) yk sk fk ek
   where
     env = Bound ()
-    label = 0
+    label = minBound
     choiceLabel = label
+    tellLabel = maxBound
     r = R { level = 1 }
     s = S { count = 0 }
     yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
@@ -309,7 +313,7 @@ split''
 split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
-    !mem' = splitMem mem.label mem.choiceLabel
+    !mem' = splitMem mem.label mem.choiceLabel maxBound
   in
     unVerseT m r' s' env mem' yieldS sk' fk' ek' >>= \ m ->
     unVerseT m r s env mem yk sk fk ek
@@ -317,9 +321,10 @@ split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
 yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
 {-# INLINABLE yieldS #-}
 yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
-  tell mem.forward mem.backward
+  whenM ((mem.tellLabel <) <$> getChoiceLabel) $
+    tell mem.tellLabel mem.forward mem.backward
   tell' mem.backward'
-  putLabels mem.label mem.choiceLabel
+  putLabel mem.label
   level <- getLevel
   if i > level then
     stuck
@@ -329,19 +334,20 @@ yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
 succeedS :: (MonadRef m, Vars a m) => Succeed (VerseT m (Stream m a)) m a
 {-# INLINABLE succeedS #-}
 succeedS s mem x fk _ek = pure $ do
-  tell mem.forward mem.backward
+  whenM ((mem.tellLabel <) <$> getChoiceLabel) $
+    tell mem.tellLabel mem.forward mem.backward
   tell' mem.backward'
   if s.count == 0 then do
     level <- getLevel
     lift (runFindT (findVars' x) level mem.label) >>= \ case
       Nothing -> do
-        putLabels mem.label mem.choiceLabel
+        putLabel mem.label
         stuck
       Just (x, label) -> do
-        putLabels label mem.choiceLabel
+        putLabel label
         pure . Step x $ liftFailS fk
   else do
-    putLabels mem.label mem.choiceLabel
+    putLabel mem.label
     stuck
 
 failS :: Monad m => Fail (VerseT m (Stream m a)) m
@@ -351,20 +357,21 @@ failS _env = emptyS
 emptyS :: Monad m => Empty (VerseT m (Stream m a)) m
 {-# INLINABLE emptyS #-}
 emptyS mem = pure $ do
-  tell mem.forward mem.backward
+  whenM ((mem.tellLabel <) <$> getChoiceLabel) $
+    tell mem.tellLabel mem.forward mem.backward
   tell' mem.backward'
-  putLabels mem.label mem.choiceLabel
+  putLabel mem.label
   pure Done
 
 liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
 {-# INLINABLE liftFailS #-}
 liftFailS fk' = VerseT $ \ r s env mem yk sk fk ek -> do
-  m <- fk' env $ splitMem mem.label mem.choiceLabel
+  m <- fk' env $ splitMem mem.label mem.choiceLabel maxBound
   unVerseT m r s env mem yk sk fk ek
 
-splitMem :: Applicative m => Label -> Label -> Mem m
+splitMem :: Applicative m => Label -> Label -> Label -> Mem m
 {-# INLINE splitMem #-}
-splitMem label choiceLabel = Mem {..}
+splitMem label choiceLabel tellLabel = Mem {..}
   where
     forward = pure ()
     backward = pure ()
@@ -640,9 +647,9 @@ writeRefState
   -> RefState m a
   -> VerseT m ()
 {-# INLINABLE writeRefState #-}
-writeRefState ref label !x = (label >=) <$> getChoiceLabel >>= \ case
-  True -> lift $ writeRef ref x
-  False -> uncurry tell <=< lift $ do
+writeRefState ref label !x = (label <) <$> getChoiceLabel >>= \ case
+  False -> lift $ writeRef ref x
+  True -> uncurry (tell label) <=< lift $ do
     y <- readRef ref
     let forward = writeRef ref x
     forward
@@ -763,3 +770,6 @@ bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
 bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
   Err -> y $> Err
   Out z label -> y $> Out z label
+
+whenM :: Monad m => m Bool -> m () -> m ()
+whenM x y = x >>= flip when y
