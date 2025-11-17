@@ -4,8 +4,8 @@
 module PomSet(module PomSet) where
 import Control.Applicative
 import Control.Monad
-import qualified Set
-import Set(Set)
+import qualified MultiSet as Set
+import MultiSet(Set)
 import GHC.Stack
 
 default ()
@@ -100,3 +100,6 @@ allLeaves (a :\/ b) = allLeaves a ++ allLeaves b
 
 mkPomSetList :: [a] -> P a
 mkPomSetList = foldr (+++) Empty . map unit
+
+norm :: Ord a => P a -> P a
+norm = uncanon . canon

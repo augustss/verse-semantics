@@ -24,7 +24,7 @@ import Data.List((\\), intercalate, nub)
 import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
 import PomSet
-import qualified Set
+import qualified MultiSet as Set
 
 default ()
 
