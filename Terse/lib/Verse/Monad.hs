@@ -254,15 +254,13 @@ runVerseT m = do
     sk s mem x fk _ek
       | s.count == 0 = runFindT (findVars' x) 0 mem.label >>= \ case
         Nothing -> pure Nothing
-        Just (x, label) ->
-          fmap (x:) <$> fk env (splitMem label mem.choiceLabel tellLabel)
+        Just (x, label) -> fmap (x:) <$> fk env (splitMem label mem.choiceLabel)
       | otherwise = pure Nothing
-  unVerseT m r s env (splitMem label choiceLabel tellLabel) yk sk fk ek
+  unVerseT m r s env (splitMem label choiceLabel) yk sk fk ek
   where
     env = Bound ()
     label = minBound
     choiceLabel = label
-    tellLabel = maxBound
     r = R { level = 1 }
     s = S { count = 0 }
     yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
@@ -313,7 +311,7 @@ split''
 split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
-    !mem' = splitMem mem.label mem.choiceLabel maxBound
+    !mem' = splitMem mem.label mem.choiceLabel
   in
     unVerseT m r' s' env mem' yieldS sk' fk' ek' >>= \ m ->
     unVerseT m r s env mem yk sk fk ek
@@ -366,13 +364,14 @@ emptyS mem = pure $ do
 liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
 {-# INLINABLE liftFailS #-}
 liftFailS fk' = VerseT $ \ r s env mem yk sk fk ek -> do
-  m <- fk' env $ splitMem mem.label mem.choiceLabel maxBound
+  m <- fk' env $ splitMem mem.label mem.choiceLabel
   unVerseT m r s env mem yk sk fk ek
 
-splitMem :: Applicative m => Label -> Label -> Label -> Mem m
+splitMem :: Applicative m => Label -> Label -> Mem m
 {-# INLINE splitMem #-}
-splitMem label choiceLabel tellLabel = Mem {..}
+splitMem label choiceLabel = Mem {..}
   where
+    tellLabel = maxBound
     forward = pure ()
     backward = pure ()
     backward' = pure ()
@@ -767,9 +766,11 @@ findVar' = \ case
       pure $! if level >= x.level then Out var label else Err
 
 bracket :: Monad m => m () -> m () -> FindT m a -> FindT m a
+{-# INLINABLE bracket #-}
 bracket x y z = FindT $ \ s -> x *> unFindT z s >>= \ case
   Err -> y $> Err
   Out z label -> y $> Out z label
 
 whenM :: Monad m => m Bool -> m () -> m ()
+{-# INLINE whenM #-}
 whenM x y = x >>= flip when y

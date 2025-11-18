@@ -122,7 +122,9 @@ readInt
 readInt s1 s2 x = do
   x <- one $ Val.readString x <|> stuck
   unifyS s1 s2
-  Val.newTup <=< traverse (uncurry Val.newPair <=< Val.newInt *** Val.newString) $ reads x
+  Val.newTup <=<
+    traverse (uncurry Val.newPair <=< Val.newInt *** Val.newString) $
+    reads x
 
 print
   :: (MonadIO m, MonadWeakRef m)
