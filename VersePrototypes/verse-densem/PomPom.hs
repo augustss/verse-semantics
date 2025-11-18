@@ -25,13 +25,14 @@ import Epic.Print hiding (empty)
 -- A Config is pass down everywhere to pick various semantic variations.
 data Config = Config
   { forUnionMode :: ForUnionMode
-  , forBaseUnion :: ForBaseUnion
-  , normalize    :: Bool
+  , forUnitMode  :: ForUnitMode
+  , ifUnionMode  :: IfUnionMode
+  , useTree      :: Bool
   }
   deriving (Show)
 
 defaultConfig :: Config
-defaultConfig = Config { forUnionMode = FUMSem2, forBaseUnion = FBUUnion, normalize = False }
+defaultConfig = Config { forUnionMode = ForUnionSem3, forUnitMode = ForUnitUnion, ifUnionMode = IfUnionUnion, useTree = True }
 
 data ConfigRef = ConfigRef
   { config       :: Config
@@ -40,40 +41,62 @@ data ConfigRef = ConfigRef
   , doTrace      :: Bool
   }
 
-data ForUnionMode = FUMSem1 | FUMSem2 | FUMSem3
+data ForUnionMode = ForUnionSem1 | ForUnionSem2 | ForUnionSem3
   deriving (Eq, Ord)
 
 instance Show ForUnionMode where
-  show FUMSem1 = "SEM1"
-  show FUMSem2 = "SEM2"
-  show FUMSem3 = "SEM3"
+  show ForUnionSem1 = "SEM1"
+  show ForUnionSem2 = "SEM2"
+  show ForUnionSem3 = "SEM3"
 
 instance Read ForUnionMode where
   readsPrec _ s = [ (m, r)
                   | (t, r) <- lex s
                   , Just m <- pure $
                               case map toLower t of
-                                "sem1" -> Just FUMSem1
-                                "sem2" -> Just FUMSem2
-                                "sem3" -> Just FUMSem3
+                                "sem1" -> Just ForUnionSem1
+                                "sem2" -> Just ForUnionSem2
+                                "sem3" -> Just ForUnionSem3
                                 _      -> Nothing
                   ]
 
-data ForBaseUnion = FBUUnion | FBUDoubleUnion
+data ForUnitMode = ForUnitFOR1 | ForUnitUnion | ForUnitDoubleUnion
   deriving (Eq, Ord)
 
-instance Show ForBaseUnion where
-  show FBUUnion = "union"
-  show FBUDoubleUnion = "doubleUnion"
+instance Show ForUnitMode where
+  show ForUnitUnion = "union"
+  show ForUnitDoubleUnion = "doubleUnion"
+  show ForUnitFOR1 = "for1"
 
-instance Read ForBaseUnion where
+instance Read ForUnitMode where
   readsPrec _ s = [ (m, r)
                   | (t, r) <- lex s
                   , Just m <- pure $
                               case map toLower t of
-                                "union"       -> Just FBUUnion
-                                "doubleunion" -> Just FBUDoubleUnion
-                                "uunion"      -> Just FBUDoubleUnion
+                                "union"       -> Just ForUnitUnion
+                                "doubleunion" -> Just ForUnitDoubleUnion
+                                "uunion"      -> Just ForUnitDoubleUnion
+                                "for1"        -> Just ForUnitFOR1
+                                _      -> Nothing
+                  ]
+
+data IfUnionMode = IfUnionUnion | IfUnionConcat | IfUnionDodgy
+
+  deriving (Eq, Ord)
+
+instance Show IfUnionMode where
+  show IfUnionUnion = "union"
+  show IfUnionDodgy = "dodgy"
+  show IfUnionConcat = "concat"
+
+instance Read IfUnionMode where
+  readsPrec _ s = [ (m, r)
+                  | (t, r) <- lex s
+                  , Just m <- pure $
+                              case map toLower t of
+                                "union"  -> Just IfUnionUnion
+                                "dodgy"  -> Just IfUnionDodgy
+                                "concat" -> Just IfUnionConcat
                                 _      -> Nothing
                   ]
 
@@ -88,6 +111,9 @@ type ParamList = [(String, String)]
 pv :: Pretty a => String -> a -> (String, String)
 pv s a = (s, prettyShow a)
 
+-- This is a pretty gruesome way to do the logging, but is saves us
+-- from making the entire semantics monadic.
+-- But maybe that would be better...
 logStep :: (Pretty a, Pretty b) => ConfigRef -> String -> a -> ParamList -> b -> b
 logStep cfg msg a ps b = unsafePerformIO $ do
   u <- readIORef (logUniq cfg)
@@ -152,22 +178,17 @@ infixl 7 >>>
 (>>>) :: P ENV -> [Ident] -> P ENV
 s >>> xs = fmap (hides xs) s
 
-{-
-This is hard to implement
-uNION :: Set (P a) -> P a
--}
-
 ------------------
 
-oNE :: [Ident] -> PENV -> PENV
-oNE _ Empty = Empty
-oNE _ (Unit d) = Unit d
-oNE xs (s :\/ t) = oNE xs s `union` oNE xs t
-oNE xs (s :++ t) = s1 `disj` (
+oNE :: ConfigRef -> [Ident] -> PENV -> PENV
+oNE _ _ Empty = Empty
+oNE _ _ (Unit d) = Unit d
+oNE cfg xs (s :\/ t) = ifUnion cfg (oNE cfg xs s) (oNE cfg xs t)
+oNE cfg xs (s :++ t) = s1 `disj` (
     --(fmap compl s1 >>> xs)
     nOT (s1 >>> xs)
-    *** oNE xs t)
-  where s1 = oNE xs s
+    *** oNE cfg xs t)
+  where s1 = oNE cfg xs s
 
 nil :: Value
 nil = Tuple []
@@ -210,66 +231,23 @@ fOR cfg xs tin t1 u v =
 
 fOR' :: ConfigRef -> [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
 fOR' _  _   Empty     _ _ _ = unit (i .= nil /\ x .= nil)
-fOR' cfg xs (Unit d0) t i x =
-  fOR1 cfg xs d0 (dE cfg t xx yy) i x xx yy
-  where (xx, yy) = fresh2 ("x","y") (i:x:xs) t
-{-
-fOR cfg xs d@Unit{}  t i x =
-  (if forBaseUnion cfg == FBUUnion then union else uu)
-  (d *** unit sings *** dB cfg t p q >>> (p:q:xs))
-  (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
-  where (p, q) = fresh2 ("p", "q") (i:x:xs) t
-        allV = allInts ++ allTuples
-        sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
-                         | ip <- allV
-                         , iq <- allV
-                         ]
--}
---fOR xs (a :\/ b) t i x = fOR xs a t i x `union` fOR xs b t i x
---fOR xs (a :\/ b) t i x = fOR xs a t i x +++ fOR xs b t i x
---fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
+fOR' cfg xs d@(Unit d0) t i x =
+  case forUnitMode (config cfg) of
+    ForUnitFOR1 ->
+      fOR1 cfg xs d0 (dE cfg t xx yy) i x xx yy
+      where (xx, yy) = fresh2 ("x","y") (i:x:xs) t
+    m ->
+      (if m == ForUnitUnion then union else uu)
+        (d *** unit sings *** dB cfg t p q >>> (p:q:xs))
+        (nOT (d >>> xs) *** unit (i .= nil /\ x .= nil))
+      where (p, q) = fresh2 ("p", "q") (i:x:xs) t
+            allV = allInts ++ allTuples
+            sings = bigUnion [i .= sing ip /\ x .= sing iq /\ p .= ip /\ q .= iq
+                             | ip <- allV
+                             , iq <- allV
+                             ]
 
-fOR' cfg xs (a :\/ b) t i x
- | forUnionMode (config cfg) == FUMSem3 =
--- This is ⊎
-  (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
-  where fora = fOR cfg xs a t u1 v1
-        forb = fOR cfg xs b t u2 v2
-        (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
-        (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
-        sings = bigUnion [ i .= tu1 `utup` tu2 /\ x .= tv1 `utup` tv2 /\
-                           u1 .= tu1 /\ u2 .= tu2 /\ v1 .= tv1 /\ v2 .= tv2
-                         | tu1 <- allValuesOf u1 fora
-                         , tu2 <- allValuesOf u2 forb
-                         , tv1 <- allValuesOf v1 fora
-                         , tv2 <- allValuesOf v2 forb
-                         , consistent tu1 tu2
-                         , consistent tv1 tv2
-                         ]
-        utup (Fun g) (Fun h) = Fun (funUnion g h)
-        utup _ _ = error "utup"
-        consistent (Fun g) (Fun h) = Set.isEmpty (funDomain g `Set.intersect` funDomain h)
-        consistent _ _ = error "consistent"
-{-
-  (unit ca *** fOR xs a t i x) `union`
-  (unit cb *** fOR xs b t i x)
-  `union` (unit (compl (ca \/ cb) /\ i .= nil /\ x .= nil))
---  `union` (nOT (ab >>> xs) *** unit (i .= nil /\ x .= nil))
-  where ca = coll (a >>> xs)
-        cb = coll (b >>> xs)
--}
-
-fOR' cfg xs (a :\/ b) t i x
- | forUnionMode (config cfg) == FUMSem1 =
- -- SEM1
- -- This is ⋓
-  fOR cfg xs a t i x `uu` fOR cfg xs b t i x
-
-fOR' cfg xs (a :\/ b) t i x
- | forUnionMode (config cfg) == FUMSem2 =
- -- SEM2
- -- This is U
-  fOR cfg xs a t i x `union` fOR cfg xs b t i x
+fOR' cfg xs (a :\/ b) t i x = fORUnion cfg xs a b t i x
 
 fOR' cfg xs (a :++ b) t i x =
 --  trace ("FOR " ++ show (a, b, t, i, x, fora, forb, sings)) $
@@ -288,19 +266,65 @@ fOR' cfg xs (a :++ b) t i x =
         app (Fun g) (Fun h) = Fun (tupConcat g h)
         app _ _ = error "app"
 
-fOR' _ _ _ _ _ _ = undefined
 
-useSEM1 :: Bool
-useSEM1 = False
+fORUnion :: ConfigRef -> [Ident] -> PENV -> PENV -> SrcEssential -> Ident -> Ident -> PENV
+fORUnion cfg xs a b t i x =
+  case forUnionMode (config cfg) of
+    ForUnionSem1 -> fora `uu` forb
+        where fora = fOR cfg xs a t u1 v1
+              forb = fOR cfg xs b t u2 v2
+    ForUnionSem2 -> fora `union` forb
+        where fora = fOR cfg xs a t u1 v1
+              forb = fOR cfg xs b t u2 v2
+
+    ForUnionSem3 ->
+-- This is ⊎
+      (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
+      where
+        fora = fOR cfg xs a t u1 v1
+        forb = fOR cfg xs b t u2 v2
+        (u1, v1) = fresh2 ("u1","v1") (i:x:xs) t
+        (u2, v2) = fresh2 ("u2","v2") (i:x:xs) t
+        sings = bigUnion [ i .= tu1 `utup` tu2 /\ x .= tv1 `utup` tv2 /\
+                           u1 .= tu1 /\ u2 .= tu2 /\ v1 .= tv1 /\ v2 .= tv2
+                         | tu1 <- allValuesOf u1 fora
+                         , tu2 <- allValuesOf u2 forb
+                         , tv1 <- allValuesOf v1 fora
+                         , tv2 <- allValuesOf v2 forb
+                         , consistent tu1 tu2
+                         , consistent tv1 tv2
+                         ]
+        utup (Fun g) (Fun h) = Fun (funUnion g h)
+        utup _ _ = error "utup"
+        consistent (Fun g) (Fun h) = Set.isEmpty (funDomain g `Set.intersect` funDomain h)
+        consistent _ _ = error "consistent"
+
 
 uu :: PENV -> PENV -> PENV
 uu xs ys = [ x \/ y | x <- xs, y <- ys ]
   
+dodgy :: PENV -> PENV -> PENV
+dodgy s t = uni (flat s) (flat t)
+  where flat (Unit x) = [x]
+        flat Empty = []
+        flat (x :++ y) = flat x ++ flat y
+        flat s = error $ "dodgy.flat " ++ show s
+        uni [] ys = foldr (+++) Empty $ map Unit ys
+        uni xs [] = foldr (+++) Empty $ map Unit xs
+        uni (x:xs) (y:ys) = Unit (x \/ y) +++ uni xs ys
+
 allValuesOf :: Ident -> P ENV -> [Value]
 allValuesOf _ Empty = []
 allValuesOf x (a :++ b) = allValuesOf x a `L.union` allValuesOf x b
 allValuesOf x (a :\/ b) = allValuesOf x a `L.union` allValuesOf x b
 allValuesOf x (Unit d) = extractVar d x
+
+ifUnion :: ConfigRef -> PENV -> PENV -> PENV
+ifUnion cfg s t =
+  case ifUnionMode (config cfg) of
+    IfUnionUnion  -> s `union` t
+    IfUnionConcat -> s +++ t
+    IfUnionDodgy  -> s `dodgy` t
 
 dE :: ConfigRef -> SrcEssential -> Ident -> Ident -> P ENV
 dE cfg tin u v =
@@ -326,14 +350,15 @@ dE' cfg (Where t0 t1)                    i x = cnorm cfg $ dE cfg t0 i x *** dC 
 dE' cfg (Block t)                        i x = dB cfg t i x
 dE' _   Fail                             _ _ = Empty
 dE' cfg (ApplyD (Variable (Ident _ "operator'|||'")) (Array [t0, t1])) i x =
-  dE cfg t0 i x `union` dE cfg t1 i x
+  ifUnion cfg
+    (dE cfg t0 i x)
+    (dE cfg t1 i x)
 dE' cfg (If3 t0 t1 t2)                   i x = cnorm cfg $
-  (s0 *** dB cfg t1 i x >>> xs)
-  `union`
-  -- +++
-  (nOT (s0 >>> xs) *** dB cfg t2 i x)
+  ifUnion cfg
+    (s0 *** dB cfg t1 i x >>> xs)
+    (nOT (s0 >>> xs) *** dB cfg t2 i x)
   where xs = bvs t0
-        s0 = oNE xs (dC cfg t0)
+        s0 = oNE cfg xs (dC cfg t0)
 dE' cfg (For2 t0 t1) i x = cnorm cfg $ fOR cfg (bvs t0) (dC cfg t0) t1 i x
 dE' cfg t@(ApplyD (EPrim DotDot) (Array [t0, t1])) i x = cnorm cfg $
   dE cfg t0 a l *** dE cfg t1 b h *** unit (i .=. x) ***
@@ -552,8 +577,8 @@ bvs :: SrcEssential -> [Ident]
 bvs = getVisibleBinders
 
 cnorm :: ConfigRef -> PENV -> PENV
-cnorm cfg | normalize (config cfg) = norm
-          | otherwise              = id
+cnorm cfg | useTree (config cfg) = id
+          | otherwise            = norm
 
 -------
 

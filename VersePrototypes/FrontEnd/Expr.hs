@@ -655,7 +655,7 @@ instance Pretty SrcExpr where
                                                    text "do",
                                                      indent $ ppr 0 e2]
 
-          Block e1 -> maybeParens (p > 0) $ sep [text "block" <+> indent (ppr 0 e1)]
+          Block e1 -> sep [text "block" <+> braces (indent (ppr 0 e1))]
 
           Case1 bs ->
             maybeParens (p > 0) $ sep [ text "case", indent $ ppr 0 bs ]
