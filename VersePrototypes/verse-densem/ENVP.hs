@@ -14,6 +14,7 @@ module ENVP(
   )where
 import Data.Function(on)
 import Data.List(intercalate, groupBy, sortBy)
+import Epic.Print(Pretty(..), text)
 import ValueP
 
 default ()
@@ -23,6 +24,9 @@ default ()
 infix  5 .=, .=., ./=
 infixr 4 /\ -- dummy
 infixr 3 \/
+
+instance Pretty ENV where
+  pPrintPrec _ _ = text . show
 
 empty :: ENV
 empty = OR []

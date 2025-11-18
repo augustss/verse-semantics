@@ -198,6 +198,7 @@ library verse-densem
                       Pom
                       SLS
                       Set
+                      MultiSet
                       ValueS
                       Map
                       ENVDesugar

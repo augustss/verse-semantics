@@ -7,8 +7,8 @@ import qualified Data.List as L
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
-import qualified Set
-import Set(Set)
+import qualified MultiSet as Set
+import MultiSet(Set)
 import PomSet
 --import Debug.Trace
 

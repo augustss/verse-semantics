@@ -16,15 +16,15 @@ module ValueP(
   funEmpty,
   funDomain,
   funUnion, funConcat, tupConcat,
-  allTuples, allTuplesLen, allTuplesLenV,
+  allTuples,
   tupleLen,
   ) where
 import Control.Monad
-import Data.List((\\), intercalate)
+import Data.List((\\), intercalate, nub)
 import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
 import PomSet
-import qualified Set
+import qualified MultiSet as Set
 
 default ()
 
@@ -236,15 +236,19 @@ showPairs :: [(Value, Value)] -> String
 showPairs xys = "{" ++ intercalate "," (map (\ (x,y) -> show x ++ "->" ++ show y) xys) ++ "}"
 
 allFUNs :: [FUN]
-allFUNs = -- [ fun[funNegate], fun[funInt], fun[funGt], fun[funLt], fun[funAdd], fun[funSub], fun[funMul], fun[funDiv] ]
+allFUNs = mkUniqFUN $
           [ fun [f] | f <- allPFs ]
           ++
           [ f | Fun f <- allTuples ]
 
+mkUniqFUN :: [FUN] -> [FUN]
+mkUniqFUN = nub
+
 -- Integers and pairs of integers
 allValues :: [Value]
-allValues = allInts ++ map Tuple (allTuplesLen 2)
-            ++ [ Fun (unit f) | f <- allPFs ]     -- all single lane functions
+allValues = nub $
+  allInts ++ allTuples
+  ++ [ Fun (unit f) | f <- allPFs ]     -- all single lane functions
 
 allValuesSet :: Set.Set Value
 allValuesSet = Set.mkSetUnsafe allValues
@@ -260,9 +264,23 @@ tupleLen _ = error "not a Tuple"
 -- and just 0,1,2-tuples
 allTuples :: [Value]
 allTuples = concatMap allTuplesLenV [0..maxTuples]
+            ++
+            extraTuples
 
+extraTuples :: [Value]
+extraTuples =
+  [ Tuple [Tuple [Int 0], Tuple [Int 2]]
+  ]
+
+{-
 allTuplesLen :: Int -> [[Value]]
-allTuplesLen = allTuplesLen' allTupleElems
+allTuplesLen 0 = [ Tuple [] ]
+allTuplesLen 1 = [ vs | Tuples (vs@[_]) <- allTuples ]
+allTuplesLen 2 = [ vs | Tuples (vs@[_,_]) <- allTuples ]
+allTuplesLen 3 = [ vs | Tuples (vs@[_,_,_]) <- allTuples ]
+allTuplesLen 4 = [ vs | Tuples (vs@[_,_,_,_]) <- allTuples ]
+allTuplesLen _ = error "allTuplesLen"
+-}
 
 allTuplesLenV :: Int -> [Value]
 allTuplesLenV = map Tuple . allTuplesLen' allTupleElems
