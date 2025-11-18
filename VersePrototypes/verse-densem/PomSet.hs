@@ -5,6 +5,7 @@ module PomSet(module PomSet) where
 import Control.Applicative
 import Control.Monad
 import qualified MultiSet as Set
+import Epic.Print(Pretty(..), text, (<+>), maybeParens)
 import MultiSet(Set)
 import GHC.Stack
 
@@ -19,6 +20,12 @@ data P a
   | P a :++ P a
   | P a :\/ P a
   deriving (Show)
+
+instance Pretty a => Pretty (P a) where
+  pPrintPrec _ _ Empty = text "empty"
+  pPrintPrec l p (Unit a) = pPrintPrec l p a
+  pPrintPrec l p (s :++ t) = maybeParens (p > 5) $ pPrintPrec l 5 s <+> text "++" <+> pPrintPrec l 5 t
+  pPrintPrec l p (s :\/ t) = maybeParens (p > 3) $ pPrintPrec l 3 s <+> text "\\/" <+> pPrintPrec l 3 t
 
 --instance (Show a, Ord a) => Show (P a) where
 --  showsPrec p s = showsPrec p (canon $ absorbEmpty s)

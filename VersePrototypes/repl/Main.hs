@@ -31,7 +31,7 @@ import SExpC(srcExprToExp)
 import qualified TimE (den)
 import qualified SLS (den)
 import qualified Pom (den)
-import qualified PomPom (denS, ForUnionMode(..))
+import qualified PomPom (denS, ForUnionMode(..), ForBaseUnion(..), Config(..), defaultConfig)
 import ENVDesugar (envDesugar)
 
 -- Epic libraries
@@ -154,6 +154,10 @@ data CState = CState
   , cs_flags       :: !Flags
   , cs_esystem     :: !ESystem
   , cs_variables   :: !(VariableMap)
+  -- PomPom related settings
+  , cs_pp_forunion :: PomPom.ForUnionMode
+  , cs_pp_forbase  :: PomPom.ForBaseUnion
+  , cs_pp_normalize:: Bool
   }
 
 type VariableMap = HashMap String String
@@ -220,9 +224,7 @@ theCommandSet = CommandSet
       , Cmd "tim-densem [EXPR]"    "Evaluate [last] expression"            cTimDensem
       , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
       , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
-      , Cmd "pp1 [EXPR]"           "Evaluate [last] expression"            cPomPomDensem1
-      , Cmd "pp2 [EXPR]"           "Evaluate [last] expression"            cPomPomDensem2
-      , Cmd "ppO [EXPR]"           "Evaluate [last] expression"            cPomPomDensemOld
+      , Cmd "ppom [EXPR]"          "Evaluate [last] expression"            cPomPomDensem
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -250,6 +252,9 @@ theCommandSet = CommandSet
                       , cs_flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
                       , cs_esystem = ESystemPlaceHolder
                       , cs_variables = mempty
+                      , cs_pp_forunion = PomPom.forUnionMode PomPom.defaultConfig
+                      , cs_pp_forbase = PomPom.forBaseUnion PomPom.defaultConfig
+                      , cs_pp_normalize = PomPom.normalize PomPom.defaultConfig
                       }
   , c_history = Just ".versei"
   , c_nl = False
@@ -288,7 +293,21 @@ cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (cs_flags s) then "on" else "off"
   putStr $ concatMap f flagTable
   printf "  %-12s %d\n" "steps" (fRewriteSteps (cs_flags s))
+  printf "  %-12s %s\n" "forunion" (show $ cs_pp_forunion s)
+  printf "  %-12s %s\n" "forbase" (show $ cs_pp_forbase s)
+  printf "  %-12s %s\n" "normalize" (show $ cs_pp_normalize s)
   pure s
+
+cSet True l s | Just l' <- stripPrefix "forunion=" l
+              , Just m <- readMaybe l'
+  = pure $ s{ cs_pp_forunion = m }
+
+cSet True l s | Just l' <- stripPrefix "forbase=" l
+              , Just m <- readMaybe l'
+  = pure $ s{ cs_pp_forbase = m }
+
+cSet b l s | l == "normalize"
+  = pure $ s{ cs_pp_normalize = b }
 
 -- Set fRewriteSteps
 cSet True l s | Just l' <- stripPrefix "steps=" l
@@ -550,23 +569,21 @@ cPomDensem
 -}
        ; return () }
 
-cPomPomDensem1 :: CmdRunner CState
-cPomPomDensem1 =  cPomPomDensem PomPom.FUMSem1
-cPomPomDensem2 :: CmdRunner CState
-cPomPomDensem2 =  cPomPomDensem PomPom.FUMSem2
-cPomPomDensemOld :: CmdRunner CState
-cPomPomDensemOld =  cPomPomDensem PomPom.FUMSemBadOld
-
-cPomPomDensem :: PomPom.ForUnionMode -> CmdRunner CState
-cPomPomDensem m
+cPomPomDensem :: CmdRunner CState
+cPomPomDensem
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
+             fum = cs_pp_forunion s
+             fbu = cs_pp_forbase s
+             norml = cs_pp_normalize s
+             cfg = PomPom.Config fum fbu norml
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- eSlsDesugar e_ess
-       ; let res = PomPom.denS m e_ds
-       ; let den_sem = addHeader "PomPom Den-sem" $ text $ show res
+       ; (res, dtrace) <- PomPom.denS cfg (fTraceEval flags) e_ds
+       ; let den_sem = addHeader "PomPom Den-sem" $ text res
        ; displayDoc den_sem
+       ; mapM_ putStrLn dtrace
        ; return () }
 
 --------------------------------------------------------

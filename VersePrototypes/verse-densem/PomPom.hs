@@ -5,6 +5,7 @@ module PomPom where
 --import Epic.List
 --import Control.DeepSeq
 import Control.Exception
+import Data.Char(toLower)
 import Data.IORef
 import qualified Data.List as L
 import FrontEnd.Expr hiding(Tuple)
@@ -24,39 +25,81 @@ import Epic.Print hiding (empty)
 -- A Config is pass down everywhere to pick various semantic variations.
 data Config = Config
   { forUnionMode :: ForUnionMode
-  , normalize    :: Bool
   , forBaseUnion :: ForBaseUnion
+  , normalize    :: Bool
+  }
+  deriving (Show)
+
+defaultConfig :: Config
+defaultConfig = Config { forUnionMode = FUMSem2, forBaseUnion = FBUUnion, normalize = False }
+
+data ConfigRef = ConfigRef
+  { config       :: Config
   , logUniq      :: IORef Int
   , logRef       :: IORef [String]     -- log, in reverse order
+  , doTrace      :: Bool
   }
---  deriving (Show)
 
-{-# NOINLINE mkConfig #-}
-mkConfigIO :: ForUnionMode -> IO Config
-mkConfigIO m = do
-  u <- newIORef 0
-  r <- newIORef []
-  return Config{ forUnionMode = m, normalize = False, forBaseUnion = FBUUnion, logUniq = u, logRef = r }
+data ForUnionMode = FUMSem1 | FUMSem2 | FUMSem3
+  deriving (Eq, Ord)
 
-mkConfig :: ForUnionMode -> Config
-mkConfig m = unsafePerformIO $ mkConfigIO m
+instance Show ForUnionMode where
+  show FUMSem1 = "SEM1"
+  show FUMSem2 = "SEM2"
+  show FUMSem3 = "SEM3"
 
-data ForUnionMode = FUMSem1 | FUMSem2 | FUMSemBadOld
-  deriving (Eq, Ord, Show)
+instance Read ForUnionMode where
+  readsPrec _ s = [ (m, r)
+                  | (t, r) <- lex s
+                  , Just m <- pure $
+                              case map toLower t of
+                                "sem1" -> Just FUMSem1
+                                "sem2" -> Just FUMSem2
+                                "sem3" -> Just FUMSem3
+                                _      -> Nothing
+                  ]
 
 data ForBaseUnion = FBUUnion | FBUDoubleUnion
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
 
-logStep :: (Pretty a, Show a', Show b) => Config -> String -> a -> a' -> b -> b
-logStep cfg msg a a' b = unsafePerformIO $ do
+instance Show ForBaseUnion where
+  show FBUUnion = "union"
+  show FBUDoubleUnion = "doubleUnion"
+
+instance Read ForBaseUnion where
+  readsPrec _ s = [ (m, r)
+                  | (t, r) <- lex s
+                  , Just m <- pure $
+                              case map toLower t of
+                                "union"       -> Just FBUUnion
+                                "doubleunion" -> Just FBUDoubleUnion
+                                "uunion"      -> Just FBUDoubleUnion
+                                _      -> Nothing
+                  ]
+
+mkConfigRefIO :: Config -> Bool -> IO ConfigRef
+mkConfigRefIO cfg tr = do
+  u <- newIORef 0
+  r <- newIORef []
+  return ConfigRef{ config = cfg, doTrace = tr, logUniq = u, logRef = r }
+
+type ParamList = [(String, String)]
+
+pv :: Pretty a => String -> a -> (String, String)
+pv s a = (s, prettyShow a)
+
+logStep :: (Pretty a, Pretty b) => ConfigRef -> String -> a -> ParamList -> b -> b
+logStep cfg msg a ps b = unsafePerformIO $ do
   u <- readIORef (logUniq cfg)
   writeIORef (logUniq cfg) $! u + 1
-  let s1 = printf "%5d { %5s: (%s) %s\n" u msg (prettyShow a) (show a')
+  let arg = printf "%5s[ %s ] %s" msg (prettyShow a) ppl :: String
+      s1  = printf "%5d { %s" u arg
+      ppl = unwords $ map (\ (n,v) -> n ++ "=" ++ v) ps
 --  putStr $ "*** " ++ s1
   True <- evaluate (s1==s1)
   l1 <- readIORef (logRef cfg)
   writeIORef (logRef cfg) (s1:l1)
-  let s2 = printf "%5d } %5s: (%s) %s = %s\n" u msg (prettyShow a) (show a') (show b)
+  let s2 = printf "%5d } %s --> %s" u arg (prettyShow b)
 --  putStr $ "*** " ++ s2
   True <- evaluate (s2==s2)
   l2 <- readIORef (logRef cfg)
@@ -94,9 +137,6 @@ Unit d    *** (s :\/ t) = (Unit d *** s) `union` (Unit d *** t)
 Unit d    *** (s :++ t) = (Unit d *** s) +++     (Unit d *** t)
 Unit d1   *** Unit d2   = mkUnit (d1 /\ d2)
 -}
-
-instance Pretty PENV where
-  pPrintPrec _ _ = text . show
 
 -- Disjunction
 disj :: P ENV -> P ENV -> P ENV
@@ -140,12 +180,14 @@ coll (a :\/ b) = coll a \/ coll b
 coll (a :++ b) = coll a \/ coll b
 coll (Unit e)  = e
 
-fOR1 :: Config -> [Ident] -> ENV -> PENV -> Ident -> Ident -> Ident -> Ident -> PENV
+fOR1 :: ConfigRef -> [Ident] -> ENV -> PENV -> Ident -> Ident -> Ident -> Ident -> PENV
 fOR1 cfg xs d0 tin u v x y =
-  logStep cfg "FOR1" tin (xs, d0, u, v, x, y) $
+  (if doTrace cfg then
+     logStep cfg "FOR1" tin [pv "xs" xs, pv "d0" d0, pv "u" u, pv "v" v, pv "x" x, pv "y" y]
+   else id) $
   fOR1' cfg xs d0 tin u v x y
 
-fOR1' :: Config -> [Ident] -> ENV -> PENV -> Ident -> Ident -> Ident -> Ident -> PENV
+fOR1' :: ConfigRef -> [Ident] -> ENV -> PENV -> Ident -> Ident -> Ident -> Ident -> PENV
 fOR1' cfg xs d0 (s :\/ t) u v x y =
   fOR1 cfg xs d0 s u v x y `union` fOR1 cfg xs d0 t u v x y
 fOR1' cfg xs d0 (s :++ t) u v x y =
@@ -159,12 +201,14 @@ fOR1' _   xs d0 (Unit d1) u v x y =
                          , iy <- allInts -- XXX allV
                          ]
 
-fOR :: Config -> [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
-fOR cfg xs tin t i x =
-  logStep cfg "FOR" tin (xs, t, i, x) $
-  fOR' cfg xs tin t i x
+fOR :: ConfigRef -> [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
+fOR cfg xs tin t1 u v =
+  (if doTrace cfg then
+     logStep cfg "FOR" tin [pv "xs" xs, pv "t1" t1, pv "u" u, pv "v" v]
+   else id) $
+  fOR' cfg xs tin t1 u v
 
-fOR' :: Config -> [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
+fOR' :: ConfigRef -> [Ident] -> P ENV -> SrcEssential -> Ident -> Ident -> P ENV
 fOR' _  _   Empty     _ _ _ = unit (i .= nil /\ x .= nil)
 fOR' cfg xs (Unit d0) t i x =
   fOR1 cfg xs d0 (dE cfg t xx yy) i x xx yy
@@ -186,7 +230,7 @@ fOR cfg xs d@Unit{}  t i x =
 --fOR xs (a :\/ b) t i x = fOR xs (a :++ b) t i x
 
 fOR' cfg xs (a :\/ b) t i x
- | forUnionMode cfg == FUMSemBadOld =
+ | forUnionMode (config cfg) == FUMSem3 =
 -- This is ⊎
   (unit sings *** fora *** forb) >>> (u1:v1:u2:v2:xs)
   where fora = fOR cfg xs a t u1 v1
@@ -216,13 +260,13 @@ fOR' cfg xs (a :\/ b) t i x
 -}
 
 fOR' cfg xs (a :\/ b) t i x
- | forUnionMode cfg == FUMSem1 =
+ | forUnionMode (config cfg) == FUMSem1 =
  -- SEM1
  -- This is ⋓
   fOR cfg xs a t i x `uu` fOR cfg xs b t i x
 
 fOR' cfg xs (a :\/ b) t i x
- | forUnionMode cfg == FUMSem2 =
+ | forUnionMode (config cfg) == FUMSem2 =
  -- SEM2
  -- This is U
   fOR cfg xs a t i x `union` fOR cfg xs b t i x
@@ -258,12 +302,14 @@ allValuesOf x (a :++ b) = allValuesOf x a `L.union` allValuesOf x b
 allValuesOf x (a :\/ b) = allValuesOf x a `L.union` allValuesOf x b
 allValuesOf x (Unit d) = extractVar d x
 
-dE :: Config -> SrcEssential -> Ident -> Ident -> P ENV
+dE :: ConfigRef -> SrcEssential -> Ident -> Ident -> P ENV
 dE cfg tin u v =
-  logStep cfg "E" tin (i, x) $
+  (if doTrace cfg then
+     logStep cfg "E" tin [pv "u" u, pv "v" v]
+   else id) $
   dE' cfg tin u v
 
-dE' :: Config -> SrcEssential -> Ident -> Ident -> P ENV
+dE' :: ConfigRef -> SrcEssential -> Ident -> Ident -> P ENV
 -- The denotational semantics itself (Fig 10)
 dE' _   (Lit (LInt k))                   i x = unit $ i .=. x /\ x .= Int (fromIntegral k)
 dE' _   (EPrim p)                        i x = unit $ i .=. x /\ x .= Fun (dP p)
@@ -417,20 +463,25 @@ conc :: [Value] -> Value
 conc vs = Tuple $ concatMap (\ (Tuple ys) -> ys) vs
 -}
 
-dB :: Config -> SrcEssential -> Ident -> Ident -> P ENV
-dB cfg tin i x =
-  logStep cfg "B" tin (i, x) $
-  dB' cfg tin i x
+dB :: ConfigRef -> SrcEssential -> Ident -> Ident -> P ENV
+dB cfg tin u v =
+  (if doTrace cfg then
+     logStep cfg "B" tin [pv "u" u, pv "v" v]
+   else
+     id) $
+  dB' cfg tin u v
 
-dB' :: Config -> SrcEssential -> Ident -> Ident -> P ENV
+dB' :: ConfigRef -> SrcEssential -> Ident -> Ident -> P ENV
 dB' cfg e i x = dE cfg e i x >>> bvs e
 
-dC :: Config -> SrcEssential -> P ENV
+dC :: ConfigRef -> SrcEssential -> P ENV
 dC cfg tin =
-  logStep cfg "C" tin () $
+  (if doTrace cfg then
+     logStep cfg "C" tin []
+   else id) $
   dC' cfg tin
 
-dC' :: Config -> SrcEssential -> P ENV
+dC' :: ConfigRef -> SrcEssential -> P ENV
 dC' cfg e =
   dE cfg e i x >>> [i,x]  where (i, x) = fresh2 ("i", "x") [] e
 
@@ -500,26 +551,25 @@ fresh2' (sx, sy) is = (x, y)
 bvs :: SrcEssential -> [Ident]
 bvs = getVisibleBinders
 
-cnorm :: Config -> PENV -> PENV
-cnorm cfg | normalize cfg = norm
-          | otherwise     = id
+cnorm :: ConfigRef -> PENV -> PENV
+cnorm cfg | normalize (config cfg) = norm
+          | otherwise              = id
 
 -------
 
-denS :: ForUnionMode -> SrcEssential -> Set [ENV]
-denS m t = canon $
-             dE cfg (Block t) i x -- `remv` [i]
-  where (i, x) = fresh2 ("u", "v") [] t
-        -- res = Ident noLoc "res"
-        cfg = mkConfig m
-
-den :: SrcEssential -> Set [ENV]
-den = denS FUMSem2
+denS :: Config -> Bool -> SrcEssential -> IO (String, [String])
+denS cfg trc t = do
+  let (i, x) = fresh2 ("u", "v") [] t
+  cfgr <- mkConfigRefIO cfg trc
+  let res = show $ canon $ dE cfgr (Block t) i x
+  True <- evaluate (res == res)
+  l <- readIORef (logRef cfgr)
+  return (res, reverse l)
 
 -------
 
 -- The first argument to fUN is only used to make sure we make fresh variables
-fUN :: Config -> [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN :: ConfigRef -> [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
 fUN _ _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
 fUN cfg used apt xs (s :\/ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
@@ -630,10 +680,8 @@ bigIntersectSet = bigIntersect . Set.toList
 
 tE :: SrcEssential -> Ident -> Ident -> IO ()
 tE t u v = do
-  cfg <- mkConfigIO FUMSem2
+  cfg <- mkConfigRefIO defaultConfig True
   let r = dE cfg t u v
   print r
   l <- readIORef (logRef cfg)
-  mapM_ putStr $ reverse l
-
-  
+  mapM_ putStrLn $ reverse l
