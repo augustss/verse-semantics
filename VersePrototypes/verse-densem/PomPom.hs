@@ -411,6 +411,9 @@ dF f a r =
   , d /= E.empty
   ]
 
+mkPomSetList :: [a] -> P a
+mkPomSetList = foldr union Empty . map unit
+
 -- The constraint {{ (x => y) `elem` h }}
 funHasPair :: Ident -> Ident -> PartialFun -> ENV
 funHasPair x y h = bigUnion [ x .= u /\ y .= v | u <- allValues, Just v <- [applyPF h u] ]
@@ -595,8 +598,15 @@ denS cfg trc t = do
 
 -- The first argument to fUN is only used to make sure we make fresh variables
 fUN :: ConfigRef -> [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
-fUN _ _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
-fUN cfg used apt xs (s :\/ t) t1 p q h f =
+fUN cfg used apt xs penv t1 c d h f =
+  (if doTrace cfg then
+     logStep cfg "FUN" penv [pv "apt" apt, pv "xs" xs, pv "t1" t1, pv "c" c, pv "d" d, pv "h" h, pv "f" f]
+   else id) $
+  fUN' cfg used apt xs penv t1 c d h f
+
+fUN' :: ConfigRef -> [Ident] -> Aperture -> [Ident] -> PENV -> SrcEssential -> Ident -> Ident -> Ident -> Ident -> PENV
+fUN' _ _ _ _ Empty _ _ _ h f = unit $ h .= Fun (fun [funEmpty]) /\ f .= Fun (fun [funEmpty])
+fUN' cfg used apt xs (s :\/ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
   where funa = fUN cfg used apt xs s t1 p q h1 f1
         funb = fUN cfg used apt xs t t1 p q h2 f2
@@ -611,7 +621,7 @@ fUN cfg used apt xs (s :\/ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funUnion g h)
         ufun _ _ = error "ufun-1"
-fUN cfg used apt xs (s :++ t) t1 p q h f =
+fUN' cfg used apt xs (s :++ t) t1 p q h f =
   (unit sings *** funa *** funb) >>> (h1:f1:h2:f2:xs)
   where funa = fUN cfg used apt xs s t1 p q h1 f1
         funb = fUN cfg used apt xs t t1 p q h2 f2
@@ -626,8 +636,8 @@ fUN cfg used apt xs (s :++ t) t1 p q h f =
                          ]
         ufun (Fun g) (Fun h) = Fun (funConcat g h)
         ufun _ _ = error "ufun-2"
-fUN cfg used apt xs d@(Unit dd) t1 p q h f =
---trace ("fUN dd=" ++ show dd ++ " t1=" ++ show t1 ++ " (p,q,h,f)=" ++ show(p,q,h,f) ++ "xs=" ++ show xs) $
+fUN' cfg used apt xs d@(Unit dd) t1 p q h f =
+--trace ("fUN' dd=" ++ show dd ++ " t1=" ++ show t1 ++ " (p,q,h,f)=" ++ show(p,q,h,f) ++ "xs=" ++ show xs) $
   (d *** unit sings >>> (p:q:xs))
   `union`
   (nOT (d >>> (p:q:xs)) *** unit (h .= Fun Empty /\ f .= Fun Empty))
