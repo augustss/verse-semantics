@@ -16,6 +16,7 @@ module Verse.Monad
   , Stream (..)
   , split
   , fork
+  , fork1
   , stuck
   , Var
   , Vars (..)
@@ -418,18 +419,60 @@ yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
     modifyS succS
     altF (f $ \ m -> modifyS predS *> fork' m sk) fk ek
 
-succeedF :: Monad m => Succeed (VerseT m ()) m ()
-{-# INLINABLE succeedF #-}
-succeedF s mem () fk ek = pure $ do
+fork1
+  :: (MonadWeakRef m, ZipVars_ a m)
+  => VerseT m (Var m a) -> VerseT m (Var m a)
+{-# INLINE fork1 #-}
+fork1 m = fork1' m succeedF
+
+fork1'
+  :: (MonadWeakRef m, ZipVars_ b m)
+  => VerseT m a
+  -> Succeed (VerseT m (Var m b)) m a
+  -> VerseT m (Var m b)
+{-# INLINABLE fork1' #-}
+fork1' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
+  unVerseT m r s env mem yieldF1 sk' failF emptyF >>= \ m ->
+  unVerseT m r s env mem yk sk fk ek
+
+yieldF1
+  :: (MonadWeakRef m, ZipVars_ a m)
+  => Yield (VerseT m (Var m a)) m
+{-# INLINABLE yieldF1 #-}
+yieldF1 = Yield $ \ i f s mem sk fk ek -> pure $ do
   putS s
   putMem mem
-  altF (pure ()) fk ek
+  level <- getLevel
+  if i < level then
+    altF (yield i (\ k -> f $ \ m -> k $ fork1' m sk)) fk ek
+  else do
+    modifyS succS
+    var <- freshVar
+    altF
+      (f (\ m -> modifyS predS *> fork (m >>= liftSucceedF1 sk var)) $> var)
+      fk
+      ek
 
-failF :: Applicative m => Fail (VerseT m ()) m
+liftSucceedF1
+  :: (MonadWeakRef m, ZipVars_ b m)
+  => Succeed (VerseT m (Var m b)) m a -> Var m b -> a -> VerseT m ()
+{-# INLINABLE liftSucceedF1 #-}
+liftSucceedF1 sk' var x = VerseT $ \ r s env mem yk sk fk ek ->
+  sk' s mem x failF emptyF >>= \ m ->
+  unVerseT (m >>= unifyVar var) r s env mem yk sk fk ek
+
+succeedF :: Monad m => Succeed (VerseT m a) m a
+{-# INLINABLE succeedF #-}
+succeedF s mem x fk ek = pure $ do
+  putS s
+  putMem mem
+  altF (pure x) fk ek
+
+failF :: Applicative m => Fail (VerseT m a) m
 {-# INLINE failF #-}
 failF _env = emptyF
 
-emptyF :: Applicative m => Empty (VerseT m ()) m
+emptyF :: Applicative m => Empty (VerseT m a) m
 {-# INLINE emptyF #-}
 emptyF mem = pure $ do
   putMem mem
@@ -437,10 +480,10 @@ emptyF mem = pure $ do
 
 altF
   :: Monad m
-  => VerseT m ()
-  -> Fail (VerseT m ()) m
-  -> Empty (VerseT m ()) m
-  -> VerseT m ()
+  => VerseT m a
+  -> Fail (VerseT m a) m
+  -> Empty (VerseT m a) m
+  -> VerseT m a
 {-# INLINABLE altF #-}
 altF m fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
   unVerseT m r s env mem yk sk

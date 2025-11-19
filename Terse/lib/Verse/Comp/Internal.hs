@@ -102,9 +102,7 @@ comp' s1 s2 = wrap $ \ case
     var1 <- $(comp' s1 's3 e1)
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
-    var <- Val.freshVar
-    fork $ Val.unifyVar var =<< app var1 s4 $(varE s2) var2
-    pure var |]
+    Val.fork1 $ app var1 s4 $(varE s2) var2 |]
   Exi x e -> [| do
     var <- Val.freshVar
     $(localEnv (Env.insert x 'var) $ comp' s1 s2 e) |]
@@ -132,98 +130,81 @@ comp' s1 s2 = wrap $ \ case
     var2 <- $(comp' 's3 s2 e2)
     Val.unifyVar var1 var2
     pure var1 |]
-  e1 :| e2 -> [| do
-    var <- Val.freshVar
-    fork $ do
-      readChoiceFree $(varE s1)
-      Val.unifyVar var =<< $(comp' s1 s2 e1) <|> $(comp' s1 s2 e2)
-    pure var |]
-  e1 :.. e2 -> [| do
-    var <- Val.freshVar
-    fork $ do
-      readChoiceFree $(varE s1)
-      s3 <- freshS
-      var1 <- $(comp' s1 's3 e1)
-      var2 <- $(comp' 's3 s2 e2)
-      (,) <$> Val.readVar var1 <*> Val.readVar var2 >>= \ case
-        (Val.Int x1, Val.Int x2) ->
-          Val.unifyVar var <=< asum $ Val.newVar . Val.Int <$> [x1 .. x2]
-        _ -> stuck
-    pure var |]
+  e1 :| e2 -> [| Val.fork1 $ do
+    readChoiceFree $(varE s1)
+    $(comp' s1 s2 e1) <|> $(comp' s1 s2 e2) |]
+  e1 :.. e2 -> [| Val.fork1 $ do
+    readChoiceFree $(varE s1)
+    s3 <- freshS
+    var1 <- $(comp' s1 's3 e1)
+    var2 <- $(comp' 's3 s2 e2)
+    (,) <$> Val.readVar var1 <*> Val.readVar var2 >>= \ case
+      (Val.Int x1, Val.Int x2) ->
+        asum $ Val.newVar . Val.Int <$> [x1 .. x2]
+      _ -> stuck |]
   e1 :+ e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
-    var <- Val.freshVar
-    fork $ Val.unifyVar var =<< plus' s4 $(varE s2) var1 var2
-    pure var |]
+    Val.fork1 $ plus' s4 $(varE s2) var1 var2 |]
   e1 :- e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
-    var <- Val.freshVar
-    fork $ Val.unifyVar var =<< minus' s4 $(varE s2) var1 var2
-    pure var |]
+    Val.fork1 $ minus' s4 $(varE s2) var1 var2 |]
   e1 :< e2 -> [| do
     s3 <- freshS
     var1 <- $(comp' s1 's3 e1)
     s4 <- freshS
     var2 <- $(comp' 's3 's4 e2)
-    var <- Val.freshVar
-    fork $ Val.unifyVar var =<< less' s4 $(varE s2) var1 var2
-    pure var |]
+    Val.fork1 $ less' s4 $(varE s2) var1 var2 |]
   Fail -> [| empty |]
   All e -> [| do
-    var <- Val.freshVar
     heap <- newHeap $(varE s1)
-    fork $ do
-      Val.unifyVar var <=< Val.newTup <=< all' $ do
+    Val.fork1 $ do
+      var <- Val.newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
         local (const heap) $(comp' 's1 's2 e) <* readS s2
       unifyS $(varE s1) $(varE s2)
-    pure var |]
-  For e1 x e2 -> [| do
-    var <- Val.freshVar
+      pure var |]
+  For e1 x e2 -> [|
     let
       loop s1 vars = \ case
         Done -> do
           unifyS s1 $(varE s2)
-          Val.unifyVar var <=< Val.newTup $ reverse vars
+          Val.newTup $ reverse vars
         Step var m -> do
           s2 <- freshS
           var <- $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e2)
           heap <- newHeap s2
           loop s2 (var:vars) =<< local (const heap) m
-    fork $ loop $(varE s1) [] =<< do
-      heap <- newHeap $(varE s1)
-      split $ do
-        s1 <- newS
-        s2 <- freshS
-        local (const heap) $(comp' 's1 's2 e1) <* readS s2
-    pure var |]
+    in
+      Val.fork1 $ loop $(varE s1) [] =<< do
+        heap <- newHeap $(varE s1)
+        split $ do
+          s1 <- newS
+          s2 <- freshS
+          local (const heap) $(comp' 's1 's2 e1) <* readS s2 |]
   One e -> [| do
-    var <- Val.freshVar
     heap <- newHeap $(varE s1)
-    fork $ do
-      Val.unifyVar var <=< one $ do
+    Val.fork1 $ do
+      var <- one $ do
         s1 <- newS
         s2 <- freshS
         local (const heap) $(comp' 's1 's2 e) <* readS s2
       unifyS $(varE s1) $(varE s2)
-    pure var |]
+      pure var |]
   If e1 x e2 e3 -> [| do
-    var <- Val.freshVar
     heap <- newHeap $(varE s1)
-    fork $ Val.unifyVar var =<< if'
+    Val.fork1 $ if'
       (do s1 <- newS
           s2 <- freshS
           local (const heap) $(comp' 's1 's2 e1) <* readS s2)
       (\ var -> $(localEnv (Env.insert x 'var) $ comp' s1 s2 e2))
-      $(comp' s1 s2 e3)
-    pure var |]
+      $(comp' s1 s2 e3) |]
 
 freeVars :: Quote m => CompT m a -> CompT m (a, Map TH.Name TH.Name)
 freeVars m = do

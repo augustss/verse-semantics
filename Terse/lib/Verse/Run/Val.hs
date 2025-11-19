@@ -8,6 +8,7 @@ module Verse.Run.Val
   , newVar
   , readVar
   , unifyVar
+  , fork1
   , freeze
   , newInt
   , readInt
@@ -88,6 +89,10 @@ readVar = Monad.readVar . getCompose . getFix
 unifyVar :: MonadWeakRef m => Var m -> Var m -> VerseT m ()
 {-# INLINE unifyVar #-}
 unifyVar = Monad.unifyVar `on` getCompose . getFix
+
+fork1 :: MonadWeakRef m => VerseT m (Var m) -> VerseT m (Var m)
+{-# INLINE fork1 #-}
+fork1 = fmap (Fix . Compose) . Monad.fork1 . fmap (getCompose . getFix)
 
 freeze
   :: MonadWeakRef m
