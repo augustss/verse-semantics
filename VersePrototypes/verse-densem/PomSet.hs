@@ -105,8 +105,8 @@ allLeaves (Unit a) = [a]
 allLeaves (a :++ b) = allLeaves a ++ allLeaves b
 allLeaves (a :\/ b) = allLeaves a ++ allLeaves b
 
-mkPomSetList :: [a] -> P a
-mkPomSetList = foldr (+++) Empty . map unit
+--mkPomSetList :: [a] -> P a
+--mkPomSetList = foldr (+++) Empty . map unit
 
 norm :: Ord a => P a -> P a
 norm = uncanon . canon
