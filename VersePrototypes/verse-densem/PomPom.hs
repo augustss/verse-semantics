@@ -42,7 +42,7 @@ data ConfigRef = ConfigRef
   }
 
 data ForUnionMode = ForUnionSem1 | ForUnionSem2 | ForUnionSem3
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Bounded, Enum)
 
 instance Show ForUnionMode where
   show ForUnionSem1 = "SEM1"
@@ -61,7 +61,7 @@ instance Read ForUnionMode where
                   ]
 
 data ForUnitMode = ForUnitFOR1 | ForUnitUnion | ForUnitDoubleUnion
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Bounded, Enum)
 
 instance Show ForUnitMode where
   show ForUnitUnion = "union"
@@ -81,8 +81,7 @@ instance Read ForUnitMode where
                   ]
 
 data IfUnionMode = IfUnionUnion | IfUnionConcat | IfUnionDodgy
-
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Bounded, Enum)
 
 instance Show IfUnionMode where
   show IfUnionUnion = "union"

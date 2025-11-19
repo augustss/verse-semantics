@@ -294,11 +294,11 @@ cSet :: Bool -> CmdRunner CState
 cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (cs_flags s) then "on" else "off"
   putStr $ concatMap f flagTable
-  printf "  %-12s %d\n" "steps" (fRewriteSteps (cs_flags s))
-  printf "  %-12s %s\n" "forunion" (show $ cs_pp_forunion s)
-  printf "  %-12s %s\n" "forunit" (show $ cs_pp_forunit s)
-  printf "  %-12s %s\n" "ifunion" (show $ cs_pp_ifunion s)
-  printf "  %-12s %s\n" "tree" (show $ cs_pp_tree s)
+  printf "  %-12s= %d\n" "steps" (fRewriteSteps (cs_flags s))
+  printf "  %-12s= %-10s  choices:%s\n" "forunion" (show $ cs_pp_forunion s) (show [minBound..maxBound `asTypeOf` cs_pp_forunion s])
+  printf "  %-12s= %-10s  choices:%s\n" "forunit" (show $ cs_pp_forunit s) (show [minBound..maxBound `asTypeOf` cs_pp_forunit s])
+  printf "  %-12s= %-10s  choices:%s\n" "ifunion" (show $ cs_pp_ifunion s) (show [minBound..maxBound `asTypeOf` cs_pp_ifunion s])
+  printf "  %-12s= %s\n" "tree" (show $ cs_pp_tree s)
   pure s
 
 cSet True l s | Just l' <- stripPrefix "forunion=" l
