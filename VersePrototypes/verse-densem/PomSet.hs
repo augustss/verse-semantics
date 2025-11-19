@@ -23,7 +23,7 @@ data P a
 
 instance Pretty a => Pretty (P a) where
   pPrintPrec _ _ Empty = text "empty"
-  pPrintPrec l p (Unit a) = pPrintPrec l p a
+  pPrintPrec l _ (Unit a) = text"u" <> pPrintPrec l 11 a
   pPrintPrec l p (s :++ t) = maybeParens (p > 5) $ pPrintPrec l 5 s <+> text "++" <+> pPrintPrec l 5 t
   pPrintPrec l p (s :\/ t) = maybeParens (p > 3) $ pPrintPrec l 3 s <+> text "\\/" <+> pPrintPrec l 3 t
 
