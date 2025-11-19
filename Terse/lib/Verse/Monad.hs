@@ -17,6 +17,7 @@ module Verse.Monad
   , split
   , fork
   , fork1
+  , fork2
   , stuck
   , Var
   , Vars (..)
@@ -460,6 +461,53 @@ liftSucceedF1
 liftSucceedF1 sk' var x = VerseT $ \ r s env mem yk sk fk ek ->
   sk' s mem x failF emptyF >>= \ m ->
   unVerseT (m >>= unifyVar var) r s env mem yk sk fk ek
+
+fork2
+  :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m)
+  => VerseT m (Var m a, Var m b) -> VerseT m (Var m a, Var m b)
+{-# INLINE fork2 #-}
+fork2 m = fork2' m succeedF
+
+fork2'
+  :: (MonadWeakRef m, ZipVars_ b m, ZipVars_ c m)
+  => VerseT m a
+  -> Succeed (VerseT m (Var m b, Var m c)) m a
+  -> VerseT m (Var m b, Var m c)
+{-# INLINABLE fork2' #-}
+fork2' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
+  unVerseT m r s env mem yieldF2 sk' failF emptyF >>= \ m ->
+  unVerseT m r s env mem yk sk fk ek
+
+yieldF2
+  :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m)
+  => Yield (VerseT m (Var m a, Var m b)) m
+{-# INLINABLE yieldF2 #-}
+yieldF2 = Yield $ \ i f s mem sk fk ek -> pure $ do
+  putS s
+  putMem mem
+  level <- getLevel
+  if i < level then
+    altF (yield i (\ k -> f $ \ m -> k $ fork2' m sk)) fk ek
+  else do
+    modifyS succS
+    vars <- (,) <$> freshVar <*> freshVar
+    altF
+      (f (\ m -> modifyS predS *> fork (m >>= liftSucceedF2 sk vars)) $> vars)
+      fk
+      ek
+
+liftSucceedF2
+  :: (MonadWeakRef m, ZipVars_ b m, ZipVars_ c m)
+  => Succeed (VerseT m (Var m b, Var m c)) m a
+  -> (Var m b, Var m c)
+  -> a
+  -> VerseT m ()
+{-# INLINABLE liftSucceedF2 #-}
+liftSucceedF2 sk' vars x = VerseT $ \ r s env mem yk sk fk ek ->
+  sk' s mem x failF emptyF >>= \ m ->
+  unVerseT (m >>= unifyVar2 vars) r s env mem yk sk fk ek
+  where
+    unifyVar2 (a, b) = \ (c, d) -> unifyVar a c *> unifyVar b d
 
 succeedF :: Monad m => Succeed (VerseT m a) m a
 {-# INLINABLE succeedF #-}
