@@ -26,7 +26,7 @@ infixr 4 /\ -- dummy
 infixr 3 \/
 
 instance Pretty ENV where
-  pPrintPrec _ _ = text . show
+  pPrintPrec _ p x = text $ showsPrec (floor p) x ""
 
 empty :: ENV
 empty = OR []
@@ -110,8 +110,8 @@ data ENV = OR [ CASE ]
  deriving (Show)
 #else
 instance Show ENV where
-  show (OR [])              = "∅"
-  show (OR cs)              = intercalate " \x222a " (map show cs)
+  showsPrec _ (OR [])              = showString "∅"
+  showsPrec p (OR cs)              = showParen (p>0 && length cs > 1) $ showString $ intercalate " \x222a " (map show cs)
 #endif
 
 disj :: [CASE] -> ENV
