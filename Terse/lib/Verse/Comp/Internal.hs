@@ -93,7 +93,7 @@ evalRWT m = fmap fst . runWriterT . runReaderT m
 comp' :: Quote m => TH.Name -> TH.Name -> LExp -> CompT m TH.Exp
 comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
-    Nothing -> [| fork stuck *> ($(varE s1), $(varE s2), ) <$> Val.freshVar |]
+    Nothing -> [| fork stuck *> (($(varE s1), $(varE s2), ) <$> Val.freshVar) |]
     Just y -> do
       tell $ Vars.singleton y
       [| pure ($(varE s1), $(varE s2), $(varE y)) |]

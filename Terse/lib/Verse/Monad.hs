@@ -847,12 +847,14 @@ readVarsRef (VarsRef _ ref) = lift $ readRef ref
 
 writeVarsRef :: (MonadWeakRef m, Vars a m) => VarsRef m a -> a -> VerseT m ()
 {-# INLINABLE writeVarsRef #-}
-writeVarsRef (VarsRef label ref) x = do
-  x <- findVars x
-  tell' label <=< lift $ do
-    y <- readRef ref
-    writeRef ref x
-    newWeakTrail ref $ writeRef ref y
+writeVarsRef (VarsRef label ref) x = (label <) <$> getRefMinBound >>= \ case
+  False -> lift $ writeRef ref x
+  True -> do
+    x <- findVars x
+    tell' label <=< lift $ do
+      y <- readRef ref
+      writeRef ref x
+      newWeakTrail ref $ writeRef ref y
 
 findVars :: (MonadWeakRef m, Vars a m) => a -> VerseT m a
 {-# INLINE findVars #-}
