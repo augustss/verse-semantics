@@ -632,6 +632,15 @@ instance (Vars a m, Vars b m, Vars c m, Vars d m) => Vars (a, b, c, d) m where
   vars f (a, b, c, d) =
     (,,,) <$> vars f a <*> vars f b <*> vars f c <*> vars f d
 
+instance ( Vars a m
+         , Vars b m
+         , Vars c m
+         , Vars d m
+         , Vars e m
+         ) => Vars (a, b, c, d, e) m where
+  vars f (a, b, c, d, e) =
+    (,,,,) <$> vars f a <*> vars f b <*> vars f c <*> vars f d <*> vars f e
+
 instance Vars a m => Vars (Maybe a) m where
   vars f = \ case
     Nothing -> pure Nothing

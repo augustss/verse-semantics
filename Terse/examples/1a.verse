@@ -11,24 +11,19 @@ Compose = fun(Arg) {
   }
 };
 
-exists Length;
-Length = fun(Arg) {
-  if (Arg = false) then(Arg) {
-    0
-  } else {
-    exists X; exists Xs;
-    Arg = (X, Xs);
-    Length[Xs] + 1
-  }
-};
-
 exists FromList;
 FromList = fun(Arg) {
-  exists N;
-  N = Length[Arg];
   exists Xs;
   Xs = Alloc[Arg];
-  all{1..N; exists X; exists Ys; (X, Ys) = Read[Xs]; Write[Xs, Ys]; X}
+  exists Loop;
+  Loop = fun(Arg) {
+    exists X;
+    exists Ys;
+    (X, Ys) = Read[Xs];
+    Write[Xs, Ys];
+    X|Loop[]
+  };
+  all{Loop[]}
 };
 
 exists ToRevList;
