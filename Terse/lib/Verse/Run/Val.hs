@@ -9,6 +9,8 @@ module Verse.Run.Val
   , readVar
   , unifyVar
   , fork1
+  , fork2
+  , fork3
   , freeze
   , newInt
   , readInt
@@ -37,14 +39,17 @@ import Ref
 
 import Verse.Monad (VerseT, Vars (..), ZipVars_ (..), stuck)
 import Verse.Monad qualified as Monad
-import Verse.Run.S
 
 data Val f m a
   = Int !Integer
   | Char {-# UNPACK #-} !Char
   | Ptr !(f a)
   | Tup [a]
-  | forall b . Vars b m => Lam !b !(b -> S m -> S m -> Var m -> VerseT m (Var m))
+  | forall b . Vars b m => Lam !b !(b -> Lam m)
+
+type Lam m =
+  Monad.Var m () -> Monad.Var m () -> Var m ->
+  VerseT m (Monad.Var m (), Monad.Var m (), Var m)
 
 instance Vars a m => Vars (Val f m a) m where
   {-# INLINABLE vars #-}
@@ -70,7 +75,7 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f m a) where
     Char x -> pretty x
     Ptr x -> pretty x
     Tup x -> tupled $ pretty <$> x
-    Lam _ _ -> "fun"
+    Lam {} -> "fun"
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m) m))
 
@@ -90,9 +95,29 @@ unifyVar :: MonadWeakRef m => Var m -> Var m -> VerseT m ()
 {-# INLINE unifyVar #-}
 unifyVar = Monad.unifyVar `on` getCompose . getFix
 
-fork1 :: MonadWeakRef m => VerseT m (Var m) -> VerseT m (Var m)
+fork1
+  :: MonadWeakRef m
+  => VerseT m (Var m)
+  -> VerseT m (Var m)
 {-# INLINE fork1 #-}
-fork1 = fmap (Fix . Compose) . Monad.fork1 . fmap (getCompose . getFix)
+fork1 =
+  fmap (Fix . Compose) . Monad.fork1 . fmap (getCompose . getFix)
+
+fork2
+  :: (MonadWeakRef m, ZipVars_ a m)
+  => VerseT m (Monad.Var m a, Var m)
+  -> VerseT m (Monad.Var m a, Var m)
+{-# INLINE fork2 #-}
+fork2 =
+  fmap (fmap $ Fix . Compose) . Monad.fork2 . fmap (fmap $ getCompose . getFix)
+
+fork3
+  :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m)
+  => VerseT m (Monad.Var m a, Monad.Var m b, Var m)
+  -> VerseT m (Monad.Var m a, Monad.Var m b, Var m)
+{-# INLINE fork3 #-}
+fork3 =
+  fmap (fmap $ Fix . Compose) . Monad.fork3 . fmap (fmap $ getCompose . getFix)
 
 freeze
   :: MonadWeakRef m
@@ -149,8 +174,6 @@ readString = readVar >=> \ case
   Tup xs -> traverse readChar xs
   _ -> empty
 
-newLam
-  :: Vars a m
-  => a -> (a -> S m -> S m -> Var m -> VerseT m (Var m)) -> VerseT m (Var m)
+newLam :: Vars a m => a -> (a -> Lam m) -> VerseT m (Var m)
 {-# INLINE newLam #-}
 newLam x f = newVar $ Lam x f
