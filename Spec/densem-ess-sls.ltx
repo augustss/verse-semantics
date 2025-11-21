@@ -17,43 +17,44 @@
 \begin{figure}
 $$
 \begin{array}{l}
+
+
   \multicolumn{1}{c}{\fbox{
   \begin{minipage}{10cm}
-  $$\begin{array}{rcll}
-  \multicolumn{4}{c}{{\bf type} \; \pom{A}} \;\text{where} A has a zero written $\pomempty$ \\[1mm]
-  \pomunit{\_}  & : & A \rightarrow \pom{A} \\
-  \pomcat   & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
-  \pomunion & : & \pom{A} \rightarrow \pom{A} \rightarrow \pom{A} \\
-  \pomunions & : & \powerset{\pom{A}} \rightarrow \pom{A} & \text{Infinite union} \\
-  \pomcats & : & \seq{\pom{A}} \rightarrow \pom{A} & \text{Finite concatenation}
-  \end{array}$$
+    ${\bf type} \; \pom{A} = \powersetnp{\seq{A}}$ \hspace{5mm} where $A$ has an empty element written $\pomempty$ \\[2mm]
+    {\bf Invariants:}
+    \begin{itemize}
+      \item No sequence $\seq{A}$ is empty $[]$.
+      \item No element of any sequence $\seq{A}$ is $\pomempty$.
+    \end{itemize}
   \end{minipage}
- }} \\[2mm]
-\textbf{Axioms} \\
-\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
-\rulename{ax1} & (S \pomcat T) \pomcat R	 & = & S \pomcat (T \pomcat R) \\[1mm]
-\rulename{ax2} & S \pomunion T		 & = & T \pomunion S \\
-\rulename{ax3} & (S \pomunion T) \pomunion R & = & S \pomunion (T \pomunion R) \\[1mm]
-\rulename{ax4} & (S \pomunion T) \pomcat R   & = & (S \pomcat R) \pomunion (T \pomcat R) \\
-\rulename{ax5} & S \pomcat (T \pomunion R)  & = & (S \pomcat T) \pomunion (S \pomcat R) \\[2mm]
-\multicolumn{4}{@@{}l}{\textbf{Smart constructors}\;\text{$(\mkpomunion)$ and $(\mkpomcat)$}} \\
-\rulename{c1} & \pomunit{\pomempty} \mkpomcat S      & = & S \\
-\rulename{c2} & S \mkpomcat \pomunit{\pomempty}      & = & S \\
-\rulename{c3} & \pomunit{\pomempty} \mkpomunion S      & = & S \\
-\rulename{c4} & S \mkpomunion \pomunit{\pomempty}      & = & S \\
-\end{array} \\
-\\
-\text{\textbf{$\pom{A}$ is a monad.}  Theorem: $\pombind$ satisfies axioms} \\
+  }} \\
+  \\
+
+\textbf{Constructing values of $\pom{A}$} \\
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
-  (\pombind) & : & \pom{A} \rightarrow (A \rightarrow \pom{B}) \rightarrow \pom{B} \\
-  \pomunit{a} \pombind h  	& = & h(a) \\
-  (S \pomcat T) \pombind h      & = & (S \pombind h) \mkpomcat (T \pombind h) \\
-  (S \pomunion T) \pombind h    & = & (S \pombind h) \mkpomunion (T \pombind h) \\
-%   \\
-%   \pommap & : & (A \rightarrow B) \rightarrow \pom{A} \rightarrow \pom{B} \\
-%  \pommap(f,S) & = & S \pombind \lambda a.\, \pomunit{ f(a) } 
+\pomunit{\EV} & = & \left\{ \begin{array}{@@{}ll}
+                              \{ \}  & \text{if $\EV = \pomempty $ } \\
+                              \{ [ \EV ] \}  & \text{otherwise}
+                      \end{array}\right. \\
+S \pomunion T & = & S \cup T \\
+S \pomcat T & = &  \left\{ \begin{array}{@@{}ll}
+                              T  & \text{if $S = \{\}$} \\
+                              S  & \text{if $T = \{\}$} \\
+                              \{ s \append t \vb s \in S, t \in T \}  & \text{otherwise}
+                      \end{array}\right. \\
 \end{array} \\
+
 \\[-2mm]
+\begin{minipage}{10cm}
+  \textbf{Pattern matching on values of $\pom{A}$}
+  \begin{itemize}
+  \item Uses $a \pomelem S$ to mean ``$a$ is drawn from pomset $S$''
+  \item Example: $\pommap(f,S)  = \pomcompL f(a) \vb a \pomelem S \pomcompR $
+  \end{itemize}
+\end{minipage}
+\\ \\[-2mm]
+
 \begin{minipage}{10cm}
   \textbf{Pomset comprehensions}
   $$\begin{array}{rcl}
@@ -73,34 +74,6 @@ $$
 \end{minipage}
 \\ \\[-2mm]
 
-\mathbf{Canonicalisation.} \text{Theorem: $\pomcanon$ satisfies axioms.} \\
-%    \text{Theorem: $\forall s \in \pomcanon(S).\; s \not=[] \; \text{and}\; \forall \EV \in s. \; \EV \not= \{\}$}
-\begin{array}{@@{}r@@{\;\;}c@@{\;\;}ll}
-\pomcanon & : & \pom{A} \rightarrow \powersetnp{\seq{A}} \\
-\pomcanon( \pomunit{\EV} )
-  & = & \left\{ \begin{array}{@@{}ll}
-           \{ \}  & \text{if $\EV = \pomempty $ } \\
-           \{ [ \EV ] \}  & \text{otherwise}
-           \end{array}\right. \\
-
-\pomcanon( S \pomunion T ) & = & \pomcanon(S) \cup \pomcanon(T) \\
-\pomcanon( S \pomcat T ) & = & \{ ss \append ts \vb ss \in \pomcanon(S), ts \in \pomcanon(T) \}
-\end{array}
-\\ \\
-\text{\textbf{Theorems} \hspace{3mm} ``You can remove empties''.} \\
- \begin{array}{lrcl}
-  \rulename{T1} & \pomcanon( S \pomunion \pomunit{\pomempty} ) & = & \pomcanon(S) \\
-  \rulename{T2} & \pomcanon( \pomunit{\pomempty} \pomunion S ) & = & \pomcanon(S) \\
-  \rulename{T3} & \pomcanon( S \pomcat \pomunit{\pomempty} ) & = & \pomcanon(S) \\
-  \rulename{T4} & \pomcanon( \pomunit{\pomempty} \pomcat S ) & = & \pomcanon(S) \\
- \end{array}
-
-% \text{\textbf{Theorems} \hspace{3mm} ``You can remove any sub-sequence''}\\
-% \begin{array}{lrcl}
-%  \rulename{T1} & (S \pomcat T) \pomunion T & = & S \pomcat T \\
-%  \rulename{T2} & S \pomunion (S \pomcat T) & = & S \pomcat T \\
-%  \rulename{T3} & (S \pomcat T \pomcat R) \pomunion T & = & S \pomcat T \pomcat R \\
-% \end{array}
 \end{array}
 $$
 \caption{Pomsets $\pom{A}$}
