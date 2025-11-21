@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Verse.Run.Val
   ( Val (..)
@@ -7,6 +8,7 @@ module Verse.Run.Val
   , freshVar
   , newVar
   , readVar
+  , readVar'
   , unifyVar
   , fork1
   , fork2
@@ -31,6 +33,9 @@ import Data.Function
 import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Identity
+import Data.Vector (Vector)
+
+import GHC.Exts (IsList (..))
 
 import Prettyprinter
 
@@ -44,7 +49,7 @@ data Val f m a
   = Int !Integer
   | Char {-# UNPACK #-} !Char
   | Ptr !(f a)
-  | Tup [a]
+  | Tup !(Vector a)
   | forall b . Vars b m => Lam !b !(b -> Lam m)
 
 type Lam m =
@@ -74,7 +79,7 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f m a) where
     Int x -> pretty x
     Char x -> pretty x
     Ptr x -> pretty x
-    Tup x -> tupled $ pretty <$> x
+    Tup x -> tupled $ pretty <$> toList x
     Lam {} -> "fun"
 
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m) m))
@@ -87,9 +92,19 @@ newVar :: Val (Monad.VarsRef m) m (Var m) -> VerseT m (Var m)
 {-# INLINE newVar #-}
 newVar = fmap (Fix . Compose) . Monad.newVar
 
-readVar :: MonadWeakRef m => Var m -> VerseT m (Val (Monad.VarsRef m) m (Var m))
+readVar
+  :: MonadWeakRef m
+  => Var m
+  -> VerseT m (Val (Monad.VarsRef m) m (Var m))
 {-# INLINE readVar #-}
 readVar = Monad.readVar . getCompose . getFix
+
+readVar'
+  :: MonadRef m
+  => Var m
+  -> VerseT m (Maybe (Val (Monad.VarsRef m) m (Var m)))
+{-# INLINE readVar' #-}
+readVar' = Monad.readVar' . getCompose . getFix
 
 unifyVar :: MonadWeakRef m => Var m -> Var m -> VerseT m ()
 {-# INLINE unifyVar #-}
@@ -150,7 +165,7 @@ readChar = readVar >=> \ case
   Char x -> pure x
   _ -> empty
 
-newTup :: [Var m] -> VerseT m (Var m)
+newTup :: Vector (Var m) -> VerseT m (Var m)
 {-# INLINE newTup #-}
 newTup = newVar . Tup
 
@@ -166,12 +181,12 @@ readPair = readVar >=> \ case
 
 newString :: String -> VerseT m (Var m)
 {-# INLINABLE newString #-}
-newString = newTup <=< traverse newChar
+newString = newTup <=< traverse newChar . fromList
 
 readString :: MonadWeakRef m => Var m -> VerseT m String
 {-# INLINABLE readString #-}
 readString = readVar >=> \ case
-  Tup xs -> traverse readChar xs
+  Tup xs -> traverse readChar $ toList xs
   _ -> empty
 
 newLam :: Vars a m => a -> (a -> Lam m) -> VerseT m (Var m)

@@ -40,6 +40,8 @@ import Language.Haskell.TH
   )
 import Language.Haskell.TH qualified as TH
 
+import GHC.Exts (fromList)
+
 import Loc
 
 import Verse.Exp
@@ -123,8 +125,9 @@ comp' s1 s2 = wrap $ \ case
     let
       loop s1 s2 vars = \ case
         [] -> [|
-          ($(varE s1), $(varE s2), ) <$>
-          Val.newTup $(listE $ varE <$> reverse vars) |]
+          fmap ($(varE s1), $(varE s2), ) .
+          Val.newTup $
+          fromList $(listE $ varE <$> reverse vars) |]
         e:es -> [| do
           (s1, s2, var) <- $(comp' s1 s2 e)
           $(loop 's1 's2 ('var:vars) es) |]
@@ -161,14 +164,14 @@ comp' s1 s2 = wrap $ \ case
   Fail -> [| empty |]
   All e -> [| do
     heap <- newHeap $(varE s2)
-    Val.fork3 . fmap ($(varE s1), $(varE s2), ) . Val.newTup <=< all' $ do
+    Val.fork3 . fmap ($(varE s1), $(varE s2), ) . Val.newTup . fromList <=< all' $ do
       s1 <- newVar (); s2 <- newVar ()
       (s1, s2, var) <- local (const heap) $(comp' 's1 's2 e)
       readVar s1 *> readVar s2 $> var |]
   For e1 x e2 -> [|
     let
       loop s1 s2 vars = \ case
-        Done -> fmap (s1, s2, ) . Val.newTup $ reverse vars
+        Done -> fmap (s1, s2, ) . Val.newTup . fromList $ reverse vars
         Step var m -> do
           (s1, s2, var) <- $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e2)
           heap <- newHeap s2

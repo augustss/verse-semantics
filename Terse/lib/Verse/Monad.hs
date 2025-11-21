@@ -26,6 +26,7 @@ module Verse.Monad
   , freshVar
   , newVar
   , readVar
+  , readVar'
   , unifyVar
   , VarsRef
   , newVarsRef
@@ -752,6 +753,16 @@ readVar :: MonadWeakRef m => Var m a -> VerseT m a
 readVar = \ case
   Bound binding _ -> pure binding
   Ref ref -> readRefBinding ref
+
+readVar' :: MonadRef m => Var m a -> VerseT m (Maybe a)
+readVar' = lift . readVar''
+
+readVar'' :: MonadRef m => Var m a -> m (Maybe a)
+readVar'' = \ case
+  Bound binding _ -> pure $ Just binding
+  Ref ref -> readRef ref >>= \ case
+    Link var -> readVar'' var
+    Unbound _ -> pure Nothing
 
 readRefBinding :: MonadWeakRef m => Ref m (RefState m a) -> VerseT m a
 {-# INLINABLE readRefBinding #-}

@@ -25,9 +25,14 @@ import Control.Monad.IO.Class
 import Data.Function
 import Data.Functor
 import Data.List
+import Data.Maybe
+import Data.Monoid
 import Data.Ord
 import Data.Traversable
 import Data.Tuple
+import Data.Vector qualified as Vector
+
+import GHC.Exts (IsList (..))
 
 import Prettyprinter
 
@@ -41,7 +46,7 @@ import Verse.Monad
 import Verse.Run.S
 import Verse.Run.Val qualified as Val
 
-import Prelude (Num (..), ($!))
+import Prelude (Num (..), ($!), (&&), fromIntegral)
 
 app
   :: MonadWeakRef m
@@ -53,11 +58,16 @@ app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
   Val.Char _ -> stuck
   Val.Ptr _ -> stuck
   Val.Lam x f -> f x s1 s2 var2
-  Val.Tup vars -> do
-    readVar s1
-    fmap (s1, s2, ) . asum $ zip [0 ..] vars <&> \ (i, var1) -> do
-      Val.unifyVar var2 <=< Val.newVar $ Val.Int i
-      pure var1
+  Val.Tup vars -> Val.readVar' var2 >>= \ case
+    Just x -> case x of
+      Val.Int x | 0 <= x && x <= fromIntegral (Vector.length vars) ->
+        pure (s1, s2, Vector.unsafeIndex vars $ fromIntegral x)
+      _ -> empty
+    Nothing -> do
+      readVar s1
+      fmap (s1, s2, ) . asum $ zip [0 ..] (toList vars) <&> \ (i, var1) -> do
+        Val.unifyVar var2 <=< Val.newVar $ Val.Int i
+        pure var1
 
 alloc
   :: MonadWeakRef m
@@ -93,7 +103,7 @@ write s1 s2 x = do
       readVar s2
       readHeap
       writeVarsRef x1 x2
-      (s1, s2, ) <$> Val.newTup []
+      (s1, s2, ) <$> Val.newTup mempty
     _ -> stuck
 
 getLine
@@ -102,7 +112,7 @@ getLine
   -> VerseT m (Var m (), Var m (), Val.Var m)
 {-# INLINABLE getLine #-}
 getLine s1 s2 x = do
-  one $ (Val.unifyVar x =<< Val.newTup []) <|> stuck
+  one $ (Val.unifyVar x =<< Val.newTup mempty) <|> stuck
   readVar s2
   readHeap
   fmap (s1, s2, ) . Val.newString =<< liftIO IO.getLine
@@ -114,7 +124,7 @@ readInt
 {-# INLINABLE readInt #-}
 readInt s1 s2 x = do
   x <- one $ Val.readString x <|> stuck
-  fmap (s1, s2, ) . Val.newTup <=<
+  fmap (s1, s2, ) . Val.newTup . fromList <=<
     traverse (uncurry Val.newPair <=< Val.newInt *** Val.newString) $
     reads x
 
@@ -127,7 +137,7 @@ print s1 s2 x = do
   readVar s2
   readHeap
   liftIO . IO.print . pretty =<< Val.freeze x
-  (s1, s2, ) <$> Val.newTup []
+  (s1, s2, ) <$> Val.newTup mempty
 
 plus
   :: MonadWeakRef m
