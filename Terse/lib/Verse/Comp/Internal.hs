@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -95,7 +96,7 @@ evalRWT m = fmap fst . runWriterT . runReaderT m
 comp' :: Quote m => TH.Name -> TH.Name -> LExp -> CompT m TH.Exp
 comp' s1 s2 = wrap $ \ case
   Var x -> asks (Env.lookup x . (.env)) >>= \ case
-    Nothing -> [| fork stuck *> (($(varE s1), $(varE s2), ) <$> Val.freshVar) |]
+    Nothing -> compUnbound s1 s2
     Just y -> do
       tell $ Vars.singleton y
       [| pure ($(varE s1), $(varE s2), $(varE y)) |]
@@ -118,6 +119,10 @@ comp' s1 s2 = wrap $ \ case
   Int x -> [|
     ($(varE s1), $(varE s2), ) <$>
     Val.newInt $(litE . integerL $ fromIntegral x) |]
+  (unwrap -> (unwrap -> Var x) := e1) :& e2 ->
+    compLet s1 s2 x e1 e2
+  (unwrap -> e1 := (unwrap -> Var x)) :& e2 ->
+    compLet s1 s2 x e1 e2
   e1 :& e2 -> [| do
     (s1, s2, _) <- $(comp' s1 s2 e1)
     $(comp' 's1 's2 e2) |]
@@ -197,6 +202,20 @@ comp' s1 s2 = wrap $ \ case
           readVar s1 *> readVar s2 $> var)
       (\ var -> $(localEnv (Env.insert x 'var) $ comp' s1 s2 e2))
       $(comp' s1 s2 e3) |]
+
+compLet
+  :: Quote m
+  => TH.Name -> TH.Name -> Name -> LExp -> LExp -> CompT m TH.Exp
+compLet s1 s2 x e1 e2 = asks (Env.lookup x . (.env)) >>= \ case
+  Nothing -> compUnbound s1 s2
+  Just y -> tell (Vars.singleton y) *> [| do
+    (s1, s2, var) <- $(comp' s1 s2 e1)
+    Val.unifyVar $(varE y) var
+    $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e2) |]
+
+compUnbound :: Quote m => TH.Name -> TH.Name -> CompT m TH.Exp
+compUnbound s1 s2 =
+  [| fork stuck *> (($(varE s1), $(varE s2), ) <$> Val.freshVar) |]
 
 freeVars :: Quote m => CompT m a -> CompT m (a, Map TH.Name TH.Name)
 freeVars m = do
