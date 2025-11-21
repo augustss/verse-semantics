@@ -174,3 +174,22 @@ funDomainsDistributeOverChoice f = property $ do
   l' <- f (ApplyD lhs a3)
   r' <- f (ApplyD rhs a3)
   l' === r'
+
+-- fun( e1a | e1b ){e2}[a3] === fun(e1a){e2}[a3] | fun(e1b){e2}[a3]
+funDomainsDistributeOverUChoice :: DSProperty String
+funDomainsDistributeOverUChoice f = property $ do
+  (e1a,e1b,e2,a3) <- gen $ do
+    n   <- genSize ast_size
+    e1a <- genExpr n
+    e1b <- genExpr n
+    e2  <- genExpr n
+    a3  <- genANFAtom n
+    return (e1a,e1b,e2,a3)
+  let !lhs = Function Closed (mkUChoice e1a e1b) effSucceeds e2
+      !rhs = mkUChoice (Function Closed e1a effSucceeds e2)
+             (Function Closed e1b effSucceeds e2)
+  annotate "lhs: " lhs
+  annotate "rhs: " rhs
+  l' <- f (ApplyD lhs a3)
+  r' <- f (ApplyD rhs a3)
+  l' === r'

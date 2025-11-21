@@ -64,4 +64,8 @@ properties =
 
   , testProperty "fun( e1a | e1b ){e2}[a3] === fun(e1a){e2}[a3] | fun(e1b){e2}[a3]"
     . funDomainsDistributeOverChoice
+
+  , testProperty "fun( e1a ||| e1b ){e2}[a3] === fun(e1a){e2}[a3] ||| fun(e1b){e2}[a3]"
+    . funDomainsDistributeOverUChoice
+
   ]
