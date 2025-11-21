@@ -48,7 +48,8 @@ import Data.Functor.Compose
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Kind
 import Data.Maybe (fromMaybe)
-import Data.Monoid (Ap (..), Sum (..))
+import Data.Monoid
+import Data.Proxy
 import Data.Tuple
 import Data.Vector (Vector)
 
@@ -274,7 +275,7 @@ runVerseT m = do
       | otherwise = pure Nothing
   unVerseT m r s env (splitMem label varMinBound) yk sk fk ek
   where
-    env = Bound ()
+    env = newVar' ()
     label = minBound
     varMinBound = label
     r = R { level = 1 }
@@ -594,7 +595,7 @@ stuck = VerseT $ \ r s _env mem yk ->
 
 data Var m a
   = Ref {-# UNPACK #-} !(Ref m (RefState m a))
-  | Bound !a
+  | Bound !a !Bool
 
 class Vars a m where
   vars
@@ -729,14 +730,26 @@ freshVar = do
   let susp = const $ pure ()
   lift . fmap Ref . newRef $! Unbound MkUnbound {..}
 
-newVar :: a -> VerseT m (Var m a)
+newVar :: Vars a m => a -> VerseT m (Var m a)
 {-# INLINE newVar #-}
-newVar = pure . Bound
+newVar = pure . newVar'
+
+newVar' :: forall a m . Vars a m => a -> Var m a
+{-# INLINE newVar' #-}
+newVar' x = Bound x $ anyRefs (Proxy @m) x
+
+anyRefs :: forall a m . Vars a m => Proxy m -> a -> Bool
+{-# INLINE anyRefs #-}
+anyRefs _ = getAny . getConst . vars @a @m f
+  where
+    f = \ case
+      Ref _ -> Const $ Any True
+      Bound _ anyRefs -> Const $ Any anyRefs
 
 readVar :: MonadWeakRef m => Var m a -> VerseT m a
 {-# INLINABLE readVar #-}
 readVar = \ case
-  Bound binding -> pure binding
+  Bound binding _ -> pure binding
   Ref ref -> readRefBinding ref
 
 readRefBinding :: MonadWeakRef m => Ref m (RefState m a) -> VerseT m a
@@ -822,7 +835,7 @@ writeRefState ref label !x = (label <) <$> getVarMinBound >>= \ case
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 {-# INLINABLE readRoot #-}
 readRoot var = case var of
-  Bound binding -> pure (var, BoundR binding)
+  Bound binding _ -> pure (var, BoundR binding)
   Ref ref -> lift (readRef ref) >>= \ case
     Link var -> readRoot var
     Unbound x -> pure (var, UnboundR ref x)
@@ -863,7 +876,9 @@ findVars = vars findVar
 findVar :: (MonadWeakRef m, Vars a m) => Var m a -> VerseT m (Var m a)
 {-# INLINABLE findVar #-}
 findVar = \ case
-  Bound binding -> Bound <$> findVars binding
+  var@(Bound binding anyRefs)
+    | anyRefs -> newVar' <$> findVars binding
+    | otherwise -> pure var
   var@(Ref ref) -> lift (readRef ref) >>= \ case
     Link var -> findVar var
     Unbound x -> (x.level <) <$> getLevel >>= \ case
@@ -930,7 +945,9 @@ findVars' = vars findVar'
 findVar' :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
 {-# INLINABLE findVar' #-}
 findVar' = \ case
-  Bound binding -> Bound <$> findVars' binding
+  var@(Bound binding anyRefs)
+    | anyRefs -> newVar' <$> findVars' binding
+    | otherwise -> pure var
   var@(Ref ref) -> readRef ref >>= \ case
     Link var -> findVar' var
     Unbound x -> FindT $ \ In {..} ->
