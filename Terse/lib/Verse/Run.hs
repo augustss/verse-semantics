@@ -58,16 +58,17 @@ app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
   Val.Char _ -> stuck
   Val.Ptr _ -> stuck
   Val.Lam x f -> f x s1 s2 var2
-  Val.Tup vars -> Val.readVar' var2 >>= \ case
-    Just x -> case x of
-      Val.Int x | 0 <= x && x <= fromIntegral (Vector.length vars) ->
-        pure (s1, s2, Vector.unsafeIndex vars $ fromIntegral x)
-      _ -> empty
-    Nothing -> do
-      readVar s1
-      fmap (s1, s2, ) . asum $ zip [0 ..] (toList vars) <&> \ (i, var1) -> do
-        Val.unifyVar var2 <=< Val.newVar $ Val.Int i
-        pure var1
+  Val.Tup vars -> do
+    readVar s1
+    Val.readVar' var2 >>= \ case
+      Just x -> case x of
+        Val.Int x | 0 <= x && x <= fromIntegral (Vector.length vars) ->
+          pure (s1, s2, Vector.unsafeIndex vars $ fromIntegral x)
+        _ -> empty
+      Nothing ->
+        fmap (s1, s2, ) . asum $ zip [0 ..] (toList vars) <&> \ (i, var1) -> do
+          Val.unifyVar var2 <=< Val.newVar $ Val.Int i
+          pure var1
 
 alloc
   :: MonadWeakRef m

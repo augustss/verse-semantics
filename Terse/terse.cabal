@@ -9,7 +9,7 @@ maintainer:         andy.sonnenburg@epicgames.com
 -- copyright:
 category:           Language
 build-type:         Simple
-extra-source-files: examples/1a.verse
+extra-source-files: examples/*.verse
 
 common warnings
   ghc-options: -Wall
