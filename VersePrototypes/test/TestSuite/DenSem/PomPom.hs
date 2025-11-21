@@ -20,12 +20,12 @@ module TestSuite.DenSem.PomPom
   ( properties
   ) where
 
-import qualified PomPom (den)
+import qualified PomPom (denS, defaultConfig)
 import TestSuite.DenSem.Properties
 
 import Test.Tasty
-import Test.Tasty.Falsify (testProperty)
-
+import Test.Tasty.Hedgehog
+import TestSuite.Utils
 
 -----------------------------------------------
 --
@@ -33,14 +33,15 @@ import Test.Tasty.Falsify (testProperty)
 --
 -----------------------------------------------
 
--- See Note [Reading the property-based test output] for how to read failures.
 properties :: TestTree
-properties = testGroup "PomPom.den: Semantic Identities"
-  $ map ($ PomPom.den)
-  [ testProperty "(e1 ||| e2) | e3 === (e1 | e3) ||| (e2 | e3)"
-    . uChoiceDistributesOverChoice
-
-  , testProperty "e | fail === e"
+properties =
+  let go = (liftIO . fmap fst . PomPom.denS PomPom.defaultConfig False)
+  in testGroup "PomPom.den: Semantic Identities"
+  $ map ($ go)
+  [ -- this does not hold in general so don't test it
+    -- testProperty "(e1 ||| e2) | e3 === (e1 | e3) ||| (e2 | e3)"
+    -- . uChoiceDistributesOverChoice
+    testProperty "e | fail === e"
     . failIsChoiceUnit
 
   , testProperty "e1 | (e2 | e3) === (e1 | e2) | e3"
@@ -60,4 +61,7 @@ properties = testGroup "PomPom.den: Semantic Identities"
 
   , testProperty "(e1 | e2); e3 === (e1; e3) | (e2; e3)"
     . choiceDistributesOverSequence
+
+  , testProperty "fun( e1a | e1b ){e2}[a3] === fun(e1a){e2}[a3] | fun(e1b){e2}[a3]"
+    . funDomainsDistributeOverChoice
   ]

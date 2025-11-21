@@ -16,7 +16,9 @@ module TestSuite.Utils
   , ENV
   , module Epic.Print
   , module FrontEnd.Expr
-  , exprTrace
+  , putExpr
+  , annotate
+  , liftIO
   ) where
 
 import Set(Set)
@@ -24,9 +26,13 @@ import ENVP (ENV)
 import Epic.Print
 import FrontEnd.Expr
 
-import Debug.Trace (trace)
+import Control.Monad.IO.Class
 
--- | convience function for printing generated ASTs. A good place to put it is in
--- the call to assert
-exprTrace :: SrcExpr -> a -> a
-exprTrace e = trace (show $ pPrint e)
+import qualified Hedgehog as H
+
+-- | convience function for printing generated ASTs.
+putExpr :: MonadIO io => SrcExpr -> io ()
+putExpr = liftIO . putStrLn . show . pPrint
+
+annotate :: (H.MonadTest m, Pretty a) => String -> a -> m ()
+annotate str x = H.annotate $ str ++ show (pPrint x)

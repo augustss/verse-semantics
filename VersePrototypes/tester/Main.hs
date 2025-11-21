@@ -40,7 +40,7 @@ import SExpC(srcExprToExp)
 -- Tim densem
 import qualified TimE   (den)
 import qualified Pom    (den)
-import qualified PomPom (den)
+import qualified PomPom (denS, defaultConfig)
 import ENVDesugar (envDesugar)
 
 import Epic.Print hiding ( (<>) )
@@ -452,7 +452,8 @@ evalDenSem flags test e = do
           Nothing     -> error $ "evalExpr: Expected densem type, got Nothing with test: " ++ show test
           Just Tim_DS -> fmap (showASCII . TimE.den . envDesugar) . go
           Just POM_DS -> fmap (showASCII . Pom.den . envDesugar) . go
-          Just PPM_DS -> fmap (showASCII . PomPom.den . envDesugar) . go
+          Just PPM_DS -> go >=> (fmap (showASCII . fst)
+                               . PomPom.denS PomPom.defaultConfig False . envDesugar)
           Just DLS_DS -> go >=> fmap showASCII . edenSem . edenSemDS . srcExprToExp
           Just SLS_DS -> error "SLS densem not implemented yet. Sorry!"
           Just ELS_DS -> go >=> denSemDesugar >=> fmap showASCII . denSem

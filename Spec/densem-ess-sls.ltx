@@ -336,9 +336,33 @@ $$
      , & |let|\; \ff = \{ \fpr{\envlk{\rho_1}{c}}{\envlk{\rho_1}{v}} \vb \rho_1 \in \EV_1 \} & \rulename{(f6)}\\
      , & \dom(\ff) = \{ \envlk{\rho'}{c} \vb \rho' \in \EV', \envlk{\rho'}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
      , & isFunction(\ff) & \rulename{(f8)} \\
-     , & \Fun{\pomunit{\ff}} = \rho(f)  \} } & \rulename{(f9)}
+     , & \Fun{\pomunit{\ff}} = \rho(f)  \} & \rulename{(f9)}
 
-  \end{array}
+  \end{array} \\
+  }
+  \\
+  \text{Attempt 2} \\
+  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+  &  = & \pomunit{ \pomunions
+  \begin{array}[t]{@@{}l@@{\;}ll}
+    \{ & \conBrack{ h = \Fun{\pomunit{\hh}}, f = \Fun{\pomunit{\ff}}} \\
+    \vb & \exists \EV_1. \\
+    & \hh \in \pomFUN \\
+     , & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{c,d,u,v,xs\}) & \rulename{(f1)} \\
+     , & \Fun{\pomunit{\hh}} = \rho(h)  & \rulename{(f2)} \\
+     , & |if fx = eff succeeds|  & \rulename{(f3)} \\
+      & \hspace{2mm} |then| \; \dom(\hh) = \envlk{\EV'}{d} \\
+      & \hspace{2mm} |else| \; \dom(\hh) \subseteq \envlk{\EV'}{d}  \\
+     , & \pomunit{\EV_1} = \pomunit{\EV' \cap \conBrack{ \fpr{d}{u} \in hh }}
+                 \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f4)} \\
+     , & \pomempty = \pomunit{\EV' \cap \conBrack{ d \not\in \dom(hh) }}  \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f5)} \\
+     , & |let|\; \ff = \{ \fpr{\envlk{\rho_1}{c}}{\envlk{\rho_1}{v}} \vb \rho_1 \in \EV_1 \} & \rulename{(f6)}\\
+     , & \dom(\ff) = \{ \envlk{\rho'}{c} \vb \rho' \in \EV', \envlk{\rho'}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
+     , & isFunction(\ff) & \rulename{(f8)} \\
+     , & \Fun{\pomunit{\ff}} = \rho(f)  \} & \rulename{(f9)}
+
+  \end{array} \\
+  }
 \end{array}} \\
 \end{array}
 \\ \\

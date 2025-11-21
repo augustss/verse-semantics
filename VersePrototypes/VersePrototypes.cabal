@@ -329,7 +329,6 @@ test-suite verse-libs-test
 
     other-modules: Paths_VersePrototypes
                  , TestSuite.Utils
-                 , TestSuite.Epic.PomSet
                  , TestSuite.FrontEnd.Expr
                  , TestSuite.DenSem.PomPom
                  , TestSuite.DenSem.Properties
@@ -341,7 +340,8 @@ test-suite verse-libs-test
                  , filepath
                  , prettyprinter
                  , tasty
-                 , falsify
+                 , hedgehog
+                 , tasty-hedgehog
                  , text
                  , verse-libs
                  , verse-densem
