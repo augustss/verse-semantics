@@ -727,8 +727,9 @@ freshVar :: MonadRef m => VerseT m (Var m a)
 freshVar = do
   label <- supply
   level <- getLevel
-  let susp = const $ pure ()
   lift . fmap Ref . newRef $! Unbound MkUnbound {..}
+  where
+    susp = const $ pure ()
 
 newVar :: Vars a m => a -> VerseT m (Var m a)
 {-# INLINE newVar #-}
