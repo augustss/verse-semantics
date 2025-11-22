@@ -28,6 +28,7 @@ import Parser
   ( Parser
   , Result (..)
   , chainl1
+  , chainr1
   , char
   , eof
   , get
@@ -60,7 +61,7 @@ exp :: Parser LExp
 exp = and
 
 and :: Parser LExp
-and = chainl1 tup $ wrap2 (:&) <$ semi
+and = chainr1 tup $ wrap2 (:&) <$ semi
 
 tup :: Parser LExp
 tup = (eq >>= loop []) <|> done0

@@ -13,6 +13,7 @@ module Parser
   , char
   , eof
   , chainl1
+  , chainr1
   ) where
 
 import Control.Applicative
@@ -283,6 +284,17 @@ chainl1 m n = do
       f <- n
       y <- m
       loop $ f x y
+
+chainr1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainr1 m n = loop
+  where
+    loop = do
+      x <- m
+      loop1 x <|> pure x
+    loop1 x = do
+      f <- n
+      y <- loop
+      pure $ f x y
 
 takeWhileAcc :: (Char -> Int -> a -> Maybe a) -> Text -> a -> (Text, a)
 takeWhileAcc f !xs = loop 0
