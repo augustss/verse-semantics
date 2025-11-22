@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module Verse.Run
-  ( module Verse.Run.S
+  ( module Verse.Run.Heap
   , app
   , alloc
   , read
@@ -43,7 +43,7 @@ import Text.Read (reads)
 import Ref
 
 import Verse.Monad
-import Verse.Run.S
+import Verse.Run.Heap
 import Verse.Run.Val qualified as Val
 
 import Prelude (Num (..), ($!), (&&), fromIntegral)

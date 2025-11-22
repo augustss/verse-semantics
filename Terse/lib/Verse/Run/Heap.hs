@@ -1,6 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-module Verse.Run.S
+module Verse.Run.Heap
   ( Heap
   , freshHeap
   , newHeap

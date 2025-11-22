@@ -59,9 +59,9 @@ import Ref
 
 newtype VerseT (m :: Type -> Type) a = VerseT
   { unVerseT
-    :: forall r . R
-    -> S
-    -> Env m
+    :: forall r . Level
+    -> Count
+    -> Heap m
     -> Mem m
     -> Yield r m
     -> Succeed r m a
@@ -70,21 +70,11 @@ newtype VerseT (m :: Type -> Type) a = VerseT
     -> m r
   }
 
-newtype R = R { level :: Level }
+newtype Level = Level Int deriving (Eq, Ord, Num)
 
-type Level = Sum Int
+newtype Count = Count Int deriving (Eq, Num)
 
-newtype S = S { count :: Int }
-
-succS :: S -> S
-{-# INLINE succS #-}
-succS !s = s { count = s.count + 1 }
-
-predS :: S -> S
-{-# INLINE predS #-}
-predS !s = s { count = s.count - 1 }
-
-type Env m = Var m ()
+type Heap m = Var m ()
 
 data Mem m = Mem
   { label :: {-# UNPACK #-} !Label
@@ -122,7 +112,7 @@ newtype Yield r m = Yield
   { unYield
     :: forall a . Level
     -> Handler m a
-    -> S
+    -> Count
     -> Mem m
     -> Succeed r m a
     -> Fail r m
@@ -132,49 +122,53 @@ newtype Yield r m = Yield
 
 type Handler m a = (VerseT m a -> VerseT m ()) -> VerseT m ()
 
-type Succeed r m a = S -> Mem m -> a -> Fail r m -> Empty r m -> m r
+type Succeed r m a = Count -> Mem m -> a -> Fail r m -> Empty r m -> m r
 
-type Fail r m = Env m -> Mem m -> m r
+type Fail r m = Heap m -> Mem m -> m r
 
 type Empty r m = Mem m -> m r
 
 instance Functor (VerseT m) where
   {-# INLINE fmap #-}
-  fmap f m = VerseT $ \ r s env mem yk sk ->
-    unVerseT m r s env mem yk $ \ s mem -> sk s mem . f
+  fmap f m = VerseT $ \ level count heap mem yk sk ->
+    unVerseT m level count heap mem yk $ \ count mem -> sk count mem . f
 
 instance Applicative (VerseT m) where
   {-# INLINE pure #-}
-  pure x = VerseT $ \ _r s _env mem _yk sk ->
-    sk s mem x
+  pure x = VerseT $ \ _level count _heap mem _yk sk ->
+    sk count mem x
   {-# INLINABLE (<*>) #-}
-  f <*> x = VerseT $ \ r s env mem yk sk ->
-    unVerseT f r s env mem yk $ \ s mem f ->
-    unVerseT x r s env mem yk $ \ s mem x ->
-    sk s mem $ f x
+  f <*> x = VerseT $ \ level count heap mem yk sk ->
+    unVerseT f level count heap mem yk $ \ count mem f ->
+    unVerseT x level count heap mem yk $ \ count mem x ->
+    sk count mem $ f x
 
 instance Alternative (VerseT m) where
   {-# INLINE empty #-}
-  empty = VerseT $ \ _r _s _env mem _yk _sk _fk ek ->
+  empty = VerseT $ \ _level _count _heap mem _yk _sk _fk ek ->
     ek mem
   {-# INLINABLE (<|>) #-}
-  x <|> y = VerseT $ \ r s env mem@Mem { label } yk sk fk ek ->
-    unVerseT x r s env mem { varMinBound = label, refMinBound = label } yk sk
-    (\ env mem -> unVerseT y r s env mem yk sk fk $ fk env)
-    (\ mem -> unVerseT y r s env mem yk sk fk ek)
+  x <|> y = VerseT $ \ level count heap mem@Mem { label } yk sk fk ek ->
+    let
+      varMinBound = label
+      refMinBound = label
+    in
+      unVerseT x level count heap mem { varMinBound, refMinBound } yk sk
+      (\ heap mem -> unVerseT y level count heap mem yk sk fk $ fk heap)
+      (\ mem -> unVerseT y level count heap mem yk sk fk ek)
 
 instance Monad (VerseT m) where
   {-# INLINE (>>=) #-}
-  x >>= f = VerseT $ \ r s env mem yk sk ->
-    unVerseT x r s env mem yk $ \ s mem x ->
-    unVerseT (f x) r s env mem yk sk
+  x >>= f = VerseT $ \ level count heap mem yk sk ->
+    unVerseT x level count heap mem yk $ \ count mem x ->
+    unVerseT (f x) level count heap mem yk sk
 
 instance MonadPlus (VerseT m)
 
 instance MonadTrans VerseT where
   {-# INLINE lift #-}
-  lift m = VerseT $ \ _r s _env mem _yk sk fk ek ->
-    m >>= \ x -> sk s mem x fk ek
+  lift m = VerseT $ \ _level count _heap mem _yk sk fk ek ->
+    m >>= \ x -> sk count mem x fk ek
 
 instance MonadIO m => MonadIO (VerseT m) where
   {-# INLINE liftIO #-}
@@ -182,14 +176,14 @@ instance MonadIO m => MonadIO (VerseT m) where
 
 instance MonadReader (Var m ()) (VerseT m) where
   {-# INLINE ask #-}
-  ask = VerseT $ \ _r s env mem _yk sk ->
-    sk s mem env
+  ask = VerseT $ \ _level count heap mem _yk sk ->
+    sk count mem heap
   {-# INLINE local #-}
-  local f m = VerseT $ \ r s env mem yk sk fk ek ->
-    unVerseT m r s (f env) mem yk sk fk ek
+  local f m = VerseT $ \ level count heap mem yk sk fk ek ->
+    unVerseT m level count (f heap) mem yk sk fk ek
   {-# INLINE reader #-}
-  reader f = VerseT $ \ _r s env mem _yk sk ->
-    sk s mem $ f env
+  reader f = VerseT $ \ _level count heap mem _yk sk ->
+    sk count mem $ f heap
 
 instance MonadState s m => MonadState s (VerseT m) where
   {-# INLINE get #-}
@@ -201,8 +195,8 @@ instance MonadState s m => MonadState s (VerseT m) where
 
 supply :: VerseT m Label
 {-# INLINE supply #-}
-supply = VerseT $ \ _r s _env Mem {..} _yk sk ->
-  sk s Mem { label = label + 1, .. } label
+supply = VerseT $ \ _level count _heap Mem {..} _yk sk ->
+  sk count Mem { label = label + 1, .. } label
 
 liftPut :: Monad m => m () -> m () -> VerseT m ()
 {-# INLINE liftPut #-}
@@ -212,77 +206,85 @@ liftPut forward backward = do
 
 tell :: Monad m => Label -> m () -> m () -> VerseT m ()
 {-# INLINABLE tell #-}
-tell label forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  sk s (appendMem mem label forward backward) ()
-  (\ env mem -> backward *> fk env (appendMem mem label backward forward))
+tell label forward backward = VerseT $ \ _level count _heap mem _yk sk fk ek ->
+  sk count (appendMem mem label forward backward) ()
+  (\ heap mem -> backward *> fk heap (appendMem mem label backward forward))
   (\ mem -> backward *> ek (appendMem mem label backward forward))
 
 tell' :: Applicative m => Label -> m () -> VerseT m ()
 {-# INLINABLE tell' #-}
-tell' label backward' = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  sk s (appendMem' mem label backward') () fk (\ mem -> backward' *> ek mem)
+tell' label backward' = VerseT $ \ _level count _heap mem _yk sk fk ek ->
+  sk count (appendMem' mem label backward') () fk (\ mem -> backward' *> ek mem)
 
 yield :: Level -> Handler m a -> VerseT m a
 {-# INLINE yield #-}
-yield i f = VerseT $ \ _r s _env mem yk ->
-  unYield yk i f s mem
+yield i f = VerseT $ \ _level count _heap mem yk ->
+  unYield yk i f count mem
 
 getLevel :: VerseT m Level
 {-# INLINE getLevel #-}
-getLevel = VerseT $ \ r s _env mem _yk sk ->
-  sk s mem r.level
+getLevel = VerseT $ \ level count _heap mem _yk sk ->
+  sk count mem level
 
-putS :: S -> VerseT m ()
-{-# INLINE putS #-}
-putS !s = VerseT $ \ _r _s _env mem _yk sk ->
-  sk s mem ()
+putCount :: Count -> VerseT m ()
+{-# INLINE putCount #-}
+putCount !count = VerseT $ \ _level _count _heap mem _yk sk ->
+  sk count mem ()
 
-modifyS :: (S -> S) -> VerseT m ()
-{-# INLINE modifyS #-}
-modifyS f = VerseT $ \ _r s _env mem _yk sk ->
+modifyCount :: (Count -> Count) -> VerseT m ()
+{-# INLINE modifyCount #-}
+modifyCount f = VerseT $ \ _level count _heap mem _yk sk ->
   let
-    !s' = f s
+    !count' = f count
   in
-    sk s' mem ()
+    sk count' mem ()
+
+incrCount :: VerseT m ()
+{-# INLINE incrCount #-}
+incrCount = modifyCount (+ 1)
+
+decrCount :: VerseT m ()
+{-# INLINE decrCount #-}
+decrCount = modifyCount (subtract 1)
 
 getVarMinBound :: VerseT m Label
 {-# INLINE getVarMinBound #-}
-getVarMinBound = VerseT $ \ _r s _env mem _yk sk ->
-  sk s mem mem.varMinBound
+getVarMinBound = VerseT $ \ _level count _heap mem _yk sk ->
+  sk count mem mem.varMinBound
 
 getRefMinBound :: VerseT m Label
 {-# INLINE getRefMinBound #-}
-getRefMinBound = VerseT $ \ _r s _env mem _yk sk ->
-  sk s mem mem.refMinBound
+getRefMinBound = VerseT $ \ _level count _heap mem _yk sk ->
+  sk count mem mem.refMinBound
 
 putMem :: Mem m -> VerseT m ()
 {-# INLINE putMem #-}
-putMem !mem = VerseT $ \ _r s _env _mem _yk sk ->
-  sk s mem ()
+putMem !mem = VerseT $ \ _level count _heap _mem _yk sk ->
+  sk count mem ()
 
 putLabel :: Label -> VerseT m ()
 {-# INLINE putLabel #-}
-putLabel !label = VerseT $ \ _r s _env Mem { label = _, .. } _yk sk ->
-  sk s Mem {..} ()
+putLabel !label = VerseT $ \ _level count _heap Mem { label = _, .. } _yk sk ->
+  sk count Mem {..} ()
 
 runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
 {-# INLINABLE runVerseT #-}
 runVerseT m = do
   let
-    sk s mem x fk _ek
-      | s.count == 0 = runFindT (findVars' x) 0 mem.label >>= \ case
+    sk count mem x fk _ek
+      | count == 0 = runFindT (findVars' x) 0 mem.label >>= \ case
         Nothing -> pure Nothing
-        Just (x, label) -> fmap (x:) <$> fk env (splitMem label mem.varMinBound)
+        Just (x, label) -> fmap (x:) <$> fk heap (splitMem label mem.varMinBound)
       | otherwise = pure Nothing
-  unVerseT m r s env (splitMem label varMinBound) yk sk fk ek
+  unVerseT m level count heap (splitMem label varMinBound) yk sk fk ek
   where
-    env = newVar' ()
-    label = minBound
+    heap = newVar' ()
+    label = minBound + 1
     varMinBound = label
-    r = R { level = 1 }
-    s = S { count = 0 }
-    yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
-    fk _env _mem = pure $ Just []
+    level = 1
+    count = 0
+    yk = Yield $ \ _i _f _count _mem _sk _fk _ek -> pure Nothing
+    fk _heap _mem = pure $ Just []
     ek _mem = pure $ Just []
 
 all' :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m [a]
@@ -309,34 +311,34 @@ if' m f n = split m >>= \ case
 
 split :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m (Stream m a)
 {-# INLINE split #-}
-split m = split' m S { count = 0 }
+split m = split' m 0
 
 split'
   :: (MonadRef m, Vars a m)
-  => VerseT m a -> S -> VerseT m (Stream m a)
+  => VerseT m a -> Count -> VerseT m (Stream m a)
 {-# INLINE split' #-}
-split' m s = split'' m s succeedS failS emptyS
+split' m count = split'' m count succeedS failS emptyS
 
 split''
   :: (MonadRef m, Vars b m)
   => VerseT m a
-  -> S
+  -> Count
   -> Succeed (VerseT m (Stream m b)) m a
   -> Fail (VerseT m (Stream m b)) m
   -> Empty (VerseT m (Stream m b)) m
   -> VerseT m (Stream m b)
 {-# INLINABLE split'' #-}
-split'' m s' sk' fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
+split'' m count' sk' fk' ek' = VerseT $ \ level count heap mem yk sk fk ek ->
   let
-    !r' = R { level = r.level <> 1 }
+    !level' = level + 1
     !mem' = splitMem mem.label mem.varMinBound
   in
-    unVerseT m r' s' env mem' yieldS sk' fk' ek' >>= \ m ->
-    unVerseT m r s env mem yk sk fk ek
+    unVerseT m level' count' heap mem' yieldS sk' fk' ek' >>= \ m ->
+    unVerseT m level count heap mem yk sk fk ek
 
 yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
 {-# INLINABLE yieldS #-}
-yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
+yieldS = Yield $ \ i f count mem sk fk ek -> pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
     tell mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
@@ -346,16 +348,16 @@ yieldS = Yield $ \ i f s mem sk fk ek -> pure $ do
   if i > level then
     stuck
   else
-    yield i $ \ k -> f $ \ m -> k $ split'' m s sk fk ek
+    yield i $ \ k -> f $ \ m -> k $ split'' m count sk fk ek
 
 succeedS :: (MonadRef m, Vars a m) => Succeed (VerseT m (Stream m a)) m a
 {-# INLINABLE succeedS #-}
-succeedS s mem x fk _ek = pure $ do
+succeedS count mem x fk _ek = pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
     tell mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
     tell' mem.refMin mem.backward'
-  if s.count == 0 then do
+  if count == 0 then do
     level <- getLevel
     lift (runFindT (findVars' x) level mem.label) >>= \ case
       Nothing -> do
@@ -370,7 +372,7 @@ succeedS s mem x fk _ek = pure $ do
 
 failS :: Monad m => Fail (VerseT m (Stream m a)) m
 {-# INLINE failS #-}
-failS _env = emptyS
+failS _heap = emptyS
 
 emptyS :: Monad m => Empty (VerseT m (Stream m a)) m
 {-# INLINABLE emptyS #-}
@@ -384,9 +386,9 @@ emptyS mem = pure $ do
 
 liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
 {-# INLINABLE liftFailS #-}
-liftFailS fk' = VerseT $ \ r s env mem yk sk fk ek -> do
-  m <- fk' env $ splitMem mem.label mem.varMinBound
-  unVerseT m r s env mem yk sk fk ek
+liftFailS fk' = VerseT $ \ level count heap mem yk sk fk ek -> do
+  m <- fk' heap $ splitMem mem.label mem.varMinBound
+  unVerseT m level count heap mem yk sk fk ek
 
 splitMem :: Applicative m => Label -> Label -> Mem m
 {-# INLINE splitMem #-}
@@ -407,21 +409,21 @@ fork m = fork' m succeedF
 
 fork' :: Monad m => VerseT m a -> Succeed (VerseT m ()) m a -> VerseT m ()
 {-# INLINABLE fork' #-}
-fork' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
-  unVerseT m r s env mem yieldF sk' failF emptyF >>= \ m ->
-  unVerseT m r s env mem yk sk fk ek
+fork' m sk' = VerseT $ \ level count heap mem yk sk fk ek ->
+  unVerseT m level count heap mem yieldF sk' failF emptyF >>= \ m ->
+  unVerseT m level count heap mem yk sk fk ek
 
 yieldF :: Monad m => Yield (VerseT m ()) m
 {-# INLINABLE yieldF #-}
-yieldF = Yield $ \ i f s mem sk fk ek -> pure $ do
-  putS s
+yieldF = Yield $ \ i f count mem sk fk ek -> pure $ do
+  putCount count
   putMem mem
   level <- getLevel
   if i < level then
     altF (yield i (\ k -> f $ \ m -> k $ fork' m sk)) fk ek
   else do
-    modifyS succS
-    altF (f $ \ m -> modifyS predS *> fork' m sk) fk ek
+    incrCount
+    altF (f $ \ m -> decrCount *> fork' m sk) fk ek
 
 fork1
   :: (MonadWeakRef m, ZipVars_ a m)
@@ -435,25 +437,25 @@ fork1'
   -> Succeed (VerseT m (Var m b)) m a
   -> VerseT m (Var m b)
 {-# INLINABLE fork1' #-}
-fork1' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
-  unVerseT m r s env mem yieldF1 sk' failF emptyF >>= \ m ->
-  unVerseT m r s env mem yk sk fk ek
+fork1' m sk' = VerseT $ \ level count heap mem yk sk fk ek ->
+  unVerseT m level count heap mem yieldF1 sk' failF emptyF >>= \ m ->
+  unVerseT m level count heap mem yk sk fk ek
 
 yieldF1
   :: (MonadWeakRef m, ZipVars_ a m)
   => Yield (VerseT m (Var m a)) m
 {-# INLINABLE yieldF1 #-}
-yieldF1 = Yield $ \ i f s mem sk fk ek -> pure $ do
-  putS s
+yieldF1 = Yield $ \ i f count mem sk fk ek -> pure $ do
+  putCount count
   putMem mem
   level <- getLevel
   if i < level then
     altF (yield i (\ k -> f $ \ m -> k $ fork1' m sk)) fk ek
   else do
-    modifyS succS
+    incrCount
     var <- freshVar
     altF
-      (f (\ m -> modifyS predS *> fork (m >>= liftSucceedF1 sk var)) $> var)
+      (f (\ m -> decrCount *> fork (m >>= liftSucceedF1 sk var)) $> var)
       fk
       ek
 
@@ -461,9 +463,9 @@ liftSucceedF1
   :: (MonadWeakRef m, ZipVars_ b m)
   => Succeed (VerseT m (Var m b)) m a -> Var m b -> a -> VerseT m ()
 {-# INLINABLE liftSucceedF1 #-}
-liftSucceedF1 sk' var x = VerseT $ \ r s env mem yk sk fk ek ->
-  sk' s mem x failF emptyF >>= \ m ->
-  unVerseT (m >>= unifyVar var) r s env mem yk sk fk ek
+liftSucceedF1 sk' var x = VerseT $ \ level count heap mem yk sk fk ek ->
+  sk' count mem x failF emptyF >>= \ m ->
+  unVerseT (m >>= unifyVar var) level count heap mem yk sk fk ek
 
 fork2
   :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m)
@@ -477,25 +479,25 @@ fork2'
   -> Succeed (VerseT m (Var m b, Var m c)) m a
   -> VerseT m (Var m b, Var m c)
 {-# INLINABLE fork2' #-}
-fork2' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
-  unVerseT m r s env mem yieldF2 sk' failF emptyF >>= \ m ->
-  unVerseT m r s env mem yk sk fk ek
+fork2' m sk' = VerseT $ \ level count heap mem yk sk fk ek ->
+  unVerseT m level count heap mem yieldF2 sk' failF emptyF >>= \ m ->
+  unVerseT m level count heap mem yk sk fk ek
 
 yieldF2
   :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m)
   => Yield (VerseT m (Var m a, Var m b)) m
 {-# INLINABLE yieldF2 #-}
-yieldF2 = Yield $ \ i f s mem sk fk ek -> pure $ do
-  putS s
+yieldF2 = Yield $ \ i f count mem sk fk ek -> pure $ do
+  putCount count
   putMem mem
   level <- getLevel
   if i < level then
     altF (yield i (\ k -> f $ \ m -> k $ fork2' m sk)) fk ek
   else do
-    modifyS succS
+    incrCount
     vars <- (,) <$> freshVar <*> freshVar
     altF
-      (f (\ m -> modifyS predS *> fork (m >>= liftSucceedF2 sk vars)) $> vars)
+      (f (\ m -> decrCount *> fork (m >>= liftSucceedF2 sk vars)) $> vars)
       fk
       ek
 
@@ -506,9 +508,9 @@ liftSucceedF2
   -> a
   -> VerseT m ()
 {-# INLINABLE liftSucceedF2 #-}
-liftSucceedF2 sk' vars x = VerseT $ \ r s env mem yk sk fk ek ->
-  sk' s mem x failF emptyF >>= \ m ->
-  unVerseT (m >>= unifyVar2 vars) r s env mem yk sk fk ek
+liftSucceedF2 sk' vars x = VerseT $ \ level count heap mem yk sk fk ek ->
+  sk' count mem x failF emptyF >>= \ m ->
+  unVerseT (m >>= unifyVar2 vars) level count heap mem yk sk fk ek
   where
     unifyVar2 (a, b) = \ (c, d) -> unifyVar a c *> unifyVar b d
 
@@ -524,25 +526,25 @@ fork3'
   -> Succeed (VerseT m (Var m b, Var m c, Var m d)) m a
   -> VerseT m (Var m b, Var m c, Var m d)
 {-# INLINABLE fork3' #-}
-fork3' m sk' = VerseT $ \ r s env mem yk sk fk ek ->
-  unVerseT m r s env mem yieldF3 sk' failF emptyF >>= \ m ->
-  unVerseT m r s env mem yk sk fk ek
+fork3' m sk' = VerseT $ \ level count heap mem yk sk fk ek ->
+  unVerseT m level count heap mem yieldF3 sk' failF emptyF >>= \ m ->
+  unVerseT m level count heap mem yk sk fk ek
 
 yieldF3
   :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m, ZipVars_ c m)
   => Yield (VerseT m (Var m a, Var m b, Var m c)) m
 {-# INLINABLE yieldF3 #-}
-yieldF3 = Yield $ \ i f s mem sk fk ek -> pure $ do
-  putS s
+yieldF3 = Yield $ \ i f count mem sk fk ek -> pure $ do
+  putCount count
   putMem mem
   level <- getLevel
   if i < level then
     altF (yield i (\ k -> f $ \ m -> k $ fork3' m sk)) fk ek
   else do
-    modifyS succS
+    incrCount
     vars <- (,,) <$> freshVar <*> freshVar <*> freshVar
     altF
-      (f (\ m -> modifyS predS *> fork (m >>= liftSucceedF3 sk vars)) $> vars)
+      (f (\ m -> decrCount *> fork (m >>= liftSucceedF3 sk vars)) $> vars)
       fk
       ek
 
@@ -553,23 +555,23 @@ liftSucceedF3
   -> a
   -> VerseT m ()
 {-# INLINABLE liftSucceedF3 #-}
-liftSucceedF3 sk' vars x = VerseT $ \ r s env mem yk sk fk ek ->
-  sk' s mem x failF emptyF >>= \ m ->
-  unVerseT (m >>= unifyVar3 vars) r s env mem yk sk fk ek
+liftSucceedF3 sk' vars x = VerseT $ \ level count heap mem yk sk fk ek ->
+  sk' count mem x failF emptyF >>= \ m ->
+  unVerseT (m >>= unifyVar3 vars) level count heap mem yk sk fk ek
   where
     unifyVar3 (a, b, c) = \ (d, e, f) ->
       unifyVar a d *> unifyVar b e *> unifyVar c f
 
 succeedF :: Monad m => Succeed (VerseT m a) m a
 {-# INLINABLE succeedF #-}
-succeedF s mem x fk ek = pure $ do
-  putS s
+succeedF count mem x fk ek = pure $ do
+  putCount count
   putMem mem
   altF (pure x) fk ek
 
 failF :: Applicative m => Fail (VerseT m a) m
 {-# INLINE failF #-}
-failF _env = emptyF
+failF _heap = emptyF
 
 emptyF :: Applicative m => Empty (VerseT m a) m
 {-# INLINE emptyF #-}
@@ -584,15 +586,17 @@ altF
   -> Empty (VerseT m a) m
   -> VerseT m a
 {-# INLINABLE altF #-}
-altF m fk' ek' = VerseT $ \ r s env mem yk sk fk ek ->
-  unVerseT m r s env mem yk sk
-  (\ env mem -> fk' env mem >>= \ m -> unVerseT m r s env mem yk sk fk $ fk env)
-  (\ mem -> ek' mem >>= \ m -> unVerseT m r s env mem yk sk fk ek)
+altF m fk' ek' = VerseT $ \ level count heap mem yk sk fk ek ->
+  unVerseT m level count heap mem yk sk
+  (\ heap mem -> fk' heap mem >>= \ m ->
+     unVerseT m level count heap mem yk sk fk $ fk heap)
+  (\ mem -> ek' mem >>= \ m ->
+     unVerseT m level count heap mem yk sk fk ek)
 
 stuck :: VerseT m a
 {-# INLINE stuck #-}
-stuck = VerseT $ \ r s _env mem yk ->
-  unYield yk r.level (const $ pure ()) s mem
+stuck = VerseT $ \ level count _heap mem yk ->
+  unYield yk level (const $ pure ()) count mem
 
 data Var m a
   = Ref {-# UNPACK #-} !(Ref m (RefState m a))
@@ -749,7 +753,7 @@ anyRefs _ = getAny . getConst . vars @a @m f
       Bound _ anyRefs -> Const $ Any anyRefs
 
 readVar :: MonadWeakRef m => Var m a -> VerseT m a
-{-# INLINABLE readVar #-}
+{-# INLINE readVar #-}
 readVar = \ case
   Bound binding _ -> pure binding
   Ref ref -> readRefBinding ref
