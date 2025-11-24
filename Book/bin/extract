@@ -32,8 +32,9 @@ function parseArgs() {
 }
 
 function extractPrependComment(lines, verseBlockStart) {
-  // Look backwards from verseBlockStart to find <!--verse or <!-- comment
+  // Look backwards from verseBlockStart to find <!--verse, <!--versetest, or <!-- comment
   let commentLines = [];
+  let isTest = false;
   let i = verseBlockStart - 1;
 
   // Skip empty lines
@@ -41,35 +42,55 @@ function extractPrependComment(lines, verseBlockStart) {
     i--;
   }
 
-  // Check if we found a closing -->
-  if (i >= 0 && lines[i].trim() === '-->') {
-    i--;
-    // Collect lines until we find <!--verse or <!--
-    while (i >= 0) {
-      const line = lines[i];
-      const trimmed = line.trim();
+  if (i >= 0) {
+    const trimmed = lines[i].trim();
 
-      if (trimmed.startsWith('<!--verse')) {
-        // Found <!--verse, extract content after it
-        const firstLine = line.substring(line.indexOf('<!--verse') + 9).trim();
-        if (firstLine) {
-          commentLines.unshift(firstLine);
-        }
-        break;
-      } else if (trimmed === '<!--') {
-        // Found plain <!--, don't include the marker itself
-        break;
-      }
-      commentLines.unshift(line);
+    // Check for single-line markers like <!--versetest--> or <!--verse-->
+    if (trimmed === '<!--versetest-->') {
+      isTest = true;
+      return { commentLines, isTest };
+    } else if (trimmed === '<!--verse-->') {
+      return { commentLines, isTest };
+    }
+
+    // Check if we found a closing --> (multi-line comment)
+    if (trimmed === '-->') {
       i--;
+      // Collect lines until we find <!--versetest, <!--verse, or <!--
+      while (i >= 0) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (trimmed.startsWith('<!--versetest')) {
+          // Found <!--versetest, extract content after it
+          isTest = true;
+          const firstLine = line.substring(line.indexOf('<!--versetest') + 13).trim();
+          if (firstLine) {
+            commentLines.unshift(firstLine);
+          }
+          break;
+        } else if (trimmed.startsWith('<!--verse')) {
+          // Found <!--verse, extract content after it
+          const firstLine = line.substring(line.indexOf('<!--verse') + 9).trim();
+          if (firstLine) {
+            commentLines.unshift(firstLine);
+          }
+          break;
+        } else if (trimmed === '<!--') {
+          // Found plain <!--, don't include the marker itself
+          break;
+        }
+        commentLines.unshift(line);
+        i--;
+      }
     }
   }
 
-  return commentLines;
+  return { commentLines, isTest };
 }
 
 function extractAppendComment(lines, verseBlockEnd) {
-  // Look forward from verseBlockEnd to find <!--verse or <!-- comment
+  // Look forward from verseBlockEnd to find <!--versetest, <!--verse, or <!-- comment
   let commentLines = [];
   let i = verseBlockEnd + 1;
 
@@ -78,11 +99,28 @@ function extractAppendComment(lines, verseBlockEnd) {
     i++;
   }
 
-  // Check if we found an opening <!--verse or <!--
+  // Check if we found an opening <!--versetest, <!--verse, or <!--
   if (i < lines.length) {
     const trimmed = lines[i].trim();
 
-    if (trimmed.startsWith('<!--verse')) {
+    if (trimmed.startsWith('<!--versetest')) {
+      // Extract content after <!--versetest on the same line
+      const firstLine = lines[i].substring(lines[i].indexOf('<!--versetest') + 13).trim();
+      if (firstLine && firstLine !== '') {
+        commentLines.push(firstLine);
+      }
+      i++;
+
+      // Collect lines until we find -->
+      while (i < lines.length) {
+        const line = lines[i];
+        if (line.trim() === '-->') {
+          break;
+        }
+        commentLines.push(line);
+        i++;
+      }
+    } else if (trimmed.startsWith('<!--verse')) {
       // Extract content after <!--verse on the same line
       const firstLine = lines[i].substring(lines[i].indexOf('<!--verse') + 9).trim();
       if (firstLine && firstLine !== '') {
@@ -159,21 +197,32 @@ function extractVerseSnippets(markdownContent) {
       }
 
       // Look for prepend comment before the ```verse block
-      const prependLines = extractPrependComment(lines, verseBlockStart);
+      const { commentLines: prependLines, isTest } = extractPrependComment(lines, verseBlockStart);
 
       // Look for append comment after the closing ```
       const appendLines = extractAppendComment(lines, i);
 
-      // Combine: prepend + snippet + append
+      // Choose using statement based on whether it's a test or not
+      const usingStatement = isTest
+        ? 'using { /Verse.org/Tests/VerseTestScriptCmd }'
+        : 'using { /Verse.org/VerseCLR }';
+
+      // For tests, add "assert:" before the snippet
+      const contentPrefix = isTest ? ['assert:'] : [];
+
+      // Combine: using + prepend + [assert:] + snippet (indented by 4 spaces) + append
       const fullContent = [
+        usingStatement,
         ...prependLines,
-        ...currentSnippet,
+        ...contentPrefix,
+        ...currentSnippet.map(line => '    ' + line),
         ...appendLines
       ].join('\n');
 
       snippets.push({
         number: ++snippetCount,
-        content: fullContent
+        content: fullContent,
+        isTest: isTest
       });
     } else if (inVerseBlock) {
       currentSnippet.push(line);
@@ -220,7 +269,8 @@ function main() {
   snippets.forEach(snippet => {
     // Pad single-digit numbers with leading zero
     const paddedNumber = snippet.number.toString().padStart(2, '0');
-    const filename = path.join(outputDir, `${paddedNumber}.verse`);
+    const extension = snippet.isTest ? '.versetest' : '.verse';
+    const filename = path.join(outputDir, `${paddedNumber}${extension}`);
     fs.writeFileSync(filename, snippet.content);
     console.log(`Created: ${filename}`);
   });

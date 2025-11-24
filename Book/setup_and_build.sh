@@ -94,7 +94,17 @@ echo -e "${YELLOW}Creating Python virtual environment...${NC}"
 if [ -d "venv" ]; then
     echo "Virtual environment already exists, using existing one..."
 else
-    "$PYTHON_CMD" -m venv venv
+    if ! "$PYTHON_CMD" -m venv venv 2>/dev/null; then
+        echo -e "${YELLOW}Virtual environment creation failed. Trying with --without-pip...${NC}"
+        "$PYTHON_CMD" -m venv --without-pip venv
+        source venv/bin/activate
+        curl -sS https://bootstrap.pypa.io/get-pip.py | python
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Failed to install pip. Please install python3-venv package:${NC}"
+            echo "  sudo apt install python3-venv"
+            exit 1
+        fi
+    fi
 fi
 
 # Activate virtual environment

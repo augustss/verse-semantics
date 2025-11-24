@@ -37,8 +37,14 @@ function main() {
   // Process each markdown file
   markdownFiles.forEach(file => {
     console.log(`Processing: ${path.relative(currentDir, file)}`);
+    // on windows the child process must explicitly call node because we
+    // cannot rely on the hashbang
+    const onWindows = process.platform === "win32"
+    const execCommand = onWindows
+          ? `node.exe "${extractScript}" "${file}" -t "${verseDir}"`
+          : `"${extractScript}" "${file}" -t "${verseDir}"`;
     try {
-      execSync(`"${extractScript}" "${file}" -t "${verseDir}"`, {
+      execSync(execCommand, {
         stdio: 'inherit',
         encoding: 'utf-8'
       });

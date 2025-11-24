@@ -8,7 +8,7 @@ Consider the simple act of accessing an array element. In traditional languages,
 
 <!--NoCompile-->
 ```verse
-# Traditional 
+# Traditional
 # if (index < array.length) {
 #     value = array[index]
 #     process(value)
@@ -42,12 +42,18 @@ The query operator `?` turns any value into a failable expression. When applied 
 
 You can create your own failable expressions through functions marked with the `<decides>` effect:
 
+<!--verse
+-->
 ```verse
 ValidateAge(Age:int)<decides>:int =
     Age >= 0    # Fails if age is negative
     Age <= 150  # Fails if age is unrealistic
     Age         # Returns the age if both checks pass
 ```
+<!--verse
+Main()<decides>:void=
+    ValidateAge[10]
+-->
 
 This function doesn't just check conditions - it embodies them. If the age is invalid, the function fails. If it's valid, it succeeds with the age value. The validation and the value are inseparable.
 
@@ -94,7 +100,9 @@ FindBestWeapon(Inventory:[]item)<decides>:item =
 
     BestWeapon?  # Fails if no weapon was found
 ```
-
+<!--verse
+Main()<decides>:void=return
+-->
 The function body is a failure context, allowing failable expressions throughout. The final line extracts the value from the option, failing if no weapon was found.
 
 ## Speculative Execution
@@ -167,6 +175,10 @@ Consider this function:
 ValidatePositive(X:int)<decides>:int =
     X > 0
 ```
+<!--verse
+Main()<decides>:void=
+    ValidatePositive[1]
+-->
 
 This looks like it just checks a condition, but there's more happening. When `X > 0` succeeds (when the comparison is true), it returns the value of `X`. When the comparison fails (when it's false), the function fails. The comparison is both a test and a value-producing expression.
 
@@ -182,36 +194,63 @@ GetIfLessOrEqual(X:int, Limit:int)<decides>:int =
 GetIfGreaterThan(X:int, Threshold:int)<decides>:int =
     X > Threshold  # Returns X when X > Threshold, fails otherwise
 ```
+<!--verse
+Main()<decides>:void=
+    GetIfNotEqual[1,2]
+    GetIfGreaterThan[11,2]
+    GetIfLessOrEqual[1,2]
+-->
 
 A comparison expression `A op B` in a decides context returns the left operand `A` when the comparison succeeds, and fails when the comparison is false.
 
 This creates concise validation functions:
 
 ```verse
-ValidateInRange(Value:int, Min:int, Max:int)<decides>:int =
-    Value >= Min
-    Value <= Max
+ValidateInRange(Value:int, LwrBnd:int, UprBnd:int)<decides>:int =
+    Value >= LwrBnd
+    Value <= UprBnd
     Value  # This final line is actually redundant!
 ```
+<!--verse
+Main()<decides>:void=
+    ValidateInRange[5,0,10]
+-->
 
-The last line is redundant because `Value <= Max` already returns `Value` when it succeeds. However, it can make the intent clearer. You could write this more concisely as:
+The last line is redundant because `Value <= UprBnd` already returns `Value` when it succeeds. However, it can make the intent clearer. You could write this more concisely as:
 
 ```verse
-ValidateInRange(Value:int, Min:int, Max:int)<decides>:int =
-    Value >= Min
-    Value <= Max
+ValidateInRange(Value:int, LwrBnd:int, UprBnd:int)<decides>:int =
+    Value >= LwrBnd
+    Value <= UprBnd
 ```
+<!--verse
+Main()<decides>:void=
+    ValidateInRange[5,0,10]
+-->
 
 The function returns `Value` from the last successful comparison.
 
 This pattern extends beyond comparisons to any expression that produces a value while potentially failing:
 
+<!--verse
+player := string
+FindPlayer(Name:player)<decides>:player={
+    return Name
+}
+IsAlive(Name:string)<decides>:string={
+    Name = Name
+}
+-->
 ```verse
 GetValidatedPlayer(Name:string)<decides>:player =
     Player := FindPlayer[Name]  # Fails if player not found
     IsAlive[Player]             # Fails if player is dead
     Player                      # Returns the validated player
 ```
+<!--verse
+Main()<decides>:void=
+    GetValidatedPlayer["PlayerOne"]
+-->
 
 Understanding this semantic is crucial for writing idiomatic Verse code. It's why you often see comparison chains without explicit return statements—the comparisons themselves produce the values.
 
@@ -231,13 +270,15 @@ Other := Empty?  # Fails
 ```
 <!--verse
 }
+Main()<decides>:void=return
+# the Other := Empty? line panics betaverse.
 -->
 
 The `option{}` constructor works in reverse, converting failure to an empty option:
 
 <!--verse
 RiskyComputation()<computes><decides>:int=1
-F():void={
+F()<decides>:void={
 -->
 ```verse
 Result := option{RiskyComputation[]}
@@ -246,6 +287,8 @@ Result := option{RiskyComputation[]}
 ```
 <!--verse
 }
+Main()<decides>:void=
+    F[]
 -->
 
 This bidirectional conversion makes options and failure interchangeable, allowing you to choose the most appropriate representation for your specific use case.
@@ -260,17 +303,36 @@ The question mark appears *before* the type, not after:
 ValidSyntax:?int = option{42}      # Correct
 # InvalidSyntax:int? = option{42}  # ERROR 3549 - wrong position
 ```
+<!--verse
+Main():void=
+    ValidSyntax
+    return
+-->
 
 This is the only valid syntax for declaring optional types. The `?` prefix applies to any type:
 
+<!--verse
+player := struct{}
+F()<transacts><decides>:void={
+-->
 ```verse
 MaybeNumber:?int = option{42}
 MaybeText:?string = option{"hello"}
 MaybePlayer:?player = option{player{}}
 ```
+<!--verse
+}
+Main():void=
+    F[] or "F died"
+-->
 
 Use the `option{}` constructor to wrap a value:
 
+<!--
+# TODO: this example does not work. A decides computation cannot be used to initialize
+# data. RiskyComputation is decides due to the [], but is being used to initialize
+# Result.
+-->
 ```verse
 # Filled option
 Filled:?int = option{42}
@@ -281,16 +343,35 @@ Empty:?int = false
 # Option from failable expression
 Result:?int = option{RiskyComputation[]}  # false if computation fails
 ```
+<!--verse
+Main():void=
+    Filled
+    Empty
+    Result
+    return
+-->
 
 Empty options and `false` are equivalent—an empty option *is* `false`:
 
+<!--verse
+Go()<transacts><decides>:void=
+-->
 ```verse
 EmptyOption:?int = false
 EmptyOption = false  # This comparison succeeds
 ```
+<!--verse
+
+Main():void=
+    Go[] or "Don't go"
+-->
+
 
 **Expression semantics in `option{}`**: The option constructor evaluates its contents as a sequence or tuple depending on separators:
 
+<!--verse
+Go()<transacts><decides>:void=
+-->
 ```verse
 # Semicolon creates sequence - last value is used
 option{1; 2}? = 2
@@ -301,11 +382,19 @@ option{1, 2}? = (1, 2)
 # Single expression
 option{42}? = 42
 ```
+<!--verse
+
+Main():void=
+    Go[] or "Don't go"
+-->
 
 ### Unwrapping Options
 
 The query operator `?` extracts values from options, failing if the option is empty:
 
+<!--verse
+Go()<transacts><decides>:void={
+-->
 ```verse
 MaybeValue:?int = option{42}
 Value := MaybeValue?  # Succeeds with 42
@@ -313,9 +402,25 @@ Value := MaybeValue?  # Succeeds with 42
 Empty:?int = false
 Other := Empty?  # Fails - cannot unwrap empty option
 ```
+<!--verse
+}
+Main():void=
+    Go[] or "Go should fail so use this"
+-->
 
-**Unwrapping is only allowed in failure contexts**—places where the language knows how to handle failure:
 
+Unwrapping is only allowed in failure contexts:
+
+<!--verse
+MaybeInt:?int = option{42}
+UseItem(I:int):void={return}
+ProcessItem(I:int):?int=option{3}
+Items:[]int = array{1,2,3}
+Go()<transacts><decides>:void=
+# TODO:
+# this example cannot work. We cannot catch the error and furthermore we cannot
+# wrap the if and for in a function _and exclude_ GetRequired and RegularFunction
+-->
 ```verse
 # Valid: In if condition (failure context)
 if (Value := MaybeInt?):
@@ -338,21 +443,28 @@ RegularFunction(Maybe:?int):void =
 
 Options can be nested to represent multiple layers of absence:
 
+<!--verse
+Go()<transacts><decides>:void=
+-->
 ```verse
-# Double-nested option
+# Double-nested option, notice the ?? type
 DoubleNested:??int = option{option{42}}
 
 # Single unwrap gets outer option
 if (Inner := DoubleNested?):
     # Inner has type ?int
-    if (Value := Inner?):
-        # Value has type int, equals 42
+    if (TheValue := Inner?):
+        # TheValue has type int, equals 42
 
 # Double unwrap gets the value directly
-Value := DoubleNested??  # Fails if either layer is empty
+DirectValue := DoubleNested??  # Fails if either layer is empty
 ```
+<!--verse
+Main():void=
+    Go[] or "Don't Go"
+-->
 
-Helper functions can work with nested options:
+Helper functions also work with nested options:
 
 ```verse
 UnpackNested(MaybeValue:??int):?int =
@@ -367,11 +479,18 @@ DirectUnpack(MaybeValue:??int):int =
     else:
         -1  # Default for any level empty
 ```
-
+<!--verse
+Main():void=
+    UnpackNested(option{option{1}})
+    DirectUnpack(option{option{2}})
+-->
 ### Chained Member Access
 
 The `?.` operator provides safe member access on optional values:
 
+<!--
+## TODO: this one is also tangled. I think we should remove the linked list example.
+-->
 ```verse
 entity := class:
     Name:string = "Unknown"
@@ -400,7 +519,9 @@ The `?.` operator short-circuits—if the option is empty, the entire expression
 ### Providing Defaults with `or`
 
 Use the `or` operator to provide fallback values for empty options:
-
+<!--verse
+Go()<transacts><decides>:void=
+-->
 ```verse
 # Simple default
 MaybeValue:?int = false
@@ -413,17 +534,35 @@ Default:string = "default"
 
 Result := Primary? or Secondary? or Default  # Results in "backup"
 ```
+<!--verse
+Main():void=
+    Go[] or "Hey a default!"
+-->
 
 The `or` operator tries each alternative in order, using the first one that succeeds:
 
+<!--verse
+weapon := string
+player := class:
+    EquippedWeapon:?string = option{"Lancer"}
+    HolsteredWeapon:?string = option{"Hammer of Dawn"}
+
+DefaultWeapon:string = "Melee"
+-->
 ```verse
 GetPreferredWeapon(Player:player):weapon =
     Player.EquippedWeapon? or Player.HolsteredWeapon? or DefaultWeapon
 ```
+<!--verse
+Main():void=
+    Marcus := player{}
+    GetPreferredWeapon(Marcus)
+-->
 
 ### Type System Rules
 
-**Option types are disjoint from non-option types**. You cannot implicitly convert between `T` and `?T`:
+Option types are disjoint from non-option types. Verse does not allow implicitly
+convert between `T` and `?T`:
 
 ```verse
 # ERROR 3510: Cannot pass T where ?T expected
@@ -440,9 +579,19 @@ RequiredToOptional:?int = option{42}
 # Correct: Unwrap in failure context
 GetFromOptional(Opt:?int)<decides>:int = Opt?
 ```
+<!--verse
+Main():void=
+    # TODO: GetFromOptional Errors out because its <no_rollback>
+    # the fix is to annotate it as <transacts> but then this would be in the
+    # example
+    GetFromOptional[OptionalValue] or RegularValue
+-->
 
 This disjointness prevents bugs by making the presence or absence of values explicit:
 
+<!--verse
+# TODO: this example is also tangled.
+-->
 ```verse
 entity := class:
     MaybeOwner:?player = false
@@ -461,6 +610,7 @@ else:
 
 **Wrong type syntax**:
 
+<!--NoCompile-->
 ```verse
 # ERROR 3549: ? goes before the type, not after
 # entity := class:
@@ -469,6 +619,7 @@ else:
 
 **Invalid option construction**:
 
+<!--NoCompile-->
 ```verse
 # ERROR 3502: Wrong delimiters
 # option(42)   # ERROR - use braces {}
@@ -483,6 +634,9 @@ else:
 
 **Non-type expressions as option types**:
 
+<!--verse
+Main():void=
+-->
 ```verse
 # ERROR 3547: Can only make options of types, not values
 # MaybeValue:?42 = option{42}      # ERROR
@@ -495,8 +649,12 @@ MaybeFloat:?float = option{3.14}
 MaybeString:?string = option{"hello"}
 ```
 
+
 **Unwrapping non-options**:
 
+<!--verse
+Main():void=
+-->
 ```verse
 # ERROR 3509: Can only unwrap option types
 RegularValue:int = 42
@@ -505,6 +663,7 @@ RegularValue:int = 42
 
 **Undefined type errors don't cascade**:
 
+<!--NoCompile-->
 ```verse
 # ERROR 3506: Undef is not defined, but ?Undef doesn't create additional errors
 # Function(Param:?Undef):void = {}  # Single error for Undef, not for ?Undef
@@ -512,6 +671,7 @@ RegularValue:int = 42
 
 ### Options with Other Types
 
+<!-- TODO: this should show option with a user defined type -->
 Options work with all Verse types:
 
 ```verse
@@ -536,11 +696,24 @@ MaybeEntity:?entity = option{entity{ID := 1}}
 direction := enum{North, South, East, West}
 MaybeDirection:?direction = option{direction.North}
 ```
-
+<!--verse
+# TODO: tangled, class defaults to transacts which is not allowed at top-level
+Main():void=
+    MaybeInt
+    MaybeFloat
+    MaybeString
+    MaybeArray
+    MaybeMap
+    MaybeEntity
+    MaybeDirection
+-->
 ### Comparison and Equality
 
 Empty options equal `false`, and filled options equal their unwrapped values when compared properly:
 
+<!--verse
+Go()<transacts><decides>:void=
+-->
 ```verse
 EmptyOption:?int = false
 EmptyOption = false  # Succeeds
@@ -548,9 +721,16 @@ EmptyOption = false  # Succeeds
 FilledOption:?int = option{1}
 FilledOption? = 1  # Succeeds - unwrap then compare
 ```
+<!--verse
+Main():void=
+    Go[] or 1
+-->
 
 However, you cannot directly compare optional and non-optional values without unwrapping:
 
+<!--verse
+Main():void=
+-->
 ```verse
 Opt:?int = option{42}
 Regular:int = 42
@@ -562,19 +742,31 @@ if (Opt? = Regular):
 
 ## Multi-Layer Failure with Optionals
 
-When you combine decides functions with optional return types, you create a sophisticated system with multiple layers of failure. This enables expressing complex conditions concisely while maintaining clarity.
+Combining decides functions with optional return types, creates a system with
+multiple layers of failure. This pattern enables expressing complex conditions
+concisely while maintaining clarity.
 
 A function can fail at two levels:
 
 - *Function-level failure*: The entire function fails using `<decides>`
 - *Value-level failure*: The function succeeds but returns an empty option
 
+<!--verse
+player := string
+IsActive(S:string)<transacts><decides>:string=""
+LookupPlayer(S:string)<transacts><decides>:string="player"
+# TODO: FindEligiblePlayer must have <transacts> to compile
+-->
 ```verse
 FindEligiblePlayer(Name:string)<decides>:?player =
     Name <> ""           # Layer 1: Fail if name is empty
     Player := LookupPlayer[Name]  # Layer 1: Fail if player not found
     option{IsActive[Player]}      # Layer 2: Empty option if player inactive
 ```
+<!--verse
+Main():void=
+    FindEligiblePlayer["Someone"] or "Default"
+-->
 
 This function has three possible outcomes:
 
@@ -584,6 +776,10 @@ This function has three possible outcomes:
 
 Calling this function demonstrates the layered failure:
 
+<!--verse
+FindEligiblePlayer(S:string)<transacts><decides>:?string=option{S}
+Go()<transacts><decides>:void=
+-->
 ```verse
 # Function-level failure
 Result1 := FindEligiblePlayer[""]  # Fails, Result1 never assigned
@@ -598,6 +794,10 @@ else:
 if (Player := FindEligiblePlayer["ActiveUser"]?):
     # Executes with Player bound to the active player
 ```
+<!--verse
+Main():void=
+    Go[] or "Default"
+-->
 
 This pattern is particularly powerful for validation with different failure modes:
 
@@ -606,19 +806,33 @@ ValidateScore(Score:int)<decides>:?int =
     Score >= 0           # Layer 1: Reject negative scores (invalid input)
     option{Score <= 100} # Layer 2: Reject high scores (out of range)
 ```
+<!--verse
+# TODO: ValidateScore needs <transacts> to compile
+Main():void=
+    ValidateScore[2] or 2
+-->
 
 Testing:
 
+<!--verse
+ValidateScore(Score:int)<transacts><decides>:?int =
+    Score >= 0           # Layer 1: Reject negative scores (invalid input)
+    option{Score <= 100} # Layer 2: Reject high scores (out of range)
+Main():void=
+-->
 ```verse
-ValidateScore[-1]   # Function fails - invalid input
-ValidateScore[50]?  # Succeeds, returns 50 - valid score
-ValidateScore[150]? # Function succeeds but ? fails - out of range
+ValidateScore[-1] or 1
+ValidateScore[50]? or 2
+ValidateScore[150]? or 3
 ```
 
-The distinction between function-level and value-level failure lets you express different kinds of errors. Function-level failure typically means "this operation couldn't complete" while value-level failure means "the operation completed but the result doesn't meet criteria."
+The distinction between function-level and value-level failure lets you express different kinds of errors. Function-level failure typically means "this operation couldn't complete" while value-level failure means "the operation completed but the result doesn't meet the expected criteria."
 
 You can query optionals at different points:
 
+<!--verse
+FindValidScore(S:string):?int=option{2}
+-->
 ```verse
 GetScoreClass(Name:string)<decides>:string =
     Score := FindValidScore[Name]  # Returns ?int
@@ -630,21 +844,42 @@ GetScoreClass(Name:string)<decides>:string =
     else:
         "No score"
 ```
+<!--verse
+# TODO: GetScoreClass needs a <transacts> to compile
+Main():void=
+    GetScoreClass["hello"] or "Nope"
+-->
 
 Or chain them naturally:
 
+<!--verse
+FindValidScore(S:string):?int=option{2}
+-->
 ```verse
 GetTopScore(Name:string)<decides>:int =
-    Score := FindValidScore[Name]  # Returns ?int
+    Score := FindValidScore[Name]   # Returns ?int
     ExtractedScore := Score?        # Fails if Score is empty
     ExtractedScore > 50             # Fails if score too low
 ```
+<!--verse
+# TODO: GetTopScore needs a <transacts> to compile
+Main():void=
+    GetTopScore["PlayerOne"] or 10
+-->
 
+<!-- TODO: This should end with advice, e.g., "We recommend...", on when to use
+this pattern rather than claims -->
 This multi-layer approach creates expressive APIs where different failure modes have different meanings, and callers can choose how deeply to inspect the results.
 
 ## Dynamic Casts as Decides
 
-Type casting in Verse integrates seamlessly with the failure system. A dynamic cast using square brackets `Type[value]` is inherently a decides operation—it succeeds if the value is of the target type, and fails otherwise.
+Type casting in Verse is integrated into the failure system. A dynamic cast
+behaves just like a `<decides>` function call and similarly uses bracket
+syntax. For example `Type[value]` attempts to cast `value`'s type to `Type` and
+fails if unsuccessful.
+
+<!-- TODO: link to chapter 10?  -->
+This is also works with user defined types which must specify `<castable>`:
 
 ```verse
 component := class<castable>:
@@ -657,9 +892,25 @@ physics_component := class<castable>(component):
 TryGetPhysics(Comp:component)<decides>:physics_component =
     physics_component[Comp]  # Succeeds if Comp is actually a physics_component
 ```
+<!--verse
+# TODO: TryGetPhysics needs a <transacts> to compile
+Main():void=
+    TryGetPhysics[component{}] or component{}
+-->
 
-This makes type-based dispatch natural:
+This makes type-based dispatch easily expressible:
 
+<!--verse
+component := class<castable>:
+    Name:string = "Component"
+physics_component := class<castable>(component):
+    Velocity:float = 0.0
+render_component := class<castable>(component):
+    Renderer:string = "RayTrace"
+UpdatePhysics(P:physics_component):void=return
+UpdateRendering(R:render_component):void=return
+UpdateGeneric(G:component):void=return
+-->
 ```verse
 ProcessComponent(Comp:component):void =
     if (Physics := physics_component[Comp]):
@@ -670,11 +921,32 @@ ProcessComponent(Comp:component):void =
         # Unknown component type
         UpdateGeneric(Comp)
 ```
+<!--verse
+Main():void=
+    C := component{}
+    ProcessComponent(C)
+-->
 
 The cast itself is the condition—no separate type checking needed. When the cast succeeds, you have both confirmed the type and obtained a properly-typed reference.
 
 You can chain casts with other decides operations:
 
+<!--verse
+component := class<castable>:
+    Name:string = "Component"
+physics_component := class<castable>(component):
+    Velocity:float = 0.0
+render_component := class<castable>(component):
+    Renderer:string = "RayTrace"
+UpdatePhysics(P:physics_component):void=return
+UpdateRendering(R:render_component):void=return
+UpdateGeneric(G:component):void=return
+entity := class:
+    GetComponent()<transacts><decides>:component=
+        component{}
+IsActive(c:component)<transacts><decides>:logic=true
+# TODO: GetActivePhysicsComponent needs <transacts> to compile
+-->
 ```verse
 GetActivePhysicsComponent(Entity:entity)<decides>:physics_component =
     Comp := Entity.GetComponent[]  # Fails if no component
@@ -682,6 +954,11 @@ GetActivePhysicsComponent(Entity:entity)<decides>:physics_component =
     IsActive[Physics]  # Fails if inactive
     Physics
 ```
+<!--verse
+Main():void=
+    e := entity{}
+    GetActivePhysicsComponent[e] or "No entity"
+-->
 
 Each step must succeed for the function to return a value. This creates self-documenting validation chains where type requirements are explicit.
 

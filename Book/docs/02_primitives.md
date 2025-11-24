@@ -16,6 +16,9 @@ Examples include mathematical operations like `Abs()`, collection methods like `
 
 Most intrinsic functions *cannot be referenced as first-class values*. This means you can call them directly, but you cannot store them in variables or pass them as function arguments:
 
+<!--verse
+F():void={
+-->
 ```verse
 Result := Abs(-42)  # Returns 42
 
@@ -25,6 +28,9 @@ Result := Abs(-42)  # Returns 42
 # Invalid: Cannot pass as parameter
 # ApplyFunction(Abs, -42)  # ERROR
 ```
+<!--verse
+}
+-->
 
 This restriction exists because intrinsics often require special calling conventions or optimizations that don't fit the standard function model. If you need to pass intrinsic functionality around, wrap it in a lambda or regular function.
 
@@ -137,12 +143,10 @@ This canonical form simplifies equality checking and ensures consistent behavior
 An important property: *`int` is a subtype of `rational`*. This means any integer can be used where a rational is expected:
 
 <!--verse
+ProcessRational(X:rational):rational = X
 F()<decides>:void={
 -->
 ```verse
-# Function accepting rational
-ProcessRational(X:rational):rational = X
-
 # Can pass integers directly
 ProcessRational(5)      # 5 is implicitly 5/1 (rational)
 ProcessRational(0)      # 0 is implicitly 0/1 (rational)
@@ -205,28 +209,20 @@ Ceil((-5) / -2) = 3     # 2.5 → 3
 }
 -->
 
-`Floor` rounds toward negative infinity, *not* toward zero. This matches mathematical convention but differs from truncation:
-
-- `Floor(-2.5) = -3` (toward -∞)
-- Truncate(-2.5) = -2 (toward zero) — not available in Verse
+`Floor` rounds toward negative infinity, *not* toward zero. This matches mathematical convention but differs from truncation.
 
 Rationals can be used as parameter and return types:
 
-<!--verse
-F()<decides>:void={
--->
+<!--NoCompile-->
 ```verse
 # Function returning rational
-Half(X:int)<transacts><decides>:rational = X / 2
-
+Half(X:int)>transacts><decides>:rational = X / 2
 # Use the result
 if (Result := Half[7]):
     Floor(Result) = 3   # 7/2 = 3.5, Floor gives 3
     Ceil(Result) = 4    # 7/2 = 3.5, Ceil gives 4
 ```
-<!--verse
-}
--->
+
 
 Because `int` is a subtype of `rational`, you *cannot* overload based solely on these types:
 
@@ -241,9 +237,7 @@ The compiler sees `int` as more specific than `rational`, so the signatures woul
 
 Rationals excel at resource distribution and fairness calculations:
 
-<!--verse
-F()<decides>:void={
--->
+<!--NoCompile-->
 ```verse
 # Fair resource distribution
 DistributeResources(TotalGold:int, NumPlayers:int)<decides>:int =
@@ -259,9 +253,6 @@ if (NumberOfQuivers := Floor(Coins / CoinsPerQuiver)):
     TotalArrows:int = NumberOfQuivers * ArrowsPerQuiver
     # Player can afford 2 quivers = 30 arrows
 ```
-<!--verse
-}
--->
 
 ## Floats
 
@@ -315,28 +306,41 @@ Verse provides intrinsic mathematical functions for common numerical operations.
 
 The `Abs()` function returns the absolute value of a number—its distance from zero without regard to sign:
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Abs(X:int):int
 Abs(X:float):float
 ```
 
+<!--verse
+F():void={
+-->
 ```verse
 Abs(5)    # Returns 5
 Abs(-5)   # Returns 5
 Abs(0)    # Returns 0
 Abs(3.14) # Returns 3.14
 ```
+<!--verse
+}
+-->
 
 The `Min()` and `Max()` functions return the minimum or maximum of two values:
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Min(A:int, B:int):int
 Min(A:float, B:float):float
 Max(A:int, B:int):int
 Max(A:float, B:float):float
+```
 
+<!--verse
+F():void={
+-->
+```verse
 # NaN propagates through comparison
 Max(NaN, 5.0)   # Returns NaN
 Min(NaN, 5.0)   # Returns NaN
@@ -348,9 +352,13 @@ Min(-Inf, 100.0)   # Returns -Inf
 Max(-Inf, -Inf)    # Returns -Inf
 Min(Inf, Inf)      # Returns Inf
 ```
+<!--verse
+}
+-->
 
 Verse provides multiple rounding functions that convert floats to integers with different rounding strategies:
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Floor(X:float):int   # Round down
@@ -361,21 +369,28 @@ Int(X:float):int     # Truncate toward zero
 
 Round to nearest even (ties go to even):
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
-Round(1.5)    # Returns 2 (tie: 1.5 rounds to even 2)
-Round(0.5)    # Returns 0 (tie: 0.5 rounds to even 0)
-Round(2.5)    # Returns 2 (tie: 2.5 rounds to even 2)
-Round(-1.5)   # Returns -2 (tie: -1.5 rounds to even -2)
-Round(-0.5)   # Returns 0 (tie: -0.5 rounds to even 0)
+Round[1.5]    # Returns 2 (tie: 1.5 rounds to even 2)
+Round[0.5]    # Returns 0 (tie: 0.5 rounds to even 0)
+Round[2.5]    # Returns 2 (tie: 2.5 rounds to even 2)
+Round[-1.5]   # Returns -2 (tie: -1.5 rounds to even -2)
+Round[-0.5]   # Returns 0 (tie: -0.5 rounds to even 0)
 
-Round(1.4)    # Returns 1 (no tie, rounds down)
-Round(1.6)    # Returns 2 (no tie, rounds up)
+Round[1.4]    # Returns 1 (no tie, rounds down)
+Round[1.6]    # Returns 2 (no tie, rounds up)
 ```
+<!--verse
+}
+-->
 
 The "round to nearest even" strategy (also called banker's rounding) avoids bias when rounding many tie values.
 
 Some additional mathematical functions:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Sqrt(X:float):float
@@ -401,6 +416,7 @@ Pow(NaN, 0.0)     # Returns 1.0 (0 exponent always 1)
 Pow(1.0, NaN)     # Returns 1.0 (1 to any power is 1)
 ```
 
+<!--NoCompile-->
 ```verse
 Exp(X:float):float
 
@@ -414,6 +430,7 @@ Exp(Inf)      # Returns Inf
 Exp(NaN)      # Returns NaN
 ```
 
+<!--NoCompile-->
 ```verse
 # Signature
 Ln(X:float):float
@@ -431,6 +448,7 @@ Ln(Inf)       # Returns Inf
 Ln(NaN)       # Returns NaN
 ```
 
+<!--NoCompile-->
 ```verse
 # Signature
 Log(Base:float, Value:float):float
@@ -442,6 +460,7 @@ Log(2.0, 2.0)      # Returns 1.0 (logₙ(n) = 1)
 
 Verse provides standard trigonometric functions operating on radians:
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Sin(Angle:float):float
@@ -499,6 +518,7 @@ ArcTan(-1.0, -1.0)   # Returns -3π/4 (-135 degrees)
 
 Hyperbolic functions are analogs of trigonometric functions for hyperbolas. They are useful in physics simulations, catenary curves, and certain mathematical models.
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Sinh(X:float):float    # Hyperbolic sine
@@ -536,6 +556,7 @@ ArCosh(-1.0)  # Returns NaN (domain error)
 
 For integer division with remainder, Verse provides `Mod` and `Quotient`. Both functions are failable—they fail when the divisor is zero.
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Mod(Dividend:int, Divisor:int)<decides>:int
@@ -564,6 +585,7 @@ if (not Quotient[10, 0]):
 
 The modulo result always satisfies:
 
+<!--NoCompile-->
 ```verse
 Dividend = Quotient[Dividend, Divisor] * Divisor + Mod[Dividend, Divisor]
 ```
@@ -575,6 +597,7 @@ The sign of the result follows specific rules:
 
 There are also some utility functions:
 
+<!--NoCompile-->
 ```verse
 # Signatures
 Sgn(X:int):int
@@ -596,6 +619,7 @@ Sgn(NaN)      # Returns NaN
 
 Lerp interpolates between two values:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Lerp(From:float, To:float, Parameter:float):float
@@ -614,6 +638,7 @@ The formula is: `From + Parameter * (To - From)`
 
 `IsFinite` checks if a float is finite and returns `true` if the value is not NaN, Inf, or -Inf:
 
+<!--NoCompile-->
 ```verse
 # Method on float values
 X.IsFinite():logic
@@ -636,12 +661,18 @@ SafeCalculation(X:float, Y:float)<decides>:float =
 
 Verse provides constants for common mathematical values:
 
+<!--verse
+F():void={
+-->
 ```verse
 PiFloat # 3.14159265358979323846...
 Inf     # Positive infinity
 -Inf    # Negative infinity (negation of Inf)
 NaN     # Not a Number
 ```
+<!--verse
+}
+-->
 
 ## Booleans
 
@@ -728,7 +759,7 @@ Thus, strings are sequences of code units, not necessarily sequences of Unicode 
 Because strings are arrays of `char`, you can index into them with `[]`. Indexing has the `<decides>` effect: it succeeds when the index is valid and fails otherwise.
 
 <!--verse
-F(MyName:string):void={
+F(MyName:string)<decides>:void={
 -->
 ```verse
 TheLetterJ := MyName[0]     # succeeds
@@ -812,7 +843,7 @@ B :char32 = 'é'                     # ok
 Character literals can also be written using numeric escape sequences:
 
 <!--verse
-F():void={
+TestFunc():void={
 -->
 ```verse
 E :char = 0o65                      # ok; same as 'e'
@@ -891,7 +922,7 @@ F()<transacts>:void={
 -->
 ```verse
 SecondsLeft :int = 30
-SecondsString :string = SecondsLeft    # convert int to string
+SecondsString :string = ToString(SecondsLeft)    # convert int to string
 
 var Combined :string = "Time Remaining: "
 if (SecondsString.Length > 2):
@@ -908,6 +939,8 @@ else:
 String interpolation supports complex expressions, not just simple variables:
 
 <!--verse
+
+Format(D:float, ?Decimals:int):string=""
 F():void={
 -->
 ```verse
@@ -968,6 +1001,7 @@ Text := "abc<#this comment is removed#>def"    # Same as "abcdef"
 
 The `ToString()` function converts values to their string representations. It's polymorphic—multiple overloads exist for different types:
 
+<!--NoCompile-->
 ```verse
 # Signatures
 ToString(X:int):string
@@ -978,6 +1012,9 @@ ToString(X:string):string  # Identity function
 
 String interpolation implicitly calls `ToString()` on embedded values:
 
+<!--verse
+F():void={
+-->
 ```verse
 Age := 25
 Score := 98.5
@@ -987,6 +1024,9 @@ Message1 := "Age: " + ToString(Age) + ", Score: " + ToString(Score)
 Message2 := "Age: {Age}, Score: {Score}"
 # Both produce: "Age: 25, Score: 98.5"
 ```
+<!--verse
+}
+-->
 
 This makes `ToString()` essential for formatting output, even when you don't call it directly.
 
@@ -996,6 +1036,7 @@ This makes `ToString()` essential for formatting output, even when you don't cal
 
 The `ToDiagnostic()` function converts values to diagnostic string representations, useful for debugging and logging. While similar to `ToString()`, it may provide more detailed or implementation-specific information:
 
+<!--NoCompile-->
 ```verse
 # Usage (exact signature depends on type)
 DiagnosticText := ToDiagnostic(SomeValue)
@@ -1007,6 +1048,7 @@ DiagnosticText := ToDiagnostic(SomeValue)
 
 The `ObjectToJson()` function serializes Verse objects to JSON (JavaScript Object Notation) format, enabling data interchange with external systems, debugging complex data structures, and persistent storage:
 
+<!--NoCompile-->
 ```verse
 # Signature
 ObjectToJson(Object:any):string
@@ -1014,6 +1056,7 @@ ObjectToJson(Object:any):string
 
 This function accepts any Verse value and produces a JSON string representation. The exact output format varies between VM implementations—Blueprint VM (BPVM) and Verse VM (VVM) may serialize the same object differently.
 
+<!--NoCompile-->
 ```verse
 # Primitives
 ObjectToJson(42)              # "42"
@@ -1032,6 +1075,7 @@ ObjectToJson(Name)            # "\"Alice\""
 
 Classes serialize as JSON objects with field names as keys:
 
+<!--NoCompile-->
 ```verse
 player := class:
     Name:string = "Alice"
@@ -1046,6 +1090,7 @@ Json := ObjectToJson(Instance)
 
 The function recursively serializes nested objects:
 
+<!--NoCompile-->
 ```verse
 transaction := class:
     Item:string
@@ -1070,6 +1115,7 @@ Json := ObjectToJson(MyAccount)
 
 Optionals serialize as their contained value or `null`:
 
+<!--NoCompile-->
 ```verse
 HasValue:?int = option{42}
 NoValue:?int = false
@@ -1080,6 +1126,7 @@ ObjectToJson(NoValue)    # "null"
 
 Functions and type values have VM-specific representations:
 
+<!--NoCompile-->
 ```verse
 MyFunc := (X:int):int => X + 1
 MyType := type{player}
@@ -1093,6 +1140,7 @@ ObjectToJson(MyType)  # Different structural representations
 
 The function handles objects containing references to themselves:
 
+<!--NoCompile-->
 ```verse
 node := class:
     Value:int
@@ -1125,6 +1173,7 @@ These functions enable:
 
 `ToJson[Type]` generates a JSON Schema string describing the structure of a Verse type:
 
+<!--NoCompile-->
 ```verse
 using { /Verse.org/Persona }
 
@@ -1142,6 +1191,7 @@ The generated schema follows JSON Schema conventions with properties, types, and
 
 `FromJson[JsonString, Type]` deserializes JSON data into a Verse value, validating against the type structure:
 
+<!--NoCompile-->
 ```verse
 player_data := struct:
     Name:string
@@ -1169,6 +1219,7 @@ Different Verse types serialize with different JSON representations:
 
 **Structures:**
 
+<!--NoCompile-->
 ```verse
 point := struct:
     X:int
@@ -1184,6 +1235,7 @@ Point := FromJson[Json, point]
 
 **Classes:**
 
+<!--NoCompile-->
 ```verse
 entity := class<concrete>:
     Health:int = 100
@@ -1199,6 +1251,7 @@ Entity := FromJson[Json, entity]
 
 **Enums:**
 
+<!--NoCompile-->
 ```verse
 status := enum:
     Active
@@ -1215,6 +1268,7 @@ Data := FromJson[Json, struct{State:status}]
 
 **Optional Types:**
 
+<!--NoCompile-->
 ```verse
 config := struct:
     Value:?int = option{42}
@@ -1231,6 +1285,7 @@ Result2 := FromJson[Json2, config]
 
 **Arrays and Maps:**
 
+<!--NoCompile-->
 ```verse
 # Arrays
 array_struct := struct:
@@ -1251,6 +1306,7 @@ Data := FromJson[Json, map_struct]
 
 **Tuples:**
 
+<!--NoCompile-->
 ```verse
 pair_struct := struct:
     Position:tuple(int, int)
@@ -1266,6 +1322,7 @@ Data := FromJson[Json, pair_struct]
 
 Refinement types include constraints in the schema:
 
+<!--NoCompile-->
 ```verse
 percentage := type{X:int where 0 <= X, X <= 100}
 
@@ -1286,6 +1343,7 @@ FromJson[InvalidJson, config]  # Fails - out of range
 
 Subclasses include properties from parent and child:
 
+<!--NoCompile-->
 ```verse
 base := class<concrete>:
     ID:int = 0
@@ -1331,6 +1389,7 @@ These types return `false` from `ToJson` and `FromJson`:
 
 You can generate schemas for multiple types at once:
 
+<!--NoCompile-->
 ```verse
 type1 := struct{X:int}
 type2 := struct{Y:float}
@@ -1353,14 +1412,13 @@ The `type` type is a *metatype* - a type whose values are themselves types. Ever
 
 You can create variables and parameters that hold type values:
 
+<!--NoCompile-->
 ```verse
 # Variable holding a type value
 IntType:type = int
 StringType:type = string
-
 # Function that takes a type as parameter
-CreateDefault(T:type):?T = false
-
+CreateDefault(t:type):?t = false
 # Usage
 X:?int = CreateDefault(int)      # T = int, returns false
 Y:?string = CreateDefault(string)  # T = string, returns false
@@ -1368,6 +1426,7 @@ Y:?string = CreateDefault(string)  # T = string, returns false
 
 All Verse types can be type values:
 
+<!--NoCompile-->
 ```verse
 # Primitives
 PrimitiveType:type = int
@@ -1405,6 +1464,7 @@ This universality makes `type` the foundation for Verse's generic programming - 
 
 The most common use of `type` is in **where clauses** to create parametric (generic) functions:
 
+<!--NoCompile-->
 ```verse
 # Identity function - works with any type
 Identity(X:t where t:type):t = X
@@ -1419,6 +1479,7 @@ The `where t:type` constraint means "`t` can be any Verse type." The type system
 
 While `where t:type` accepts any type, you can use more specific constraints like `subtype` to limit which types are valid:
 
+<!--NoCompile-->
 ```verse
 # Only accepts types that are subtypes of comparable
 Sort(Items:[]t where t:subtype(comparable)):[]t =
@@ -1450,6 +1511,7 @@ TypeRegistry:[string]type = map{
 
 **Passing types between functions:**
 
+<!--NoCompile-->
 ```verse
 # Helper function that takes a type parameter
 CreateArray(ElementType:type, Size:int):[]ElementType =
@@ -1465,6 +1527,7 @@ MakeIntArray():[]int =
 
 A common pattern is to have functions return `?t` where `t` is a type parameter, allowing the function to work with any type while potentially failing:
 
+<!--NoCompile-->
 ```verse
 # Function that might produce a value of any type
 MaybeValue(T:type, Condition:logic):?T =
@@ -1484,6 +1547,7 @@ This pattern is particularly useful for generic containers and factory functions
 
 The `type` constraint in where clauses is the most permissive - it accepts any Verse type. For more specific requirements, Verse provides additional constraints:
 
+<!--NoCompile-->
 ```verse
 # Most permissive: any type
 Generic(X:t where t:type):t = X
@@ -1519,6 +1583,7 @@ While `type` enables powerful abstractions, there are some limitations:
 
 **Type parameters must be inferred or explicit:**
 
+<!--NoCompile-->
 ```verse
 # Type parameter must be determinable from usage
 Identity(X:t where t:type):t = X

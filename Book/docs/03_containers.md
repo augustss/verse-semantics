@@ -58,6 +58,8 @@ The `option{...}` form also works in the opposite direction. When you have a com
 
 <!--NoCompile-->
 ```verse
+GetAFloatOrFail()<decides>:float = 3.14
+
 MaybeAFloat := option{GetAFloatOrFail[]}
 ```
 
@@ -81,32 +83,18 @@ This ability is useful whenever you want to track success or failure over time, 
 
 A common use case is searching for something that may or may not be there. Imagine a function `Find` that looks through an array of integers and returns the index of the element you want. If the element exists, the function returns `option{index}`; if not, it returns `false`. The caller can then safely decide what to do:
 
-<!--verse
+<!--NoCompile-->
+```verse
 Find(N:[]int, X:int):?int =
     for {I := 0..N.Length} do
         if (N[I] = X) then return option{I}
     return false
 
-F()<decides>:void=
-    var Numbers:[]int = array{10, 20, 30}
-    Idx:?int = Find[Numbers, 20]    # succeeds with option{1}
-    Y := Idx?                       # succeeds with 1
-<#
--->
-```verse
 var Numbers:[]int = array{10, 20, 30}
-
-Find[N:[]int, X:int]:?int =
-    for {I := 0..N.Length} do
-        if N[I] = X then return option{I}
-    return false
 
 Idx:?int = Find[Numbers, 20]    # succeeds with option{1}
 Y := Idx?                       # succeeds with 1
 ```
-<!--verse
-#>
--->
 
 Here the optional signals the possibility of failure directly in the type. The `?` operator makes it easy to use the result in an expression, while `option{...}` allows you to turn conditional computations back into optionals. The effect is that the idea of "maybe a value, maybe not" becomes a first-class part of the language, rather than an afterthought, and programmers are encouraged to handle the absence of values in a disciplined way.
 
@@ -133,11 +121,15 @@ The order of elements matters, so `(3, 2, 1)` is a completely different value. S
 Tuples can also nest inside each other:
 
 <!--verse
+F():void={
 X:tuple(int,tuple(int,float,string),string)=
 -->
 ```verse
 (1, (10, 20.0, "thirty"), "three")
 ```
+<!--verse
+}
+-->
 
 Tuples are useful when you want to return multiple values from a function or when you want a lightweight grouping of values without the overhead of defining a struct or class. The type of a tuple is written with the `tuple` keyword followed by the types of the elements, but in most cases it can be inferred. For instance, you can write `MyTuple : tuple(int, float, string) = (1, 2.0, "three")`, or simply `MyTuple := (1, 2.0, "three")` and let the compiler deduce the type.
 
@@ -145,6 +137,9 @@ The elements of a tuple are accessed using a zero-based index operator written w
 
 Another feature of tuples is *expansion*. When a tuple is passed to a function as a single argument, its elements are automatically expanded as if the function had been called with each element separately. For example:
 
+<!--verse
+using { /Verse.org/VerseCLR }
+-->
 ```verse
 F(Arg1:int, Arg2:string):void =
     Print("{Arg1}, {Arg2}")
@@ -249,10 +244,7 @@ produces a triangular array with rows of increasing length: row 0 has none, row 
 
 Nested arrays with complex initialization work naturally as class field defaults:
 
-<!--verse
-point:=class{X:int,Y:int}
-tile_class:=class{Position:tuple(int,int)}
--->
+<!--NoCompile-->
 ```verse
 # Game board with tile grid
 tile_class := class:
@@ -278,20 +270,25 @@ Board := game_board{}
 if (CenterTile := Board.GetTile[5, 5]):
     set CenterTile.IsOccupied = true
 ```
-<!--verse
--->
 
 When you create an empty array with `array{}`, Verse infers the element type from the variable's type annotation:
 
+<!--verse
+F():void={
+-->
 ```verse
 IntArray : []int = array{}       # Empty array of integers
 FloatArray : []float = array{}   # Empty array of floats
 ```
+<!--verse
+}
+-->
 
 Without a type annotation, the compiler cannot determine what type of array you want, so you must either provide the type explicitly or include at least one element that establishes the type.
 
 Arrays determine their element type from the common supertype of all elements. When you create an array with values of different but related types, Verse finds the most specific type that encompasses all elements:
 
+<!--NoCompile-->
 ```verse
 class1 := class {}
 class2 := class(class1) {}
@@ -303,10 +300,16 @@ MixedArray : []class1 = array{class2{}, class3{}}
 
 This applies to any type hierarchy, including interfaces. If you mix completely unrelated types, the element type becomes `any`:
 
+<!--verse
+F():void={
+-->
 ```verse
 # Array of any - different types with no common supertype
 DisjointArray : []any = array{42, 13.37, true}
 ```
+<!--verse
+}
+-->
 
 ### From Tuples to Arrays
 
@@ -314,6 +317,9 @@ Verse provides automatic conversion between tuples and arrays in specific contex
 
 Tuples can be directly assigned to array variables when all tuple elements are compatible with the array's element type:
 
+<!--verse
+F()<decides><transacts>:void={
+-->
 ```verse
 # Homogeneous tuple to array
 X:tuple(int, int) = (1, 2)
@@ -325,11 +331,15 @@ Numbers:tuple(int, int, int, int) = (1, 2, 3, 4)
 NumberArray:[]int = Numbers
 NumberArray.Length = 4
 ```
+<!--verse
+}
+-->
 
 This conversion creates an array containing all the tuple's elements in order.
 
 When a function has a single array parameter, you can call it with multiple arguments, which automatically form an array:
 
+<!--NoCompile-->
 ```verse
 ProcessNumbers(Numbers:[]int):int = Numbers.Length
 
@@ -342,6 +352,7 @@ ProcessNumbers[Values]             # Tuple variable → array
 
 This "variadic-like" syntax provides convenience while keeping the function signature simple:
 
+<!--NoCompile-->
 ```verse
 Sum(Numbers:[]int):int =
     var Total:int = 0
@@ -358,6 +369,7 @@ Sum[Values]                        # Returns 60
 
 Array conversion only succeeds when **all tuple elements are compatible** with the array's element type:
 
+<!--NoCompile-->
 ```verse
 # Homogeneous tuple - all int
 F(X:[]int):int = X.Length
@@ -379,6 +391,7 @@ ProcessEntities[P, E]             # Valid - player is subtype of entity
 
 Functions taking `[]any` accept **any tuple**, regardless of element types:
 
+<!--NoCompile-->
 ```verse
 GetLength(Items:[]any):int = Items.Length
 
@@ -392,6 +405,7 @@ This enables generic functions that work with heterogeneous data.
 
 When tuple elements share a common supertype (via inheritance or interface), they convert to an array of that supertype:
 
+<!--NoCompile-->
 ```verse
 interface1 := interface:
     GetID():int
@@ -417,6 +431,7 @@ Tuple-to-array conversion works with nested structures:
 
 **Nested arrays:**
 
+<!--NoCompile-->
 ```verse
 ProcessMatrix(Matrix:[][]int):int = Matrix.Length
 
@@ -430,6 +445,7 @@ ProcessMatrix[((1, 2), (3, 4))]   # Valid
 
 **Optional arrays:**
 
+<!--NoCompile-->
 ```verse
 ProcessOptional(Items:?[]int)<decides>:int = Items?[0]
 
@@ -440,6 +456,7 @@ ProcessOptional[Values]           # Valid
 
 **Tuples containing arrays:**
 
+<!--NoCompile-->
 ```verse
 ProcessComplex(Data:tuple([]int, int)):int = Data(0).Length
 
@@ -453,21 +470,35 @@ Arrays support slicing operations through the `.Slice` method, which extracts a 
 
 The two-parameter form `Array.Slice[Start, End]` returns elements from index `Start` up to but not including index `End`:
 
+<!--verse
+F()<decides><transacts>:void={
+-->
 ```verse
 Numbers : []int = array{10, 20, 30, 40, 50}
 if (Slice := Numbers.Slice[1, 4]):
     # Slice is array{20, 30, 40}
 ```
+<!--verse
+}
+-->
 
 The one-parameter form `Array.Slice[Start]` returns all elements from `Start` to the end:
 
+<!--verse
+F()<decides><transacts>:void={
+Numbers : []int = array{10, 20, 30, 40, 50}
+-->
 ```verse
 if (Slice := Numbers.Slice[2]):
     # Slice is array{30, 40, 50}
 ```
+<!--verse
+}
+-->
 
 Slicing fails if indices are negative, out of bounds, or if `Start` is greater than `End`. Creating an empty slice is valid when `Start` equals `End`:
 
+<!--NoCompile-->
 ```verse
 Numbers.Slice[2, 2]  # Succeeds with array{}
 Numbers.Slice[2, 1]  # Fails - Start > End
@@ -477,6 +508,7 @@ Numbers.Slice[0, 10] # Fails - End beyond array length
 
 Slicing also works on strings and character tuples, returning a string:
 
+<!--NoCompile-->
 ```verse
 "hello".Slice[1, 4] = "ell"
 ```
@@ -487,11 +519,16 @@ Arrays provide intrinsic methods for searching, removing, and replacing elements
 
 The `Find()` method searches for the first occurrence of an element and returns its index, or `false` if not found:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.Find[Element:t]<decides>:int  # Returns ?int
 ```
 
+<!--verse
+using { /Verse.org/VerseCLR }
+F()<decides>:void={
+-->
 ```verse
 Numbers := array{1, 2, 3, 1, 2, 3}
 
@@ -503,15 +540,25 @@ if (not Numbers.Find[0]):
     # Element not in array
     Print("Not found")
 ```
+<!--verse
+}
+-->
 
 `Find()` returns an optional (`?int`), enabling safe handling of missing elements without exceptions or special sentinel values.
 
 `RemoveFirstElement()` removes the first occurrence:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.RemoveFirstElement[Element:t]<decides>:[]t  # Returns ?[]t
+```
 
+<!--verse
+using { /Verse.org/VerseCLR }
+F()<decides>:void={
+-->
+```verse
 Numbers := array{1, 2, 3, 1, 2, 3}
 
 if (Updated := Numbers.RemoveFirstElement[2]):
@@ -522,9 +569,13 @@ if (not Numbers.RemoveFirstElement[0]):
     # Element not found - returns false
     Print("Element not in array")
 ```
+<!--verse
+}
+-->
 
 `RemoveAllElements()` removes all occurrences:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.RemoveAllElements[Element:t]:[]t
@@ -540,6 +591,7 @@ Same := Numbers.RemoveAllElements[0]
 
 `Remove()` removes element at specific position:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.Remove[Index:int]<decides>:[]t  # Returns ?[]t
@@ -558,6 +610,7 @@ if (not Numbers.Remove[10]):
 
 `ReplaceFirstElement()` replace first occurrence:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.ReplaceFirstElement[OldValue:t, NewValue:t]<decides>:[]t  # Returns ?[]t
@@ -573,6 +626,7 @@ if (not Numbers.ReplaceFirstElement[0, 99]):
 
 `ReplaceAllElements()` replace all occurrences:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.ReplaceAllElements[OldValue:t, NewValue:t]:[]t
@@ -588,6 +642,7 @@ Same := Numbers.ReplaceAllElements[0, 99]
 
 `ReplaceElement()` replaces at specific index:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.ReplaceElement[Index:int, NewValue:t]<decides>:[]t  # Returns ?[]t
@@ -606,6 +661,7 @@ if (not Numbers.ReplaceElement[10, 99]):
 
 `ReplaceAll()` is a pattern-based replacement:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.ReplaceAll[Pattern:[]t, Replacement:[]t]:[]t
@@ -626,6 +682,7 @@ Updated2 := Numbers2.ReplaceAll[array{2, 2}, array{9, 9, 9}]
 
 `Insert()` inserts an element at a specific position:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Array.Insert[Index:int, Element:t]<decides>:[]t  # Returns ?[]t
@@ -654,6 +711,7 @@ if (not Numbers.Insert[Numbers.Length + 1, 5]):
 
 The `Concatenate()` function is a variadic intrinsic that combines any number of arrays into one:
 
+<!--NoCompile-->
 ```verse
 # Signature
 Concatenate(Arrays:[]t...):[]t
@@ -661,6 +719,7 @@ Concatenate(Arrays:[]t...):[]t
 
 Unlike the `+` operator which joins two arrays, `Concatenate()` accepts zero or more arrays:
 
+<!--NoCompile-->
 ```verse
 # Empty call returns empty array
 Empty := Concatenate()  # array{}
@@ -678,6 +737,7 @@ Many := Concatenate(array{1}, array{2, 3}, array{4}, array{5, 6})
 
 Empty arrays are handled seamlessly:
 
+<!--NoCompile-->
 ```verse
 # Empty arrays contribute nothing
 Result1 := Concatenate(array{1, 2}, array{}, array{3})  # array{1, 2, 3}
@@ -689,6 +749,7 @@ EmptyResult := Concatenate(for (I := 0..100): array{})  # array{}
 
 `Concatenate()` shines when combining arrays generated dynamically:
 
+<!--NoCompile-->
 ```verse
 # Build array of arrays, then flatten
 Chunks := for (I := 0..5): array{I * 10, I * 10 + 1, I * 10 + 2}
@@ -700,6 +761,9 @@ Flattened := Concatenate(Chunks)
 
 **Comparison with `+` operator:**
 
+<!--verse
+F():void={
+-->
 ```verse
 # Using + operator (binary)
 A1 := array{1, 2}
@@ -712,9 +776,13 @@ Result2 := Concatenate(A1, A2, A3)  # Single operation
 
 # Result1 = Result2 = array{1, 2, 3, 4, 5, 6}
 ```
+<!--verse
+}
+-->
 
 `Concatenate()` also works on strings, joining multiple strings into one:
 
+<!--NoCompile-->
 ```verse
 # String concatenation
 Text := Concatenate("Hello", " ", "World", "!")  # "Hello World!"
@@ -879,6 +947,7 @@ Attempting to use a non-comparable type as a key results in a compile-time error
 
 Like arrays, maps infer their key and value types from the common supertype of all keys and values. When you create a map with mixed but related types, Verse finds the most specific types that encompass all keys and all values:
 
+<!--NoCompile-->
 ```verse
 class1 := class<unique> {}
 class2 := class<unique>(class1) {}
@@ -896,6 +965,7 @@ MixedKeyMap : [class1]int = map{Instance2 => 1, Instance3 => 2}
 
 Maps preserve insertion order, which is significant for both iteration and equality checks. When you insert entries into a map, they maintain the order of insertion. Two maps are equal only if they contain the same key–value pairs **in the same order**:
 
+<!--NoCompile-->
 ```verse
 var Scores:[string]int = map{}
 set Scores["Alice"] = 100
@@ -911,11 +981,17 @@ Map2 := map{"Bob" => 90, "Alice" => 100, "Carol" => 95}
 
 When a map literal contains duplicate keys, the last value overwrites earlier values, but the key's position remains from its **first** occurrence:
 
+<!--verse
+F():void={
+-->
 ```verse
 Map := map{0 => "zero", 1 => "one", 0 => "ZERO", 2 => "two"}
 # Equivalent to map{0 => "ZERO", 1 => "one", 2 => "two"}
 # The key 0 stays in its original position
 ```
+<!--verse
+}
+-->
 
 Iteration over the map will visit entries in their preserved insertion order.
 
@@ -923,12 +999,18 @@ Iteration over the map will visit entries in their preserved insertion order.
 
 Empty maps can infer their key and value types from context, similar to arrays:
 
+<!--verse
+F()<transacts>:void={
+-->
 ```verse
 StringToInt : [string]int = map{}  # Empty map with inferred types
 
 var Scores : [string]int = map{}
 set Scores = ConcatenateMaps(Scores, map{"Alice" => 100})
 ```
+<!--verse
+}
+-->
 
 Without type context, you may need to provide explicit type annotations.
 
@@ -941,6 +1023,7 @@ Maps exhibit different variance behavior for keys and values. A map type `[K1]V1
 
 This means a map that accepts more general keys and returns more specific values can be used where a map with more specific keys and more general values is expected:
 
+<!--NoCompile-->
 ```verse
 class1 := class<unique> {}
 class2 := class<unique>(class1) {}  # class2 is a subtype of class1
@@ -959,6 +1042,7 @@ The contravariance in keys reflects how maps are used: if a map can handle looku
 
 When modifying a mutable map through `set`, you can only insert keys and values that match the map's declared types:
 
+<!--NoCompile-->
 ```verse
 class1 := class<unique> {}
 class2 := class<unique>(class1) {}
@@ -975,6 +1059,9 @@ set Map[Key2] = 1      # Succeeds - exact type match
 
 Maps can contain other maps as values, enabling multi-level associations:
 
+<!--verse
+F()<decides>:void={
+-->
 ```verse
 # Map from strings to maps of ints to strings
 NestedMap : [string][int]string = map{
@@ -986,6 +1073,9 @@ if (InnerMap := NestedMap["numbers"]):
     if (Value := InnerMap[1]):
         # Value is "one"
 ```
+<!--verse
+}
+-->
 
 Maps as keys are currently not supported.
 
@@ -993,6 +1083,7 @@ Maps as keys are currently not supported.
 
 The `ConcatenateMaps()` function merges multiple maps into a single map, similar to how `Concatenate()` combines arrays:
 
+<!--NoCompile-->
 ```verse
 # Signature
 ConcatenateMaps(Maps:[]map(k,v)...):map(k,v)
@@ -1000,6 +1091,7 @@ ConcatenateMaps(Maps:[]map(k,v)...):map(k,v)
 
 `ConcatenateMaps()` is variadic—it accepts any number of maps and combines them into one. When maps contain duplicate keys, values from **later** maps override values from earlier ones:
 
+<!--NoCompile-->
 ```verse
 Map1 := map{1 => "one", 2 => "two"}
 Map2 := map{3 => "three", 4 => "four"}
@@ -1011,6 +1103,9 @@ Combined := ConcatenateMaps(Map1, Map2, Map3)
 
 **Handling duplicate keys:**
 
+<!--verse
+F():void={
+-->
 ```verse
 Base := map{1 => "original", 2 => "base"}
 Override := map{2 => "updated", 3 => "new"}
@@ -1019,11 +1114,15 @@ Result := ConcatenateMaps(Base, Override)
 # Result is map{1 => "original", 2 => "updated", 3 => "new"}
 # Key 2 was overridden by the later map
 ```
+<!--verse
+}
+-->
 
 The right-to-left precedence ensures that later maps take priority, enabling a natural override pattern.
 
 **Empty maps:**
 
+<!--NoCompile-->
 ```verse
 # Empty maps contribute nothing
 M1 := map{1 => "a"}
@@ -1043,6 +1142,9 @@ Single := ConcatenateMaps(map{1 => "one"})  # map{1 => "one"}
 
 All maps must have the same key and value types:
 
+<!--verse
+F():void={
+-->
 ```verse
 # Valid: All maps have same types
 M1 := map{1 => "a"}
@@ -1055,6 +1157,9 @@ Combined := ConcatenateMaps(M1, M2)  # OK
 #     map{"x" => "b"}       # [string]string
 # )  # ERROR: Type mismatch
 ```
+<!--verse
+}
+-->
 
 ## Weak Maps
 
@@ -1083,6 +1188,7 @@ Because `weak_map` is a supertype of `map`, you can assign regular maps to weak_
 
 **No Length Property (Error 3506):**
 
+<!--NoCompile-->
 ```verse
 var MyWeakMap:weak_map(int,int) = map{1 => 2}
 # ERROR: weak_map has no Length property
@@ -1091,6 +1197,7 @@ var MyWeakMap:weak_map(int,int) = map{1 => 2}
 
 **No Iteration (Error 3524):**
 
+<!--NoCompile-->
 ```verse
 var MyWeakMap:weak_map(int,int) = map{1 => 2, 3 => 4}
 # ERROR: Cannot iterate over weak_map
@@ -1099,6 +1206,7 @@ var MyWeakMap:weak_map(int,int) = map{1 => 2, 3 => 4}
 
 **Cannot Coerce to Comparable (Error 3509):**
 
+<!--NoCompile-->
 ```verse
 var MyWeakMap:weak_map(int,int) = map{}
 # ERROR: weak_map cannot be converted to comparable
@@ -1107,6 +1215,7 @@ var MyWeakMap:weak_map(int,int) = map{}
 
 **Cannot Join with Regular Maps (Error 3510):**
 
+<!--NoCompile-->
 ```verse
 var MyWeakMap:weak_map(int,int) = map{1 => 2}
 # ERROR: Cannot join weak_map with regular map to produce regular map
@@ -1119,6 +1228,7 @@ When using `weak_map` as a module-scoped variable (for persistent data), there a
 
 **Cannot Read Complete Map (Error 3502):**
 
+<!--NoCompile-->
 ```verse
 # Module-scoped persistent weak_map
 var PlayerData:weak_map(player, int) = map{}
@@ -1131,6 +1241,7 @@ GetAllData():weak_map(player, int) =
 
 **Cannot Write Complete Map (Error 3502):**
 
+<!--NoCompile-->
 ```verse
 var PlayerData:weak_map(player, int) = map{}
 
@@ -1142,6 +1253,7 @@ ResetAllData():void =
 
 **Individual Entry Access Works:**
 
+<!--NoCompile-->
 ```verse
 var PlayerData:weak_map(player, int) = map{}
 
@@ -1163,6 +1275,7 @@ For module-scoped `var weak_map` variables, both key and value types have strict
 
 **Key Type Must Have `<module_scoped_var_weak_map_key>` Specifier (Error 3502):**
 
+<!--NoCompile-->
 ```verse
 # Valid key type
 persistent_class := class<unique><allocates><computes><persistent><module_scoped_var_weak_map_key> {}
@@ -1178,6 +1291,7 @@ regular_class := class<unique><allocates><computes> {}
 
 **Value Type Must Be Persistable (Error 3502):**
 
+<!--NoCompile-->
 ```verse
 persistent_class := class<unique><allocates><computes><persistent><module_scoped_var_weak_map_key> {}
 
@@ -1205,6 +1319,7 @@ Common key types that satisfy the requirements:
 
 The `weak_map` type is **covariant** in its key type, meaning you can use a weak_map with a subclass key type where a parent class key type is expected:
 
+<!--NoCompile-->
 ```verse
 base_class := class<unique> {}
 derived_class := class(base_class) {}
@@ -1223,6 +1338,7 @@ BaseMap:weak_map(base_class, value_struct) = CreateDerivedMap()
 
 This covariance also allows regular maps to be assigned to weak_maps with compatible key types:
 
+<!--NoCompile-->
 ```verse
 DerivedKey := derived_class{}
 RegularMap:[derived_class]value_struct = map{DerivedKey => value_struct{}}
@@ -1235,6 +1351,7 @@ WeakMap:weak_map(base_class, value_struct) = RegularMap
 
 When the value type is a struct or class, you can update individual fields of stored values:
 
+<!--NoCompile-->
 ```verse
 player_data := struct<persistable>:
     Level:int
@@ -1254,6 +1371,7 @@ UpdatePlayerLevel(Player:player, NewLevel:int):void =
 
 Like all mutable state in Verse, `weak_map` updates participate in transaction semantics. If a `<decides>` expression fails, all changes are rolled back:
 
+<!--NoCompile-->
 ```verse
 var GameData:weak_map(int, int) = map{}
 
@@ -1274,6 +1392,7 @@ This applies to complete map replacements (for local variables), individual entr
 
 There is a **limit on the number of persistent `weak_map` variables** per island. In the standard environment, this limit is 4 persistent weak_maps. Exceeding this limit produces error 3502:
 
+<!--NoCompile-->
 ```verse
 key_class := class<unique><allocates><computes><persistent><module_scoped_var_weak_map_key> {}
 
@@ -1288,6 +1407,7 @@ var Map4:weak_map(key_class, int) = map{}  # OK
 
 **Exception:** If the value type is a class (not a primitive or struct), the weak_map doesn't count toward this limit:
 
+<!--NoCompile-->
 ```verse
 value_class := class<final><persistable> {}
 

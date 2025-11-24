@@ -2,90 +2,114 @@
 
 Live variables represent a reactive programming paradigm in Verse, enabling variables to automatically recompute their values when dependencies change. Rather than requiring explicit callbacks or event handlers, live variables establish dynamic relationships between data, creating a declarative system where changes propagate naturally through your code.
 
-Traditional programming requires manual tracking of dependencies and explicit updates when values change. If variable `A` depends on variable `B`, you must remember to update `A` whenever `B` changes, often through callback functions or observer patterns. Live variables eliminate this bookkeeping by automatically tracking which variables are read during evaluation and re-evaluating when those dependencies change. This creates more maintainable code where the intent—that `A` should always reflect some function of `B`—is expressed directly in the code itself.
+Traditional programming requires manual tracking of dependencies and explicit updates when values change. If variable `A` depends on variable `B`, you must remember to update `A` whenever `B` changes, often through callback functions or observer patterns. Live variables eliminate this bookkeeping by automatically tracking which variables are read during evaluation and re-evaluating when those dependencies change. This creates more maintainable code where the intent—that `A` should always reflect some function of `B` — is expressed directly in the code itself.
 
-Live variables build a foundation for reactive programming constructs in Verse, including `await`, `upon`, and `when`. Understanding live variables is essential for working with Verse's event-driven programming model, particularly for game development scenarios where many values must stay synchronized.
+Live variables build a foundation for reactive programming constructs, including `await`, `upon`, and `when`. Understanding live variables is essential for working with Verse's event-driven programming model, particularly for game development scenarios where many values must stay synchronized.
 
-## Core Concepts
+## Live Expressions
 
-### Live Expressions
-
-A live expression establishes a dynamic relationship between a variable and a target expression. Once established, the target is automatically re-evaluated whenever any of its dependencies change, keeping its variable in sync.
+A *live expression* establishes a dynamic relationship between a variable and a guard. Once established, the target is automatically re-evaluated whenever any of the guard's dependencies change, keeping the variable in sync.
 
 ```verse
 var X:int = 0
 var Y:int = 0
-set live X = Y  # X now tracks Y
-set Y = 5       # X automatically becomes 5
+set live X = Y+1  # X now tracks Y
+set Y = 5         # X automatically becomes 6
 ```
 
-Live variables extend the regular mutable variable system (see [Mutability](05_mutability.md)) with automatic dependency tracking. The key insight is that Verse tracks which variables the target expression reads during evaluation. When any of those variables change, the target is re-evaluated, and if the result differs from the current value, the variable updates automatically.
+In the above, `set live X = Y+1` is a live expression, the target is the, previously declared variable `X` and the guard is the expression `Y+1` with a dependency on variable `Y`.
+
+Live variables extend mutable variables (see [Mutability](05_mutability.md)) with automated dependency tracking: any variable read during the evaluation of the guard expression is tracked. When any of those variables change, the guard is re-evaluated, and the target variable updates automatically.
 
 ### Declaration Forms
 
 Live variables can be declared in several ways, each suited to different use cases:
 
+<!--NoCompile-->
 ```verse
 # Live variable declaration
 var live X:int = Target
 
 # Live assignment to existing variable
 var X:int = 0
+# ... later ...
 set live X = Exp
 
 # Immutable live variable
 live Y:int = Exp
 
-# Input-output variable pairs
-var live In->Out:int = Exp
+# Variable with an effectful type
+var X: effectful_t 
+
+# Input-output variable pairs with an effectful type
+var In->Out: effectful_t = Exp
 ```
 
-The most common form, `var live X = Exp`, creates a mutable variable whose initial value comes from evaluating the target and subsequently updates whenever dependencies change. The target expression can read other variables, and those reads are tracked to establish the dependency relationship.
+The most common form, `var live X = Exp`, creates a mutable variable whose initial value comes from evaluating the guard and subsequently updates whenever dependencies change. The guard expression can read other variables, and those reads are tracked to establish the dependency relationship.
 
-The assignment form, `set live X = Exp`, converts an existing variable into a live variable by attaching a target. This is useful when you need to make a variable reactive after initialization or conditionally based on program state.
+The assignment form, `set live X = Exp`, converts an existing variable into a live variable by attaching a guard. This is useful when you need to make a variable reactive after initialization or conditionally based on program state.
 
-Immutable live variables, declared with just `live Y = Exp`, cannot be directly written but still update automatically when their dependencies change. This provides a read-only reactive value, useful for derived computations that should never be manually overridden.
+Immutable live variables, declared with just `live Y = Exp`, cannot be directly written but still update automatically when their guard's dependencies change. This provides a read-only reactive value, useful for derived computations that should never be manually overridden.
+
+The remaining two forms are somewhat more complex. We detail them below.
+
+### Effectful Types
+
+Any variable whose type is a function with the `<reads>` effect is live by default and the value is updated whenever the value read by the type is updated. Consider the following example:
+
+<!--versetest-->
+```verse
+var Mult:int = 2
+
+Multiply(Arg: int)<reads>:int = Arg * Mult
+
+var X : Multiply
+
+set X = 10        # X gets 20
+set Mult = 1      # X gets 10
+```
+
+Notice how `Multiply` is both a function of one argument and is used as a type for variable `X`.  Verse allows functions to be used as types. When doing so the storage type of the variable `X` will be the type returned by the function, in this case `int`, and values assigned to variable must have the function's argument type, again `int`.  Assigning to a variable of such a type, say `set X = 10`, means that the incoming value is passed as argument to `Multiply` and the value returned by the function will be stored in `X`.
+
+In the above, `Multiply` also has a `<reads>` effect meaning that it reads from a mutable variable. This turns the declaration of variable `X` into a live expression whose guard is the `Multiply` function. Each assignment to `X` is filtered by `Multiply` and whenever the dependencies of `Multiply` are updated, the value of `X` is recomputed. In the above, updating `Mult` causes `X` to be recomputed.
 
 ### Input-Output Variables
 
-Input-output variable pairs provide bidirectional synchronization with transformation. The syntax `var live In->Out:t = E` creates two related variables where `Out` is writable and `In` tracks assignments to `Out` through the type expression `t`.
+Input-output variable pairs together with effectful types provide the ability to capture both initial and transformed values. Thus the syntax `var In->Out:effectful_t=Exp` creates two related variables where `Out` is writable and `In` tracks assignments to `Out` through the type `effectful_t`.
 
 ```verse
-min(Max:int)(Value:int):int = if (Value < Max) then Value else Max
+clamp := class:
+    var Lower:int = 0
+    var Upper:int = 100
+    Evaluate(Value:int)<reads>:int = 
+        if (Value < Upper) then:
+           if (Value > Lower) then Value else Lower
+        else:
+           Upper
 
-var MaxHealth:int = 100
-var BaseHealth->Health:min(MaxHealth) = 50
+Clamp := clamp{}
+var BaseHealth->Health: Clamp.Evaluate = 50
 
 # Health = 50 (min(50, 100))
-set Health = 75    # BaseHealth = 75, Health = 75
-set Health = 120   # BaseHealth = 120, Health = 100 (clamped)
-set MaxHealth = 60 # BaseHealth = 120, Health = 60 (reclamped)
+set Health = 75      # BaseHealth = 75, Health = 75
+set Health = 120     # BaseHealth = 120, Health = 100 (clamped)
+set Clamp.Upper = 60 # BaseHealth = 120, Health = 60 (reclamped)
 ```
 
-This pattern elegantly handles common game scenarios where values must stay within dynamic constraints. Writing to `Health` updates both `BaseHealth` (the raw value) and `Health` (the constrained value). When constraints change—like `MaxHealth` decreasing—the constrained value automatically adjusts while preserving the base value for future recalculation.
+This pattern elegantly handles common game scenarios where values must stay within dynamic constraints. Writing to `Health` updates both `BaseHealth` (the raw value) and `Health` (the constrained value).  When constraints change — like `Clamp.Upper` decreasing — the constrained value automatically adjusts while preserving the base value for future recalculation.
+
+Let's break down the above example into its constituent parts. First consider the live expression `var BaseHealth -> Health : Clamp.Evaluate = 50`.  This is indeed a live expression because the method `Clamp.Evaluate` has a `<reads>` effect and is thus treated as an effectful type. To obtain a reference to the method of an instance we write `Clamp.Evaluate`.
+
+The object `Clamp` is an instance of class `clamp` which has two mutable variables, `Lower` and `Upper`. The method `Evaluate` has a `<reads>` effect because it accesses both mutable variables.  Using an instance method in the live expression allows us to have multiple independent clamps in the same context.
+
+The expression `set Health = 75` writes 75 into variable `Health` -- the method `Evaluate` is called and it returns its argument -- `BaseHealth` is also 75.
+
+The expression `set Health = 120` writes 100 into `Health` as the value exceeds `Clamp.Upper` and `120` into `BaseHealth`.
+
+The expression `set Clamp.Upper = 60` causes `Health` to be recomputed because `Clamp.Upper` is a dependency of `Evaluate`. It will store `60` into `Health` and leave `BaseHealth` at `120`.
+
 
 The scope of input and output variables can be controlled independently: `var In<private>->Out<public>:t = E` makes the base value private while exposing the constrained value publicly.
-
-### Type Expressions with Effects
-
-When the type expression in a live variable declaration has the `<reads>` effect, it can perform additional computation during evaluation. This enables sophisticated reactive patterns where the computed value depends not just on the input but on broader program state.
-
-```verse
-var Score:int = 0
-var Multiplier:int = 2
-
-ApplyMultiplier<reads>(Value:int):int = Value * Multiplier
-
-var BasePoints->Points:ApplyMultiplier = 10
-
-# Points = 20 (10 * 2)
-set Multiplier = 3
-# Points = 30 (10 * 3)
-set Points = 15
-# BasePoints = 15, Points = 45 (15 * 3)
-```
-
-The `<reads>` effect allows `ApplyMultiplier` to read `Multiplier`, establishing an additional dependency. When `Multiplier` changes, all variables using `ApplyMultiplier` automatically recompute.
 
 ## Reactive Constructs
 
@@ -278,37 +302,11 @@ set live X = block:
 
 This restriction also has a subtle implication: since any variable might become live after creation, reading any variable must be assumed to potentially trigger guard evaluation. The effect system accounts for this: the `<writes>` effect implies `<diverges>` because any write might trigger cyclic live variable evaluation.
 
-### Recursive Targets
-
-If a guard expression reads its own target variable, evaluation diverges into infinite recursion. Verse provides the `Old` function to safely access a variable's current value without triggering guard evaluation.
-
-<!--verse
-F():void={
--->
-```verse
-var X:int = 0
-
-# ERROR: infinite recursion
-set live X = X + 1
-
-# Correct: use Old to access current value
-set live X = Old(X) + 1
-```
-<!--verse
-}
--->
-
-Now each read of `X` increments its value—`X` becomes 1 on first read, 2 on second read, and so on. The `Old` function breaks the recursion by returning the stored value directly.
-
-Using `Old` in a variable declaration is disallowed: `var live X := 1 + Old(X)` is an error because `X` doesn't have a prior value to access.
-
 ### Convergence and Stability
 
 Live variables with interdependencies can form cycles. When target expression use idempotent operations and values are comparable, these cycles can naturally converge to fixed points.
 
-<!--verse
-F():void={
--->
+<!--versetest-->
 ```verse
 var X:int = 2
 var Y:int = 2
@@ -318,9 +316,6 @@ set live Y = if (X < 0) then 0 else X - 1
 
 # Evaluates as: X=1, Y=0, X=-1, Y=0 (stable)
 ```
-<!--verse
-}
--->
 
 If the type of the variable is comparable, the guards are re-evaluated until values stabilize. In this example, `X` decrements to -1, `Y` clamps to 0, and `X` would recompute but produces -1 again, so the system stabilizes.
 
@@ -395,28 +390,6 @@ set Y = 10  # Y remains 0
 This ensures that reactive behaviors only observe committed changes, maintaining consistency even in the presence of speculative execution and failure.
 
 ## Common Patterns
-
-### Clamped Values
-
-Live variables excel at maintaining values within dynamic constraints:
-
-```verse
-clamp(Min:int, Max:int)(Value:int):int =
-    if (Value < Min) then Min
-    else if (Value > Max) then Max
-    else Value
-
-var MinHealth:int = 0
-var MaxHealth:int = 100
-var BaseHealth->Health:clamp(MinHealth, MaxHealth) = 50
-
-set Health = 120    # Health = 100
-set MaxHealth = 80  # Health = 80 (reclamped)
-set Health = 75     # Health = 75
-set MinHealth = 60  # Health = 75 (above new minimum)
-```
-
-The health value automatically respects both bounds, and changing the bounds automatically adjusts the current value.
 
 ### Derived State Synchronization
 

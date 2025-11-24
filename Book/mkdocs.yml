@@ -1,11 +1,11 @@
-site_name: Verse Language Documentation
-site_url: https://augustss.github.io/verse-paper/
-site_description: Comprehensive documentation for the Verse programming language
+site_name: Book of Verse 
+site_url: https://pages.github.ol.epicgames.net/verse/VerseBook
+site_description: Documentation for the Verse programming language
 site_author: Jan Vitek
 
-repo_name: augustss/verse-paper
-repo_url: https://github.com/augustss/verse-paper
-edit_uri: edit/main/Book/docs/
+repo_name: verse/VerseBook
+repo_url: https://github.ol.epicgames.net/verse/VerseBook
+edit_uri: edit/main/VerseBook/docs/
 
 theme:
   name: material

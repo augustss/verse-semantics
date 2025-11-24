@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+/**
+ * compile.js
+ * this was written by AI.
+ *
+ * Reads every file in a directory and runs the hard-coded PATH command:
+ *   foo --open=<file>
+ * Reports how many succeeded (exit code 0) and how many failed.
+ *
+ * Usage:
+ *   node batch-open.js <directory> [--list-failures]
+ */
+
+const fs   = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
+
+// -- HARD-CODED COMMAND ---------------------------------------------------------
+const CMD = 'verseCLRVM.exe'; // must exist on PATH, .exe for wsl to find the windows binary
+const ARG_TEMPLATE = file => `--open=${file}`;
+// -------------------------------------------------------------------------------
+
+async function main() {
+  const { dir, listFailures } = parseArgs(process.argv.slice(2));
+  if (!dir) {
+    printHelp();
+    process.exit(2);
+  }
+
+  // Verify & read directory
+  let entries;
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    console.error(`? Failed to read directory "${dir}": ${err.message}`);
+    process.exit(2);
+  }
+
+  const files = entries.filter(e => e.isFile())
+                       .map(e => path.join(dir, e.name));
+
+  if (files.length === 0) {
+    console.log(`No files found in "${dir}". Nothing to do.`);
+    return;
+  }
+
+  console.log(`Processing ${files.length} file(s) with command "${CMD}"...\n`);
+
+  const results = [];
+  for (const file of files) {
+    const res = await runCommand(file);
+    results.push(res);
+    console.log(`${res.success ? '? success' : '? fail'} — ${path.basename(file)}`);
+  }
+
+  const successes = results.filter(r => r.success);
+  const failures  = results.filter(r => !r.success);
+
+  console.log('\nSummary');
+  console.log('-------');
+  console.log(`Successes: ${successes.length}`);
+  console.log(`Failures : ${failures.length}`);
+
+  if (listFailures && failures.length) {
+    console.log('\nFailed files:');
+    failures.forEach(f => {
+      const why = f.error ? ` (${f.error})`
+                : f.code !== null ? ` (exit code ${f.code})`
+                : '';
+      console.log(`- ${f.file}${why}`);
+    });
+  }
+
+  if (failures.length) process.exitCode = 1;
+}
+
+function parseArgs(argv) {
+  let dir = null;
+  let listFailures = false;
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith('-') && !dir) {
+      dir = a;
+    } else if (a === '--list-failures') {
+      listFailures = true;
+    } else if (a === '--help' || a === '-h') {
+      printHelp();
+      process.exit(0);
+    }
+  }
+  return { dir, listFailures };
+}
+
+function printHelp() {
+  console.log(`Usage:
+  node batch-open.js <directory> [--list-failures]
+
+Description:
+  Runs "${CMD} --open=<file>" for each top-level file in <directory>.
+  Reports how many succeeded (exit code 0) and how many failed.
+
+Options:
+  --list-failures   Also list the files that failed and why.
+  -h, --help        Show this help.
+`);
+}
+
+function runCommand(file) {
+  return new Promise(resolve => {
+    const child = spawn(CMD, [ARG_TEMPLATE(file)], { stdio: 'ignore', shell: false });
+
+    child.on('error', err => {
+      resolve({ file, success: false, code: null, error: err.message });
+    });
+
+    child.on('exit', code => {
+      resolve({ file, success: code === 0, code, error: null });
+    });
+  });
+}
+
+main().catch(err => {
+  console.error('Unexpected error:', err);
+  process.exit(1);
+});

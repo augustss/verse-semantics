@@ -1,27 +1,48 @@
 #!/usr/bin/env node
 const { spawn } = require('child_process')
 const path = require('path')
-const defaultPath = "../../fortniteMain/Engine/Restricted/NotForLicensees/Binaries/Win64/VerseCLRVM-Win64-Shipping.exe"
+
+// Available Verse VMs
+const testScriptVM = path.join(__dirname, 'test_one_versetest')
+const clrVM = "../../fortniteMain/Engine/Restricted/NotForLicensees/Binaries/Win64/VerseCLRVM-Win64-Shipping.exe"
+
 function printUsage() {
-  console.log('Usage: vc <compiler-path> <verse-file>'); console.log('')
+  console.log('Usage: vc <verse-file>')
+  console.log('   or: vc <compiler-path> <verse-file>')
+  console.log('')
   console.log('Runs the Verse compiler and formats error messages.')
+  console.log('Automatically selects VM based on file extension:')
+  console.log('  .verse      -> CLR VM')
+  console.log('  .versetest  -> TestScript VM')
+  console.log('')
+  console.log('Examples:')
+  console.log('  vc test.verse       # Use CLR VM')
+  console.log('  vc test.versetest   # Use TestScript VM')
+  console.log('  vc /path/to/vm test.verse  # Use custom VM')
   process.exit(1)
 }
+
 function parseArgs() {
     const args = process.argv.slice(2)
     if (args.length < 1) printUsage()
-    if (args.length == 2) {
+
+    // Two arguments: custom compiler path and verse file
+    if (args.length === 2) {
         const compilerPath = args[0]
         const verseFile = args[1]
         return { compilerPath, verseFile }
-    } else  if (args.length == 1) {
-        const compilerPath = defaultPath
-        const verseFile = args[0]
-        return { compilerPath, verseFile }
-    } else {
-        console.log("Not expected")
     }
+
+    // One argument: verse file - choose VM based on extension
+    if (args.length === 1) {
+        const verseFile = args[0]
+        const compilerPath = verseFile.endsWith('.versetest') ? testScriptVM : clrVM
+        return { compilerPath, verseFile }
+    }
+
+    printUsage()
 }
+
 function parseErrorMessages(output) {
     const lines = output.split('\n')
     const errors = []
@@ -33,12 +54,24 @@ function parseErrorMessages(output) {
         const line = lines[i]
         // Stop if we hit the final error/command lines
         if (line.startsWith('ERROR:') || line.startsWith('Command:')) { break; }
-        // Check if this is a "Build Failure:" line
+
+        // Check if this is a "Build Failure:" line (CLR VM format)
         if (line.startsWith('Build Failure:')) {
-            // Extract the error message
             const re = /^Build Failure:\s+(.+?)\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\):\s*([^\r\n]+)/
             const m = re.exec(line)
-            if (!m) { console.log("No match")
+            if (!m) {
+                console.log("No match")
+            } else {
+                const [_, file, lineNumber, startCol, endLine, endCol, message] = m
+                errors.push({ lineNumber, message })
+            }
+        }
+        // Check if this is a "LogVerseBuild: Error:" line (TestScript VM format)
+        else if (line.startsWith('LogVerseBuild: Error:')) {
+            const re = /^LogVerseBuild: Error:\s+(.+?)\((\d+),(\d+),\s*(\d+),(\d+)\):\s*(.+)/
+            const m = re.exec(line)
+            if (!m) {
+                console.log("No match")
             } else {
                 const [_, file, lineNumber, startCol, endLine, endCol, message] = m
                 errors.push({ lineNumber, message })
@@ -48,10 +81,16 @@ function parseErrorMessages(output) {
     }
     return errors
 }
-function isSuccess(output) { return !output.includes('Build Failure:') }
+
+function isSuccess(output) {
+    return !output.includes('Build Failure:') && !output.includes('LogVerseBuild: Error:')
+}
+
 function main() {
   const { compilerPath, verseFile } = parseArgs();
-  const compiler = spawn(compilerPath, ['--open=' + verseFile], { stdio: ['pipe', 'pipe', 'pipe'] });
+  // test_one_versetest takes the file directly as argument, not --open=
+  const args = compilerPath === testScriptVM ? [verseFile] : ['--open=' + verseFile];
+  const compiler = spawn(compilerPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
   compiler.stdout.on('data', (data) => { stdout += data.toString(); });
@@ -62,10 +101,10 @@ function main() {
       } else { // Failure - parse and print error messages
           const errors = parseErrorMessages(output)
           if (errors.length==0) console.log(output)
-          errors.forEach(error => { console.log(${error.lineNumber}: ${error.message}) })
+          errors.forEach(error => { console.log(`${error.lineNumber}: ${error.message}`) })
           process.exit(1)
       }
   });
-    compiler.on('error', (err) => {  console.error(Failed to run compiler: ${err.message});  process.exit(1) })
+    compiler.on('error', (err) => {  console.error(`Failed to run compiler: ${err.message}`);  process.exit(1) })
 }
 main();

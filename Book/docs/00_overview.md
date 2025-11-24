@@ -47,9 +47,9 @@ For experienced programmers coming from other languages, the [Failure System](08
 
 In Verse, there are no statements—everything is an expression that produces a value. This creates a highly composable system where any piece of code can be used anywhere a value is expected.
 
-<!--verse
+<!--versetest
 Condition()<computes><decides> :void= {}
-Main() :void = { Array := array{1}
+Array :[]int= array{1}
 -->
 ```verse
 # Even control flow produces values
@@ -58,9 +58,6 @@ Result := if (Condition[]) then "yes" else "no"
 # Loops are expressions
 Multiply := for (X : Array) { X * 42 }
 ```
-<!--verse
-} 
--->
 
 **Failure as Control Flow**
 
@@ -69,17 +66,14 @@ Instead of boolean conditions and exceptions, Verse uses failure as a primary co
 <!--verse
 ValidateInput(x:string)<computes><decides>:void= {}
 ProcessData(x:string)<computes>:void= {}
-myclass := class {
-  Data:="hi"
-  M()<decides>:={
+myclass := class:
+    Data:string="hi"
+    M()<decides>:void=
 -->
 ```verse
-ValidateInput[Data] # Proceeds only if validation succeeds
-ProcessData[Data]
+ValidateInput[Data] # Square braces indicate that this function may fail
+ProcessData(Data)   # Data is only processed if valid, round braces mean must succeed
 ```
-<!--verse
-} }
--->
 
 See [Failure](08_failure.md) for complete details on failable expressions and failure contexts, and [Control Flow](07_control.md) for if expressions.
 
@@ -87,34 +81,26 @@ See [Failure](08_failure.md) for complete details on failable expressions and fa
 
 Verse features a powerful type system that catches errors at compile time while minimizing the need for type annotations through inference. See [Types](11_types.md) for complete details on the type system and subtyping.
 
-<!--verse
-M():={
--->
+<!--versetest-->
 ```verse
 X := 42                    # Type inferred as int
 Name := "Verse"            # Type inferred as string
 ```
-<!--verse
-}
--->
 
 **Effect Tracking**
 
 Functions declare their side effects through specifiers like `<computes>`, `<reads>`, `<writes>`, `<transacts>`, `<decides>`, and `<suspends>`. These effect specifiers make it immediately clear what a function can do beyond computing its return value:
 
 <!--verse
-x := class {
-  GetCurrentValue()<reads>:int=1
-  var Score:int=0
+x := class:
+    GetCurrentValue()<reads>:int=1
+    var Score:int=0
 -->
 ```verse
-PureCompute()<computes>:int = 2 + 2           # No side effects
-ReadState()<reads>:int = GetCurrentValue()    # Can read mutable state
+PureCompute()<computes>:int = 2 + 2            # No side effects
+ReadState()<reads>:int = GetCurrentValue()     # Can read mutable state
 UpdateGame()<transacts>:void = set Score += 10 # Can read, write, allocate
 ```
-<!--verse
-}
--->
 
 See [Effects](13_effects.md) for complete details on the effect system.
 
@@ -128,7 +114,7 @@ TaskB()<suspends>:void={}
 TaskC():void={}
 FastPath()<suspends>:void={}
 SlowButReliablePath()<suspends>:void={}
-Main()<suspends>:void= {
+M()<suspends>:void=
 -->
 ```verse
 # Run tasks concurrently and wait for all
@@ -142,34 +128,27 @@ race:
     FastPath()
     SlowButReliablePath()
 ```
-<!--verse
-}
--->
 
 **Speculative Execution**
 
 Verse can speculatively execute code and roll back changes if the execution fails, enabling powerful patterns for validation and error handling.
 
-<!--verse
+<!--versetest
 TryComplexOperation()<computes><decides>:void={}
-M():void={
 -->
 ```verse
 if (TryComplexOperation[]):
-    # Changes are committed
+    # Changes performed by TryComplexOperation[] are committed
 else:
     # Changes are rolled back automatically
 ```
-<!--verse
-}
--->
 
 **Reactive Programming with Live Variables**
 
-Verse provides first-class support for reactive programming through live variables that automatically recompute when their dependencies change, eliminating manual event handling.
+Verse provides first-class support for reactive programming through live variables that automatically recompute when their dependencies change, decreasing the need for manual event handling.
 
-<!--verse
-F():void={
+<!--versetest
+Print(:string):void={}
 -->
 ```verse
 var MaxHealth:int = 100
@@ -184,16 +163,14 @@ set MaxHealth = 150  # Health becomes 130
 when(Health < 25):
     Print("Low health warning!")
 ```
-<!--verse
-}
--->
 
 Welcome to Verse—a language built not just for today's games, but for tomorrow's metaverse.
 
-## Example: Game Inventory
+## An Example
 
-Let's explore the language with an example that demonstrates its key features. We'll build an inventory management system for a game, showing how Verse's unique constructs come together to create robust, maintainable code.
+Let's explore the language with an example that demonstrates its key features. We'll build an inventory management system for a game, showing how Verse's constructs come together to create robust, maintainable code.
 
+<!--NoCompile-->
 ```verse
 # Module declaration - start by importing utility functions
 using { /Verse.org/VerseCLR }
@@ -358,9 +335,9 @@ TODO: the above has a lambda ... that does not work yet.
 The above has some superfluous <transacts> due to <no_rollback>, in some cases they could be just <computes>.  Apparently an Old VM pathology
 
 Also methods that have an empty return type have weird behavior in some cases. Easily fixed by typing them.
-
 -->
-This example showcases many feature of Verse in a practical context. Let's explore what makes this code uniquely Verse:
+
+This example showcases Verse in a practical context. Let's explore what makes this code uniquely Verse:
 
 **Type System and Data Modeling**
 
@@ -440,15 +417,15 @@ Generic type parameters use single lowercase letters or short descriptive names:
 
 ```verse
 # Single letter for simple generics
-Find(Array:[]t, Target:t where t:subtype(comparable)):?int
+Find(Array:[]t, Target:t where t:type):?int = false
 
 # Descriptive names for complex relationships
-Transform(Input:input_t, Processor:type{_(:input_t):output_t}
-          where input_t:type, output_t:type):?output_t
+Transform(Input:input_t, Processor:type{_(:input_t):output_t} where intput_t:type, output_t:type):?output_t = false
 ```
 
 Module names follow the snake_case pattern, while paths use a hierarchical structure with forward slashes and PascalCase for path segments:
 
+<!--NoCompile-->
 ```verse
 # Module definition
 inventory_system := module:
@@ -479,7 +456,7 @@ player := class:
 
 Verse code follows consistent formatting patterns to emphasize readability.
 
-Use 4-space indentation for code blocks. The colon introduces a block, with subsequent lines indented:
+Use four spaces to indent code blocks. The colon introduces a block, with subsequent lines indented:
 
 <!--NoCompile-->
 ```verse
@@ -597,7 +574,8 @@ Indented comments begin with a `<#>` on its own line; everything indented by fou
     This entire block is a comment because it's indented.
     It provides a clean way to write longer documentation
     without cluttering each line with comment markers.
-DoSomething()  # This is not part of the indented comment
+
+DoSomething()  # Not part of the comment.
 ```
 
 ## Syntactic Styles
