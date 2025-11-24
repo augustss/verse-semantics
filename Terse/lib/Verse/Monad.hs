@@ -95,9 +95,9 @@ appendMem mem label forward backward = mem
   , backward = backward *> mem.backward
   }
 
-appendMem' :: Applicative m => Mem m -> Label -> m () -> Mem m
-{-# INLINE appendMem' #-}
-appendMem' mem label backward' = mem
+appendMemRef :: Applicative m => Mem m -> Label -> m () -> Mem m
+{-# INLINE appendMemRef #-}
+appendMemRef mem label backward' = mem
   { refMin = min mem.refMin label
   , backward' = backward' *> mem.backward'
   }
@@ -137,7 +137,7 @@ instance Applicative (VerseT m) where
   {-# INLINE pure #-}
   pure x = VerseT $ \ _level count _heap mem _yk sk ->
     sk count mem x
-  {-# INLINABLE (<*>) #-}
+  {-# INLINE (<*>) #-}
   f <*> x = VerseT $ \ level count heap mem yk sk ->
     unVerseT f level count heap mem yk $ \ count mem f ->
     unVerseT x level count heap mem yk $ \ count mem x ->
@@ -204,17 +204,26 @@ liftPut forward backward = do
   lift forward
   tell minBound forward backward
 
-tell :: Monad m => Label -> m () -> m () -> VerseT m ()
+tell :: Applicative m => Label -> m () -> m () -> VerseT m ()
 {-# INLINABLE tell #-}
 tell label forward backward = VerseT $ \ _level count _heap mem _yk sk fk ek ->
-  sk count (appendMem mem label forward backward) ()
-  (\ heap mem -> backward *> fk heap (appendMem mem label backward forward))
-  (\ mem -> backward *> ek (appendMem mem label backward forward))
+  sk count mem ()
+  (\ heap mem -> backward *> tell' label backward forward (fk heap) mem)
+  (\ mem -> backward *> tell' label backward forward ek mem)
 
-tell' :: Applicative m => Label -> m () -> VerseT m ()
-{-# INLINABLE tell' #-}
-tell' label backward' = VerseT $ \ _level count _heap mem _yk sk fk ek ->
-  sk count (appendMem' mem label backward') () fk (\ mem -> backward' *> ek mem)
+tell'
+  :: Applicative m
+  => Label -> m () -> m () -> (Mem m -> m r) -> Mem m -> m r
+{-# INLINE tell' #-}
+tell' label forward backward f mem
+  | label < mem.varMinBound = f $ appendMem mem label forward backward
+  | otherwise = f mem
+
+tellRef :: Applicative m => Label -> m () -> VerseT m ()
+{-# INLINABLE tellRef #-}
+tellRef label backward' = VerseT $ \ _level count _heap mem _yk sk fk ek ->
+  sk count (appendMemRef mem label backward') ()
+  fk (\ mem -> backward' *> ek mem)
 
 yield :: Level -> Handler m a -> VerseT m a
 {-# INLINE yield #-}
@@ -342,7 +351,7 @@ yieldS = Yield $ \ i f count mem sk fk ek -> pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
     tell mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
-    tell' mem.refMin mem.backward'
+    tellRef mem.refMin mem.backward'
   putLabel mem.label
   level <- getLevel
   if i > level then
@@ -356,7 +365,7 @@ succeedS count mem x fk _ek = pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
     tell mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
-    tell' mem.refMin mem.backward'
+    tellRef mem.refMin mem.backward'
   if count == 0 then do
     level <- getLevel
     lift (runFindT (findVars' x) level mem.label) >>= \ case
@@ -380,7 +389,7 @@ emptyS mem = pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
     tell mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
-    tell' mem.refMin mem.backward'
+    tellRef mem.refMin mem.backward'
   putLabel mem.label
   pure Done
 
@@ -880,7 +889,7 @@ writeVarsRef (VarsRef label ref) x = (label <) <$> getRefMinBound >>= \ case
   False -> lift . writeRef ref =<< findVars x
   True -> do
     x <- findVars x
-    tell' label <=< lift $ do
+    tellRef label <=< lift $ do
       y <- readRef ref
       writeRef ref x
       newWeakTrail ref $ writeRef ref y
@@ -921,7 +930,7 @@ instance Functor m => Functor (FindT m) where
 instance Monad m => Applicative (FindT m) where
   {-# INLINE pure #-}
   pure x = FindT $ \ In {..} -> pure $! Out x label
-  {-# INLINABLE (<*>) #-}
+  {-# INLINE (<*>) #-}
   f <*> x = FindT $ \ s@In {..} -> unFindT f s >>= \ case
     Err -> pure Err
     Out f label -> unFindT x In {..} <&> \ case
