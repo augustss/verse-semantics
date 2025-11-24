@@ -326,16 +326,13 @@ point and resumes exactly when the condition becomes true.
 <!--verse
 int_ref := class:
     var Contents:int = 0
-F(X:int_ref, Y:int_ref)<suspends>:void={
+F(X:int_ref, Y:int_ref)<suspends>:void=
 -->
 ```verse
 # Wait for a specific condition
 await{X.Contents > 10}
 set Y.Contents = X.Contents * 2
 ```
-<!--verse
-}
--->
 
 The guard expression must have effects `<reads><computes><decides>`
 (see [Effects](13_effects.md))—it can read and compute but cannot
@@ -389,7 +386,7 @@ The `when` expression evaluates its guard immediately. If the guard succeeds, th
 This makes `when` ideal for maintaining derived state and responding to ongoing changes. Synchronizing UI with game state, updating AI behavior based on player actions, or maintaining consistency between related variables all benefit from `when`'s persistent reactivity.
 
 <!--verse
-F():void={
+F():void=
 -->
 ```verse
 var X:int = 2
@@ -407,9 +404,6 @@ when(X):
 
 # These when expressions will stabilize at X = -1, Y = 0
 ```
-<!--verse
-}
--->
 
 The body executes with the `<transacts>` effect, and the when immediately re-registers after each execution, creating the continuous observation pattern.
 
@@ -419,7 +413,7 @@ All three reactive constructs—`await`, `upon`, and `when`—return a `task` th
 
 <!--verse
 using {/Verse.org/Concurrency}
-F()<suspends>:void={
+F()<suspends>:void=
 -->
 ```verse
 var X:int = 0
@@ -431,9 +425,6 @@ Task := upon(X > 5):
 Task.Cancel()  # Cancels the reactive behavior
 set X = 10     # Y remains 0
 ```
-<!--verse
-}
--->
 
 Canceling a task immediately removes all dependency tracking and prevents the associated code from running. This provides fine-grained control over the lifecycle of reactive behaviors, allowing you to enable and disable observations based on game state or user actions.
 
@@ -442,7 +433,7 @@ Canceling a task immediately removes all dependency tracking and prevents the as
 The `batch` expression groups multiple variable updates together, delaying notifications until the entire group completes. This prevents intermediate states from triggering reactive behaviors and ensures observers see consistent snapshots of related changes.
 
 <!--verse
-F()<suspends>:void={
+F()<suspends>:void=
 -->
 ```verse
 var X:int = 0
@@ -463,9 +454,6 @@ Print("After batch")
 # "Fired!"
 # "After batch"
 ```
-<!--verse
-}
--->
 
 Inside a `batch` block, variable updates occur immediately but notifications to awaiting tasks and reactive constructs are deferred. When the batch completes, all pending notifications fire in the order their triggers occurred, but observers see the final consistent state rather than intermediate values.
 
@@ -477,34 +465,19 @@ The body of a batch must not have the `<suspends>` effect—all operations must 
 
 ## Issues and Patterns
 
-### API Design 
+### API Design
 
 Any variable appearing in the public interface of a class or module
 can be made live by external code, potentially violating class
 invariants. To avoid this, one could limit the exposure of mutable
 variables or at least use access modifiers to control this:
 
-<!--verse
-ten_counter := class:
-    var<private> X<public>:int = 0
-
-    MakeLive():void =
-        set live X = if (Old(X) < 10) then Old(X) + 1 else 0
--->
 ```verse
-ten_counter := class:
-    var<private> X<public>:int = 0
-
-    MakeLive():void =
-        set live X = if (Old(X) < 10) then Old(X) + 1 else 0
+var<private> live X<public>:int = Exp
 ```
-<!--verse
 
--->
-
-Here `X` is publicly visible for reading but can only be made live by
-the class itself through `MakeLive()`. This prevents external code
-from attaching arbitrary guards that might break the class's
+Here `X` is publicly visible for reading but can only be updated by
+the class itself. This prevents external code from attaching arbitrary guards that might break the class's
 invariants.
 
 ### Failures and Liveness
@@ -515,7 +488,7 @@ variable updates are rolled back and their notifications are
 suppressed.
 
 <!--verse
-F()<suspends>:void={
+F()<suspends>:void=
 -->
 ```verse
 var X:int = 0
@@ -532,9 +505,6 @@ if:
 # Live relationship was not established
 set Y = 10  # Y remains 0
 ```
-<!--verse
-}
--->
 
 This ensures that reactive behaviors only observe committed changes,
 maintaining consistency even in the presence of speculative execution
@@ -609,6 +579,89 @@ ResourceManager := class:
 
 This pattern eliminates manual tracking of loading state. When both
 resources finish loading, the game starts automatically.
+
+### Modifier Stack (Under Consideration)
+
+**The design of modifier_stack has not been finalized; material presented here is likely to change.**
+
+Game development often requires applying multiple modifiers to a single value. For instance, a player's health might need to be
+clamped to a valid range, temporarily boosted by a health potion and automatically recomputed when dependencies change.
+
+The `modifier_stack` pattern provides a composable solution using live variables and function-as-type, allowing ordered transformations that automatically update when any modifier's dependencies change.
+
+The modifier stack consists of three components:
+
+1. **`modifier_ifc(t)`** - An interface for modifiers that transform values of type `t`
+2. **`modifier_stack(t)`** - A container that orders and composes modifiers
+3. **Live variable** - Uses `modifier_stack.Evaluate` as its type for automatic reactivity
+
+When you assign to a live variable with a modifier stack type, the value flows through each modifier in position order, and the final result is stored. Because `modifier_stack.Evaluate` has the `<reads>` effect, changes to any modifier's dependencies (or adding/removing modifiers) trigger automatic recalculation.
+
+The public API is as follows:
+
+```verse
+modifier_ifc(t : type) := interface:
+   Evaluate(Value:t)<reads> : t
+
+modifier_stack(t:type) := class:
+   # Insert a Modifier at Position; return a cancelable used to remove the Modifier.
+   AddModifier<final>(Modifier:modifier_ifc(t), Position:rational)<transacts>: cancelable
+
+   # Returns the input Value evaluated against each modifier in the stack in position order.
+   Evaluate<final>(Value:t)<reads> : t
+```
+
+The `AddModifier` method returns a `cancelable` which can be used to remove the inserted modifier. Removing a modifier triggers recalculation of any live variable associated with this stack.
+
+For example, consider the following which creates a live variable `Health` filtered through a modifier stack containing a magic potion modifier that doubles the input value:
+
+```verse
+HealthStack := modifier_stack(float){}
+HealthStack.AddModifier(magic_potion{Value:=2.0})
+var RawHealth -> Health : HealthStack.Evaluate = 10.0
+# RawHealth = 10.0, Health = 20.0
+```
+
+The variable automatically recomputes when the multiplier changes or when modifiers are added to the stack.
+
+In more detail, this example demonstrates two modifiers working together: a `magic_potion` that multiplies health, and a `clamp` that bounds values within a range.
+
+```verse
+# Define modifier implementations
+magic_potion := class(modifier_ifc(float)):
+   var Value:float
+   Evaluate<override>(Arg:float)<reads>:float = Arg * Value
+
+clamp := class(modifier_ifc(float)):
+   var Low:float
+   var High:float
+   Evaluate<override>(Arg:float)<reads>:float =
+       if (Arg<Low) then Low else { if (Arg>High) then High else Arg }
+
+# Create instances
+Potion := magic_potion{ Value:= 2.0 }
+Clamp := clamp{Low:=1.0, High:= 12.0 }
+
+# Build the modifier stack
+HealthStack := modifier_stack(float){}
+RevokePotion := HealthStack.AddModifier(Potion, 0.0)  # Apply first (position 0.0)
+HealthStack.AddModifier(Clamp, 1.0)                   # Apply second (position 1.0)
+
+# Create live variable with modifier stack
+var Health : HealthStack.Evaluate = 5.0  # 5.0 * 2.0 = 10.0 (then clamped to [1.0, 12.0])
+set Potion.Value = 3.0                   # 5.0 * 3.0 = 15.0 (clamped to 12.0)
+RevokePotion.Cancel()                    # 5.0 (no potion, just clamp to [1.0, 12.0])
+```
+
+The value flows through modifiers in position order:
+
+1. **Initial:** 5.0 → Potion (×2.0) → 10.0 → Clamp → 10.0
+2. **After changing `Potion.Value`:** 5.0 → Potion (×3.0) → 15.0 → Clamp → 12.0
+3. **After removing potion:** 5.0 → Clamp → 5.0
+
+There are plans to enforce via the compiler that: each modifier instance can only be added to one stack, and 
+each stack instance can be associated with one variable.  This will enable future features
+where modifier stacks maintain state specific to their associated live variable.
 
 ### Common Errors
 
