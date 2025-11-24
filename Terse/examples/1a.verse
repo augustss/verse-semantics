@@ -42,15 +42,14 @@ RevImpl = fun(Arg) {
   exists Xs;
   exists Ys;
   Arg = (Xs, Ys);
-  (
-    Xs = false;
+  if (Xs = false) then(Xs) {
     Ys
-  ) | (
+  } else {
     exists Z;
     exists Zs;
     Xs = (Z, Zs);
     RevImpl[Zs, (Z, Ys)]
-  )
+  }
 };
 
 exists Rev;
@@ -81,13 +80,9 @@ Split = fun(Arg) {
               exists Right;
               Split[Ys] = (Left, Right);
               (X, Left), (Y, Right)
-            ) | (
-              ((X, false), (Y, false))
-            )
+            ) | ((X, false), (Y, false))
           }
-        ) | (
-          ((X, false), false)
-        )
+        ) | ((X, false), false)
       }
     ) | false
   }
@@ -163,7 +158,7 @@ Sum = fun(Arg) {
 
 exists Abs;
 Abs = fun(Arg) {
-  one {(Arg < 0; 0 - Arg) | Arg}
+  if (Arg < 0) then(Arg) { 0 - Arg } else { Arg }
 };
 
 exists ReadLine;
