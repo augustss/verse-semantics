@@ -53,6 +53,7 @@ import Verse.Monad
   , newVar
   , one
   , fork
+  , fork2
   , readVar
   , split
   , stuck
@@ -123,9 +124,6 @@ comp' s1 s2 = wrap $ \ case
     compLet s1 s2 x e1 e2
   (unwrap -> e1 := (unwrap -> Var x)) :& e2 ->
     compLet s1 s2 x e1 e2
-  e1 :& e2 -> [| do
-    (s1, s2, _) <- $(comp' s1 s2 e1)
-    $(comp' 's1 's2 e2) |]
   Tup es ->
     let
       loop s1 s2 vars = \ case
@@ -167,12 +165,35 @@ comp' s1 s2 = wrap $ \ case
     (s1, s2, var2) <- $(comp' 's1 's2 e2)
     Val.fork3 $ less' s1 s2 var1 var2 |]
   Fail -> [| empty |]
+  (unwrap -> All e1) :& e2 -> [| do
+    heap <- newHeap $(varE s2)
+    (s1, s2) <- fork2 . (($(varE s1), $(varE s2)) <$) . all_ $ do
+      s1 <- newVar (); s2 <- newVar ()
+      (s1, s2, _var) <- local (const heap) $(comp' 's1 's2 e1)
+      readVar s1 *> readVar s2
+    $(comp' 's1 's2 e2) |]
   All e -> [| do
     heap <- newHeap $(varE s2)
     Val.fork3 . fmap ($(varE s1), $(varE s2), ) . Val.newTup . fromList <=< all' $ do
       s1 <- newVar (); s2 <- newVar ()
       (s1, s2, var) <- local (const heap) $(comp' 's1 's2 e)
       readVar s1 *> readVar s2 $> var |]
+  (unwrap -> For e1 x e2) :& e3 -> [|
+    let
+      loop s1 s2 = \ case
+        Done -> pure (s1, s2)
+        Step var m -> do
+          (s1, s2, _var) <- $(localEnv (Env.insert x 'var) $ comp' 's1 's2 e2)
+          heap <- newHeap s2
+          loop s1 s2 =<< local (const heap) m
+    in do
+      (s1, s2) <- fork2 $ loop $(varE s1) $(varE s2) =<< do
+        heap <- newHeap $(varE s2)
+        split $ do
+          s1 <- newVar (); s2 <- newVar ()
+          (s1, s2, _var) <- local (const heap) $(comp' 's1 's2 e1)
+          readVar s1 *> readVar s2
+      $(comp' 's1 's2 e3) |]
   For e1 x e2 -> [|
     let
       loop s1 s2 vars = \ case
@@ -202,6 +223,9 @@ comp' s1 s2 = wrap $ \ case
           readVar s1 *> readVar s2 $> var)
       (\ var -> $(localEnv (Env.insert x 'var) $ comp' s1 s2 e2))
       $(comp' s1 s2 e3) |]
+  e1 :& e2 -> [| do
+    (s1, s2, _) <- $(comp' s1 s2 e1)
+    $(comp' 's1 's2 e2) |]
 
 compLet
   :: Quote m

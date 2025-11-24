@@ -30,10 +30,7 @@ exists ToRevList;
 ToRevList = fun(Arg) {
   exists Xs;
   Xs = Alloc[];
-  all {
-    exists I;
-    Write[Xs, (Arg[I], Read[Xs])]
-  };
+  all{exists I; Write[Xs, (Arg[I], Read[Xs])]};
   Read[Xs]
 };
 
@@ -149,10 +146,7 @@ exists Sum;
 Sum = fun(Arg) {
   exists Result;
   Result = Alloc[0];
-  all {
-    exists I;
-    Write[Result, Arg[I] + Read[Result]]
-  };
+  all{exists I; Write[Result, Arg[I] + Read[Result]]};
   Read[Result]
 };
 

@@ -16,6 +16,7 @@ module Verse.Run
   , minus'
   , less
   , less'
+  , all_
   ) where
 
 import Control.Applicative
@@ -194,6 +195,14 @@ less' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   guard $! x1 < x2
   pure (s1, s2, var1)
+
+all_ :: MonadRef m => VerseT m () -> VerseT m ()
+{-# INLINE all_ #-}
+all_ = split >=> loop
+  where
+    loop = \ case
+      Done -> pure ()
+      Step _ m -> loop =<< m
 
 infixr 3 ***
 (***) :: Monad m => (a -> m c) -> (b -> m d) -> (a, b) -> m (c, d)
