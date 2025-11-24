@@ -239,7 +239,35 @@ set live X = Y
 set X = 1  # Error! Cyclic evaluation
 ```
 
-### Turning Off Live
+### Tracking Dependencies
+
+Live variables track dependencies dynamically at runtime, not statically from source code. A variable becomes a dependency only when it's actually read during evaluation, not merely when it appears in the guard expression:
+
+1. *Runtime tracking:* Dependencies are determined by which variables are actually accessed during each evaluation
+2. *Transitive tracking:* Dependencies include variables read in called functions
+3. *Dynamic changes:* The dependency set can change from one evaluation to the next
+
+Consider this example:
+
+```verse
+var X:int = 1
+var Y:int = 2
+var Z:int = 3
+
+SomeFun(Value:int):int =
+   if(Value > 0) then X else Y
+
+var live W:int = SomeFun(Z)   # W is 1, Dependencies: {Z, X}
+set Z = 0                     # W is 2, Dependencies: {Z, Y}
+```
+
+Initially, `SomeFun(Z)` reads `Z` (which is 3) and evaluates the `then` branch, reading `X`, yielding `W=1` with dependencies `{Z, X}`.
+
+After `set Z=0`, the change to `Z` triggers re-evaluation. Now `SomeFun(Z)` reads `Z` (which is 0) and evaluates the `else` branch, reading `Y`. This results in `W=2` with new dependencies `{Z, Y}`.
+
+Notice how `Y` became a dependency only when the execution path changed. If `X` is subsequently modified, `W` will *not* update because `X` is no longer in the dependency set. This dynamic tracking ensures that live variables only react to changes that actually affect their current value.
+
+### Turning Off Liveness
 
 A live variable established through its guard (not its type) can be
 turned off by a subsequent regular assignment.
