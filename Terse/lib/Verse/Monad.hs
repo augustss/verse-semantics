@@ -207,7 +207,7 @@ liftPut forward backward = do
 tellVar :: Applicative m => Label -> m () -> m () -> VerseT m ()
 {-# INLINABLE tellVar #-}
 tellVar label forward backward = VerseT $ \ _level count _heap mem _yk sk fk ek ->
-  sk count mem ()
+  sk count (appendMemVar mem label forward backward) ()
   (\ heap mem -> backward *> tellVar' label backward forward (fk heap) mem)
   (\ mem -> backward *> tellVar' label backward forward ek mem)
 
