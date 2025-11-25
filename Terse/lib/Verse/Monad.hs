@@ -87,9 +87,9 @@ data Mem m = Mem
   , backward' :: !(m ())
   }
 
-appendMem :: Applicative m => Mem m -> Label -> m () -> m () -> Mem m
-{-# INLINE appendMem #-}
-appendMem mem label forward backward = mem
+appendMemVar :: Applicative m => Mem m -> Label -> m () -> m () -> Mem m
+{-# INLINE appendMemVar #-}
+appendMemVar mem label forward backward = mem
   { varMin = min mem.varMin label
   , forward = mem.forward *> forward
   , backward = backward *> mem.backward
@@ -202,21 +202,21 @@ liftPut :: Monad m => m () -> m () -> VerseT m ()
 {-# INLINE liftPut #-}
 liftPut forward backward = do
   lift forward
-  tell minBound forward backward
+  tellVar minBound forward backward
 
-tell :: Applicative m => Label -> m () -> m () -> VerseT m ()
-{-# INLINABLE tell #-}
-tell label forward backward = VerseT $ \ _level count _heap mem _yk sk fk ek ->
+tellVar :: Applicative m => Label -> m () -> m () -> VerseT m ()
+{-# INLINABLE tellVar #-}
+tellVar label forward backward = VerseT $ \ _ count _ mem _ sk fk ek ->
   sk count mem ()
-  (\ heap mem -> backward *> tell' label backward forward (fk heap) mem)
-  (\ mem -> backward *> tell' label backward forward ek mem)
+  (\ heap mem -> backward *> tellVar' label backward forward (fk heap) mem)
+  (\ mem -> backward *> tellVar' label backward forward ek mem)
 
-tell'
+tellVar'
   :: Applicative m
   => Label -> m () -> m () -> (Mem m -> m r) -> Mem m -> m r
-{-# INLINE tell' #-}
-tell' label forward backward f mem
-  | label < mem.varMinBound = f $ appendMem mem label forward backward
+{-# INLINE tellVar' #-}
+tellVar' label forward backward f mem
+  | label < mem.varMinBound = f $ appendMemVar mem label forward backward
   | otherwise = f mem
 
 tellRef :: Applicative m => Label -> m () -> VerseT m ()
@@ -283,7 +283,9 @@ runVerseT m = do
     sk count mem x fk _ek
       | count == 0 = runFindT (findVars' x) 0 mem.label >>= \ case
         Nothing -> pure Nothing
-        Just (x, label) -> fmap (x:) <$> fk heap (splitMem label mem.varMinBound)
+        Just (x, label) ->
+          fmap (x:) <$>
+          fk heap (splitMem label mem.varMinBound)
       | otherwise = pure Nothing
   unVerseT m level count heap (splitMem label varMinBound) yk sk fk ek
   where
@@ -349,7 +351,7 @@ yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
 {-# INLINABLE yieldS #-}
 yieldS = Yield $ \ i f count mem sk fk ek -> pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
-    tell mem.varMin mem.forward mem.backward
+    tellVar mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
     tellRef mem.refMin mem.backward'
   putLabel mem.label
@@ -363,7 +365,7 @@ succeedS :: (MonadRef m, Vars a m) => Succeed (VerseT m (Stream m a)) m a
 {-# INLINABLE succeedS #-}
 succeedS count mem x fk _ek = pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
-    tell mem.varMin mem.forward mem.backward
+    tellVar mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
     tellRef mem.refMin mem.backward'
   if count == 0 then do
@@ -387,7 +389,7 @@ emptyS :: Monad m => Empty (VerseT m (Stream m a)) m
 {-# INLINABLE emptyS #-}
 emptyS mem = pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
-    tell mem.varMin mem.forward mem.backward
+    tellVar mem.varMin mem.forward mem.backward
   whenM ((mem.refMin <) <$> getRefMinBound) $
     tellRef mem.refMin mem.backward'
   putLabel mem.label
@@ -525,7 +527,8 @@ liftSucceedF2 sk' vars x = VerseT $ \ level count heap mem yk sk fk ek ->
 
 fork3
   :: (MonadWeakRef m, ZipVars_ a m, ZipVars_ b m, ZipVars_ c m)
-  => VerseT m (Var m a, Var m b, Var m c) -> VerseT m (Var m a, Var m b, Var m c)
+  => VerseT m (Var m a, Var m b, Var m c)
+  -> VerseT m (Var m a, Var m b, Var m c)
 {-# INLINE fork3 #-}
 fork3 m = fork3' m succeedF
 
@@ -849,7 +852,7 @@ writeRefState
 {-# INLINABLE writeRefState #-}
 writeRefState ref label !x = (label <) <$> getVarMinBound >>= \ case
   False -> lift $ writeRef ref x
-  True -> uncurry (tell label) <=< lift $ do
+  True -> uncurry (tellVar label) <=< lift $ do
     y <- readRef ref
     let forward = writeRef ref x
     forward
