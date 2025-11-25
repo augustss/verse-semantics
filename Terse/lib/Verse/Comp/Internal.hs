@@ -174,7 +174,7 @@ comp' s1 s2 = wrap $ \ case
     $(comp' 's1 's2 e2) |]
   All e -> [| do
     heap <- newHeap $(varE s2)
-    Val.fork3 . fmap ($(varE s1), $(varE s2), ) . Val.newTup . fromList <=< all' $ do
+    Val.fork3 $ fmap ($(varE s1), $(varE s2), ) . Val.newTup . fromList <=< all' $ do
       s1 <- newVar (); s2 <- newVar ()
       (s1, s2, var) <- local (const heap) $(comp' 's1 's2 e)
       readVar s1 *> readVar s2 $> var |]

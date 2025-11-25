@@ -206,7 +206,7 @@ liftPut forward backward = do
 
 tellVar :: Applicative m => Label -> m () -> m () -> VerseT m ()
 {-# INLINABLE tellVar #-}
-tellVar label forward backward = VerseT $ \ _ count _ mem _ sk fk ek ->
+tellVar label forward backward = VerseT $ \ _level count _heap mem _yk sk fk ek ->
   sk count mem ()
   (\ heap mem -> backward *> tellVar' label backward forward (fk heap) mem)
   (\ mem -> backward *> tellVar' label backward forward ek mem)
@@ -304,7 +304,7 @@ all' = split >=> loop
   where
     loop = \ case
       Done -> pure []
-      Step x m -> (x:) <$> (m >>= loop)
+      Step x m -> fmap (x:) . loop =<< m
 
 one :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m a
 {-# INLINE one #-}
