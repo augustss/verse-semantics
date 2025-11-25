@@ -27,7 +27,7 @@ main :: IO ()
 main = do
   setEnv "TASTY_COLOR" "ALWAYS"
   defaultMain $
-    localOption (HedgehogTestLimit $ Just 50) tests
+    localOption (HedgehogTestLimit $ Just 100) tests
 
 tests :: TestTree
 tests = testGroup "Libs"

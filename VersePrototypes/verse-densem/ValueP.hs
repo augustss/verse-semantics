@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
+{-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE MonadComprehensions #-}
 module ValueP(
   Z,
   Ident, fresh, freshList,
@@ -25,6 +26,8 @@ import qualified Map as M
 import FrontEnd.Expr(Ident(..), noLoc)
 import PomSet
 import qualified MultiSet as Set
+import Data.Text (Text)
+import qualified Data.Text as T
 
 default ()
 
@@ -77,7 +80,7 @@ getTuple (Fun p) =
          map fst xys == map Int [0..length sq-1] -> Just $ map snd xys
        | otherwise -> Nothing
 
-data PartialFun = PF { pfName :: String, pfMap :: M.Map Value Value }
+data PartialFun = PF { pfName :: Text, pfMap :: M.Map Value Value }
 -- deriving ( Show )
 
 {-
@@ -102,7 +105,7 @@ instance Ord PartialFun where
   PF _ f1 `compare` PF _ f2  =  f1 `compare` f2
 
 instance Show PartialFun where
-  show (PF s _m) = s -- show m
+  show (PF s _m) = T.unpack s -- show m
 
 applyPF :: PartialFun -> Value -> Maybe Value
 applyPF (PF _ m) a = M.lookup a m
@@ -113,7 +116,7 @@ domPF (PF _ m) = Set.mkSetUnsafe $ M.keys m
 -- Single point mapping
 pattern PFSing :: Value -> Value -> PartialFun
 pattern PFSing x y <- (getPFSing -> Just (x, y))
-  where PFSing x y = PF (show (show x ++ "->" ++ show y)) (M.fromList [(x, y)])
+  where PFSing x y = PF (T.pack (show x ++ "->" ++ show y)) (M.fromList [(x, y)])
 
 getPFSing :: PartialFun -> Maybe (Value, Value)
 getPFSing (PF _ m) =
@@ -194,7 +197,7 @@ allPFs =
          | x <- allInts, y <- allInts ]
          ++
          -- All int->int functions with singleton range
-         [ PF ("K" ++ show y) $ M.fromList [(x, y) | x <- allInts]
+         [ PF ("K" <> T.pack (show y)) $ M.fromList [(x, y) | x <- allInts]
          | y <- allInts ]
          ++
          -- The {0,1,2}->{0} function
@@ -232,8 +235,10 @@ mkPFList pairs =
 mkPFList' :: [(Value, Value)] -> PartialFun
 mkPFList' pairs = PF { pfName = showPairs pairs, pfMap = M.fromList pairs }
 
-showPairs :: [(Value, Value)] -> String
-showPairs xys = "{" ++ intercalate "," (map (\ (x,y) -> show x ++ "->" ++ show y) xys) ++ "}"
+showPairs :: [(Value, Value)] -> Text
+showPairs xys = "{"
+  <> T.intercalate "," (fmap (\ (x,y) -> T.pack $ show x ++ "->" ++ show y) xys)
+  <> "}"
 
 allFUNs :: [FUN]
 allFUNs = mkUniqFUN $

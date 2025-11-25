@@ -13,7 +13,7 @@ module ENVP(
   extractVar,  -- dubious
   )where
 import Data.Function(on)
-import Data.List(intercalate, groupBy, sortBy)
+import Data.List(intercalate, groupBy, foldl', sortBy)
 import Epic.Print(Pretty(..), text)
 import ValueP
 
@@ -59,20 +59,20 @@ hide :: Ident -> ENV -> ENV
 hide x (OR cs) = disj [ hideCase x c | c <- cs ]
 
 hides :: [Ident] -> ENV -> ENV
-hides xs env = foldr hide env xs
+hides xs env = foldl' (flip hide) env xs
 
 compl :: ENV -> ENV
 compl (OR as) =
-  foldr (/\) univ
+  foldl' (/\) univ
   [ OR [YES [neg c] | c <- cs]
   | YES cs <- as
   ]
 
 bigUnion :: [ENV] -> ENV
-bigUnion = foldr (\/) empty
+bigUnion = foldl' (\/) empty
 
 bigIntersect :: [ENV] -> ENV
-bigIntersect = foldr (/\) univ
+bigIntersect = foldl' (/\) univ
 
 ----------------------------------
 
@@ -177,7 +177,7 @@ hideCase x (YES cs) =
 usort :: Ord a => [a] -> [a]
 --usort = map head . group . sort
 -- with the very short lists we have it's faster to use insertion sort
-usort = foldr uinsert []
+usort = foldl' (flip uinsert) []
 
 uinsert :: Ord a => a -> [a] -> [a]
 uinsert x []     = [x]
@@ -240,20 +240,20 @@ add constr cs0 = normConstr constr
       (t1@(Value _), t2@(Ident _)) -> addNeq t2 t1 cs0
       (t1@(Ident _), t2@(Value _)) -> addNeq t1 t2 cs0
 -}
-      
+
   addEq  (Ident x) t cs = ((x :=: t) `uinsert`) `fmap` subst x t cs
   addNeq (Ident x) t cs = Just ((x :/=: t) `uinsert` cs)
 
   subst x t ((y :=: Ident x'):cs) | x == x' =
     ((y :=: t) `uinsert`) `fmap` subst x t cs
-    
+
   subst x t ((x' :/=: t'):cs) | x == x' =
     case (t, t') of
       (t, t')            | t == t' -> Nothing
       (Value a, Value b) | a /= b  -> subst x t cs
       (Ident z, t') | Ident z > t' -> ((z :/=: t') `uinsert`) `fmap` subst x t cs
       (t, Ident z)                 -> ((z :/=: t)  `uinsert`) `fmap` subst x t cs
-  
+
   subst x t ((y :/=: Ident x'):cs) | x == x' =
     case t of
       t | t == Ident y -> Nothing

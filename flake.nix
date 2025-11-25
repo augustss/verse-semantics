@@ -99,8 +99,10 @@
           hPkgs.cabal-install
           hPkgs.lhs2tex                 # for latex make
           hPkgs.fast-tags               # for TAGS files
+          hPkgs.eventlog2html
           texEnv                        # the latex packages
           stack-wrapped
+          pkgs.ghostscript              # for ps2pdf
           pkgs.zlib # External C library needed by some Haskell packages
 
           ## python deps for verse book
