@@ -81,7 +81,9 @@ exists Sum;
 Sum = fun(Arg) {
   exists Result;
   Result = Alloc[0];
-  all{exists I; Write[Result, Arg[I] + Read[Result]]};
+  for (exists I; Arg[I]) do(X) {
+    Write[Result, X + Read[Result]]
+  };
   Read[Result]
 };
 

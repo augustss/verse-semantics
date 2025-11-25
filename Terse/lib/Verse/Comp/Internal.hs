@@ -195,8 +195,8 @@ comp' s1 s2 = wrap $ \ case
         heap <- newHeap $(varE s2)
         split $ do
           s1 <- newVar (); s2 <- newVar ()
-          (s1, s2, _var) <- local (const heap) $(comp' 's1 's2 e1)
-          readVar s1 *> readVar s2
+          (s1, s2, var) <- local (const heap) $(comp' 's1 's2 e1)
+          readVar s1 *> readVar s2 $> var
       $(comp' 's1 's2 e3) |]
   For e1 x e2 -> [|
     let
