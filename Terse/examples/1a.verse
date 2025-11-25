@@ -30,21 +30,21 @@ Merge = fun(Arg) {
     exists X; X = Xs[Read[I]];
     exists Y; Y = Ys[Read[J]];
     if (X < Y) then(X) {
-      Write[I, Read[I] + 1];
+      Incr[I];
       X|Intersect[]
     } else {
-      Write[J, Read[J] + 1];
+      Incr[J];
       Y|Intersect[]
     }
   };
   exists Left; Left = fun(Arg) {
     exists X; X = Xs[Read[I]];
-    Write[I, Read[I] + 1];
+    Incr[I];
     X|Left[]
   };
   exists Right; Right = fun(Arg) {
     exists Y; Y = Ys[Read[J]];
-    Write[J, Read[J] + 1];
+    Incr[J];
     Y|Right[]
   };
   all{Intersect[]|Left[]|Right[]}
@@ -85,11 +85,6 @@ Sum = fun(Arg) {
     Write[Result, X + Read[Result]]
   };
   Read[Result]
-};
-
-exists Abs;
-Abs = fun(Arg) {
-  if (Arg < 0) then(Arg) { 0 - Arg } else { Arg }
 };
 
 exists ReadLine;

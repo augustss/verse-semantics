@@ -7,6 +7,7 @@ module Verse.Run
   , alloc
   , read
   , write
+  , incr
   , getLine
   , readInt
   , print
@@ -17,6 +18,7 @@ module Verse.Run
   , times'
   , less
   , less'
+  , abs
   , all_
   ) where
 
@@ -48,7 +50,8 @@ import Verse.Monad
 import Verse.Run.Heap
 import Verse.Run.Val qualified as Val
 
-import Prelude (Num (..), ($!), (&&), fromIntegral)
+import Prelude (($!), (&&), (+), (-), (*), fromIntegral)
+import Prelude qualified
 
 app
   :: MonadWeakRef m
@@ -108,6 +111,20 @@ write s1 s2 x = do
       writeVarsRef x1 x2
       (s1, s2, ) <$> Val.newTup mempty
     _ -> stuck
+
+incr
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE incr #-}
+incr s1 s2 x = Val.readVar x >>= \ case
+  Val.Ptr x -> do
+    readVar s2
+    readHeap
+    y <- one $ (Val.readInt =<< readVarsRef x) <|> stuck
+    writeVarsRef x <=< Val.newInt $! y + 1
+    (s1, s2, ) <$> Val.newTup mempty
+  _ -> stuck
 
 getLine
   :: (MonadIO m, MonadWeakRef m)
@@ -195,6 +212,15 @@ less
 less s1 s2 x = do
   (x1, x2) <- one $ Val.readPair x <|> stuck
   less' s1 s2 x1 x2
+
+abs
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE abs #-}
+abs s1 s2 x = do
+  x <- one $ Val.readInt x <|> stuck
+  fmap (s1, s2, ) . Val.newInt $! Prelude.abs x
 
 less'
   :: MonadWeakRef m
