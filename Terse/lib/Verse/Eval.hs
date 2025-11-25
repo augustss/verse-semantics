@@ -164,6 +164,14 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     fork' $ unifyVar var =<< evalMinus s4 s2 var1 var2
     pure var
+  e1 :* e2 -> do
+    s3 <- freshS
+    var1 <- eval' s1 s3 e1
+    s4 <- freshS
+    var2 <- eval' s3 s4 e2
+    var <- freshVar
+    fork' $ unifyVar var =<< evalTimes s4 s2 var1 var2
+    pure var
   e1 :< e2 -> do
     s3 <- freshS
     var1 <- eval' s1 s3 e1
@@ -341,6 +349,14 @@ evalMinus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
   unifyS s1 s2
   newInteger $! x1 - x2
+
+evalTimes
+  :: MonadWeakRef m
+  => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
+evalTimes s1 s2 var1 var2 = do
+  (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
+  unifyS s1 s2
+  newInteger $! x1 * x2
 
 evalLess
   :: MonadWeakRef m

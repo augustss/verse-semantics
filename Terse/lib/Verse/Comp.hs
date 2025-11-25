@@ -25,6 +25,7 @@ comp e = [| runVerseT $ do
   readInt <- Val.newLam () $ const Run.readInt
   print <- Val.newLam () $ const Run.print
   minus <- Val.newLam () $ const Run.minus
+  less <- Val.newLam () $ const Run.less
   s1 <- newVar ()
   s2 <- newVar ()
   (s1, s2, var) <- $(runCompT (comp' 's1 's2 e)
@@ -35,6 +36,7 @@ comp e = [| runVerseT $ do
     , ("ReadInt", 'readInt)
     , ("Print", 'print)
     , ("operator'-'", 'minus)
+    , ("operator'<'", 'less)
     ])
   readVar s1
   readVar s2

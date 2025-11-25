@@ -26,6 +26,7 @@ data ExpF a
   | a :.. a
   | a :+ a
   | a :- a
+  | a :* a
   | Fail
   | All a
   | For a {-# UNPACK #-} !Name a
@@ -74,6 +75,9 @@ instance PrettyPrec a => PrettyPrec (ExpF a) where
     e1 :- e2 ->
       prettyParens (prec > 6) $
       prettyPrec 7 e1 <> pretty '-' <> prettyPrec 7 e2
+    e1 :* e2 ->
+      prettyParens (prec > 7) $
+      prettyPrec 8 e1 <> pretty '*' <> prettyPrec 8 e2
     Fail ->
       "fail"
     All e ->

@@ -160,6 +160,10 @@ comp' s1 s2 = wrap $ \ case
     (s1, s2, var1) <- $(comp' s1 s2 e1)
     (s1, s2, var2) <- $(comp' 's1 's2 e2)
     Val.fork3 $ minus' s1 s2 var1 var2 |]
+  e1 :* e2 -> [| do
+    (s1, s2, var1) <- $(comp' s1 s2 e1)
+    (s1, s2, var2) <- $(comp' 's1 's2 e2)
+    Val.fork3 $ times' s1 s2 var1 var2 |]
   e1 :< e2 -> [| do
     (s1, s2, var1) <- $(comp' s1 s2 e1)
     (s1, s2, var2) <- $(comp' 's1 's2 e2)

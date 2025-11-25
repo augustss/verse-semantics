@@ -14,6 +14,7 @@ module Verse.Run
   , plus'
   , minus
   , minus'
+  , times'
   , less
   , less'
   , all_
@@ -63,7 +64,7 @@ app var1 s1 s2 var2 = Val.readVar var1 >>= \ case
     readVar s1
     Val.readVar' var2 >>= \ case
       Just x -> case x of
-        Val.Int x | 0 <= x && x <= fromIntegral (Vector.length vars) ->
+        Val.Int x | 0 <= x && x < fromIntegral (Vector.length vars) ->
           pure (s1, s2, Vector.unsafeIndex vars $ fromIntegral x)
         _ -> empty
       Nothing ->
@@ -176,6 +177,15 @@ minus'
 minus' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   fmap (s1, s2, ) . Val.newInt $! x1 - x2
+
+times'
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE times' #-}
+times' s1 s2 var1 var2 = do
+  (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
+  fmap (s1, s2, ) . Val.newInt $! x1 * x2
 
 less
   :: MonadWeakRef m

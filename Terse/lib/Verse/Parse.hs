@@ -47,6 +47,7 @@ import Verse.Exp
   , pattern (:..)
   , pattern (:+)
   , pattern (:-)
+  , pattern (:*)
   )
 import Verse.Exp qualified as Exp
 import Verse.Token
@@ -89,9 +90,12 @@ dotDot = chainl1 plusMinus $ wrap2 (:..) <$ token ".."
 
 plusMinus :: Parser LExp
 plusMinus =
-  chainl1 app $
+  chainl1 times $
   wrap2 (:+) <$ token (char '+') <|>
   wrap2 (:-) <$ token (char '-')
+
+times :: Parser LExp
+times = chainl1 app $ wrap2 (:*) <$ token (char '*')
 
 app :: Parser LExp
 app = base >>= loop
