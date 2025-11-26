@@ -22,10 +22,13 @@ comp e = [| runVerseT $ do
   read <- Val.newLam () $ const Run.read
   write <- Val.newLam () $ const Run.write
   incr <- Val.newLam () $ const Run.incr
+  length <- Val.newLam () $ const Run.length
+  slice <- Val.newLam () $ const Run.slice
   getLine <- Val.newLam () $ const Run.getLine
   readInt <- Val.newLam () $ const Run.readInt
   print <- Val.newLam () $ const Run.print
   minus <- Val.newLam () $ const Run.minus
+  div <- Val.newLam () $ const Run.div
   less <- Val.newLam () $ const Run.less
   abs <- Val.newLam () $ const Run.abs
   s1 <- newVar ()
@@ -35,11 +38,14 @@ comp e = [| runVerseT $ do
     , ("Read", 'read)
     , ("Write", 'write)
     , ("Incr", 'incr)
+    , ("Length", 'length)
+    , ("Slice", 'slice)
     , ("GetLine", 'getLine)
     , ("ReadInt", 'readInt)
     , ("Print", 'print)
     , ("operator'-'", 'minus)
     , ("operator'<'", 'less)
+    , ("Div", 'div)
     , ("Abs", 'abs)
     ])
   readVar s1

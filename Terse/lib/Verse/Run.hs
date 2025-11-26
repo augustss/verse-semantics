@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module Verse.Run
   ( module Verse.Run.Heap
@@ -8,6 +9,8 @@ module Verse.Run
   , read
   , write
   , incr
+  , length
+  , slice
   , getLine
   , readInt
   , print
@@ -16,6 +19,7 @@ module Verse.Run
   , minus
   , minus'
   , times'
+  , div
   , less
   , less'
   , abs
@@ -28,7 +32,6 @@ import Control.Monad.IO.Class
 
 import Data.Function
 import Data.Functor
-import Data.List
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
@@ -50,7 +53,7 @@ import Verse.Monad
 import Verse.Run.Heap
 import Verse.Run.Val qualified as Val
 
-import Prelude (($!), (&&), (+), (-), (*), fromIntegral)
+import Prelude ((==), ($!), (&&), (+), (-), (*), fromIntegral, zip)
 import Prelude qualified
 
 app
@@ -124,6 +127,31 @@ incr s1 s2 x = Val.readVar x >>= \ case
     y <- one $ (Val.readInt =<< readVarsRef x) <|> stuck
     writeVarsRef x <=< Val.newInt $! y + 1
     (s1, s2, ) <$> Val.newTup mempty
+  _ -> stuck
+
+length
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE length #-}
+length s1 s2 x = Val.readVar x >>= \ case
+  Val.Tup x -> fmap (s1, s2, ) . Val.newInt $! fromIntegral $ Vector.length x
+  _ -> stuck
+
+slice
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE slice #-}
+slice s1 s2 x = Val.readVar x >>= \ case
+  Val.Tup [i, n, x] -> Val.readVar x >>= \ case
+    Val.Tup x -> do
+      (i, n) <- one $ (,) <$> Val.readInt i <*> Val.readInt n <|> stuck
+      unless (0 <= i && 0 <= n && n <= fromIntegral (Vector.length x) - i)
+        empty
+      fmap (s1, s2, ) . Val.newTup $!
+        Vector.unsafeSlice (fromIntegral i) (fromIntegral n) x
+    _ -> stuck
   _ -> stuck
 
 getLine
@@ -203,6 +231,17 @@ times'
 times' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   fmap (s1, s2, ) . Val.newInt $! x1 * x2
+
+div
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE div #-}
+div s1 s2 x = do
+  (x1, x2) <- one $ Val.readPair x <|> stuck
+  (x1, x2) <- one $ (,) <$> Val.readInt x1 <*> Val.readInt x2 <|> stuck
+  when (x2 == 0) empty
+  fmap (s1, s2, ) . Val.newInt $! Prelude.div x1 x2
 
 less
   :: MonadWeakRef m
