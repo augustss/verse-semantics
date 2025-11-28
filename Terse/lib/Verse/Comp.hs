@@ -31,6 +31,7 @@ comp e = [| runVerseT $ do
   div <- Val.newLam () $ const Run.div
   less <- Val.newLam () $ const Run.less
   abs <- Val.newLam () $ const Run.abs
+  introSort <- Val.newLam () $ const Run.introSort
   s1 <- newVar ()
   s2 <- newVar ()
   (s1, s2, var) <- $(runCompT (comp' 's1 's2 e)
@@ -47,6 +48,7 @@ comp e = [| runVerseT $ do
     , ("operator'<'", 'less)
     , ("Div", 'div)
     , ("Abs", 'abs)
+    , ("IntroSort", 'introSort)
     ])
   readVar s1
   readVar s2

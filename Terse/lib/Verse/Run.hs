@@ -23,12 +23,14 @@ module Verse.Run
   , less
   , less'
   , abs
+  , introSort
   , all_
   ) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.ST
 
 import Data.Function
 import Data.Functor
@@ -38,6 +40,7 @@ import Data.Ord
 import Data.Traversable
 import Data.Tuple
 import Data.Vector qualified as Vector
+import Data.Vector.Algorithms.Intro qualified as Vector.Intro
 
 import GHC.Exts (IsList (..))
 
@@ -263,13 +266,27 @@ abs s1 s2 x = do
 
 less'
   :: MonadWeakRef m
-  => Var m () -> Var m () -> Val.Var m
-  -> Val.Var m -> VerseT m (Var m (), Var m (), Val.Var m)
+  => Var m () -> Var m () -> Val.Var m -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
 {-# INLINABLE less' #-}
 less' s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> Val.readInt var1 <*> Val.readInt var2 <|> stuck
   guard $! x1 < x2
   pure (s1, s2, var1)
+
+introSort
+  :: MonadWeakRef m
+  => Var m () -> Var m () -> Val.Var m
+  -> VerseT m (Var m (), Var m (), Val.Var m)
+{-# INLINABLE introSort #-}
+introSort s1 s2 var = Val.readVar var >>= \ case
+  Val.Tup vars -> do
+    xs <- for vars $ \ var -> one $ Val.readInt var <|> stuck
+    fmap (s1, s2, ) . Val.newTup <=< traverse Val.newInt $ runST $ do
+      xs <- Vector.thaw xs
+      Vector.Intro.sort xs
+      Vector.unsafeFreeze xs
+  _ -> stuck
 
 all_ :: MonadRef m => VerseT m () -> VerseT m ()
 {-# INLINE all_ #-}

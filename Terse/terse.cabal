@@ -50,11 +50,13 @@ library
     mtl,
     prettyprinter,
     prettyprinter-ansi-terminal,
+    primitive,
     template-haskell,
     text,
     transformers,
     unordered-containers,
-    vector
+    vector,
+    vector-algorithms
   default-language: GHC2021
 
 executable tersec

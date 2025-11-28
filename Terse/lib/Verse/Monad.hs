@@ -38,6 +38,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Reader.Class
 import Control.Monad.IO.Class
+import Control.Monad.Primitive
 import Control.Monad.State.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Zip
@@ -173,6 +174,11 @@ instance MonadTrans VerseT where
 instance MonadIO m => MonadIO (VerseT m) where
   {-# INLINE liftIO #-}
   liftIO = lift . liftIO
+
+instance PrimMonad m => PrimMonad (VerseT m) where
+  type PrimState (VerseT m) = PrimState m
+  {-# INLINE primitive #-}
+  primitive = lift . primitive
 
 instance MonadReader (Var m ()) (VerseT m) where
   {-# INLINE ask #-}
