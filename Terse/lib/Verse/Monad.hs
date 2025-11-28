@@ -337,13 +337,13 @@ split'
 split' m count = split'' m count succeedS failS emptyS
 
 split''
-  :: (MonadRef m, Vars b m)
+  :: Monad m
   => VerseT m a
   -> Count
-  -> Succeed (VerseT m (Stream m b)) m a
-  -> Fail (VerseT m (Stream m b)) m
-  -> Empty (VerseT m (Stream m b)) m
-  -> VerseT m (Stream m b)
+  -> Succeed (VerseT m b) m a
+  -> Fail (VerseT m b) m
+  -> Empty (VerseT m b) m
+  -> VerseT m b
 {-# INLINABLE split'' #-}
 split'' m count' sk' fk' ek' = VerseT $ \ level count heap mem yk sk fk ek ->
   let
@@ -353,7 +353,7 @@ split'' m count' sk' fk' ek' = VerseT $ \ level count heap mem yk sk fk ek ->
     unVerseT m level' count' heap mem' yieldS sk' fk' ek' >>= \ m ->
     unVerseT m level count heap mem yk sk fk ek
 
-yieldS :: (MonadRef m, Vars a m) => Yield (VerseT m (Stream m a)) m
+yieldS :: Monad m => Yield (VerseT m a) m
 {-# INLINABLE yieldS #-}
 yieldS = Yield $ \ i f count mem sk fk ek -> pure $ do
   whenM ((mem.varMin <) <$> getVarMinBound) $
