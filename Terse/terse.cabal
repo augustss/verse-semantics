@@ -64,6 +64,7 @@ executable tersec
     base,
     filepath,
     prettyprinter,
+    process,
     template-haskell,
     terse,
     text
