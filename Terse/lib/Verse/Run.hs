@@ -52,7 +52,7 @@ import Text.Read (reads)
 
 import Ref
 
-import Verse.Monad
+import Verse.Monad.Trans
 import Verse.Run.Heap
 import Verse.Run.Val qualified as Val
 

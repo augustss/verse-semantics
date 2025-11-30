@@ -46,7 +46,7 @@ import GHC.Exts (fromList)
 import Loc
 
 import Verse.Exp
-import Verse.Monad
+import Verse.Monad.Trans
   ( Stream (..)
   , all'
   , if'

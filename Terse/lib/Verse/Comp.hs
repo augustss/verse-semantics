@@ -12,7 +12,7 @@ import Language.Haskell.TH qualified as TH
 
 import Verse.Comp.Internal
 import Verse.Exp
-import Verse.Monad
+import Verse.Monad.Trans
 import Verse.Run qualified as Run
 import Verse.Run.Val qualified as Val
 

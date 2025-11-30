@@ -10,7 +10,7 @@ import Control.Monad.Reader
 
 import Ref
 
-import Verse.Monad
+import Verse.Monad.Trans
 
 type Heap m = Var m ()
 

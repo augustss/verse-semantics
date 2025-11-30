@@ -37,6 +37,7 @@ library
     Verse.Exp
     Verse.Parse
     Verse.Monad
+    Verse.Monad.Trans
     Verse.Name
     Verse.Run
     Verse.Run.Heap

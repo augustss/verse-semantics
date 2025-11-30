@@ -19,7 +19,7 @@ import Prettyprinter
 
 import Verse.Eval.Fun (Fun)
 import Verse.Exp (LExp)
-import Verse.Monad
+import Verse.Monad.Trans
 import Verse.Name
 
 data Val f a

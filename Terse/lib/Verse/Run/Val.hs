@@ -42,8 +42,8 @@ import Prettyprinter
 import Fix
 import Ref
 
-import Verse.Monad (VerseT, Vars (..), ZipVars_ (..), stuck)
-import Verse.Monad qualified as Monad
+import Verse.Monad.Trans (VerseT, Vars (..), ZipVars_ (..), stuck)
+import Verse.Monad.Trans qualified as Monad
 
 data Val f m a
   = Int !Integer
