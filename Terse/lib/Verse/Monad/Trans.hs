@@ -149,14 +149,10 @@ instance Alternative (VerseT m) where
   empty = VerseT $ \ _level _count _heap mem _yk _sk _fk ek ->
     ek mem
   {-# INLINABLE (<|>) #-}
-  x <|> y = VerseT $ \ level count heap mem@Mem { label } yk sk fk ek ->
-    let
-      varMinBound = label
-      refMinBound = label
-    in
-      unVerseT x level count heap mem { varMinBound, refMinBound } yk sk
-      (\ heap mem -> unVerseT y level count heap mem yk sk fk $ fk heap)
-      (\ mem -> unVerseT y level count heap mem yk sk fk ek)
+  x <|> y = VerseT $ \ level count heap mem yk sk fk ek ->
+    unVerseT x level count heap (leftMem mem) yk sk
+    (\ heap mem -> unVerseT y level count heap (rightMem mem) yk sk fk $ fk heap)
+    (\ mem -> unVerseT y level count heap (rightMem mem) yk sk fk ek)
 
 instance Monad (VerseT m) where
   {-# INLINE (>>=) #-}
@@ -417,6 +413,14 @@ splitMem label varMinBound = Mem {..}
     forward = pure ()
     backward = pure ()
     backward' = pure ()
+
+leftMem :: Mem m -> Mem m
+{-# INLINE leftMem #-}
+leftMem mem@Mem{ label } = mem { varMinBound = label, refMinBound = label }
+
+rightMem :: Mem m -> Mem m
+{-# INLINE rightMem #-}
+rightMem mem@Mem{ label } = mem { refMinBound = label }
 
 data Stream m a = Done | Step !a (VerseT m (Stream m a))
 
