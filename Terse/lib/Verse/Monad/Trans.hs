@@ -88,6 +88,25 @@ data Mem m = Mem
   , backward' :: !(m ())
   }
 
+splitMem :: Applicative m => Label -> Label -> Mem m
+{-# INLINE splitMem #-}
+splitMem label varMinBound = Mem {..}
+  where
+    varMin = maxBound
+    refMin = maxBound
+    refMinBound = label
+    forward = pure ()
+    backward = pure ()
+    backward' = pure ()
+
+leftMem :: Mem m -> Mem m
+{-# INLINE leftMem #-}
+leftMem mem@Mem{ label } = mem { varMinBound = label, refMinBound = label }
+
+rightMem :: Mem m -> Mem m
+{-# INLINE rightMem #-}
+rightMem mem@Mem{ label } = mem { refMinBound = label }
+
 appendMemVar :: Applicative m => Mem m -> Label -> m () -> m () -> Mem m
 {-# INLINE appendMemVar #-}
 appendMemVar mem label forward backward = mem
@@ -95,6 +114,14 @@ appendMemVar mem label forward backward = mem
   , forward = mem.forward *> forward
   , backward = backward *> mem.backward
   }
+
+appendMemVar'
+  :: Applicative m
+  => Mem m -> Label -> m () -> m () -> Mem m
+{-# INLINE appendMemVar' #-}
+appendMemVar' mem label forward backward
+  | label < mem.varMinBound = appendMemVar mem label forward backward
+  | otherwise = mem
 
 appendMemRef :: Applicative m => Mem m -> Label -> m () -> Mem m
 {-# INLINE appendMemRef #-}
@@ -150,9 +177,15 @@ instance Alternative (VerseT m) where
     ek mem
   {-# INLINABLE (<|>) #-}
   x <|> y = VerseT $ \ level count heap mem yk sk fk ek ->
-    unVerseT x level count heap (leftMem mem) yk sk
-    (\ heap mem -> unVerseT y level count heap (rightMem mem) yk sk fk $ fk heap)
-    (\ mem -> unVerseT y level count heap (rightMem mem) yk sk fk ek)
+    let
+      mem' =
+        leftMem mem
+      fk' heap mem =
+        unVerseT y level count heap (rightMem mem) yk sk fk $ fk heap
+      ek' mem =
+        unVerseT y level count heap (rightMem mem) yk sk fk ek
+    in
+      unVerseT x level count heap mem' yk sk fk' ek'
 
 instance Monad (VerseT m) where
   {-# INLINE (>>=) #-}
@@ -209,17 +242,15 @@ liftPut forward backward = do
 tellVar :: Applicative m => Label -> m () -> m () -> VerseT m ()
 {-# INLINABLE tellVar #-}
 tellVar label forward backward = VerseT $ \ _level count _heap mem _yk sk fk ek ->
-  sk count (appendMemVar mem label forward backward) ()
-  (\ heap mem -> backward *> tellVar' label backward forward (fk heap) mem)
-  (\ mem -> backward *> tellVar' label backward forward ek mem)
-
-tellVar'
-  :: Applicative m
-  => Label -> m () -> m () -> (Mem m -> m r) -> Mem m -> m r
-{-# INLINE tellVar' #-}
-tellVar' label forward backward f mem
-  | label < mem.varMinBound = f $ appendMemVar mem label forward backward
-  | otherwise = f mem
+  let
+    mem' =
+      appendMemVar mem label forward backward
+    fk' heap mem =
+      backward *> fk heap (appendMemVar' mem label forward backward)
+    ek' mem =
+      backward *> ek (appendMemVar' mem label forward backward)
+  in
+    sk count mem' () fk' ek'
 
 tellRef :: Applicative m => Label -> m () -> VerseT m ()
 {-# INLINABLE tellRef #-}
@@ -402,25 +433,6 @@ liftFailS :: Monad m => Fail (VerseT m a) m -> VerseT m a
 liftFailS fk' = VerseT $ \ level count heap mem yk sk fk ek -> do
   m <- fk' heap $ splitMem mem.label mem.varMinBound
   unVerseT m level count heap mem yk sk fk ek
-
-splitMem :: Applicative m => Label -> Label -> Mem m
-{-# INLINE splitMem #-}
-splitMem label varMinBound = Mem {..}
-  where
-    varMin = maxBound
-    refMin = maxBound
-    refMinBound = label
-    forward = pure ()
-    backward = pure ()
-    backward' = pure ()
-
-leftMem :: Mem m -> Mem m
-{-# INLINE leftMem #-}
-leftMem mem@Mem{ label } = mem { varMinBound = label, refMinBound = label }
-
-rightMem :: Mem m -> Mem m
-{-# INLINE rightMem #-}
-rightMem mem@Mem{ label } = mem { refMinBound = label }
 
 data Stream m a = Done | Step !a (VerseT m (Stream m a))
 
