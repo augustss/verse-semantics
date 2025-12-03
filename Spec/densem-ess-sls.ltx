@@ -237,10 +237,12 @@ $$
 % \semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
 %                   \hfill \text{(NB: |for1 fail| returns empty tuple)} \\[1mm]
 \semFOR{S \pomunion T}{xs}{u}{v}{t_1}
-                   & = & \pomunit{\conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2}}
-                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
-    &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
-    && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
+  & = & \semFOR{S}{xs}{u}{v}{t_1} \pomunion  \semFOR{T}{xs}{u}{v}{t_1} \\
+\text{or}  & = & \semFOR{S}{xs}{u}{v}{t_1} \pomor  \semFOR{T}{xs}{u}{v}{t_1} \\
+%                   & = & \pomunit{\conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2}}
+%                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
+%    &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
+%    && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
 \semFOR{S \pomcat T}{xs}{u}{v}{t_1}
                    & = & \pomunit{\conBrack{u=u_1 \tupcat u_2, v=v_1 \tupcat v_2}}
                    \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
