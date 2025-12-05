@@ -22,10 +22,12 @@ library
     Fix
     List
     Loc
+    Logic.PromptControl
     Parser
     Parser.PWD
     Pos
     Pretty
+    PromptControl
     Ref
     Text
     Verse
