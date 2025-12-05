@@ -62,7 +62,8 @@ instance Monad m => Monad (LogicT m) where
     unLogicT (f x) ft fk
 
 instance MonadTrans LogicT where
-  lift m = LogicT $ \ _ fk -> m <&> \ x -> (x, fk)
+  lift m = LogicT $ \ _ fk ->
+    m <&> \ x -> (x, fk)
 
 instance MonadPromptControl m => Alternative (LogicT m) where
   empty = LogicT $ \ ft fk ->

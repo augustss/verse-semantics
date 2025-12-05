@@ -1,140 +1,105 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE UnboxedTuples #-}
 module Verse.Monad
-  ( Verse
-  , runVerse
+  ( VerseT
+  , runVerseT
   , fork
   , yield
   , all'
   , one
+  , Stream (..)
   , split
   ) where
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 
-import Data.IntMap.Strict (IntMap)
-import Data.IntMap.Strict qualified as IntMap
+import Data.Functor
 
-import GHC.Exts
-import GHC.IO (IO (..))
+import PromptControl
 
-data PromptTag a = PromptTag (PromptTag# a)
-
-newPromptTag :: IO (PromptTag a)
-newPromptTag = IO $ \ s -> case newPromptTag# s of
-  (# s, x #) -> (# s, PromptTag x #)
-
-prompt :: PromptTag a -> IO a -> IO a
-prompt (PromptTag x) (IO f) = IO $ prompt# x f
-
-control0 :: PromptTag a -> ((IO b -> IO a) -> IO a) -> IO b
-control0 (PromptTag x) f = IO $ control0# x $ \ k s ->
-  case f $ \ (IO f) -> IO $ k f of
-    IO f -> f s
-
-newtype Verse a = Verse
-  { unVerse
-    :: Level
-    -> forall b . PromptTag b
-    -> IO b
-    -> IntMap (PromptTag ())
-    -> forall c . PromptTag c
-    -> (c -> IO c -> IO c)
-    -> IO c
-    -> IO a
+newtype VerseT m a = VerseT
+  { unVerseT
+    :: forall b c . PromptTag m b
+    -> (m c -> m b)
+    -> PromptTag m c
+    -> m c
+    -> m (a, m c)
   }
 
-newtype Level = Level Int deriving (Eq, Ord, Num)
-
-newtype Count = Count Int deriving (Eq, Num)
-
-runVerse :: Verse a -> IO (Maybe [a])
-runVerse m = do
+runVerseT :: MonadPromptControl m => VerseT m a -> m (Maybe [a])
+runVerseT m = do
   yt <- newPromptTag
   prompt yt $ Just <$> do
     ft <- newPromptTag
-    prompt ft $ (:[]) <$>
-      unVerse m level yt yk yts ft sk fk
+    prompt ft $ uncurry (fmap . (:)) =<< unVerseT m yt yk ft fk
   where
-    level = 1
-    yk = pure Nothing
-    yts = mempty
-    sk = fmap . (<>)
-    fk = pure mempty
+    yk = const $ pure Nothing
+    fk = pure []
 
-fork :: Verse () -> Verse ()
-fork m = Verse $ \ level@(Level i) yt yk yts ft sk fk -> do
-  yt' <- newPromptTag
-  prompt yt' $ unVerse m level yt yk (IntMap.insert i yt' yts) ft sk fk
+fork :: MonadPromptControl m => VerseT m () -> VerseT m ()
+fork m = VerseT $ \ _yt _yk fk ft -> do
+  yt <- newPromptTag
+  prompt yt $ unVerseT m yt yk fk ft
+  where
+    yk fk = pure ((), fk)
 
-yield :: Level -> ((Verse a -> Verse ()) -> Verse ()) -> Verse a
-yield (Level i) f = Verse $ \ level yt yk yts ft sk fk ->
-  let
-    unVerse' m = unVerse m level yt yk yts ft sk fk
-  in
-    case IntMap.lookupLE i yts of
-      Nothing -> control0 yt $ \ k ->
-        unVerse' (f $ \ m -> liftIO . void . prompt yt . k $ unVerse' m) *> yk
-      Just (_, yt) -> control0 yt $ \ k ->
-        unVerse' $ f $ \ m -> liftIO . prompt yt . k $ unVerse' m
+yield
+  :: MonadPromptControl m
+  => ((VerseT m a -> VerseT m ()) -> VerseT m ()) -> VerseT m a
+yield f = VerseT $ \ yt yk ft fk ->
+  control yt $ \ k ->
+    let
+      unVerseT' m = unVerseT m yt yk ft fk
+      k' m = VerseT $ \ _yt _yk _ft fk -> k (unVerseT' m) $> ((), fk)
+    in
+      unVerseT' (f k') *> yk fk
 
-data Stream a = Done | Step a (Verse (Stream a))
+one :: MonadPromptControl m => VerseT m a -> VerseT m a
+one = split >=> \ case
+  Done -> empty
+  Step x _ -> pure x
 
-singleton :: a -> Stream a
-singleton x = Step x $ pure Done
-
-all' :: Verse a -> Verse [a]
+all' :: MonadPromptControl m => VerseT m a -> VerseT m [a]
 all' = split >=> loop
   where
     loop = \ case
       Done -> pure []
       Step x m -> fmap (x:) . loop =<< m
 
-one :: Verse a -> Verse a
-one = split >=> \ case
-  Done -> empty
-  Step x _m -> pure x
+data Stream m a = Done | Step a (VerseT m (Stream m a))
 
-split :: Verse a -> Verse (Stream a)
-split m = Verse $ \ level yt yts yk _ft _sk _fk -> do
-  let !level' = level + 1
-  ft' <- newPromptTag
-  prompt ft' $ singleton <$> unVerse m level' yt yts yk ft' sk' fk'
+split :: MonadPromptControl m => VerseT m a -> VerseT m (Stream m a)
+split m = VerseT $ \ yt yk _ft fk -> do
+  ft <- newPromptTag
+  fmap (, fk) . prompt ft $
+    uncurry Step . fmap lift <$> unVerseT m yt (const $ yk fk) ft fk'
   where
-    sk' x m = case x of
-      Done -> m
-      Step x n -> pure . Step x $ n >>= liftIO . (`sk'` m)
-    fk' =
-      pure Done
+    fk' = pure Done
 
-instance Functor Verse where
-  fmap f x = Verse $ \ level yt yts yk ft sk ->
-    fmap f . unVerse x level yt yts yk ft sk
+instance Functor m => Functor (VerseT m) where
+  fmap f x = VerseT $ \ yt yk ft fk ->
+    unVerseT x yt yk ft fk <&> \ (x, fk) -> (f x, fk)
 
-instance Applicative Verse where
-  pure x = Verse $ \ _level _yt _yts _yk _ft _sk _fk ->
-    pure x
-  f <*> x = Verse $ \ level yt yts yk ft sk fk ->
-    unVerse f level yt yts yk ft sk fk <*>
-    unVerse x level yt yts yk ft sk fk
+instance Monad m => Applicative (VerseT m) where
+  pure x = VerseT $ \ _yt _yk _ft fk -> pure (x, fk)
+  f <*> x = VerseT $ \ yt yk ft fk -> do
+    (f, fk) <- unVerseT f yt yk ft fk
+    (x, fk) <- unVerseT x yt yk ft fk
+    pure (f x, fk)
 
-instance Alternative Verse where
-  empty = Verse $ \ _level _yt _yts _yk ft _sk fk ->
+instance Monad m => Monad (VerseT m) where
+  x >>= f = VerseT $ \ yt yk ft fk ->
+    unVerseT x yt yk ft fk >>= \ (x, fk) ->
+    unVerseT (f x) yt yk ft fk
+
+instance MonadTrans VerseT where
+  lift m = VerseT $ \ _yt _yk _ft fk ->
+    m <&> \ x -> (x, fk)
+
+instance MonadPromptControl m => Alternative (VerseT m) where
+  empty = VerseT $ \ _yt _yk ft fk ->
     control0 ft $ const fk
-  x <|> y = Verse $ \ level yt yts yk ft sk fk -> control0 ft $ \ k -> do
-    x <- prompt ft . k $ unVerse x level yt yts yk ft sk fk
-    sk x (prompt ft . k $ unVerse y level yt yts yk ft sk fk)
-
-instance Monad Verse where
-  x >>= f = Verse $ \ level yt yk yts ft sk fk ->
-    unVerse x level yt yk yts ft sk fk >>= \ x ->
-    unVerse (f x) level yt yk yts ft sk fk
-
-instance MonadPlus Verse
-
-instance MonadIO Verse where
-  liftIO x = Verse $ \ _ _ _ _ _ _ _ -> x
+  x <|> y = VerseT $ \ yt yk ft fk ->
+    control ft $ \ k -> k . unVerseT x yt yk ft . k $ unVerseT y yt yk ft fk
