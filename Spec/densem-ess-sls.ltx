@@ -271,8 +271,8 @@ $$
                 & \semess{E}{h}{f}{|t|} & : & \pomENV  \\
   \rulename{sfun} &
    \semess{E}{h}{f}{|functionOCX q t_0 fx t_1|}
-    & = &  \semFUN{\semess{E}{c}{d}{|t_0|}}{\semap{I}{t_0},q,|fx|}{cd}{hf}{|t_1|}
-   \hspace{1cm} \hfill c,d,u,v \not\in \freevars{t_0,t_1,h,f,xs} \\
+    & = &  \semFUN{\semess{E}{p}{w}{|t_0|}}{\semap{I}{t_0},q,|fx|}{cd}{hf}{|t_1|}
+   \hspace{1cm} \hfill p,w,j,z \not\in \freevars{t_0,t_1,h,f,xs} \\
    & \multicolumn{3}{l}{\hspace{6mm}\textbf{where}} \\
    & \multicolumn{3}{l}{\hspace{1cm}
 \begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
@@ -295,6 +295,9 @@ $$
               &&  \pomseq \semFUN{S}{xs,q,|fx|}{cd}{h_1f_1}{t_1} \\
               && \pomseq \semFUN{T}{xs,q,|fx|}{cd}{h_2f_2}{t_1} \\
               && \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
+
+% --------- FUNCTIONS ATTEMPT 1 ---------------
+ \text{Attempt OUROLD} \\
   \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
   &  = & \pomunit{
   \begin{array}[t]{@@{}l@@{\;}ll}
@@ -316,33 +319,51 @@ $$
   \end{array} \\
   }
   \\
-  \text{Attempt 2} \\
-  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
-  &  = & \pomunit{ \pomunions
-  \begin{array}[t]{@@{}l@@{\;}ll}
-    \{ & \conBrack{ h = \Fun{\pomunit{\hh}}, f = \Fun{\pomunit{\ff}}} \\
-    \vb & \exists \EV_1. \\
-    & \hh \in \pomFUN \\
-     , & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{c,d,u,v,xs\}) & \rulename{(f1)} \\
-     , & \Fun{\pomunit{\hh}} = \rho(h)  & \rulename{(f2)} \\
-     , & |if fx = eff succeeds|  & \rulename{(f3)} \\
-      & \hspace{2mm} |then| \; \dom(\hh) = \envlk{\EV'}{d} \\
-      & \hspace{2mm} |else| \; \dom(\hh) \subseteq \envlk{\EV'}{d}  \\
-     , & \pomunit{\EV_1} = \pomunit{\EV' \cap \conBrack{ \fpr{d}{u} \in hh }}
-                 \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f4)} \\
-     , & \pomempty = \pomunit{\EV' \cap \conBrack{ d \not\in \dom(hh) }}  \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f5)} \\
-     , & |let|\; \ff = \{ \fpr{\envlk{\rho_1}{c}}{\envlk{\rho_1}{v}} \vb \rho_1 \in \EV_1 \} & \rulename{(f6)}\\
-     , & \dom(\ff) = \{ \envlk{\rho'}{c} \vb \rho' \in \EV', \envlk{\rho'}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
-     , & isFunction(\ff) & \rulename{(f8)} \\
-     , & \Fun{\pomunit{\ff}} = \rho(f)  \} & \rulename{(f9)}
 
-  \end{array} \\
-  }
+% % --------- FUNCTIONS ATTEMPT 2 ---------------
+%  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+%  &  = & \pomunit{ \pomunions
+%  \begin{array}[t]{@@{}l@@{\;}ll}
+%    \{ & \conBrack{ h = \Fun{\pomunit{\hh}}, f = \Fun{\pomunit{\ff}}} \\
+%    \vb & \exists \EV_1. \\
+%    & \hh \in \pomFUN \\
+%     , & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{c,d,u,v,xs\}) & \rulename{(f1)} \\
+%     , & \Fun{\pomunit{\hh}} = \rho(h)  & \rulename{(f2)} \\
+%     , & |if fx = eff succeeds|  & \rulename{(f3)} \\
+%      & \hspace{2mm} |then| \; \dom(\hh) = \envlk{\EV'}{d} \\
+%      & \hspace{2mm} |else| \; \dom(\hh) \subseteq \envlk{\EV'}{d}  \\
+%     , & \pomunit{\EV_1} = \pomunit{\EV' \cap \conBrack{ \fpr{d}{u} \in hh }}
+%                 \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f4)} \\
+%     , & \pomempty = \pomunit{\EV' \cap \conBrack{ d \not\in \dom(hh) }}  \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f5)} \\
+%     , & |let|\; \ff = \{ \fpr{\envlk{\rho_1}{c}}{\envlk{\rho_1}{v}} \vb \rho_1 \in \EV_1 \} & \rulename{(f6)}\\
+%     , & \dom(\ff) = \{ \envlk{\rho'}{c} \vb \rho' \in \EV', \envlk{\rho'}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
+%     , & isFunction(\ff) & \rulename{(f8)} \\
+%     , & \Fun{\pomunit{\ff}} = \rho(f)  \} & \rulename{(f9)}
+% 
+%  \end{array} \\
+%  }
+% \\
+% --------- FUNCTIONS ATTEMPT 3 ---------------
+\text{Attempt OURNEW} \\
+  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+  &  = & \pomunit{
+  \begin{array}[t]{@@{}l@@{\;}ll}
+     \{ & \rho \in \Env \\
+     \vb & |let|\; \EV_0' = \EV_0 \cap (\rho \pomHIDE \{p,q,j,z,xs\}) & \rulename{(f1)} \\
+     , & \exists \EV_1. \pomunit{\EV_1} = \pomunit{\EV_0'} \pomseq \semess{E}{j}{z}{|t_1|} & \rulename{(f2)} \\
+     , & |fx = eff decides| \; \vee \; \EV_0'(p) = \EV_1(p)  & \rulename{(f3)} \\
+     , & \rho(f) = \Fun{ \pomunit{ \mkfunction \{ \fpr{ \rho_1(p)}{\rho_1(z)} \vb \rho_1 \in \EV_1 \} } }  & \rulename{(f4)} \\
+     , & \rho(h) = \Fun{ \pomunit{ \mkfunction \{ \fpr{ \rho_1(w)}{\rho_1(j)} \vb \rho_1 \in \EV_1 \} } }  & \rulename{(f5)} \\
+       \}
+
+  \end{array} \\ }
+
+
 \end{array}} \\
 \end{array}
 \\ \\
-\text{Note 1: for |eff succeeds|, \rulename{f5} is vacuously true } \\
-\text{Note 2: for |eff succeeds|, \rulename{f7} is equivalent to $\dom(\ff) = \envlk{\EV'}{c}$}
+% \text{Note 1: for |eff succeeds|, \rulename{f5} is vacuously true } \\
+% \text{Note 2: for |eff succeeds|, \rulename{f7} is equivalent to $\dom(\ff) = \envlk{\EV'}{c}$}
 
 \end{array}
 $$
