@@ -30,7 +30,7 @@ data EQD x a
   = TRUE
   | FALSE
   | IF x (Atom x a) (EQD x a) (EQD x a)
- deriving ( Eq, Ord, Show )
+ deriving ( Eq, Ord )
 
 invariant :: (Ord x, Ord a) => EQD x a -> Bool
 invariant t = check S.empty t
@@ -48,7 +48,6 @@ invariant t = check S.empty t
   xa <. IF y b _ _ = xa < (y,b)
   _  <. _          = True
 
-{-
 instance (Ord x, Show x, Ord a, Show a) => Show (EQD x a) where
   show t = case cubes t of
              [] -> "fail"
@@ -69,7 +68,6 @@ instance (Ord x, Show x, Ord a, Show a) => Show (EQD x a) where
       neg c = [ show l ++ "≠" ++ show r
               | (l,r,False) <- c
               ]
--}
 
 -----------------------------------------------------------------------
 -- raw operations, do not expose to the user
