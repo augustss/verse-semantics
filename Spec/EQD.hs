@@ -21,8 +21,8 @@ instance Show Var where show (Idf x) = x
 data Val = Int Int deriving ( Eq, Ord )
 instance Show Val where show (Int n) = show n
 instance Num Val where fromInteger n = Int (fromInteger n); (+)=undefined; (*)=undefined; abs=undefined; signum=undefined; negate=undefined
-x,y,z :: Var
-x = Idf "x"; y = Idf "y"; z = Idf "z"
+x,y,z :: Atom Var a
+x = Var (Idf "x"); y = Var (Idf "y"); z = Var (Idf "z")
 
 -----------------------------------------------------------------------
 
@@ -30,7 +30,7 @@ data EQD x a
   = TRUE
   | FALSE
   | IF x (Atom x a) (EQD x a) (EQD x a)
- deriving ( Eq, Ord )
+ deriving ( Eq, Ord, Show )
 
 invariant :: (Ord x, Ord a) => EQD x a -> Bool
 invariant t = check S.empty t
@@ -40,14 +40,15 @@ invariant t = check S.empty t
   check forb (IF x a yes no) =
        not (x `S.member` forb)
     && Var x > a
-    && (x,a) >. yes
-    && (x,a) >. no
+    && (x,a) <. yes
+    && (x,a) <. no
     && check (S.insert x forb) yes
     && check forb              no
 
-  xa >. IF y b _ _ = xa > (y,b)
-  _  >. _          = True
+  xa <. IF y b _ _ = xa < (y,b)
+  _  <. _          = True
 
+{-
 instance (Ord x, Show x, Ord a, Show a) => Show (EQD x a) where
   show t = case cubes t of
              [] -> "fail"
@@ -68,6 +69,7 @@ instance (Ord x, Show x, Ord a, Show a) => Show (EQD x a) where
       neg c = [ show l ++ "≠" ++ show r
               | (l,r,False) <- c
               ]
+-}
 
 -----------------------------------------------------------------------
 -- raw operations, do not expose to the user
@@ -80,7 +82,7 @@ mkIF x a yes no = mkIFxa (simp x a yes) no
    mkIFxa yes@(~(IF y b yes1 no1)) no@(~(IF z c yes2 no2))
      | yes==no      = yes
      | (x,a) =? no  = mkIFxa yes no2
-     -- make sure to choose the smallest one of the following two cases
+     -- TODO optimization: choose the smallest one of the following two cases
      | (x,a) >? yes = mkIF y b (mkIFxa yes1 no) (mkIFxa no1 no)
      | (x,a) >? no  = mkIF z c (mkIFxa yes yes2) (mkIFxa yes no2)
      | otherwise    = IF x a yes no
