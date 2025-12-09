@@ -120,11 +120,19 @@ qall :: (Ord x, Ord a) => x -> EQD x a -> EQD x a
 qall x TRUE            = TRUE
 qall x FALSE           = FALSE
 qall x (IF y a yes no)
-  | y==x || a==Var x   = yes' /\ no'
+  | y==x               = yes' /\ no'
+  | a==Var x           = ren x y yes /\ no'
   | otherwise          = mkIF y a yes' no'
  where
   yes' = qall x yes
   no'  = qall x no
+
+  ren x y FALSE           = FALSE
+  ren x y TRUE            = TRUE
+  ren x y (IF z a yes no) = mkIF (if z==x then y else z)
+                                 (if a==Var x then Var y else a)
+                                 (ren x y yes)
+                                 (ren x y no)
 
 nt :: EQD x a -> EQD x a
 nt FALSE           = TRUE
