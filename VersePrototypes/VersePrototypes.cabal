@@ -206,6 +206,7 @@ library verse-densem
                       PomPom
                       ValueP
                       ENVP
+                      EQD
     build-depends:    verse-libs,
                       base,
                       containers,
