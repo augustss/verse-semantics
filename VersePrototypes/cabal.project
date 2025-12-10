@@ -6,7 +6,3 @@ test-show-details: streaming
 
 library-profiling: False
 executable-profiling: False
-
-
-package *
-  ghc-options: -rtsopts -fprof-auto
