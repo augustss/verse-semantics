@@ -15,15 +15,6 @@ instance (Show x, Show a) => Show (Atom x a) where
   show (Val a) = show a
   show (Var x) = show x
 
--- only for local use
-data Var = Idf String deriving ( Eq, Ord )
-instance Show Var where show (Idf x) = x
-data Val = Int Int deriving ( Eq, Ord )
-instance Show Val where show (Int n) = show n
-instance Num Val where fromInteger n = Int (fromInteger n); (+)=undefined; (*)=undefined; abs=undefined; signum=undefined; negate=undefined
-x,y,z :: Atom Var a
-x = Var (Idf "x"); y = Var (Idf "y"); z = Var (Idf "z")
-
 -----------------------------------------------------------------------
 
 data EQD x a

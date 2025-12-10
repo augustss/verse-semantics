@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-x-partial -Wno-name-shadowing -Wno-incomplete-patterns -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-x-partial -Wno-name-shadowing -Wno-incomplete-patterns -Wno-unused-matches -Wno-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 #define DEBUG_SHOW 0
@@ -12,6 +12,76 @@ module ENVP(
   bigUnion, bigIntersect,
   extractVar,  -- dubious
   )where
+import qualified EQD
+import ValueP
+import Epic.Print(Pretty(..), text)
+import Debug.Trace
+
+#if 1
+trace2 msg f x y = f x y
+{-
+  trace ("EQD." ++ msg ++ show (x, y)) $
+  let r = f x y
+  in  trace ("EQD." ++ msg ++ show (x, y) ++ " = " ++ show r) r
+-}
+
+infix  5 .=, .=., ./=
+infixr 4 /\ -- dummy
+infixr 3 \/
+
+type ENV = EQD.EQD Ident Value
+
+instance Pretty ENV where
+  pPrintPrec _ p x = text $ showsPrec (floor p) x ""
+
+empty :: ENV
+empty = EQD.FALSE
+
+univ :: ENV
+univ = EQD.TRUE
+
+(/\) :: ENV -> ENV -> ENV
+(/\) = trace2 "/\\" (EQD./\)
+
+(\/) :: ENV -> ENV -> ENV
+(\/) = (EQD.\/)
+
+(\\\) :: ENV -> ENV -> ENV
+x \\\ y = x /\ compl y
+
+compl :: ENV -> ENV
+compl = EQD.nt
+
+(.=) :: Ident -> Value -> ENV
+x .= v = EQD.Var x EQD..=. EQD.Val v
+
+(./=) :: Ident -> Value -> ENV
+x ./= v = compl (x .= v)
+
+(.=.) :: Ident -> Ident -> ENV
+x .=. y = EQD.Var x EQD..=. EQD.Var y
+
+hide :: Ident -> ENV -> ENV
+hide = EQD.qexi
+
+hides :: [Ident] -> ENV -> ENV
+hides xs env = foldl' (flip hide) env xs
+
+bigUnion :: [ENV] -> ENV
+bigUnion = foldl' (\/) empty
+
+bigIntersect :: [ENV] -> ENV
+bigIntersect = foldl' (/\) univ
+
+-- highly dubious
+extractVar :: ENV -> Ident -> [Value]
+extractVar EQD.FALSE _ = []
+extractVar EQD.TRUE _ = []
+extractVar (EQD.IF x a l r) x'
+  | x == x' = (case a of EQD.Val v -> [v]; _ -> []) ++ extractVar r x'
+  | otherwise = extractVar l x' ++ extractVar r x'
+
+#else
 import Data.Function(on)
 import Data.List(intercalate, groupBy, foldl', sortBy)
 import Epic.Print(Pretty(..), text)
@@ -272,3 +342,4 @@ extractVar (OR cs) x = map extr cs
             [Ident _] -> error $ "extractVar: variable " ++ show x
             [Value v] -> v
             _ -> error $ "extractVar: conflicting values " ++ show x
+#endif
