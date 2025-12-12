@@ -1,0 +1,573 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+% -------------------------------------------------------------
+%               The Verse Monad
+% -------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{The Verse monad $\Vm{\cdot}$ comes equpped with the following operations} \\
+  \begin{array}{rcl}
+    \vmreturn & :: & a \rightarrow \Vm{a} \\
+    (\vmbind) & :: & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
+    \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
+    \vmseq    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} \\
+    \vmcat    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} \\
+    \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
+    \vmunion  & :: & \powerset{a} \rightarrow \Vm{a} \\
+  \end{array}
+  \\ \\
+  \textbf{Monad comprehensions} \\
+  \text{The Verse monad enjoys the usual monad-comprenension notation:} \\
+  \begin{array}{rcl}
+    \vmcompL e \vmcompR & = & \vmreturn(e) \\
+    \vmcompL e_1 \vb x \leftarrow e_2, \; Q \vmcompR & = & e_2 \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
+    \vmcompL e_1 \vb x \in e_2, \; Q \vmcompR & = & \vminject(e_2) \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
+  \end{array}
+\\ \\
+  \textbf{Derived functions} \\
+  \begin{array}{rcl}
+  (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
+  s \vmhide vs & = & \vmcompL \rho \vb \rho' \leftarrow s, \rho \in \Env, x \not\in vs \Rightarrow \rho(x) = \rho'(x) \vmcompR \\
+  \end{array}
+\end{array}
+$$
+\caption{The Verse monad}
+\end{figure}
+
+% -------------------------------------------------------------
+%               The ENV type and its operations
+% -------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+
+\textbf{Domains}\\
+\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
+  v \in & \Value & = & \Int(\Z) + \Fun(\F) \\\
+  & \F & = & \Vm{\semfcn}  & \text{Any invariants? e.g. disjoint domains} \\
+  \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Total: gives a value to every identifier} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \\
+  \{ \fpr{x_1}{y_1}, \mydots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+  & \text{Partial functions} \\
+\end{array} \\
+\\
+\textbf{The constraint language}\\
+\begin{array}{l@@{\;\;}rc@@{\;\;}ll}
+  \text{Simple values}    & a & ::= & |v| \vb |x| \vb op[a_1,\mydots,a_n] \vb |arr (a_0, xdots, a_n)| \\
+% \vb |truth a|\\
+  \text{Constraints} &  \EV & ::= & \conBrack{relop[a_1,\mydots,a_n]} \\
+   &  & \vb & \conBrack{ \fpr{x}{y} \in h } \vb \conBrack{ x \not\in \dom(h) }  & \text{where}\; h \in \semfcn \\
+%   &  & \vb & \conBrack{ \conFun{a_{arg}}{a_{res}}{a_{fun}}{i}{n}}  \\
+  &  & \vb & \conEmpty \vb \conUniv \\
+  &  & \vb & \EV_1 \cup \EV_2 \vb \EV_1 \cap \EV_2 \\
+  &  & \vb & \conCompl(\EV)  & \text{Complement} \\
+  &  & \vb & \HIDE{\EV}{xs} & \text{Hiding} \\
+  \text{Relational ops} &  relop & ::= & = \vb < \vb \leq \vb \geq \vb > \\
+  \text{Value ops} & op & ::= & + \vb - \vb * \vb / \\
+  & & \vb & \funcat \vb \tupcat  & \text{Function and tuple concatenation resp.} \\
+  & & \vb & \fununion & \text{Function/tuple union} \\
+\end{array}\\
+\\[-1mm]
+\textbf{Interpretation of simple values and constraints}\\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+  \sembrack{\EV} & : & \ENV \\
+  \sembrack{\conEmpty} & = & \{\} \\
+  \sembrack{\conUniv} & = & \Env   & \text{Set of all environments} \\
+  \sembrack{\conCompl(\EV)} & = & \complE( \sembrack{\EV} )\\
+  \sembrack{\HIDE{\EV}{xs}} & = & \{ \rho \in \Env \vb \exists \rho' \in \sembrack{\EV} .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
+  \sembrack{\EV_1 \cup \EV_2} & = & \sembrack{\EV_1} \cup \sembrack{\EV_2} \\
+  \sembrack{\EV_1 \cap \EV_2} & = & \sembrack{\EV_1} \cap \sembrack{\EV_2} \\
+  \sembrack{\conBrack{a_1=a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho = \semapp{A}{a_2}\rho \} \\
+  \sembrack{\conBrack{a_1>a_2}} & = & \{ \rho \in \Env \vb \semapp{A}{a_1}\rho > \semapp{A}{a_2}\rho \}
+      \hspace{4mm} \text{...and similarly other $relops$} \\
+  \sembrack{ \conBrack{\fpr{x}{y} \in h} } & = & \{ \rho \in \Env \vb \fpr{\rho(x)}{\rho(y)} \in h \} \\
+  \sembrack{ \conBrack{ x \not\in \dom(h) } } & = & \{ \rho \in \Env \vb \rho(x) \not\in \dom(h) \}
+\end{array} \\
+\\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\semapp{A}{|a|} & : & \parfun{\Env}{\Val} \\
+\semapp{A}{|x|}\rho & = & \rho(x) \\
+\semapp{A}{|v|}\rho & = & v \\
+%\semapp{A}{|o|}\rho & = & \semap{O}{o} \\
+\semapp{A}{|a_1 + a_2|}\rho & = & \Int(r_1 + r_2)
+  & \text{if $\Int(r_1)= \semapp{A}{a_1}\rho$ and
+     $\Int(r_2) = \semapp{A}{a_2}\rho$ } \\
+
+% \semapp{A}{|truth a|}\rho & = &  FUN [ \fpr{v}{v} ] \hspace{5mm} \text{where $v = \semapp{A}{a}\rho$} \\
+\semapp{A}{|a_1| \fununion |a_2|}\rho & = & \Fun(r_1 \pomunion r_2)
+    &\text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
+                      $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
+\semapp{A}{|a_1| \funcat |a_2|}\rho & = & \Fun(r_1 \pomcat r_2)
+    & \text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
+                      $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
+\semapp{A}{|a_1| \tupcat |a_2|}\rho & = & \Fun(\pomtupcat(r_1,r_2))
+    & \text{if $\Fun(r_1)= \semapp{A}{a_1}\rho$, $\Fun(r_2)= \semapp{A}{a_2}\rho$,
+                      $\pomdom(r_1)\cap \pomdom(r_2) = \emptyset$} \\
+\semapp{A}{|emptytup|}\rho & = & \Fun(\pomunit{ \pomempty } ) \\
+\semapp{A}{|arr (a_0, xdots, a_n)|}\rho
+  & = & \multicolumn{2}{@@{}l}{\Fun ( \; \pomunit{ \{ \fpr{0}{\semapp{A}{a_0}\rho} \}} \pomcat \ldots \pomcat
+            \pomunit{ \{ \fpr{n}{\semapp{A}{a_n}\rho} \}} \; )} \\
+% \semap{O}{|o|} & : & \Val \\
+% \semap{O}{|<=|} & = & \mul\Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,] \\[1mm]
+\end{array}\\
+\\[-1mm]
+\textbf{Semantic functions} \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}l}
+\text{Binders of block} & \semap{I}{|t|} & : & \powerset{\Ident} \\
+&  \semap{I}{|t|} & = & \text{the outer $\exists$-bound variables in |t|} \\[1mm]
+
+% \text{Tuple values} &  \tupE & : & [\Val] \rightarrow \Val \\
+% &  \tupE [v_0,\mydots,v_n] & = & \Fun \pomcompL \{ \fpr{i}{v_i} \} \vb i |<-| 0 \mycdots n \pomcompR
+%   \hspace{1cm} \text{So $\tupE [] = \Fun(\pomempty)$}
+\end{array} \\
+
+\end{array}
+$$
+\caption{Semantic domains and associated functions}\label{fig:densem-notation}
+\end{figure}
+
+
+% ------------------------------------------------------------------------------------
+%
+%            The semantics itself
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+  & \semess{E}{u}{v}{|t|} & : & \VmENV  \\
+
+% Wildcards and atoms
+\rulename{swild}  &  \semess{E}{u}{v}{|_|} & = & \vminject \conBrack{u =v} \\
+\rulename{svar}   &  \semess{E}{u}{v}{|x|} & = & \vminject \conBrack{u=v=x} \\
+\rulename{sconst} &  \semess{E}{u}{v}{|k|} & = & \vminject \conBrack{u=v=k}\\
+\rulename{sprim}  &  \semess{E}{u}{v}{|o|} & = & \vminject \conBrack{u=v=o} \\
+
+% Capture input and output
+\rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &
+   \vminject\conBrack{x=v} \pomseq \semess{E}{u}{v}{t} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+   \vminject\conBrack{x=u} \pomseq \semess{E}{u}{v}{t} \\
+
+% Tuples
+\multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}}
+  & = & (\vminject \conBrack{ u=|arr (u_1, xdots, u_n)|, v=|arr (v_1, xdots, v_n)|} \\
+  &&&   \; \vmseq \semess{E}{u_1}{v_1}{t_1}
+         \vmseq \mydots
+         \vmseq \semess{E}{u_n}{v_n}{t_n}) \\
+&&&      \vmhide { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \hfill u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v} \\
+
+% Choice and failure
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \vminject( \emptyset ) \hspace{6mm} \text{Or do we need a $\VmKw$ empty elt?} \\
+\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
+  & = & \semess{B}{u}{v}{t_1} \vmcat \semess{B}{u}{v}{t_2} \\
+\rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
+  & = & \semess{B}{u}{v}{t_1} \vmunion \semess{B}{u}{v}{t_2} \\
+
+% Unification
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \vmseq \semess{E}{u}{v}{t_2} \\
+
+% Sequencing
+\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \vmseq \semess{E}{u}{v}{t_2} \\
+% Dot-dot
+\rulename{sdotdot} &  \semess{E}{u}{v}{|t_1 ..  t_2|}
+  & = & \pomunit{\conBrack{u=v}} \pomseq \semess{E}{p_1}{q_1}{t_1} \pomseq \semess{E}{p_2}{q_2}{t_2} \pomseq \\
+  & & & \pomunions \{\;  \pomcats [ \conBrack{v=q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
+  & & & \pomHIDE \{p_1,q_1,p_2,q_2\} \hfill  p_1,q_1,p_2,q_2 \not\in \freevars{t_1,t_2,u,v} \\[1mm]
+
+% Application and type
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N t_1 t_2|}
+& = &  \pomunit{\conBrack{u=v}} \pomseq \semess{E}{f}{g}{t_1} \pomseq \semess{E}{p}{q}{t_2}
+\pomseq \semap{F}{|apply1N g q|}v  \\
+& & & \pomHIDE \{f,g,p,q\} \hfill f,g,p,q \not\in \freevars{t_1,t_2,u,v} \\[1mm]
+\rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \pomseq \semap{F}{|apply1N q u|}v
+  \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t,u,v} \\[1mm]
+
+% IF
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = & \begin{array}[t]{@@{\;}l@@{\,}l}
+        (S0 \pomseq \semess{B}{u}{v}{t_1} \pomHIDE xs)
+            \pomunion
+          (\pomNOT(S0 \pomHIDE xs) \pomseq \semess{B}{u}{v}{t_2}) \\
+        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
+      \end{array}
+\\[5mm]
+\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
+& = &  \semFOR{\semapp{C}{t_0}}{\semap{I}{t_0}}{u}{v}{t_1} \\[2mm]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       B, C, and F
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+& \semess{B}{u}{v}{|t|} & : & \VmENV \\
+& \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
+& \semapp{C}{|t|} & : & \VmENV \\
+& \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
+& \semap{F}{|apply1N f x|}r & : & \VmENV \\
+& \semap{F}{|apply1N f x|}r  & = &
+  \pomcompL  \conBrack{ f = \Fun(F) } \cap \conBrack{ \fpr{x}{r} \in h }\vb \Fun(F) \in \Val, \; h \leftarrow F \pomcompR
+\end{array} \\
+\\
+
+%% --------------- ONE -------------------------------
+\begin{array}{r@@{\;\;}c@@{\;\;}l}
+  \pomONE & : & \powerset{\Ident} \rightarrow \VmENV \rightarrow \VmENV
+       \hspace{5mm} \text{Result has no $(\pomcat)$}\\
+
+%   \pomONE( xs, \pomempty )  & = & \pomempty \\
+  \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
+  \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
+  \pomONE( xs, S \pomcat T )  & = & S1 \pomor ( \pomNOT(S1 \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
+                              & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
+
+%% --------------- FOR -------------------------------
+\semFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
+% \semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
+%                   \hfill \text{(NB: |for1 fail| returns empty tuple)} \\[1mm]
+\semFOR{S \pomunion T}{xs}{u}{v}{t_1}
+  & = & \semFOR{S}{xs}{u}{v}{t_1} \pomunion  \semFOR{T}{xs}{u}{v}{t_1} \\
+\text{or}  & = & \semFOR{S}{xs}{u}{v}{t_1} \pomor  \semFOR{T}{xs}{u}{v}{t_1} \\
+%                   & = & \pomunit{\conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2}}
+%                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
+%    &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
+%    && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
+\semFOR{S \pomcat T}{xs}{u}{v}{t_1}
+                   & = & \pomunit{\conBrack{u=u_1 \tupcat u_2, v=v_1 \tupcat v_2}}
+                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
+    &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
+    && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
+\semFOR{\pomunit{\EV}}{xs}{u}{v}{t_1}
+       &  = &  (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
+                  \pomseq \semess{B}{p}{q}{t_1}) \pomHIDE \{p,q,xs\}   \\
+ &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=v=|emptytup|}}  \hspace{6mm}  p,q \not\in \freevars{t_1,u,v,xs} \\
+\end{array}
+\end{array}
+$$
+\caption{E-POM: denotational semantics of Essential Verse, using pomsets}
+\label{fig:E-sls1}
+\end{figure}
+
+
+% --------------------------------------------
+%                Functions
+% --------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+                & \semess{E}{h}{f}{|t|} & : & \pomENV  \\
+  \rulename{sfun} &
+   \semess{E}{h}{f}{|functionOCX q t_0 fx t_1|}
+    & = &  \semFUN{\semess{E}{p}{w}{|t_0|}}{\semap{I}{t_0},q,|fx|}{cd}{hf}{|t_1|}
+   \hspace{1cm} \hfill p,w,j,z \not\in \freevars{t_0,t_1,h,f,xs} \\
+   & \multicolumn{3}{l}{\hspace{6mm}\textbf{where}} \\
+   & \multicolumn{3}{l}{\hspace{1cm}
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+
+  xs & = & \semap{I}{t_0} \\[1mm]
+  \semFUN{\_}{xs,q,|fx|}{cd}{hf}{t_1} & : & \pomENV \rightarrow \pomENV \\
+% &  \semFUN{\pomempty}{xs}{cd}{hf}{t_1} & = & \pomunit{\conBrack{h=f=\Fun(\pomempty)}} \\[1mm]
+% &  \semFUN{S \pomunion T}{xs}{cd}{hf}{t_1 } & = & \semFUN{S}{xs}{cd}{hf}{t_1} \pomunion \semFUN{T}{xs}{cd}{hf}{t_1} \\[1mm]
+
+  \semFUN{S \pomunion T}{xs,q,|fx|}{cd}{hf}{t_1}
+                   & = & \pomunit{\conBrack{h=h_1 \fununion h_2, f=f_1 \fununion f_2}}
+                   \hspace{6mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
+              &&  \pomseq \semFUN{S}{xs,q,|fx|}{cd}{h_1f_1}{t_1} \\
+              &&  \pomseq \semFUN{T}{xs,q,|fx|}{cd}{h_2f_2}{t_1} \\
+              && \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
+
+  \semFUN{S \pomcat T}{xs,q,|fx|}{cd}{hf}{t_1}
+                   & = & \pomunit{\conBrack{h=h_1 \funcat h_2, f=f_1 \funcat f_2}}
+                   \hspace{3mm} \hfill h_1,f_1,h_2,f_2 \not\in \freevars{t_1,h,f,xs} \\
+              &&  \pomseq \semFUN{S}{xs,q,|fx|}{cd}{h_1f_1}{t_1} \\
+              && \pomseq \semFUN{T}{xs,q,|fx|}{cd}{h_2f_2}{t_1} \\
+              && \pomHIDE \{h_1,f_1,h_2,f_2\} \\[1mm]
+
+% --------- FUNCTIONS ATTEMPT 1 ---------------
+ \text{Attempt OUROLD} \\
+  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+  &  = & \pomunit{
+  \begin{array}[t]{@@{}l@@{\;}ll}
+     \{ & \rho \in \Env \\
+     \vb & \exists \hh, \EV_1. \\
+     & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{c,d,u,v,xs\}) & \rulename{(f1)} \\
+     , & \Fun{\pomunit{\hh}} = \rho(h)  & \rulename{(f2)} \\
+     , & |if fx = eff succeeds|  & \rulename{(f3)} \\
+      & \hspace{2mm} |then| \; \dom(\hh) = \envlk{\EV'}{d} \\
+      & \hspace{2mm} |else| \; \dom(\hh) \subseteq \envlk{\EV'}{d}  \\
+     , & \pomunit{\EV_1} = \pomunit{\EV' \cap \conBrack{ \fpr{d}{u} \in hh }}
+                 \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f4)} \\
+     , & \pomempty = \pomunit{\EV' \cap \conBrack{ d \not\in \dom(hh) }}  \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f5)} \\
+     , & |let|\; \ff = \{ \fpr{\envlk{\rho_1}{c}}{\envlk{\rho_1}{v}} \vb \rho_1 \in \EV_1 \} & \rulename{(f6)}\\
+     , & \dom(\ff) = \{ \envlk{\rho'}{c} \vb \rho' \in \EV', \envlk{\rho'}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
+     , & isFunction(\ff) & \rulename{(f8)} \\
+     , & \Fun{\pomunit{\ff}} = \rho(f)  \} & \rulename{(f9)}
+
+  \end{array} \\
+  }
+  \\
+
+% % --------- FUNCTIONS ATTEMPT 2 ---------------
+%  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+%  &  = & \pomunit{ \pomunions
+%  \begin{array}[t]{@@{}l@@{\;}ll}
+%    \{ & \conBrack{ h = \Fun{\pomunit{\hh}}, f = \Fun{\pomunit{\ff}}} \\
+%    \vb & \exists \EV_1. \\
+%    & \hh \in \pomFUN \\
+%     , & |let|\; \EV' = \EV_0 \cap (\rho \pomHIDE \{c,d,u,v,xs\}) & \rulename{(f1)} \\
+%     , & \Fun{\pomunit{\hh}} = \rho(h)  & \rulename{(f2)} \\
+%     , & |if fx = eff succeeds|  & \rulename{(f3)} \\
+%      & \hspace{2mm} |then| \; \dom(\hh) = \envlk{\EV'}{d} \\
+%      & \hspace{2mm} |else| \; \dom(\hh) \subseteq \envlk{\EV'}{d}  \\
+%     , & \pomunit{\EV_1} = \pomunit{\EV' \cap \conBrack{ \fpr{d}{u} \in hh }}
+%                 \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f4)} \\
+%     , & \pomempty = \pomunit{\EV' \cap \conBrack{ d \not\in \dom(hh) }}  \pomseq \semess{E}{u}{v}{|t_1|} & \rulename{(f5)} \\
+%     , & |let|\; \ff = \{ \fpr{\envlk{\rho_1}{c}}{\envlk{\rho_1}{v}} \vb \rho_1 \in \EV_1 \} & \rulename{(f6)}\\
+%     , & \dom(\ff) = \{ \envlk{\rho'}{c} \vb \rho' \in \EV', \envlk{\rho'}{d} \in \dom(\hh) \} & \rulename{(f7)}\\
+%     , & isFunction(\ff) & \rulename{(f8)} \\
+%     , & \Fun{\pomunit{\ff}} = \rho(f)  \} & \rulename{(f9)}
+% 
+%  \end{array} \\
+%  }
+% \\
+% --------- FUNCTIONS ATTEMPT 3 ---------------
+\text{Attempt OURNEW} \\
+  \semFUN{\pomunit{\EV_0}}{xs}{cd}{hf}{t_1}
+  &  = & \pomunit{
+  \begin{array}[t]{@@{}l@@{\;}ll}
+     \{ & \rho \in \Env \\
+     \vb & |let|\; \EV_0' = \EV_0 \cap (\rho \pomHIDE \{p,q,j,z,xs\}) & \rulename{(f1)} \\
+     , & \exists \EV_1. \pomunit{\EV_1} = \pomunit{\EV_0'} \pomseq \semess{E}{j}{z}{|t_1|} & \rulename{(f2)} \\
+     , & |fx = eff decides| \; \vee \; \EV_0'(p) = \EV_1(p)  & \rulename{(f3)} \\
+     , & \rho(f) = \Fun{ \pomunit{ \mkfunction \{ \fpr{ \rho_1(p)}{\rho_1(z)} \vb \rho_1 \in \EV_1 \} } }  & \rulename{(f4)} \\
+     , & \rho(h) = \Fun{ \pomunit{ \mkfunction \{ \fpr{ \rho_1(w)}{\rho_1(j)} \vb \rho_1 \in \EV_1 \} } }  & \rulename{(f5)} \\
+       \}
+
+  \end{array} \\ }
+
+
+\end{array}} \\
+\end{array}
+\\ \\
+% \text{Note 1: for |eff succeeds|, \rulename{f5} is vacuously true } \\
+% \text{Note 2: for |eff succeeds|, \rulename{f7} is equivalent to $\dom(\ff) = \envlk{\EV'}{c}$}
+
+\end{array}
+$$
+\caption{E-POM: denotational semantics of Essential Verse: functions}
+\label{fig:E-sls-funs}
+\end{figure}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%     Commented out for now
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{comment}
+
+% ------------------------------------------------------------------------------------
+%
+%           The SL monad
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+  \multicolumn{1}{c}{\fbox{\parbox{8cm}{
+   \begin{center}
+      ${\bf type} \; \SL{A} = \powersetnp{\seq{A}}$ \\
+      \text{The set may be infinite, but the list is always finite}
+   \end{center}
+ }}} \\ \\
+
+\textbf{SL is an applicative functor} \\[1mm]
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+     \pureSL & : & \ENV \rightarrow \SL{\ENV}  \\
+     \pureSL( \EV ) & = & \{ [ \EV ] \} \\[1mm]
+
+\liftATwo & : & (A \rightarrow B \rightarrow C) \rightarrow \SL{A} \rightarrow \SL{B} \rightarrow\SL{C} \\
+\liftATwo(OP,S_1,S_2) & = &
+  \{ \; \concat(ss)
+     \begin{array}[t]{@@{}l@@{\;}l}
+     \vb & s_1 {:} \seq{A} \in S_1 \\
+     , & \letvar t {:} \seq{\SL{C}} = [\; \mapSL(OP(\EV,\_), S_2) \vb \EV |<-| s_1 \; ] \\
+     , & \letvar r {:} \SL{\seq{C}} = \pickE(t) \\
+     , & ss {:} \seq{\seq{C}} \in r \; \}
+     \end{array} \\
+     \\[-2mm]
+
+ (\seqSL) & : & \SL{\ENV} \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
+ E_1 \seqSL E_2 & = & \liftATwo(\, \cap, \, E_1, \, E_2 \, ) \\[1mm]
+ (\seqSLOne) & : & \ENV \rightarrow \SL{\ENV} \rightarrow \SL{\ENV} \\
+ \EV_1 \seqSLOne E_2 & = & \pureSL(\EV_1) \seqSL E_2 \\
+              & = & \mapSL(\;  \lambda \EV_2.\, \EV_1 \cap \EV_2, E_2 \;) \\[1mm]
+  \mapSL & : & (A \rightarrow B) \rightarrow \SL{A} \rightarrow \SL{B} \\
+  \mapSL(OP, E) & = & \{ \; [ OP( \EV) \vb \EV |<-| s ] \vb s \in E \; \} \\[1mm]
+(\HIDESkw) & : &  \SL{\ENV} \rightarrow \powerset{\Ident} \rightarrow \SL{\ENV} \\
+\HIDES{s}{xs} & = & \mapSL( \lambda \EV.\, \HIDE{\EV}{xs}, \; s) \\
+\end{array}
+\\
+\\
+\text{ \textbf{SL is also a monad (I think)} and bind is easier to think about than liftA2!} \\[1mm]
+\begin{array}{@@{}r@@{\;\;}c@@{\;\;}l}
+(\bindSL) & : & \SL{A} \rightarrow (A \rightarrow \SL{B}) \rightarrow \SL{B} \\
+S \bindSL K & = & \{ \; \concat(ss)
+\begin{array}[t]{@@{}l@@{\;}l}
+   \vb & s{:}[A] \in S \\
+   , & \letvar t {:} [\SL{C}] = [\, K(\EV) \vb \EV |<-| s\, ] \\
+   , & \letvar r {:} \SL{[C]} = \pickE(t) \\
+   , & ss{:}[[C]] \in r \; \}
+\end{array} \\
+& = & \{ \; \concat(ss) \vb s \in S, \; ss \in \pickE[\, K(\EV) \vb \EV |<-| s\, ] \; \} \hspace{3mm} \text{\emph{more compactly}}
+  \\[1mm]
+\liftATwo(OP,S_1, S_2) & = & \begin{array}[t]{@@{}l}
+  S_1 \bindSL (\lambda \EV_1. \\
+  S_2 \bindSL (\lambda \EV_2. \\
+  \pureSL( OP(\EV_1,\EV_2) )\,))
+  \end{array}
+\end{array} \\
+\\
+\parbox{8cm}{NB: this naive version of $\liftATwo$ is wrong:
+  $$\liftATwo(OP,S_1,S_2)
+  = \{ [ OP(\EV_1,\EV_2) \vb \EV_1 |<-| s_1, \EV_2 |<-| s_2 ] \vb s_1 \in S_1, s_2 \in S_2 \}$$
+...but there is no naive $\bindSL$.   True?}
+
+\end{array}
+$$
+\caption{The $\SL{A}$ applicative functor}
+\end{figure}
+
+% ------------------------------------------------------------------------------------
+%
+%           Denotational semantics of Essential Verse in SLS style
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+    & \semess{E}{u}{v}{|t|} & : & \SL{\Env} \\
+
+% Wildcards and atoms
+\rulename{swild}  &  \semess{E}{u}{v}{|_|} & = & \pureSL \conBrack{u =v} \\
+\rulename{svar}   &  \semess{E}{u}{v}{|x|} & = & \pureSL \conBrack{u=v=x} \\
+\rulename{sconst} &  \semess{E}{u}{v}{|k|} & = & \pureSL \conBrack{u=v=k} \\
+\rulename{sprim}  &  \semess{E}{u}{v}{|o|} & = & \pureSL \conBrack{u=v=o} \\
+
+% Capture input and output
+\rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &  \conBrack{x=v} \seqSLOne \semess{E}{u}{v}{t} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+   \conBrack{x=u} \seqSLOne \semess{E}{u}{v}{t} \\
+
+% Tuples
+\multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}}
+& = & \begin{array}[t]{@@{}l}
+         \conBrack{ u=|arr (u_1, xdots, u_n)|,
+                    v=|arr (v_1, xdots, v_n)|}
+         \seqSLOne \semess{E}{u_1}{v_1}{t_1}
+         \seqSL \mydots
+         \seqSL \semess{E}{u_n}{v_n}{t_n} \\
+         \HIDESkw { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \hspace{5mm} u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v}
+      \end{array} \\
+
+% Choice and failure
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \{ [ ] \} \\
+\rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
+  & = & \{ \; s_1 \append s_2 \vb s_1 \in \semess{B}{u}{v}{t_1}, s_2 \in \semess{B}{u}{v}{t_2} \; \} \\
+
+% Unification
+\rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \seqSL \semess{E}{u}{v}{t_2} \\
+
+% Sequencing
+\rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \seqSL \semess{E}{u}{v}{t_2} \\
+% Dot-dot
+\rulename{sdotdot} &  \semess{E}{u}{v}{|a_1 ..  a_2|}
+& = & \conBrack{u=v} \seqSLOne
+   \{  \; [\conBrack{v=a_1+i, i \leq a_2 - a_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \} \\
+
+% Application and type
+\rulename{sapp} & \semess{E}{u}{v}{|apply1N a_1 a_2|}
+ & = &  \conBrack{u=v} \seqSLOne \semap{F}{|apply1N a_1 a_2|}v \\
+\rulename{stype} &  \semess{E}{u}{v}{|:a|} & = & \semap{F}{|apply1N a u|}v  \\
+\\
+
+% IF
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = &   \bigcup\limits_{s_0 \in \semap{C}{|t_0|}}\left\{
+ \begin{array}{@@{\;}l@@{\,}l}
+(\HIDES{\EV_1 \seqSLOne \semess{B}{u}{v}{t_2})}{xs} \\
+\cup \\
+(\HIDE{\conCompl(\EV_1)}{xs}) \seqSLOne \semess{B}{u}{v}{t_3} \\
+ \textbf{where} \; \xs = \semap{I}{|t_0|}, \; \EV_1 = \firstE(xs,s_0)
+ \end{array}
+ \right\}
+\\ \\
+\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_1 t_2|}}
+& = &   \bigcup\limits_{s_0 \in \semap{C}{|t_0|}} \left\{
+ \begin{array}{@@{\;}l@@{\,}l}
+   \conBrack{ u=(u_1 \oplus \mydots \oplus u_n), v=(v_1 \oplus \mydots \oplus v_n)}
+   \seqSLOne D_1 \seqSL \mydots \seqSL D_n \\
+\hspace{5mm} \HIDESkw \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \\
+\textbf{where} \\
+\;  \begin{array}[t]{l}
+  \{u_1, \mydots, u_n, v_1, \mydots, v_n \} \not\in \freevars{u,v,t_0,t_1} \\
+  {} [\EV_1,\mydots,\EV_n] = s_0 \\
+  S1 = \semess{B}{p}{q}{t_1} \\
+  C_i = \begin{array}[t]{@@{}l}
+      \HIDES{(\EV_i \seqSLOne \conBrack{u_i=|arr p|, v_i=|arr q|} \seqSLOne S1)}{\{p,q\}} \\
+      \cup \\
+      \conCompl( \EV_i ) \seqSLOne \pureSL \conBrack{u_i=|arr ()|, v_i=|arr ()|}
+      \end{array} \\
+  D_i = \HIDES{C_i}{xs} \\ 
+  \xs = \semap{I}{|t_0|}
+ \end{array}
+ \end{array}
+ \right\}
+\end{array}
+\\
+
+\\
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       B, C, and F
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
+& \semess{B}{u}{v}{|t|} & : & \SL{ \ENV } \\
+& \semess{B}{u}{v}{|t|} & = & \HIDES{\semess{E}{u}{v}{e}}{\semapp{I}{|t|}} \\[1mm]
+& \semapp{C}{|t|} & : & \SL{ \ENV } \\
+& \semapp{C}{|t|} & = & \HIDES{\semess{E}{p}{q}{|t|}}{\{p,q\}} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+& \semap{F}{|apply1N a_1 a_2|}r & : & \SL{\ENV} \\
+& \semap{F}{|apply1N a_1 a_2|}r  & = &
+    \{ \ [ \; \conBrack{\conFun{a_2}{r}{a_1}{i}{n}} \vb i |<-| [0..n] \; ] \vb n \in \N
+      \; \}
+ \\[1.5ex]
+
+& \firstE & : & \powerset{\Ident} \rightarrow [\ENV] \rightarrow \ENV \\
+& \firstE(xs,\; []) & = & \{\} \\
+& \firstE(xs,\; \EV : s)  & = & \EV \cup (\firstE(xs, s) \cap \conCompl(\HIDE{\EV}{xs})) \\
+\end{array}
+\end{array}
+$$
+\caption{E-SLS: denotational semantics of Essential Verse, in SLS style}
+\label{fig:E-sls1}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%     End of commented out for now
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{comment}

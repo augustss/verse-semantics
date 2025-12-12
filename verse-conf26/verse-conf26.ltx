@@ -1,0 +1,58 @@
+\documentclass[acmsmall,screen,review,9pt]{acmart}\settopmatter{}
+
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+% Boxed figures
+\floatstyle{boxed}
+\restylefloat{figure}
+\usepackage{../LaTex/quiver}
+\usepackage{framed}
+\usepackage{amssymb}
+\usepackage{cleveref}   % \Cref etc
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{conteq}
+\usepackage{textgreek}
+\usepackage{xspace}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{multirow}
+\usepackage{makecell}
+\input{../LaTex/verse-macros}
+\input{macros}
+
+\begin{document}
+
+\title{The Verse Language: its type system and semantics}
+\author{Tim, Jan, Andy S, Simon, Lennart, Koen, Ranjit, Stephanie, Benjamin, \today}
+\maketitle
+
+% -------------------------------------------------------------
+%               Overview
+% -------------------------------------------------------------
+
+\section{Overview}
+
+
+% -------------------------------------------------------------
+%               Syntax
+% -------------------------------------------------------------
+
+\section{Syntax}
+
+\input{syntax}
+
+% -------------------------------------------------------------
+%               Syntax
+% -------------------------------------------------------------
+
+\section{Semantics}
+
+\input{densem}
+
+\end{document}

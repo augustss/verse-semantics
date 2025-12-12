@@ -1,0 +1,24 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\newcommand{\VmKw}{{\mathcal V}}
+\newcommand{\Vm}[1]{\VmKw(#1)}
+\newcommand{\VmENV}{\Vm{\Env}}   % Return type of E[e]uv
+
+\newcommand{\vmreturn}{\mathbf{return}}
+\newcommand{\vminject}{\mathbf{inject}}
+\newcommand{\vmbind}{|>>=|}
+\newcommand{\vmseq}{\,\star\,}
+\newcommand{\vmcat}{\append\,}
+\newcommand{\vmhide}{\;\backslash\!\backslash\;}
+\newcommand{\vmunion}{\mathbin{\mathaccent\cdot\cup}}
+
+% Monad-comprehension notation
+\newcommand{\vmcompL}{\{\!\mid}  % left bracket for V-monad comprehensions
+\newcommand{\vmcompR}{\mid\!\}}   % right bracket for V-monad comprehensions
+
+
+% --------- Domains -----------

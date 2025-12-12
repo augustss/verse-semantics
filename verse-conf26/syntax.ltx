@@ -1,0 +1,62 @@
+% ----------------------------------------------------
+%
+%            Essential Verse source language
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}
+$
+\begin{array}{l}
+
+\textbf{Syntax} \\
+\begin{array}{lrcll}
+\text{Variables} &  |x,y,f| &     \\
+
+\text{Constants} & |k| & ::= & \textit{integer constants} \\
+                 &     & \vb & \textit{string constants} \\
+\\
+\text{Terms} &  |t| & ::= & |_|                        & \text{Underscore} \\
+&      & \vb & |x|                        & \text{Variable} \\
+&      & \vb & |k|                        & \text{Constant} \\
+&      & \vb & |o|                        & \text{Primops} \\
+&      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
+&      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
+&      & \vb & |t_1 where t_2|             & \text{Reverse sequencing} \\
+&      & \vb & |t_1 = t_2|                 & \text{Unification} \\
+&      & \vb & |x := t|                    & \text{Definition; binds |x|} \\
+&      & \vb & |esssquig x t|              & \text{Capture input; binds |x|} \\
+&      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
+&      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+&      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
+&      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
+&      & \vb & |truth t|                  & \text{Truth value} \\
+&      & \vb & |functionOCX q t_1 fx t_2|  & \text{Function} \\
+&      & \vb & |: t|                      & \text{Range} \\
+% &      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
+% &      & \vb & |check fx t|                & \text{Effects check} \\
+\\
+\text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
+\text{Aperture} &  |q| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
+\end{array}\\
+\\
+\hline
+\\
+\textbf{Abbreviations} \\
+\begin{array}{rcll}
+|x : t| & \rightarrow  & |x := :t| \\
+|apply1 f t_1 := t_2| & \rightarrow  & |f := functionOCX closed t_1 succeeds t_2| \\
+|type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
+\end{array}
+
+\end{array}
+$
+\caption{Syntax of Verse} \label{fig:syntax}
+\end{figure}
+
+
