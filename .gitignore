@@ -82,3 +82,7 @@ Tsx/tests/failing-tests.parseset
 Tsx/analyze_all_verse.js
 Tsx/analyze_specific_patterns.js
 Tsx/analyze_verse_files.js
+verse-conf26/densem.tex
+verse-conf26/macros.tex
+verse-conf26/syntax.tex
+verse-conf26/verse-conf26.tex
