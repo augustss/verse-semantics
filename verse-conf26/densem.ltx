@@ -5,42 +5,6 @@
 %include ../LaTex/calculus.fmt
 
 % -------------------------------------------------------------
-%               The Verse Monad
-% -------------------------------------------------------------
-
-\begin{figure}
-$$
-\begin{array}{l}
-\text{The Verse monad $\Vm{\cdot}$ comes equpped with the following operations} \\
-  \begin{array}{rcl}
-    \vmreturn & :: & a \rightarrow \Vm{a} \\
-    (\vmbind) & :: & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
-    \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
-    \vmseq    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} \\
-    \vmcat    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} \\
-    \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
-    \vmunion  & :: & \powerset{a} \rightarrow \Vm{a} \\
-  \end{array}
-  \\ \\
-  \textbf{Monad comprehensions} \\
-  \text{The Verse monad enjoys the usual monad-comprenension notation:} \\
-  \begin{array}{rcl}
-    \vmcompL e \vmcompR & = & \vmreturn(e) \\
-    \vmcompL e_1 \vb x \leftarrow e_2, \; Q \vmcompR & = & e_2 \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
-    \vmcompL e_1 \vb x \in e_2, \; Q \vmcompR & = & \vminject(e_2) \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
-  \end{array}
-\\ \\
-  \textbf{Derived functions} \\
-  \begin{array}{rcl}
-  (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
-  s \vmhide vs & = & \vmcompL \rho \vb \rho' \leftarrow s, \rho \in \Env, x \not\in vs \Rightarrow \rho(x) = \rho'(x) \vmcompR \\
-  \end{array}
-\end{array}
-$$
-\caption{The Verse monad}
-\end{figure}
-
-% -------------------------------------------------------------
 %               The ENV type and its operations
 % -------------------------------------------------------------
 
@@ -135,6 +99,78 @@ $$
 \end{figure}
 
 
+% -------------------------------------------------------------
+%               The Verse Monad
+% -------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{The Verse monad $\Vm{\cdot}$ comes equipped with the following operations} \\
+  \begin{array}{rcll}
+    \vmempty & :: & \Vm{a} \\
+    \vmreturn & :: & a \rightarrow \Vm{a} \\
+%    (\vmbind) & :: & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
+    \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
+    \vmcat    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Ordered choice} \\
+    \vmseq    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set intersection}\\
+    \vminnerunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set union} \\
+    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
+    \vmunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Unordered choice}\\
+    \vmunions & :: & \powerset{\Vm{a}} \rightarrow \Vm{a}  & \text{Infinite unordered choice} \\
+    \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+    \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b})
+                          \rightarrow \Vm{b} \rightarrow \Vm{a} \rightarrow \Vm{b}} \\
+    \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \powerset{b}) \rightarrow \powerset{\Vm{a,b}} \\
+    \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
+    \vmnot      & :: & \Vm{a} \rightarrow \Vm{a}
+  \end{array}
+  \\ \\
+  \textbf{Desirable laws} \\
+  \begin{array}{rclcl}
+%     \vmempty \vmbind k & = & \vmempty \\
+     \vmempty \vmseq   s & = & \vmempty & = & s \vmseq \vmempty \\
+     \vmempty \vmcat   s & = & s        & = & s \vmcat \vmempty \\
+     \vmempty \vmunion s & = & s        & = & s \vmunion \vmempty \\
+     \vmcollapse(\vminject(s)) & = & s \\
+  \end{array}
+\\ \\
+%   \textbf{Monad comprehensions} \\
+%  \text{The Verse monad enjoys the usual monad-comprehension notation:} \\
+%  \begin{array}{rcl}
+%    \vmcompL e \vmcompR & = & \vmreturn(e) \\
+%    \vmcompL e_1 \vb e_2, \; Q \vmcompR
+%       & = & |if| \; e_2 \; |then| \; \vmcompL e_1 \vb Q \vmcompR \; |else|\; \vmempty \\
+%    \vmcompL e_1 \vb x \leftarrow e_2, \; Q \vmcompR & = & e_2 \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
+%    \vmcompL e_1 \vb x \in e_2, \; Q \vmcompR & = & \vminject(e_2) \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
+%  \end{array}
+% \\ \\
+  \textbf{Derived functions} \\
+  \begin{array}{rcl}
+    \vmflatmap & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+    \vmflatmap(f,s) & = & \vmflatten(\; \vmmap( f, s ) \; ) \\[1mm]
+    (\ENVhide) & :: & \powerset{\Env} \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
+    \rho{}s \ENVhide vs & = & \{ \rho' \in \Env \vb \exists \rho \in \rho{}s, \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
+    (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
+    s \vmhide vs & = & \vmflatmap (\; \lambda \rho. \{ \rho \} \ENVhide vs, \;s\; ) \\[1mm]
+    \vmone & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
+    \vmone( s, vs ) & = & \vmfold( op, \vminject\{\}, s ) \\
+    & \multicolumn{2}{l}{\text{where}} \\
+    && \begin{array}[t]{@@{}l}
+         op :: \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
+         op( \rho{}s, rest ) = \vminject( \rho{}s ) \vminnerunion (\vminject( \conCompl( \rho{}s \ENVhide vs )) \vmseq rest )
+       \end{array} \\
+\\
+    \vmconcat & :: & [\Vm{a}] \rightarrow \Vm{a} \\
+    \vmconcat(\, [] \, ) & = & \vmempty \\
+    \vmconcat(\, s:ss \, ) & = & s \vmcat \vmconcat(ss) \\
+    \end{array}
+
+\end{array}
+$$
+\caption{The Verse monad}
+\end{figure}
+
 % ------------------------------------------------------------------------------------
 %
 %            The semantics itself
@@ -169,7 +205,7 @@ $$
          \hfill u_i,v_i\not\in \freevars{t_1 \mydots t_n, u,v} \\
 
 % Choice and failure
-\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \vminject( \emptyset ) \hspace{6mm} \text{Or do we need a $\VmKw$ empty elt?} \\
+\rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \vmempty \\
 \rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
   & = & \semess{B}{u}{v}{t_1} \vmcat \semess{B}{u}{v}{t_2} \\
 \rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
@@ -182,31 +218,61 @@ $$
 \rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \vmseq \semess{E}{u}{v}{t_2} \\
 % Dot-dot
 \rulename{sdotdot} &  \semess{E}{u}{v}{|t_1 ..  t_2|}
-  & = & \pomunit{\conBrack{u=v}} \pomseq \semess{E}{p_1}{q_1}{t_1} \pomseq \semess{E}{p_2}{q_2}{t_2} \pomseq \\
-  & & & \pomunions \{\;  \pomcats [ \conBrack{v=q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
+  & = & \vminject \conBrack{u=v} \vmseq \semess{E}{p_1}{q_1}{t_1} \vmseq \semess{E}{p_2}{q_2}{t_2} \vmseq \\
+  & & & \vmunions \{\;  \vmconcat [ \vminject \conBrack{v=q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
   & & & \pomHIDE \{p_1,q_1,p_2,q_2\} \hfill  p_1,q_1,p_2,q_2 \not\in \freevars{t_1,t_2,u,v} \\[1mm]
 
 % Application and type
 \rulename{sapp} & \semess{E}{u}{v}{|apply1N t_1 t_2|}
-& = &  \pomunit{\conBrack{u=v}} \pomseq \semess{E}{f}{g}{t_1} \pomseq \semess{E}{p}{q}{t_2}
-\pomseq \semap{F}{|apply1N g q|}v  \\
-& & & \pomHIDE \{f,g,p,q\} \hfill f,g,p,q \not\in \freevars{t_1,t_2,u,v} \\[1mm]
-\rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \pomseq \semap{F}{|apply1N q u|}v
-  \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t,u,v} \\[1mm]
+& = &  \vminject \conBrack{u=v} \vmseq \semess{E}{f}{g}{t_1}
+       \vmseq \semess{E}{p}{q}{t_2}
+       \vmseq \semap{F}{|apply1N g q|}v  \\
+    & & & \vmhide \{f,g,p,q\} \hfill f,g,p,q \not\in \freevars{t_1,t_2,u,v} \\[1mm]
+\rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \vmseq \semap{F}{|apply1N q u|}v
+  \vmhide \{p,q\} \hfill p,q \not\in \freevars{t,u,v} \\[1mm]
 
 % IF
 \multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
   \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
 & = & \begin{array}[t]{@@{\;}l@@{\,}l}
-        (S0 \pomseq \semess{B}{u}{v}{t_1} \pomHIDE xs)
-            \pomunion
-          (\pomNOT(S0 \pomHIDE xs) \pomseq \semess{B}{u}{v}{t_2}) \\
-        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \pomONE( xs, \semap{C}{|t_0|} )
+        (S0 \vmseq \semess{B}{u}{v}{t_1} \vmhide xs)
+            \vmunion
+          (\vmnot(S0 \vmhide xs) \vmseq \semess{B}{u}{v}{t_2}) \\
+        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \vmone( \semap{C}{|t_0|}, xs )
       \end{array}
 \\[5mm]
-\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
-& = &  \semFOR{\semapp{C}{t_0}}{\semap{I}{t_0}}{u}{v}{t_1} \\[2mm]
 
+% FOR
+\multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
+& = &  \ldots \\[2mm]
+
+% FUNCTIONS
+  \rulename{sfun} &
+   \semess{E}{h}{f}{|functionOCX q t_a fx t_b|} \\
+   & \multicolumn{3}{l}{\;\; = \vminject \begin{array}[t]{@@{}l@@{\;}l}
+     \{  & \rho \in \Env \\
+     \vb & |let| \begin{array}[t]{l}
+       |dom|:\Vm{\Env} \\
+       |dom| = (\vminject\{ \rho \} \vmhide \semap{I}{|t_a|} \vmhide \{p,w\}) \vmseq \semess{E}{p}{w}{t_a}
+       \end{array} \\
+     , & |fun| : \Vm{\Val,\Val} \\
+       & |fun| \in \vmpi \begin{array}[t]{@@{}l@@{\;}l}
+               ( & \vmmap( \lambda \rho. \rho(p), |dom| ) \\
+       , & \lambda val . \bigcap \begin{array}[t]{@@{}l@@{\;}l}
+                            \{ & ((\{ \rho_0 \} \ENVhide \{j,z\} \ENVhide \semap{I}{t_b}) \cap \vmcollapse(\semess{E}{j}{z}{t_b}) \vmhide \semap{I}{t_a} \\
+                            \vb & \rho_0 \in \vmcollapse(|dom|), \envlk{\rho_0}{p} = val \; \} \; )
+                            \end{array}
+               \end{array} \\
+     , & |let| \begin{array}[t]{l}
+                   \ff, \hh :: \Vm{ \Val, \Val } \\
+                   \ff = \vmmap( \; \lambda (\_,\rho). (\envlk{\rho}{p}, \envlk{\rho}{z}),\; |fun|\; ) \\
+                   \hh = \vmmap( \; \lambda (\_,\rho). (\envlk{\rho}{w}, \envlk{\rho}{j}),\; |fun|\; ) \\
+                \end{array} \\
+     , & \envlk{\rho}{f} = \Fun(\ff) \\
+     , & \envlk{\rho}{h} = \Fun(\hh) \; \} \\
+  \end{array}
+  }
+   \\ \\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %       B, C, and F
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -216,42 +282,13 @@ $$
 & \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
 & \semap{F}{|apply1N f x|}r & : & \VmENV \\
 & \semap{F}{|apply1N f x|}r  & = &
-  \pomcompL  \conBrack{ f = \Fun(F) } \cap \conBrack{ \fpr{x}{r} \in h }\vb \Fun(F) \in \Val, \; h \leftarrow F \pomcompR
+\vmunions \begin{array}[t]{@@{}l}
+           \,\{ \; \vmflatmap(\; \lambda (p,q). \conBrack{ f = \Fun(\ff), x=p, y=q }, \ff \; )\\
+           \vb \Fun(\ff) \in \Val \; \}
+           \end{array}
 \end{array} \\
 \\
 
-%% --------------- ONE -------------------------------
-\begin{array}{r@@{\;\;}c@@{\;\;}l}
-  \pomONE & : & \powerset{\Ident} \rightarrow \VmENV \rightarrow \VmENV
-       \hspace{5mm} \text{Result has no $(\pomcat)$}\\
-
-%   \pomONE( xs, \pomempty )  & = & \pomempty \\
-  \pomONE( xs, \pomunit{\EV} )  &  = & \pomunit{\EV} \\
-  \pomONE( xs, S \pomunion T) & = & \pomONE(xs,S) \pomunion \pomONE(xs,T) \\
-  \pomONE( xs, S \pomcat T )  & = & S1 \pomor ( \pomNOT(S1 \pomHIDE xs) \pomseq \pomONE(xs, T)) \\
-                              & \multicolumn{2}{l}{\textbf{where}\; S1 = \pomONE(xs, S)} \\[1mm]
-
-%% --------------- FOR -------------------------------
-\semFOR{\_}{xs}{u}{v}{t_1} & : & \powerset{\Ident} \rightarrow \pomENV \rightarrow \pomENV \\
-% \semFOR{\pomempty}{xs}{u}{v}{t_1} & = & \pomunit{\conBrack{u=v=|emptytup|}}
-%                   \hfill \text{(NB: |for1 fail| returns empty tuple)} \\[1mm]
-\semFOR{S \pomunion T}{xs}{u}{v}{t_1}
-  & = & \semFOR{S}{xs}{u}{v}{t_1} \pomunion  \semFOR{T}{xs}{u}{v}{t_1} \\
-\text{or}  & = & \semFOR{S}{xs}{u}{v}{t_1} \pomor  \semFOR{T}{xs}{u}{v}{t_1} \\
-%                   & = & \pomunit{\conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2}}
-%                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
-%    &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
-%    && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
-\semFOR{S \pomcat T}{xs}{u}{v}{t_1}
-                   & = & \pomunit{\conBrack{u=u_1 \tupcat u_2, v=v_1 \tupcat v_2}}
-                   \hfill u_1,v_1,u_2,v_2 \not\in \freevars{t_1,u,v,xs} \\
-    &&  \pomseq \semFOR{S}{xs}{u_1}{v_1}{t_1} \pomseq \semFOR{T}{xs}{u_2}{v_2}{t_1} \\
-    && \pomHIDE \{u_1,v_1,u_2,v_2\} \\[1mm]
-\semFOR{\pomunit{\EV}}{xs}{u}{v}{t_1}
-       &  = &  (\pomunit{\EV} \pomseq \pomunit{\conBrack{u=|arr p|,v=|arr q|}}
-                  \pomseq \semess{B}{p}{q}{t_1}) \pomHIDE \{p,q,xs\}   \\
- &&  \pomunion \; \pomNOT(\pomunit{\EV} \pomHIDE xs) \pomseq \pomunit{\conBrack{u=v=|emptytup|}}  \hspace{6mm}  p,q \not\in \freevars{t_1,u,v,xs} \\
-\end{array}
 \end{array}
 $$
 \caption{E-POM: denotational semantics of Essential Verse, using pomsets}
