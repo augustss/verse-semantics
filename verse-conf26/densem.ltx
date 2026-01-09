@@ -115,13 +115,13 @@ $$
     \vminnerunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set union} \\
     \vmunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Unordered choice}\\
     \vmunions & :: & \powerset{\Vm{a}} \rightarrow \Vm{a}  & \text{Infinite unordered choice} \\
-    \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
-    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
+%    \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+    \vmmapset    & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+%    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
     \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b})
-                          \rightarrow \Vm{a} \rightarrow \Vm{b}} \\
-    \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \powerset{b}) \rightarrow \powerset{\Vm{a,b}} \\
+                          \rightarrow \Vm{a} \rightarrow \Vm{b}} \hspace{5mm} \text{Fold over choices} \\
+    \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{\Vm{\fpr{a}{b}}} \\
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
-    \vmnot      & :: & \Vm{a} \rightarrow \Vm{a}
   \end{array}
   \\ \\
   \textbf{Desirable laws} \\
@@ -145,12 +145,14 @@ $$
 % \\ \\
   \textbf{Derived functions} \\
   \begin{array}{rcl}
-    \vmflatmap & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
-    \vmflatmap(f,s) & = & \vmflatten(\; \vmmap( f, s ) \; ) \\[1mm]
-    (\ENVhide) & :: & \Env \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
-    \rho \ENVhide vs & = & \{ \rho' \in \Env \vb \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
+%     \vmflatmap & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+%     \vmflatmap(f,s) & = & \vmflatten(\; \vmmap( f, s ) \; ) \\[1mm]
+%    (\ENVhide) & :: & \Env \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
+%    \rho \ENVhide vs & = & \{ \rho' \in \Env \vb \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
     (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
-    s \vmhide vs & = & \vmflatmap (\; \lambda \rho. \rho\ENVhide vs, \;s\; ) \\[1mm]
+    s \vmhide vs & = & \vmmapset (\; \lambda \EV. \, \HIDE{\EV}{vs},\; s \;) \\[1mm]
+    \vmnot      & :: & \Vm{\Env} \rightarrow \Vm{\Env} \\
+    \vmnot(s) & = & \vminject( \conCompl( \vmcollapse(s))) \\
     \vmone & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
     \vmone( s, vs ) & = & \vmfold( op, s ) \\
     & \multicolumn{2}{l}{\text{where}} \\
@@ -179,24 +181,22 @@ $$
 $$
 \begin{array}{l}
   \begin{array}{rcll}
-    \multicolumn{3}{l}{|type| \Vm{a} = \powerset{a}} \\[2mm]
+    \multicolumn{3}{l}{|type|\; \Vm{a} = \powerset{a}} \\[2mm]
     \vmempty & = & \{\} \\
     \vminject(\EV) & = & \EV \\
     \vmcat(s,t)  & = & \text{Not possible in this instance} \\
+    \vmfold(k,s)   & = & \text{Not possible in this instance} \\
     \vmseq(s,t)   & =  & s \cap t \\
     \vminnerunion(s,t)  & = & s \cup t \\
     \vmunion(s,t)  & =  & s \cup t \\
     \vmunions(ss) & =  & \bigcup_{s \in ss}s \\
-    \vmmap(f,s)    & = & \{ f(x) \vb x \in s \} \\
-    \vmflatten(ss)  & = & \{ x \vb s \in ss, x \in s \} \\
-    \vmfold(k,z,s)   & = & ??? \\
+    \vmmapset(f,s)    & = & f(s) \\
     \vmpi & = & ??? \\
     \vmcollapse(s) & = & s \\
-    \vmnot(s)    & = &  ???
   \end{array}
   \\ \\
   \begin{array}{rcll}
-    \multicolumn{3}{l}{|type| \Vm{a} = \seq{\powerset{a}}} \\[2mm]
+    \multicolumn{3}{l}{|type|\; \Vm{a} = \seq{\powerset{a}}} \\[2mm]
     \vmempty & = & [\{\}] \\
     \vminject(\EV) & = & [\EV] \\
     \vmcat(s,t)  & = & s \append t \\
@@ -204,12 +204,12 @@ $$
     \vminnerunion(s,t)  & = & \text{Dodgy union} \\
     \vmunion(s,t)  & =  & \text{Dodgy union} \\
     \vmunions(ss) & =  & \text{Dodgy union} \\
-    \vmmap(f,s)    & = & [ \{ f(x) \vb x \in \EV \} \vb \EV \leftarrow s ]\\
-    \vmflatten(ss)  & = & \{ x \vb s \in ss, x \in s \} \\
-    \vmfold(k,z,s)   & = & ??? \\
+    \vmmapset(f,s)    & = & [ f(x) \vb x \in s ]\\
+    \vmfold(k,[])   & = & \vmempty \\
+    \vmfold(k,x{:}xs)   & = & k( x, \vmfold(k, xs)) \\
     \vmpi & = & ??? \\
-    \vmcollapse(s) & = & s \\
-    \vmnot(s)    & = &  ???
+    \vmcollapse([]) & = & \{\} \\
+    \vmcollapse( x{:}xs ) & = & x \cup \vmcollapse( xs )
   \end{array}
 
 \end{array}
@@ -318,19 +318,21 @@ $$
      , & \envlk{\rho}{h} = \Fun(\hh) \; \} \\
   \end{array}
   }
-   \\ \\
+\end{array}
+  \\ \\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %       B, C, and F
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-& \semess{B}{u}{v}{|t|} & : & \VmENV \\
-& \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
-& \semapp{C}{|t|} & : & \VmENV \\
-& \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
-& \semap{F}{|apply1N f x|}r & : & \VmENV \\
-& \semap{F}{|apply1N f x|}r  & = &
+\begin{array}{rcll}
+ \semess{B}{u}{v}{|t|} & : & \VmENV \\
+ \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
+ \semapp{C}{|t|} & : & \VmENV \\
+ \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+ \semap{F}{|apply1N f x|}r & : & \VmENV \\
+ \semap{F}{|apply1N f x|}r  & = &
 \vmunions \begin{array}[t]{@@{}l}
-           \,\{ \; \vmflatmap(\; \lambda (p,q). \conBrack{ f = \Fun(\ff), x=p, y=q }, \ff \; )\\
-           \vb \Fun(\ff) \in \Val \; \}
+           \,\{ \; \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; )\\
+           \vb \Fun(\ff : \Vm{\Val \times \Val} ) \in \Val \; \}
            \end{array}
 \end{array} \\
 \\
