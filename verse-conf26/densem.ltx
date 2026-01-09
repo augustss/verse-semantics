@@ -109,8 +109,6 @@ $$
 \text{The Verse computation type $\Vm{\cdot}$ comes equipped with the following operations} \\
   \begin{array}{rcll}
     \vmempty & :: & \Vm{a} \\
-    \vmreturn & :: & a \rightarrow \Vm{a} \\
-%    (\vmbind) & :: & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
     \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
     \vmcat    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Ordered choice} \\
     \vmseq    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set intersection}\\
@@ -119,8 +117,8 @@ $$
     \vmunions & :: & \powerset{\Vm{a}} \rightarrow \Vm{a}  & \text{Infinite unordered choice} \\
     \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
     \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
-    \vmfold   & :: & \multicolumn{2}{l}{(a \rightarrow \Vm{b} \rightarrow \Vm{b})
-                          \rightarrow \Vm{b} \rightarrow \Vm{a} \rightarrow \Vm{b}} \\
+    \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b})
+                          \rightarrow \Vm{a} \rightarrow \Vm{b}} \\
     \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \powerset{b}) \rightarrow \powerset{\Vm{a,b}} \\
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
     \vmnot      & :: & \Vm{a} \rightarrow \Vm{a}
@@ -154,11 +152,11 @@ $$
     (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
     s \vmhide vs & = & \vmflatmap (\; \lambda \rho. \rho\ENVhide vs, \;s\; ) \\[1mm]
     \vmone & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
-    \vmone( s, vs ) & = & \vmfold( op, \vminject\{\}, s ) \\
+    \vmone( s, vs ) & = & \vmfold( op, s ) \\
     & \multicolumn{2}{l}{\text{where}} \\
     && \begin{array}[t]{@@{}l}
-         op :: \Env \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
-         op( \rho, rest ) = \vminject \{ \rho \} \vminnerunion (\vminject( \conCompl( \rho \ENVhide vs )) \vmseq rest )
+         op :: \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
+         op( \EV, rest ) = \vminject(\EV) \vminnerunion (\vminject( \conCompl( \HIDE{\EV}{vs})) \vmseq rest )
        \end{array} \\
 \\
     \vmconcat & :: & [\Vm{a}] \rightarrow \Vm{a} \\
@@ -168,7 +166,55 @@ $$
 
 \end{array}
 $$
-\caption{The Verse monad}
+\caption{The Verse computation type}
+\end{figure}
+
+% ------------------------------------------------------------------------------------
+%
+%            Instances of the M
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+  \begin{array}{rcll}
+    \multicolumn{3}{l}{|type| \Vm{a} = \powerset{a}} \\[2mm]
+    \vmempty & = & \{\} \\
+    \vminject(\EV) & = & \EV \\
+    \vmcat(s,t)  & = & \text{Not possible in this instance} \\
+    \vmseq(s,t)   & =  & s \cap t \\
+    \vminnerunion(s,t)  & = & s \cup t \\
+    \vmunion(s,t)  & =  & s \cup t \\
+    \vmunions(ss) & =  & \bigcup_{s \in ss}s \\
+    \vmmap(f,s)    & = & \{ f(x) \vb x \in s \} \\
+    \vmflatten(ss)  & = & \{ x \vb s \in ss, x \in s \} \\
+    \vmfold(k,z,s)   & = & ??? \\
+    \vmpi & = & ??? \\
+    \vmcollapse(s) & = & s \\
+    \vmnot(s)    & = &  ???
+  \end{array}
+  \\ \\
+  \begin{array}{rcll}
+    \multicolumn{3}{l}{|type| \Vm{a} = \seq{\powerset{a}}} \\[2mm]
+    \vmempty & = & [\{\}] \\
+    \vminject(\EV) & = & [\EV] \\
+    \vmcat(s,t)  & = & s \append t \\
+    \vmseq(s,t)   & =  & [ \EV_1 \cap \EV_2 \vb \EV_1 \leftarrow s, \EV_2 \leftarrow t ] \\
+    \vminnerunion(s,t)  & = & \text{Dodgy union} \\
+    \vmunion(s,t)  & =  & \text{Dodgy union} \\
+    \vmunions(ss) & =  & \text{Dodgy union} \\
+    \vmmap(f,s)    & = & [ \{ f(x) \vb x \in \EV \} \vb \EV \leftarrow s ]\\
+    \vmflatten(ss)  & = & \{ x \vb s \in ss, x \in s \} \\
+    \vmfold(k,z,s)   & = & ??? \\
+    \vmpi & = & ??? \\
+    \vmcollapse(s) & = & s \\
+    \vmnot(s)    & = &  ???
+  \end{array}
+
+\end{array}
+$$
+\caption{Instances of the Verse computation type}
 \end{figure}
 
 % ------------------------------------------------------------------------------------
@@ -191,9 +237,9 @@ $$
 
 % Capture input and output
 \rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &
-   \vminject\conBrack{x=v} \pomseq \semess{E}{u}{v}{t} \\
+   \vminject\conBrack{x=v} \vmseq \semess{E}{u}{v}{t} \\
 \rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
-   \vminject\conBrack{x=u} \pomseq \semess{E}{u}{v}{t} \\
+   \vminject\conBrack{x=u} \vmseq \semess{E}{u}{v}{t} \\
 
 % Tuples
 \multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}}
