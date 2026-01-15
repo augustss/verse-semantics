@@ -18,7 +18,7 @@ $$
   & \F & = & \Vm{\Val,\Val}  & \text{Any invariants? e.g. disjoint domains} \\
   \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Total: gives a value to every identifier} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
-  \{ \fpr{x_1}{y_1}, \mydots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+  \{ \fpr{x_1}{y_1}, \mydots, \fpr{x_n}{y_n} \} \in & \PFUN & = & \parfun{\Value}{\Value} = \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
 \\
@@ -118,7 +118,7 @@ $$
 %    \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
     \vmmapset    & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
 %    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
-    \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b})
+    \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b}) \rightarrow \Vm{b}
                           \rightarrow \Vm{a} \rightarrow \Vm{b}} \hspace{5mm} \text{Fold over choices} \\
     \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{\Vm{\fpr{a}{b}}} \\
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
@@ -154,7 +154,7 @@ $$
     \vmnot      & :: & \Vm{\Env} \rightarrow \Vm{\Env} \\
     \vmnot(s) & = & \vminject( \conCompl( \vmcollapse(s))) \\
     \vmone & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
-    \vmone( s, vs ) & = & \vmfold( op, s ) \\
+    \vmone( s, vs ) & = & \vmfold( op, \vmempty, s ) \\
     & \multicolumn{2}{l}{\text{where}} \\
     && \begin{array}[t]{@@{}l}
          op :: \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
@@ -191,7 +191,7 @@ $$
     \vmunion(s,t)  & =  & s \cup t \\
     \vmunions(ss) & =  & \bigcup_{s \in ss}s \\
     \vmmapset(f,s)    & = & f(s) \\
-    \vmpi & = & ??? \\
+    \vmpi(s, F) & = & \{ g \in \PFUN \vb \forall (\fpr{x}{y}) \in g. \; x\in s \wedge y \in F(x) \} \\
     \vmcollapse(s) & = & s \\
   \end{array}
   \\ \\
@@ -201,17 +201,33 @@ $$
     \vminject(\EV) & = & [\EV] \\
     \vmcat(s,t)  & = & s \append t \\
     \vmseq(s,t)   & =  & [ \EV_1 \cap \EV_2 \vb \EV_1 \leftarrow s, \EV_2 \leftarrow t ] \\
-    \vminnerunion(s,t)  & = & \text{Dodgy union} \\
-    \vmunion(s,t)  & =  & \text{Dodgy union} \\
-    \vmunions(ss) & =  & \text{Dodgy union} \\
+    \vminnerunion(s,t)  & = & \dodgyunion(s,t) & \text{Dodgy union} \\
+    \vmunion(s,t)  & =  & \dodgyunion(s,t)  & \text{Dodgy union} \\
+    \vmunions(ss) & =  & \text{Infinite dodgy union?} \\
     \vmmapset(f,s)    & = & [ f(x) \vb x \in s ]\\
-    \vmfold(k,[])   & = & \vmempty \\
-    \vmfold(k,x{:}xs)   & = & k( x, \vmfold(k, xs)) \\
+    \vmfold(k,z,[])   & = & z \\
+    \vmfold(k,z, x{:}xs)   & = & k( x, \vmfold(k,z,xs)) \\
     \vmpi & = & ??? \\
     \vmcollapse([]) & = & \{\} \\
     \vmcollapse( x{:}xs ) & = & x \cup \vmcollapse( xs )
   \end{array}
-
+\\ \\
+  \begin{array}{rcll}
+    \multicolumn{3}{l}{|type|\; \Vm{a} = \pomunit{\powerset{a}} \vb (\Vm{a} \pomunion \Vm{a}) \vb (\Vm{a} \append \Vm{a})} \\[2mm]
+    (\treebind) & = & \Vm{a} \rightarrow (\powerset{a} \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
+    \vmempty & = & [\{\}] \\
+    \vminject(\EV) & = & [\EV] \\
+    \vmcat(s,t)  & = & s \append t \\
+    \vmseq(s,t)   & =  & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cap \EV_2\\ 
+    \vminnerunion(s,t)  & = & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cup \EV_2\\ 
+    \vmunion(s,t)  & =  & s \pomunion t \\
+    \vmunions(ss) & =  & ?? \\
+    \vmmapset(f,s)    & = & s \treebind \lambda \EV. \vminject( f(\EV) )\\
+    \vmfold(k,z,s)   & = & ?? \\
+    \vmpi & = & ??? \\
+    \vmcollapse([]) & = & \{\} \\
+    \vmcollapse( x{:}xs ) & = & x \cup \vmcollapse( xs )
+  \end{array}
 \end{array}
 $$
 \caption{Instances of the Verse computation type}
@@ -230,7 +246,8 @@ $$
   & \semess{E}{u}{v}{|t|} & : & \VmENV  \\
 
 % Wildcards and atoms
-\rulename{swild}  &  \semess{E}{u}{v}{|_|} & = & \vminject \conBrack{u =v} \\
+  \rulename{swild}  &  \semess{E}{u}{v}{|
+    _|} & = & \vminject \conBrack{u =v} \\
 \rulename{svar}   &  \semess{E}{u}{v}{|x|} & = & \vminject \conBrack{u=v=x} \\
 \rulename{sconst} &  \semess{E}{u}{v}{|k|} & = & \vminject \conBrack{u=v=k}\\
 \rulename{sprim}  &  \semess{E}{u}{v}{|o|} & = & \vminject \conBrack{u=v=o} \\
@@ -238,8 +255,8 @@ $$
 % Capture input and output
 \rulename{sbind} &  \semess{E}{u}{v}{|x:=t|} & = &
    \vminject\conBrack{x=v} \vmseq \semess{E}{u}{v}{t} \\
-\rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
-   \vminject\conBrack{x=u} \vmseq \semess{E}{u}{v}{t} \\
+% \rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+%    \vminject\conBrack{x=u} \vmseq \semess{E}{u}{v}{t} \\
 
 % Tuples
 \multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semess{E}{u}{v}{|array (t_1,xdots,t_n)|}}
@@ -257,8 +274,10 @@ $$
 \rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
   & = & \semess{B}{u}{v}{t_1} \vmunion \semess{B}{u}{v}{t_2} \\
 
-% Unification
+% Unification and matching
 \rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \vmseq \semess{E}{u}{v}{t_2} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|squig t_1 t_2|} & = &
+   (\semess{E}{u}{w}{t_1} \vmseq \semess{E}{w}{v}{t_2}) \vmhide \{w\} \hspace{10mm} w \not\in \freevars{t_1,t_2} \\
 
 % Sequencing
 \rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \vmseq \semess{E}{u}{v}{t_2} \\
@@ -288,10 +307,52 @@ $$
       \end{array}
 \\[5mm]
 
+\end{array}
+  \\ \\
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       B, C, and F
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{array}{rcll}
+ \semess{B}{u}{v}{|t|} & : & \VmENV \\
+ \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
+ \semapp{C}{|t|} & : & \VmENV \\
+ \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+ \semap{F}{|apply1N f x|}r & : & \VmENV \\
+ \semap{F}{|apply1N f x|}r  & = &
+\vmunions \begin{array}[t]{@@{}l}
+           \,\{ \; \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; )\\
+           \vb \Fun(\ff : \Vm{\Val \times \Val} ) \in \Val \; \}
+           \end{array}
+\end{array} \\
+\\
+
+\end{array}
+$$
+\caption{Denotational semantics of Essential Verse, Part 1}
+\label{fig:E-sls1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+
 % FOR
 \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
-& = &  \ldots \\[2mm]
+  & = & \vmfold ( op, z, \semapp{C}{|t_0|} ) \\
+  && \multicolumn{2}{l}{\textbf{where}} \\
+&&& \begin{array}[t]{@@{}r@@{\;}c@@{\;}l}
+      xs & = & \semap{I}{|t_0|} \\
+      S_1 & = & \semess{B}{p}{q}{|t_1|} \\
+      op & :: & \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
+      op(\EV, m) & = & \vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
+         & &  \vmseq ( (\vminject(\EV) \vmseq \conBrack{u_1=|arr p|,v_1=|arr q|} \vmseq S_1) \\
+         & & \hspace{5mm}  \vmunion (\vmnot( \vminject(\EV) \vmhide xs ) \vmseq \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
+      & & \vmseq (m \vmseq \conBrack{u=u_1, v=v_2}) \vmhide \{u,v\} \\
+      && \vmhide \{ u_1, u_2, v_1, v_2 \}
+    \end{array}
 
+\\
 % FUNCTIONS
 \multicolumn{3}{@@{}l}{\rulename{sfun} \; \hfill
    \semess{E}{h}{f}{|functionOCX q t_a fx t_b|}} \\
@@ -319,28 +380,8 @@ $$
   \end{array}
   }
 \end{array}
-  \\ \\
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%       B, C, and F
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{array}{rcll}
- \semess{B}{u}{v}{|t|} & : & \VmENV \\
- \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
- \semapp{C}{|t|} & : & \VmENV \\
- \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
- \semap{F}{|apply1N f x|}r & : & \VmENV \\
- \semap{F}{|apply1N f x|}r  & = &
-\vmunions \begin{array}[t]{@@{}l}
-           \,\{ \; \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; )\\
-           \vb \Fun(\ff : \Vm{\Val \times \Val} ) \in \Val \; \}
-           \end{array}
-\end{array} \\
-\\
-
 \end{array}
 $$
-\caption{E-POM: denotational semantics of Essential Verse, using pomsets}
+\caption{Denotational semantics of Essential Verse, Part 1}
 \label{fig:E-sls1}
 \end{figure}
-
-
