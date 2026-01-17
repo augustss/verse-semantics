@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wno-x-partial -Wno-name-shadowing -Wno-incomplete-patterns -Wno-unused-matches -Wno-orphans #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 #define DEBUG_SHOW 0
 module ENVP(
   ENV,
@@ -16,6 +18,7 @@ import qualified EQD
 import ValueP
 import Epic.Print(Pretty(..), text)
 import Debug.Trace
+import Data.List(foldl')
 
 #if 1
 trace2 msg f x y = f x y
