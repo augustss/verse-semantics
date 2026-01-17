@@ -46,11 +46,11 @@ jobs:
 
    steps:
     - uses: actions/checkout@v4
-    - name: Set up GHC ${{ matrix.ghc-version }}
+    - name: Set up GHC ${{ matrix.ghc }}
       uses: haskell-actions/setup@v2
       id: setup
       with:
-        ghc-version: ${{ matrix.ghc-version }}
+        ghc-version: ${{ matrix.ghc }}
         cabal-version: 'latest'
         cabal-update: true
 
@@ -90,21 +90,27 @@ jobs:
     - name: Test
       id: test
       working-directory: VersePrototypes
-      uses: actions/upload-artifact@v4
-      with:
-        name: test_pre
-        path: good-commit.txt
       run: |
         make test && git rev-parse HEAD > good-commit.txt
 
-    - name: Bisect on failure
+    - name: Upload good commit
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_pre
+        path: VersePrototypes/good-commit.txt
+
+    - name: Download last good commit
       if: failure()
       uses: actions/download-artifact@v4
       with:
         name: test_pre
+
+    - name: Bisect on failure
+      if: failure()
       working-directory: VersePrototypes
       run: |
         git bisect start
         git bisect bad HEAD
-        git bisect good `cat good-commit.txt`
+        git bisect good `cat ../good-commit.txt`
         git bisect run bash -c "set -e; make profile"

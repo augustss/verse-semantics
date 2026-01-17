@@ -16,4 +16,4 @@ $(PAPER).pdf: $(PAPERSRC)
 	lhs2TeX $< > $@
 
 clean:
-	-rm -f verse-*.tex syntax.tex densem.tex
+	-rm -f verse-*.tex syntax.tex densem.tex  *.log *.out *.aux
