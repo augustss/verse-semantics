@@ -18,6 +18,8 @@
 % \newcommand{\vcshort}{VC\xspace}
 \newcommand{\vcname}{Verse Calculus\xspace}
 
+\renewcommand{\boxed}[1]{\text{\fboxsep=0.2mm\fbox{$\displaystyle#1$}}}
+
 % Right arrow for rewrites
 \newcommand{\movesto}{\longrightarrow}
 \newcommand{\movesfrom}{\longleftarrow}
@@ -310,10 +312,10 @@
 \newcommand{\pomENV}{\mathbf{PENV}}
 \newcommand{\pomFUN}{\mathbf{PFUN}}
 \newcommand{\pomempty}{\emptyset}
-\newcommand{\pomunion}{\mathbin{\mathaccent\cdot\cup}}
+\newcommand{\pomunion}{\,\boxed{\mathbin{\mathaccent\cdot\cup}}\,}
 \newcommand{\pomelem}{\Yleft}
 \newcommand{\pomunions}{\mathit{UNION}}
-\newcommand{\pomcat}{\append\,}
+\newcommand{\pomcat}{\,\boxed{\append}\,}
 \newcommand{\mkpomcat}{\append^{\!\!*}\,}
 \newcommand{\mkpomunion}{\pomunion^{*}}
 \newcommand{\pomcats}{\mathit{CONC}}

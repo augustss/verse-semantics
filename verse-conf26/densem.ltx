@@ -15,7 +15,7 @@ $$
 \textbf{Domains}\\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   v \in & \Value & = & \Int(\Z) + \Fun(\F) \\\
-  & \F & = & \Vm{\Val,\Val}  & \text{Any invariants? e.g. disjoint domains} \\
+  & \F & = & \Vm{\Val \times \Val}  & \text{Any invariants? e.g. disjoint domains} \\
   \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Total: gives a value to every identifier} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
   \{ \fpr{x_1}{y_1}, \mydots, \fpr{x_n}{y_n} \} \in & \PFUN & = & \parfun{\Value}{\Value} = \powerset{ \Val \times \Val }
@@ -179,7 +179,8 @@ $$
 
 \begin{figure}
 $$
-\begin{array}{l}
+  \begin{array}{l}
+  \textbf{Set semantics}\\
   \begin{array}{rcll}
     \multicolumn{3}{l}{|type|\; \Vm{a} = \powerset{a}} \\[2mm]
     \vmempty & = & \{\} \\
@@ -195,6 +196,8 @@ $$
     \vmcollapse(s) & = & s \\
   \end{array}
   \\ \\
+
+  \textbf{List-of-set semantics}\\
   \begin{array}{rcll}
     \multicolumn{3}{l}{|type|\; \Vm{a} = \seq{\powerset{a}}} \\[2mm]
     \vmempty & = & [\{\}] \\
@@ -212,14 +215,18 @@ $$
     \vmcollapse( x{:}xs ) & = & x \cup \vmcollapse( xs )
   \end{array}
 \\ \\
+  \textbf{Tree semantics}\\
   \begin{array}{rcll}
-    \multicolumn{3}{l}{|type|\; \Vm{a} = \pomunit{\powerset{a}} \vb (\Vm{a} \pomunion \Vm{a}) \vb (\Vm{a} \append \Vm{a})} \\[2mm]
+    \multicolumn{3}{l}{|type|\; \Vm{a} = \pomunit{\powerset{a}} \;
+      \vb \; \Vm{a} \pomunion \Vm{a} \;
+      \vb \; \Vm{a} \pomcat \Vm{a}
+    } \\[2mm]
     (\treebind) & = & \Vm{a} \rightarrow (\powerset{a} \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
     \vmempty & = & [\{\}] \\
     \vminject(\EV) & = & [\EV] \\
-    \vmcat(s,t)  & = & s \append t \\
-    \vmseq(s,t)   & =  & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cap \EV_2\\ 
-    \vminnerunion(s,t)  & = & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cup \EV_2\\ 
+    \vmcat(s,t)  & = & s \pomcat t \\
+    \vmseq(s,t)   & =  & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cap \EV_2\\
+    \vminnerunion(s,t)  & = & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cup \EV_2\\
     \vmunion(s,t)  & =  & s \pomunion t \\
     \vmunions(ss) & =  & ?? \\
     \vmmapset(f,s)    & = & s \treebind \lambda \EV. \vminject( f(\EV) )\\
@@ -276,8 +283,8 @@ $$
 
 % Unification and matching
 \rulename{sunify} &  \semess{E}{u}{v}{|t_1 == t_2|} & = &   \semess{E}{u}{v} {t_1} \vmseq \semess{E}{u}{v}{t_2} \\
-\rulename{ssquig} &  \semess{E}{u}{v}{|squig t_1 t_2|} & = &
-   (\semess{E}{u}{w}{t_1} \vmseq \semess{E}{w}{v}{t_2}) \vmhide \{w\} \hspace{10mm} w \not\in \freevars{t_1,t_2} \\
+\rulename{ssquig} &  \semess{E}{u}{v}{|matches t_1 t_2|} & = &
+   (\semess{E}{u}{w}{t_1} \vmseq \semess{E}{w}{v}{t_2}) \vmhide \{w\} \hfill w \not\in \freevars{t_1,t_2,u,v} \\
 
 % Sequencing
 \rulename{sseq} &  \semess{E}{u}{v}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \vmseq \semess{E}{u}{v}{t_2} \\
@@ -296,17 +303,6 @@ $$
 \rulename{stype} &  \semess{E}{u}{v}{|:t|} & = & \semess{E}{p}{q}{t} \vmseq \semap{F}{|apply1N q u|}v
   \vmhide \{p,q\} \hfill p,q \not\in \freevars{t,u,v} \\[1mm]
 
-% IF
-\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
-  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
-& = & \begin{array}[t]{@@{\;}l@@{\,}l}
-        (S0 \vmseq \semess{B}{u}{v}{t_1} \vmhide xs)
-            \vmunion
-          (\vmnot(S0 \vmhide xs) \vmseq \semess{B}{u}{v}{t_2}) \\
-        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S0 = \vmone( \semap{C}{|t_0|}, xs )
-      \end{array}
-\\[5mm]
-
 \end{array}
   \\ \\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -314,9 +310,9 @@ $$
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{array}{rcll}
  \semess{B}{u}{v}{|t|} & : & \VmENV \\
- \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{e} \pomHIDE \semapp{I}{|t|} \\[1mm]
+ \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{t} \pomHIDE \semapp{I}{|t|} \\[1mm]
  \semapp{C}{|t|} & : & \VmENV \\
- \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hspace{5mm} p,q \not\in \freevars{t}\\[1mm]
+ \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
  \semap{F}{|apply1N f x|}r & : & \VmENV \\
  \semap{F}{|apply1N f x|}r  & = &
 \vmunions \begin{array}[t]{@@{}l}
@@ -337,18 +333,32 @@ $$
 \begin{array}{l}
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
 
+% IF
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = & \begin{array}[t]{@@{\;}l@@{\,}l}
+        (S_0 \vmseq \semess{B}{u}{v}{t_1} \vmhide xs)
+            \vmunion
+          (\vmnot(S_0 \vmhide xs) \vmseq \semess{B}{u}{v}{t_2}) \\
+        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; S_0 = \vmone( \semap{C}{|t_0|}, xs )
+      \end{array}
+\\[5mm]
+
 % FOR
 \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
   & = & \vmfold ( op, z, \semapp{C}{|t_0|} ) \\
-  && \multicolumn{2}{l}{\textbf{where}} \\
+&& \multicolumn{2}{@@{}l}{\textbf{where} \hfill
+       u_1,u_2,v_1,v_2 \not\in \freevars{t_0,t_1,u,v}}\\
 &&& \begin{array}[t]{@@{}r@@{\;}c@@{\;}l}
       xs & = & \semap{I}{|t_0|} \\
-      S_1 & = & \semess{B}{p}{q}{|t_1|} \\
+      S_1 :: \Vm{\Env} & = & \semess{B}{p}{q}{|t_1|} \\
+      z :: \Vm{\Env} & = & \vminject \conBrack{u=|emptytup|,v=|emptytup|}  \\
       op & :: & \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
-      op(\EV, m) & = & \vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
-         & &  \vmseq ( (\vminject(\EV) \vmseq \conBrack{u_1=|arr p|,v_1=|arr q|} \vmseq S_1) \\
-         & & \hspace{5mm}  \vmunion (\vmnot( \vminject(\EV) \vmhide xs ) \vmseq \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
-      & & \vmseq (m \vmseq \conBrack{u=u_1, v=v_2}) \vmhide \{u,v\} \\
+      op(\EV, m) & = & (\vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
+         & &  \vmseq ( (\vminject(\EV)  \vmseq S_1 \vmseq \conBrack{u_1=|arr p|,v_1=|arr q|}) \\
+      & & \hspace{5mm}  \vmunion (\vminject(\conCompl(\EV \vmhide xs) ) \vmseq
+                         \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
+      & & \vmseq ((m \vmseq \conBrack{u=u_2, v=v_2}) \vmhide \{u,v\} ) \\
       && \vmhide \{ u_1, u_2, v_1, v_2 \}
     \end{array}
 
@@ -382,6 +392,6 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Denotational semantics of Essential Verse, Part 1}
+\caption{Denotational semantics of Essential Verse, Part 2}
 \label{fig:E-sls1}
 \end{figure}
