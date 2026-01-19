@@ -209,20 +209,21 @@ $$
   \end{array}
   \\ \\
 
-  \text{The Verse sequence type $\VmSeq{\cdot}$ comes equipped with the following operations} \\
+  \text{The Verse sequence monad $\VmSeq{\cdot}$ comes equipped with the following operations} \\
   \begin{array}{rcll}
     \seqappend & :: & \VmSeq{a} \rightarrow \VmSeq{a} \rightarrow \VmSeq{a} \\
     \sequnit & :: & a \rightarrow \VmSeq{a} \\
     (\seqbind) & :: & \VmSeq{a} \rightarrow (a \rightarrow \VmSeq{b} \rightarrow \VmSeq{b} \\
     \seqfold & :: & (a \rightarrow b \rightarrow b) \rightarrow b \rightarrow \VmSeq{a} \rightarrow  b \\
     \seqzip & :: & (a \rightarrow a \rightarrow a) \rightarrow \powerset{\VmSeq{a}} \rightarrow  \VmSeq{a}
+      & \text{Dodgy-zip of infinite set}
   \end{array}
 \\ \\
 
   \textbf{Sequence-of-set semantics}\\
   \begin{array}{rcll}
     \multicolumn{3}{l}{|type|\; \Vm{a} = \VmSeq{\powerset{a}}} \\[2mm]
-    \vmempty & = & [\{\}] \\
+    \vmempty & = & \sequnit( \{\} ) \\
     \vminject(\EV) & = & \sequnit(\EV) \\
     s \vmcat t  & = & \seqappend( s, t ) \\
     \vmseq(s,t)   & =  & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \EV_1 \cap \EV_2\\
