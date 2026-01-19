@@ -4,6 +4,18 @@
 %include forall.fmt
 %include ../LaTex/calculus.fmt
 
+% --------------- Sequences, S ------------
+\newcommand{\VmSeqKw}{{\mathcal S}}
+\newcommand{\VmSeq}[1]{\VmSeqKw(#1)}
+
+\newcommand{\seqappend}{\mathbf{append}_{\scriptsize s}}
+\newcommand{\seqbind}{{|>>=|_{\scriptsize s}}}
+\newcommand{\sequnit}{\mathbf{unit}_{\scriptsize s}}
+\newcommand{\seqfold}{\mathbf{fold}_{\scriptsize s}}
+\newcommand{\seqzip}{\mathbf{dzip}_{\scriptsize s}}    % Dodgy zip
+
+
+% --------------- Verse computation type, M ------------
 \newcommand{\VmKw}{{\mathcal M}}
 \newcommand{\Vm}[1]{\VmKw(#1)}
 \newcommand{\VmENV}{\Vm{\Env}}   % Return type of E[e]uv
@@ -13,7 +25,7 @@
 \newcommand{\vminject}{\mathbf{inj}}
 \newcommand{\vmbind}{|>>=|}
 \newcommand{\vmcat}{\append\,}
-\newcommand{\vmhide}{\;\backslash\!\backslash\;}
+\newcommand{\vmhide}{\;\backslash\!\backslash\!\backslash\;}
 \newcommand{\ENVhide}{\;\backslash\;}
 \newcommand{\vmunion}{\mathrel{\vcenter{\offinterlineskip \hbox{$\cup$}\vskip-1ex\hbox{\hskip.4ex $\cdot$}}}}
 \newcommand{\vminnerunion}{\mathrel{\vcenter{\offinterlineskip \hbox{$\cup$}\vskip-1.3ex\hbox{\tiny \hskip.55ex $\star$}}}}
@@ -28,6 +40,7 @@
 \newcommand{\vmone}{\mathbf{one}}
 \newcommand{\vmflatmap}{\mathbf{flatmap}}
 \newcommand{\vmcollapse}{\mathbf{collapse}}
+\newcommand{\vmprune}{\mathbf{prune}}
 \newcommand{\vmpi}{\Pi_m}
 
 % Tree semantics

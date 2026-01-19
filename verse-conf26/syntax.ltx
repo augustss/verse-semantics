@@ -54,6 +54,7 @@ $
 |t_1 : t_2 := t_3| & \rightarrow  & |t_1 := apply1N t_2 t_3| \\
 |squig x t_1 := t_2| & \rightarrow  & |x:any; t_1 := matches x t_2| \\
 |apply1 t_1 t_2 := t_3| & \rightarrow  & |t_1 := functionOCX open t_2 succeeds t_3| \\
+|apply1 t_1 t_2 (eff oc) (eff fx) := t_3| & \rightarrow  & |t_1 := functionOCX oc t_2 fx t_3| \\
 |type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
 \end{array}
 
