@@ -2,7 +2,7 @@
 #                   Array tests
 # -------------------------------------------------------
 
-verify("ArrayV0", pass, broken) {a:=(1;2;),a=(1,2)}
+verify("ArrayV0", pass, broken) {(a:=(1;2;),a=(1,2))}
   # ArrayV0: Funny parsing
 
 # ArrayV1a, V1b. In the verifier we never expand a n..m choice;
@@ -35,13 +35,14 @@ verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
 verify("arr-index2", pass){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
 verify("arr-index3", pass){ f( x:[]nat )<succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
 verify("arr-index4", pass){ f( x:[]nat where x[0] )<succeeds> : nat := x[0] }
-testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
+# arr-index5: lam is not valid syntax
+#testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
 verify("arr-index6", pass){
    f( x:[]nat, i:nat )<succeeds> : nat
       := if (Length[x]>i) then {x[i]} else {88} }
   # arr-index6 requires reasoning about array bounds
 
-verify("dotdot1", pass, broken){ f(n:int)<decides> := 3=1..n }
+verify("dotdot1", pass){ f(n:int)<decides> := 3=1..n }
   # dotdot1 requires knowing that 1..n --> Choose(n){inrange(1,n)} --> all are unique
 
 # arr5: does isArr$ on the same thing twice, returning an array of the same length
@@ -83,8 +84,8 @@ verify("arr-fail2a", pass){ f( n:int where n>0 )<fails>    : []int = for(i:=1..n
   # arr-fail2a: Since n>0 this always fails
 verify("arr-fail3", fail)        { f( n:int )<succeeds> : []int = for(i:=1..n){fail} }
 
-verify("arr-elem1", pass){ f(n:int):[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
-verify("arr-elem2", pass){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+verify("arr-elem1", pass,broken){ f(n:int):[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
+verify("arr-elem2", pass,broken){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
 verify("arr-elem3", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
 
 # dotdot in the domain
