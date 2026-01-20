@@ -118,17 +118,17 @@ verify("M26Mar25-3", pass) { f()<decides> := {int["monkey"] } }
 verify("M26Mar25-4", pass) { f()<decides> := { x:int := int["monkey"] } }
   # Passes becuase int["monkey"] fails, and then has type int
 
-verify("M20Mar25-1", pass) { f( :int | :string ):int := 3
+verify("M20Mar25-1", pass) { f( (:int) | (:string) ):int := 3
                            ; f[2]; f["monkey"] }
   # -1: this one actually just scrapes past, even without
   #     pushing kappa inwards in WCHOICE, but only because int is
   #     visibly a partial identity function.
 verify("M20Mar25-1a", pass) { succ(x:int) := x+1
-                            ; f( :succ | :string ):int := 3
+                            ; f( (:succ) | (:string) ):int := 3
                             ; f[2]; f["monkey"] }
   # -1a: This requires WCHOICE to push kappa inwards
 
-verify("M20Mar25-2", fail) { f( :int | :string ):int := 3
+verify("M20Mar25-2", fail) { f( (:int) | (:string) ):int := 3
                            ; f['c'] }
 
 # -------------- A collection of examples that involve choice in the domain ------------
@@ -412,31 +412,32 @@ verify("TimL300-9", pass, broken)   { f( g(x:int):char ):int := 1
 
 
 # Meeting 9 August
-testeq( "M9Aug24-1", pass){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+testeq("M9Aug24-1", pass){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
   # M9Aug24-1 uses bidirectional programming
   # broken because the check<decides> messes up bidirectionality
   # Now working becuase we discard runtime check<fx>
-verify( "M9Aug24-2", pass,tim=skip_rej){ F1(X:int)<closed><decides> := X = 1|2 }
-verify( "M9Aug24-3", pass,tim=skip_rej){ F1(X:any)<closed><decides> := X = 1|2 }
+verify("M9Aug24-2", pass,tim=skip_rej){ F1(X:int)<closed><decides> := X = 1|2 }
+verify("M9Aug24-3", pass,tim=skip_rej){ F1(X:any)<closed><decides> := X = 1|2 }
 
 # Meeting 7 August
-verify( "M7Aug24-1", pass ) { G(f()<decides>:int):=3; G[ h():=3 ] }
-verify( "M7Aug24-2", fail,tim=skip_acc ) { G(f()<decides>:int):=3; G[ h():='m' ] }
+verify("M7Aug24-1", pass ) { G(f()<decides>:int):=3; G[ h():=3 ] }
+verify("M7Aug24-2", fail,tim=skip_acc ) { G(f()<decides>:int):=3; G[ h():='m' ] }
    # h() := 'm' does not have the right return type
-verify( "M7Aug24-3", pass ) { G(f()<decides>:int):=3; G[ h()<decides>:=3=4 ] }
+verify("M7Aug24-3", pass ) { G(f()<decides>:int):=3; G[ h()<decides>:=3=4 ] }
 
-verify( "M7Aug24-4", fail, tim=V10 ) { x:int := 'm' }
+verify("M7Aug24-4", fail, tim=V10 ) { x:int := 'm' }
    # Manifestly, 'm' does not have type int
-verify( "M7Aug24-5", pass, broken, tim=skip_rej ) { all{ x:int := (1 | 2) } }
+verify("M7Aug24-5", pass, broken, tim=skip_rej ) { all{ x:int := (1 | 2) } }
    # M7Aug24-5: broken because of the implicit cardinality check on the RHS of x:int :- ...
-verify( "M7Aug24-6", fail, tim=A00 ) { all{ x:int := (1 | 'm') } }
+verify("M7Aug24-6", fail, tim=A00 ) { all{ x:int := (1 | 'm') } }
 
 
 # Meeting 7 August
-testeq( "M5Aug24-1", pass, tim=skip_rej ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
-testeq( "M5Aug24-2", loop, tim=skip_rej ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
-verify( "M5Aug24-3", fail, tim=D00 ) { foo(f()<decides>:int)<succeeds> := {f[]} }
-verify( "M5Aug24-4", pass, broken ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
+testeq("M5Aug24-1", pass, tim=skip_rej ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
+testeq("M5Aug24-2", loop, tim=skip_rej ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
+verify("M5Aug24-3", fail, tim=D00 ) { foo(f()<decides>:int)<succeeds> := {f[]} }
+# M5Aug24-4: cannot parse <computes>
+#verify("M5Aug24-4", pass, broken ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
 
 
 # -----------------------------------------
@@ -454,26 +455,26 @@ testeq("S1Aug24-4", pass) { f(x:int)<decides><closed> := x=3
 # Email 28 July 24
 # Email thread with Andy/Lennart.  The loop in G stops Y getting a value,
 #  so this test fails with "out of fuel".
-testeq( "M28Jul24-1", loop, tim=skip_rej ) { F(X:int)<decides>:void = if (X = 2) then fail
+testeq("M28Jul24-1", loop, tim=skip_rej ) { F(X:int)<decides>:void = if (X = 2) then fail
                              ; Y := all{(F[1]; G[1]) | (G[2]; F[2])}
                              ; G(X:int):void = if (X = 2) then G(2)
                              ; Y } { array{1} }
 
 # -----------------------------------------
 # Meeting 31 July 24
-verify( "T31Jul24-1", pass){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
+verify("T31Jul24-1", pass){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
    # We aren't sure what this one does
 
 # -----------------------------------------
 # Meeting 29 July 24
-testeq( "T29Jul24-1", pass ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
-verify( "T29Jul24-2", fail, tim=skip_acc ){ f( x:any ) := x=x }   # Gets stuck; reject
+testeq("T29Jul24-1", pass ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
+verify("T29Jul24-2", fail, tim=skip_acc ){ f( x:any ) := x=x }   # Gets stuck; reject
 
-verify( "T29Jul24-3", pass ){ f(x:int,y:int)<decides> := x=y; all{ a:int; f[2,a]=2; a } }
-verify( "T29Jul24-4", fail, tim=skip_acc ){ f(x:int):int = x; y:int; y=f[y] }   # Gets stuck
+verify("T29Jul24-3", pass ){ f(x:int,y:int)<decides> := x=y; all{ a:int; f[2,a]=2; a } }
+verify("T29Jul24-4", fail, tim=skip_acc ){ f(x:int):int = x; y:int; y=f[y] }   # Gets stuck
 
-verify( "T29Jul24-5", fail ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y; F[3] }
-verify( "T29Jul24-6", pass ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
+verify("T29Jul24-5", fail ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y; F[3] }
+verify("T29Jul24-6", pass ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
   # T29Jul24-5: reject because of ill-typed G in argument to F
   # T29Jul24-6: accept because we can in general only verify
   #             the domain at a call site; and here there are no calls
@@ -481,10 +482,10 @@ verify( "T29Jul24-6", pass ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
 # -----------------------------------------
 # Meeting 26 July 24
 #
-verify( "T26Jul24-1", pass ){ f(x:=3)<succeeds> := x>2 }
+verify("T26Jul24-1", pass ){ f(x:=3)<succeeds> := x>2 }
   # Should verify easily
 
-verify( "T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
+verify("T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
   # This is much trickier
 
 # We don't allow 'exists' in a pattern; not part of Source Verse

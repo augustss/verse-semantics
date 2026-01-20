@@ -460,10 +460,11 @@
 %format X = "X"
 %format CX = "CX"
 %format eqgt = "\!=>\!\!"
-%format squig (x) (y) = x "\!" squiggt "\!" y
+%format squig (x) (y) = x "\! \shortrightarrow \!" y
+%format matches (x) (y) = x "\! \leadsto \!" y
 %format esssquig (x) (y) = x "\!:\shortrightarrow\!" y
-%format squiggt = "\rightarrow"
-% %format squiggt = "\leadsto"
+% %format squiggt = "\rightarrow"
+%format squiggt = "\leadsto"
 % %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
 %format (eff (fx)) = "\langle" fx "\rangle"
@@ -663,6 +664,8 @@
 %format t_1
 %format t_2
 %format t_3
+%format t_a
+%format t_b
 %format t_k
 %format t_n
 %format t_km1 = "t_{k-1}"

@@ -18,6 +18,8 @@
 % \newcommand{\vcshort}{VC\xspace}
 \newcommand{\vcname}{Verse Calculus\xspace}
 
+\renewcommand{\boxed}[1]{\text{\fboxsep=0.2mm\fbox{$\displaystyle#1$}}}
+
 % Right arrow for rewrites
 \newcommand{\movesto}{\longrightarrow}
 \newcommand{\movesfrom}{\longleftarrow}
@@ -287,10 +289,13 @@
 \newcommand{\Env}{\M{\mathit{Env}}}
 \newcommand{\ENV}{\M{\mathit{ENV}}}
 \newcommand{\Ident}{\M{\mathit{Iden}}}
-\newcommand{\Fun}{\M{\mathbf{F}}}
-\newcommand{\Int}{\mathbf{I}}
-\newcommand{\Z}{\M{\mathbb Z}}
-\newcommand{\N}{\M{\mathbb N}}
+\newcommand{\Fun}{\M{\mathbf{F}}}     % Data constructor
+\newcommand{\Int}{\mathbf{I}}         % Data constructor
+
+\newcommand{\F}{\M{\mathbb{F}}}       % Function value domain
+\newcommand{\Z}{\M{\mathbb Z}}        % Integer value domain
+\newcommand{\N}{\M{\mathbb N}}        % Natural number domain
+
 \newcommand{\Val}{\Value}
 \newcommand{\Value}{\M{\mathit{Val}}}
 \newcommand{\VAL}{\M{\mathit{VAL}}}
@@ -307,10 +312,10 @@
 \newcommand{\pomENV}{\mathbf{PENV}}
 \newcommand{\pomFUN}{\mathbf{PFUN}}
 \newcommand{\pomempty}{\emptyset}
-\newcommand{\pomunion}{\mathbin{\mathaccent\cdot\cup}}
+\newcommand{\pomunion}{\,\boxed{\mathbin{\mathaccent\cdot\cup}}\,}
 \newcommand{\pomelem}{\Yleft}
 \newcommand{\pomunions}{\mathit{UNION}}
-\newcommand{\pomcat}{\append\,}
+\newcommand{\pomcat}{\,\boxed{\append}\,}
 \newcommand{\mkpomcat}{\append^{\!\!*}\,}
 \newcommand{\mkpomunion}{\pomunion^{*}}
 \newcommand{\pomcats}{\mathit{CONC}}
@@ -352,7 +357,7 @@
 \newcommand{\semappppp}[6]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5 \, #6}
 
 %% Semantics of Essential Verse
-\newcommand{\semess}[4]{\semfun{#1}\llbracket #4 \rrbracket \mathit{#2 #3}}
+\newcommand{\semess}[4]{\semfun{#1}\llbracket #4 \rrbracket #2 #3}
 
 % Functions over ENV
 \newcommand{\EV}{\Delta}   % A variable that ranges over \ENV

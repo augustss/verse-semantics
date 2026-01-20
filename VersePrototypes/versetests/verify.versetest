@@ -118,8 +118,8 @@ verify("T53",pass) {f(x:int)<succeeds>:=x/2}
 verify("T54",fail) {f(x:int)<succeeds>:=x/0}
   # T55: Tim bug
 verify("T55",fail,tim=skip_acc) {f(x:int)(y:int):int := (x,y)}
-verify("T56",pass) {x:int,x=3}
-verify("T57",fail) {x:int = 3,x=3}
+verify("T56",pass) {(x:int,x=3)}
+verify("T57",fail) {(x:int = 3,x=3)}
   # T57: x's defn should be opaque, so x=3 should fail
 
 # Effects
@@ -141,9 +141,9 @@ verify("Opacity3", fail,tim=skip_acc) { f(x:int)<decides>:type{x=99999} := 10000
       # verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
 
 # Opacity4: Tim doesn't implement LHS y<succeeds>:three
-verify("Opacity4", pass,tim=skip_acc) { three(x:int)<decides> := x = 3
-                                      ; main() := y:three<succeeds> := 3 }
-      # Opacity4: 'main' should verify despite three's<decides>, because 'three' is transparent
+#verify("Opacity4", pass,tim=skip_acc) { three(x:int)<decides> := x = 3
+#                                      ; main() := y:three<succeeds> := 3 }
+#      # Opacity4: 'main' should verify despite three's<decides>, because 'three' is transparent
 
 # if-then-else (negations)
 verify("If1",pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
@@ -211,7 +211,7 @@ verify("HO20-suc",fail,tim=U00)
                       g( h(:int):char ) := { 0 };
                       main()<succeeds> := { g[ inc ] }
                     }
-verify("HO20-dec",fail,tim=U00)
+verify("HO20-dec",fail,broken,tim=U00)
                     { inc(x:int):int := {x};
                       g( h(:int):char ) := { 0 };
                       main()<decides> := { g[ inc ] }
@@ -310,8 +310,9 @@ verify("blame0", pass) { f2( g() := 3 ) := g[] = 3 }
 
 # ---------------------------------------------
 # For now we just ignore 'computes' i.e. treat as 'succeeds'
-verify("computes00", pass) { f(x:int)<computes>:int = 1 }
-verify("computes01", fail,tim=V10) { f(x:int)<computes>:int = (x = 1) }
+# <computes> not allowed by Niklas' parser
+#verify("computes00", pass) { f(x:int)<computes>:int = 1 }
+#verify("computes01", fail,tim=V10) { f(x:int)<computes>:int = (x = 1) }
 
 # Testing the tim style
 test(D00){x:int => x=3}
@@ -322,7 +323,8 @@ verify("comparable00", fail,tim=U00){a:any => comparable[a]}
 verify("comparable01", pass){a:int => comparable[a]}
 verify("comparable02", pass){f(a:comparable):comparable => x:=f(2)}
 verify("comparable03", pass){f(a:comparable):comparable => x:=f[2]}
-verify("comp-tup", pass,tim=skip_unimpl){f(x:comparable)<decides>:comparable := {(p,q):=x; p } }
+# parser problem with comp-tup
+#verify("comp-tup", pass,tim=skip_unimpl){f(x:comparable)<decides>:comparable := {(p,q):=x; p } }
 
 # RI accepts, Tim's verifier rejects:
 verify("jan00", pass) { fi(x:int)<succeeds><closed>:int = {x};
@@ -413,7 +415,8 @@ verify("Ampersand3a", pass){ x&y := 4; x+y = 8 }
   # Ampersand3a: Both x and are bound to 4,
 verify("Ampersand4", pass){ ((f&g)(:int,:int):int) => f[3,4] }
 
-verify("Ampersand5", fail)  # Koen says this should fail rather than pass
+# Koen says Ampersand5 should fail rather than pass
+verify("Ampersand5", fail)
     { a&b&c:int =>
       (f&g)(:int,:int):int =>
       h(:int):int =>

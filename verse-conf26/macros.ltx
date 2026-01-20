@@ -1,0 +1,53 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+% --------------- Sequences, S ------------
+\newcommand{\VmSeqKw}{{\mathcal S}}
+\newcommand{\VmSeq}[1]{\VmSeqKw(#1)}
+
+\newcommand{\seqappend}{\mathbf{append}_{\scriptsize s}}
+\newcommand{\seqbind}{{|>>=|_{\scriptsize s}}}
+\newcommand{\sequnit}{\mathbf{unit}_{\scriptsize s}}
+\newcommand{\seqfold}{\mathbf{fold}_{\scriptsize s}}
+\newcommand{\seqzip}{\mathbf{dzip}_{\scriptsize s}}    % Dodgy zip
+
+
+% --------------- Verse computation type, M ------------
+\newcommand{\VmKw}{{\mathcal M}}
+\newcommand{\Vm}[1]{\VmKw(#1)}
+\newcommand{\VmENV}{\Vm{\Env}}   % Return type of E[e]uv
+
+\newcommand{\vmempty}{\mathbf{empty}}
+\newcommand{\vmreturn}{\mathbf{return}}
+\newcommand{\vminject}{\mathbf{inj}}
+\newcommand{\vmbind}{|>>=|}
+\newcommand{\vmcat}{\append\,}
+\newcommand{\vmhide}{\;\backslash\!\backslash\!\backslash\;}
+\newcommand{\ENVhide}{\;\backslash\;}
+\newcommand{\vmunion}{\mathrel{\vcenter{\offinterlineskip \hbox{$\cup$}\vskip-1ex\hbox{\hskip.4ex $\cdot$}}}}
+\newcommand{\vminnerunion}{\mathrel{\vcenter{\offinterlineskip \hbox{$\cup$}\vskip-1.3ex\hbox{\tiny \hskip.55ex $\star$}}}}
+\newcommand{\vmseq}{\mathrel{\vcenter{\offinterlineskip \hbox{$\cap$}\vskip-1ex\hbox{\tiny \hskip.55ex $\star$}}}}
+\newcommand{\vmunions}{\mathbf{unionS}}
+\newcommand{\vmflatten}{\mathbf{flatten}}
+\newcommand{\vmconcat}{\mathbf{concat}}
+\newcommand{\vmmap}{\mathbf{map}}
+\newcommand{\vmmapset}{\mathbf{mapS}}
+\newcommand{\vmfold}{\mathbf{fold}}
+\newcommand{\vmnot}{\mathbf{not}}
+\newcommand{\vmone}{\mathbf{one}}
+\newcommand{\vmflatmap}{\mathbf{flatmap}}
+\newcommand{\vmcollapse}{\mathbf{collapse}}
+\newcommand{\vmprune}{\mathbf{prune}}
+\newcommand{\vmpi}{\Pi_m}
+
+% Tree semantics
+\newcommand{\treebind}{\gg \! =_{T}}
+
+% Partial functions = Set( Val x Val )
+\newcommand{\PFUN}{\mathit{PFUN}}
+
+% Dodgy union
+% \newcommand{\dodgyunion}{\mathbf{dunion}}
