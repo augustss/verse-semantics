@@ -313,7 +313,7 @@ $$
 \rulename{sdotdot} &  \semess{E}{u}{v}{|t_1 ..  t_2|}
   & = & \vminject \conBrack{u=v} \vmseq \semess{E}{p_1}{q_1}{t_1} \vmseq \semess{E}{p_2}{q_2}{t_2} \vmseq \\
   & & & \vmunions \{\;  \vmconcat [ \vminject \conBrack{v=q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \vb n \in \N \; \} \\
-  & & & \pomHIDE \{p_1,q_1,p_2,q_2\} \hfill  p_1,q_1,p_2,q_2 \not\in \freevars{t_1,t_2,u,v} \\[1mm]
+  & & & \vmhide \{p_1,q_1,p_2,q_2\} \hfill  p_1,q_1,p_2,q_2 \not\in \freevars{t_1,t_2,u,v} \\[1mm]
 
 % Application and type
 \rulename{sapp} & \semess{E}{u}{v}{|apply1N t_1 t_2|}
@@ -369,18 +369,18 @@ $$
 \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
   & = & \vmfold ( op, z, \semapp{C}{|t_0|} ) \\
 && \multicolumn{2}{@@{}l}{\textbf{where} \hfill
-       u_1,u_2,v_1,v_2 \not\in \freevars{t_0,t_1,u,v}}\\
+       p,q,u_1,u_2,v_1,v_2 \not\in \freevars{t_0,t_1,u,v}}\\
 &&& \begin{array}[t]{@@{}r@@{\;}c@@{\;}l}
       xs & = & \semap{I}{|t_0|} \\
       S_1 :: \Vm{\Env} & = & \semess{B}{p}{q}{|t_1|} \\
       z :: \Vm{\Env} & = & \vminject \conBrack{u=|emptytup|,v=|emptytup|}  \\
       op & :: & \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
-      op(\EV, m) & = & (\vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
-         & &  \vmseq ( (\vminject(\EV)  \vmseq S_1 \vmseq \conBrack{u_1=|arr p|,v_1=|arr q|}) \\
+      op(\EV, m) & = & \vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
+         & &  \vmseq ( (\vminject(\EV)  \vmseq S_1 \vmseq \vminject \conBrack{u_1=|arr p|,v_1=|arr q|} \vmhide \{p,q\}) \\
       & & \hspace{5mm}  \vmunion (\vminject(\conCompl(\EV \vmhide xs) ) \vmseq
-                         \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
-      & & \vmseq ((m \vmseq \conBrack{u=u_2, v=v_2}) \vmhide \{u,v\} ) \\
-      && \vmhide \{ u_1, u_2, v_1, v_2 \}
+                         \vminject \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
+      & & \vmseq (m \vmseq \vminject \conBrack{u=u_2, v=v_2} \vmhide \{u,v\} ) \\
+      & & \vmhide \{ u_1, u_2, v_1, v_2 \}
     \end{array}
 
 \\
