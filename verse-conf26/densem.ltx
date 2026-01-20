@@ -115,7 +115,7 @@ $$
     \vminnerunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set union} \\
     \vmunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Unordered choice}\\
     \vmunions & :: & \powerset{\Vm{a}} \rightarrow \Vm{a}  & \text{Infinite unordered choice} \\
-%    \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+    \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
 %    \vmmapset    & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
 %    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
     \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b}) \rightarrow \Vm{b}
@@ -149,8 +149,10 @@ $$
 %     \vmflatmap(f,s) & = & \vmflatten(\; \vmmap( f, s ) \; ) \\[1mm]
 %    (\ENVhide) & :: & \Env \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
 %    \rho \ENVhide vs & = & \{ \rho' \in \Env \vb \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
+    \vmmapset & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \powerset{b} \\
+    \vmmapset(f,s) & = & \vmfold( \; (\lambda x\, t. \, \vminject(f(x)) \vmcat t), \; \vmempty, \; s \;) \\[1mm]
     (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
-    s \vmhide vs & = & \vmfold( \; (\lambda \EV t. \, \vminject(\HIDE{\EV}{vs}) \vmcat t), \vmempty, s \;) \\[1mm]
+    s \vmhide vs & = & \vmmapset( \; (\lambda \EV. \, \HIDE{\EV}{vs}),\; s \;) \\[1mm]
     \vmnot      & :: & \Vm{\Env} \rightarrow \Vm{\Env} \\
     \vmnot(s) & = & \vminject( \conCompl( \vmcollapse(s))) \\
 \\
