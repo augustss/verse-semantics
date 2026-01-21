@@ -20,7 +20,7 @@ import Epic.Print(Pretty(..), text)
 import Debug.Trace
 import Data.List(foldl')
 
-#if 1
+#if 0
 trace2 msg f x y = f x y
 {-
   trace ("EQD." ++ msg ++ show (x, y)) $
