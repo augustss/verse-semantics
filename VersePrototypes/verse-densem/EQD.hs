@@ -66,8 +66,9 @@ mcubes (EQD as p) = summarize cs0
 instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
   show p =
     case mcubes p of
-      [] -> "fail"
-      cs -> intercalate "∪" [ showCube c | c <- cs ]
+      []   -> "∅"
+      [[]] -> "𝕌"
+      cs   -> intercalate "∪" [ showCube c | c <- cs ]
    where
     showCube c = "⦅" ++ intercalate "," (pos c ++ neg c) ++ "⦆"
      where
