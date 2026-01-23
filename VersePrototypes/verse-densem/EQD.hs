@@ -1,16 +1,20 @@
 module EQD
   ( EQD
   , Atom(..)
+  , mcubes
   , invariant
   , false
   , true
-  , (.=.)
+  , (.=.), (=:), (=~)
   , (/\), (\/), (EQD.==>), (<=>)
+  , andl
+  , orl
   , (|=)
   , nt
   , qall
   , qexi
   , subst
+  , support
   )
  where
 
@@ -34,12 +38,9 @@ instance (Show x, Show a) => Show (Atom x a) where
 data EQD x a = EQD [a] (VEQ x)
  deriving ( Eq, Ord )
 
-instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
-  show (EQD as p) =
-    case cs0 of
-      [] -> "fail"
-      cs -> intercalate "U" [ showCube c | c <- cs ]
-   where
+mcubes :: (Ord x, Ord a) => EQD x a -> [[(Atom x a, Atom x a, Bool)]]
+mcubes (EQD as p) = summarize cs0
+ where
     cs0 = cubesVEQ Var [Val a|a<-as] p
 
     summarize []     = []
@@ -62,6 +63,12 @@ instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
     eqVarVar x y = NODE x [ NODE y [ if a==b then TRUE else FALSE | a <- as ] FALSE | b <- as ]
                           (NODE y ([ FALSE | a <- as ]++[TRUE]) FALSE)
 
+instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
+  show p =
+    case mcubes p of
+      [] -> "fail"
+      cs -> intercalate "U" [ showCube c | c <- cs ]
+   where
     showCube c = "{{" ++ intercalate "," (pos c ++ neg c) ++ "}}"
      where
       clss  = M.fromListWith union $
@@ -79,8 +86,9 @@ instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
                 Nothing -> x
                 Just r  -> r
      
-      pos c = [ intercalate "="
-              $ [ show x | x@(Var _) <- xs ]
+      pos c = sort
+              [ intercalate "="
+              $ [ show x | x@(Var _) <- sort xs ]
              ++ [ show x | x@(Val _) <- xs ]
               | (_,xs) <- M.toList clss
               ]
@@ -101,12 +109,23 @@ false, true :: (Ord x, Ord a) => EQD x a
 false = EQD [] FALSE
 true  = EQD [] TRUE
 
+infix 4 .=., =:, =~
+
 (.=.) :: (Ord x, Ord a) => Atom x a -> Atom x a -> EQD x a
 a     .=. b     | a == b = true
 Val u .=. Val v | u /= v = false
 Var x .=. Val v          = EQD [v] (NODE x [TRUE] FALSE)
 Val v .=. Var x          = EQD [v] (NODE x [TRUE] FALSE)
 Var x .=. Var y          = EQD [] (eqVEQ x y)
+
+(=:) :: (Ord x, Ord a) => x -> a -> EQD x a
+x =: a = Var x .=. Val a
+
+(=~) :: (Ord x, Ord a) => x -> x -> EQD x a
+x =~ y = Var x .=. Var y
+
+infixr 3 /\, <=>
+infixr 2 \/, ==>
 
 (/\),(\/),(==>),(<=>) :: (Ord x, Ord a) => EQD x a -> EQD x a -> EQD x a
 EQD vs p /\ EQD ws q = operAnd [] vs p ws q
@@ -127,6 +146,10 @@ p \/ q  = nt (nt p /\ nt q)
 p ==> q = nt (p /\ nt q)
 p <=> q = (p /\ q) \/ (nt p /\ nt q)
 
+andl, orl :: (Ord a, Ord x) => [EQD x a] -> EQD x a
+andl = foldr (/\) true
+orl  = foldr (\/) false
+
 (|=) :: (Ord x, Ord a) => (x -> a) -> EQD x a -> Bool
 mod |= EQD as p = go as p
  where
@@ -146,6 +169,13 @@ mkEQD as p = go 0 [] as p
     | otherwise        = go (k+1) (a:bs) as p
    where
     p' = unexpand k p
+
+support :: Ord x => EQD x a -> [x]
+support (EQD _ p) = supp S.empty [p]
+ where
+  supp s (NODE x olds new : ps) = supp (S.insert x s) (new : olds ++ ps)
+  supp s (_ : ps)               = supp s ps
+  supp s []                     = S.toList s
 
 -----------------------------------------------------------------------
 
