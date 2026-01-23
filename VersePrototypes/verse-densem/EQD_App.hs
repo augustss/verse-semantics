@@ -145,17 +145,20 @@ showFUN p
 -- pi
 
 {-
-pi :: Set a -> (a -> Set b) -> Set (a->b)
+pi :: Set a -> (a -> Set b) -> Set (Set(a,b))
 pi A fB = { f∈A->B | All x∈A. f(x)∈fB(x) } where B = UNION{ fB(x) | x∈A }
 
 pi :: Set Val -> (Val -> Set Val) -> Set FUN
 -}
 
-type Set_Val = FUN0
+type REL1 = ENV
+type REL2 = ENV
 
-type Val_to_Set_Val = FUN1
+type Set_Val = REL1
 
-type Set_FUN = FUN0
+type Val_to_Set_Val = REL2 -- Var -> Set_Val
+
+type Set_FUN = REL1
 
 pi :: Set_Val -> Val_to_Set_Val -> Set_FUN
 pi dom range =
@@ -164,21 +167,85 @@ pi dom range =
  /\ qall x (qall y (
       fun@@[x,y] ==> dom@@[x]
     ))
- /\ qall x (qexi y (
-      dom@@[x] ==> (fun@@[x,y] /\ range@@[x,y])
-    ))
+ /\ qall x (
+      dom@@[x] ==> qexi y (fun@@[x,y] /\ range@@[x,y])
+    )
   | fun <- allFUN1s
   ]
  where
   x:y:_ = fresh ["x","y"] (support dom ++ support range)
 
+{-
+pi :: Set_Val -> Val_to_Set_Val -> Set_FUN
+pi dom range =
+  orl
+  [ xx =: Fun fun
+ /\ qall x (qall y (
+      fun@@[x,y] ==> (qexi zz dom)@@[x]
+    ))
+ /\ qall x (
+      (qexi zz dom)@@[x] ==> qexi y (fun@@[x,y] /\ (qall zz (dom ==> range))@@[x,y])
+    )
+  | fun <- allFUN1s
+  ]
+ where
+  x:y:_ = fresh ["x","y"] (support dom ++ support range)
+
+pi :: Set_Val -> Val_to_Set_Val -> Set_FUN
+pi dom range =
+  orl
+  [ xx =: Fun fun
+ /\ qall x (qall y (
+      fun@@[x,y] ==> (qexi zz dom)@@[x]
+    ))
+ /\ qall x (qall zz (
+      dom@@[x] ==> qexi y (fun@@[x,y] /\ (qall zz (dom ==> range))@@[x,y])
+    ))
+  | fun <- allFUN1s
+  ]
+ where
+  x:y:_ = fresh ["x","y"] (support dom ++ support range)
+-}
+
 ---------------------------------------------------------------------------
 -- example
 
-main = print (pi dom range @@ [f])
+printREL = putStrLn . showFUN
+
+-- fun(x:=0..2){x+a}
+ex1 =
+  do printREL dom
+     printREL range
+     print (pi dom range @@ [f])
  where
   dom   = orl [ xx =: Int i | i <- [0..2] ]
   range = plus@@[xx,a,yy]
+
+-- fun(x:=0..2 where z:=1|2)
+-- { if(z=1){x|a} else {
+--   if(z=2){x|1} else {
+--   if(z=3){3}   else {fail}}}
+-- }
+ex2 =
+  do putStrLn "--domain--"
+     printREL dom
+     putStrLn "-->"
+     printREL (qexi zz dom) -- quantify away the bvs in the domain
+     putStrLn "--range--"
+     printREL range
+     putStrLn "-->"
+     printREL (qall zz (dom ==> range)) -- intersect over all possible values
+     putStrLn "--PI--"
+     print (pi (qexi zz dom) (qall zz (dom ==> range)) @@ [f])
+ where
+  dom   = orl [ xx =: Int i /\ (zz =: Int 1 \/ zz =: Int 2) | i <- [0..2] ]
+  range = (zz =: Int 1 /\ (yy =~ xx \/ yy =~ a))
+       \/ (zz =: Int 2 /\ (yy =~ xx \/ yy =: Int 1))
+       \/ (zz =: Int 3 /\ (yy =: Int 3))
+
+main = ex2
+
+--
 
 plus :: REL
 plus = orl
