@@ -59,7 +59,19 @@ yys = [ Idf ("𝓎" ++ l) | l <- "" : map show [1..] ]
 infix 5 @@
 
 (@@) :: FUN -> [Var] -> ENV
-fun @@ xs = foldr (\(x,y) p -> subst y (Var x) p) fun (xs `zip` (xx : yys))
+fun @@ xs = foldr (\(x,y) p -> subst x (Var y) p) fun sub
+ where
+  vxs = (xx : yys) `zip` xs
+  ws  = [ v | (v,_) <- vxs, v `elem` map snd vxs ]
+  wzs = ws `zip` fresh [] (xs ++ support fun)
+
+  sub = [ (z,w)
+        | (w,z) <- wzs
+        ]
+        ++
+        [ (v, head $ [ z | (w,z) <- wzs, w == x ] ++ [ x ])
+        | (v,x) <- vxs
+        ]
 
 data Val
   = Int Int
@@ -92,15 +104,15 @@ showFUN p
   showTuple [x] = show x
   showTuple xs  = "(" ++ intercalate "," (map show xs) ++ ")"
 
-  showCompr ('{':'{':s) = showCompr' s
+  showCompr ('⦅':s) = showCompr' s
   showCompr s           = s
 
-  showCompr' ('}':'}':s) = showCompr'' s
+  showCompr' ('⦆':s) = showCompr'' s
   showCompr' (c:s)       = c : showCompr' s
   showCompr' s           = s -- shouldn't happen
 
-  showCompr'' ('U':'{':'{':s) = "\\/" ++ showCompr' s
-  showCompr'' s               = s
+  showCompr'' ('∪':'⦅':s) = "∨" ++ showCompr' s
+  showCompr'' s           = s
   
 {-
 pi :: Set a -> (a -> Set b) -> Set (a->b)
@@ -155,7 +167,7 @@ fresh templ forb = go templ bad
 
   names x = Idf x : [ Idf (x ++ show i) | i <- [1..] ]
 
-  go [] bad = []
+  go [] bad = go ["$"] bad
   go (x:xs) bad = v : go xs (S.insert v bad)
    where
     v:_ = filter (not . (`S.member` bad)) (names x)

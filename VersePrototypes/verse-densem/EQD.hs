@@ -11,8 +11,8 @@ module EQD
   , orl
   , (|=)
   , nt
-  , qall
-  , qexi
+  , qall, qalls
+  , qexi, qexis
   , subst
   , support
   )
@@ -67,9 +67,9 @@ instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
   show p =
     case mcubes p of
       [] -> "fail"
-      cs -> intercalate "U" [ showCube c | c <- cs ]
+      cs -> intercalate "∪" [ showCube c | c <- cs ]
    where
-    showCube c = "{{" ++ intercalate "," (pos c ++ neg c) ++ "}}"
+    showCube c = "⦅" ++ intercalate "," (pos c ++ neg c) ++ "⦆"
      where
       clss  = M.fromListWith union $
               [ (y,[x,y])
@@ -77,7 +77,7 @@ instance (Show x, Ord x, Show a, Ord a) => Show (EQD x a) where
               ]
 
       tab   = M.fromList
-              [ (x, head $ [ x | x@(Val _) <- xs ] ++ xs)
+              [ (x, head $ [ x | x@(Val _) <- xs ] ++ sort xs)
               | (_,xs) <- M.toList clss
               , x <- xs
               ]
@@ -182,6 +182,13 @@ support (EQD _ p) = supp S.empty [p]
 qall, qexi :: (Ord x, Ord a) => x -> EQD x a -> EQD x a
 qall x (EQD as p) = mkEQD as (allVEQ x p)
 qexi x (EQD as p) = mkEQD as (exiVEQ x p)
+
+qalls, qexis :: (Ord x, Ord a) => [x] -> EQD x a -> EQD x a
+qalls []     p = p
+qalls (x:xs) p = qall x (qalls xs p)
+
+qexis []     p = p
+qexis (x:xs) p = qexi x (qexis xs p)
 
 -----------------------------------------------------------------------
 
