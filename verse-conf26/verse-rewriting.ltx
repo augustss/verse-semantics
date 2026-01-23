@@ -1,0 +1,69 @@
+\documentclass[acmsmall,screen,review,9pt]{acmart}\settopmatter{}
+
+% Put \everythingfalse in a file local.tex to build a streamlined
+% version with just DPS semantics
+\newif\ifeverything \everythingtrue
+\IfFileExists{local.tex}{\input{local.tex}}{}
+
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+% Boxed figures
+\floatstyle{boxed}
+\restylefloat{figure}
+\usepackage{../LaTex/quiver}
+\usepackage{framed}
+\usepackage{amssymb}
+\usepackage{cleveref}   % \Cref etc
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{conteq}
+\usepackage{textgreek}
+\usepackage{xspace}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{multirow}
+\usepackage{makecell}
+\input{../LaTex/verse-macros}
+
+\begin{document}
+
+\title{A rewrite semantics for Essential Verse}
+\author{Simon}
+\ifeverything
+\maketitle
+\fi
+
+\ifeverything
+\section{Overview}
+
+
+% -------------------------------------------------------------
+%               Syntax
+% -------------------------------------------------------------
+
+\section{Syntax}
+
+\input{syntax}
+
+% -------------------------------------------------------------
+%               Rewrite rules
+% -------------------------------------------------------------
+
+\section{Runtime rewrite rules}
+
+\input{runtime-rules}
+
+% -------------------------------------------------------------
+%               Verification rules
+% -------------------------------------------------------------
+
+\section{Verification rules}
+
+\input{runtime-rules}
+
+\end{document}

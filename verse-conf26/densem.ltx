@@ -151,7 +151,8 @@ $$
 %    \rho \ENVhide vs & = & \{ \rho' \in \Env \vb \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
     \vmmapset & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \powerset{b} \\
     \vmmapset(f,s) & = & \vmfold( \; (\lambda x\, t. \, \vminject(f(x)) \vmcat t), \; \vmempty, \; s \;) \\[1mm]
-    (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \\
+    (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \hspace{5mm}
+        \text{Binds less tightly than $\vmseq$, $\vmunion$ etc} \\
     s \vmhide vs & = & \vmmapset( \; (\lambda \EV. \, \HIDE{\EV}{vs}),\; s \;) \\[1mm]
     \vmnot      & :: & \Vm{\Env} \rightarrow \Vm{\Env} \\
     \vmnot(s) & = & \vminject( \conCompl( \vmcollapse(s))) \\
@@ -217,7 +218,7 @@ $$
     \sequnit & :: & a \rightarrow \VmSeq{a} \\
     (\seqbind) & :: & \VmSeq{a} \rightarrow (a \rightarrow \VmSeq{b} \rightarrow \VmSeq{b} \\
     \seqfold & :: & (a \rightarrow b \rightarrow b) \rightarrow b \rightarrow \VmSeq{a} \rightarrow  b \\
-    \seqzip & :: & (a \rightarrow a \rightarrow a) \rightarrow \powerset{\VmSeq{a}} \rightarrow  \VmSeq{a}
+    \seqzip & :: & (\powerset{a} \rightarrow a) \rightarrow \powerset{\VmSeq{a}} \rightarrow  \VmSeq{a}
       & \text{Dodgy-zip of infinite set}
   \end{array}
 \\ \\
@@ -333,9 +334,9 @@ $$
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{array}{rcll}
  \semess{B}{u}{v}{|t|} & : & \VmENV \\
- \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{t} \pomHIDE \semapp{I}{|t|} \\[1mm]
+ \semess{B}{u}{v}{|t|} & = & \semess{E}{u}{v}{t} \vmhide \semapp{I}{|t|} \\[1mm]
  \semapp{C}{|t|} & : & \VmENV \\
- \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \pomHIDE \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
+ \semapp{C}{|t|} & = & \semess{E}{p}{q}{|t|} \vmhide \{p,q\} \hfill p,q \not\in \freevars{t}\\[1mm]
  \semap{F}{|apply1N f x|}r & : & \VmENV \\
  \semap{F}{|apply1N f x|}r  & = &
 \vmunions \begin{array}[t]{@@{}l}
@@ -379,7 +380,7 @@ $$
       op & :: & \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
       op(\EV, m) & = & \vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
          & &  \vmseq ( (\vminject(\EV)  \vmseq S_1 \vmseq \vminject \conBrack{u_1=|arr p|,v_1=|arr q|} \vmhide \{p,q\}) \\
-      & & \hspace{5mm}  \vmunion (\vminject(\conCompl(\EV \vmhide xs) ) \vmseq
+      & & \hspace{5mm}  \vmunion (\vminject(\conCompl(\HIDE{\EV}{xs}) ) \vmseq
                          \vminject \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
       & & \vmseq (m \vmseq \vminject \conBrack{u=u_2, v=v_2} \vmhide \{u,v\} ) \\
       & & \vmhide \{ u_1, u_2, v_1, v_2 \}
