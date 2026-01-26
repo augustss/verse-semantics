@@ -180,6 +180,8 @@ class Comp m where
   mapM     :: (a→b, m(a)) → m(b)
 
 -- Derived functions
+mapS :: Comp m => (Set(a) → Set(b), m(a)) → m(b)
+mapS(f, s) = fold( \(x,t)→inj(f(x)) ++ t, empty, s )
 
 infixl 5 \\\
 (\\\) :: Comp m => m(Env m) → Set(Iden) → m(Env m)
@@ -333,7 +335,7 @@ instance Comp Tree where
 ε (Fun(tₐ)(q)(ω)(tb)) f h =
  unionS
   [ mapFilterS(\(fun :: m(Val m, Env m)) → [ ρ | ρ(f) == F (xfn fun x z)
-                                                , ρ(h) == F (xfn fun w j) ]
+                                               , ρ(h) == F (xfn fun w j) ]
 
               ,funs(ρ))
   | ρ ← allEnvs
@@ -374,8 +376,6 @@ dF f x r = unionS [ mapS (\ (prs :: Val m ⇀ Val m) →
                             (f .= vf /\ ((x :⇒ r) ⭄ prs)), ff)
                   | vf@(F(Fn ff)) ← allVals ]
 -- 
-mapS :: Comp m => (Set(a) → Set(b), m(a)) → m(b)
-mapS = undefined
 
 mapFilterS :: Comp m => (a → Set(b), m(a)) → m(b)
 mapFilterS = undefined
