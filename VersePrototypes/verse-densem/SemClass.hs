@@ -172,6 +172,10 @@ funNegate = [(I i, I ((-i) `mod` numZ)) | i <- allZ ]
 funInt :: Val ⇀ Val
 funInt = [(I i, I i) | i <- allZ ]
 
+-- Apply a partial function
+applyPF :: (Val ⇀ Val) -> Val -> Maybe Val
+applyPF f x = Set.getSing $ Set.lookupSet x f
+
 ----- Val -----
 
 data Val = I Z | F Fn
@@ -234,6 +238,13 @@ instance ASet Val where
 
 instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  
+instance (Ord a, ASet a) => ASet (Set(a)) where
+  type XSet (Set a) = Set (Set(a))
   ø = Set.empty
   (∪) = Set.union
   (∩) = Set.intersect
@@ -333,10 +344,6 @@ unionENVs = P.foldr (\/) cempty
 (x :⇒ y) ⭄ f =
   unionENVs [ x .= u /\ y .= v | u <- Set.toList allVals, Just v <- [applyPF f u] ]
 
--- Apply a partial function
-applyPF :: (Val ⇀ Val) -> Val -> Maybe Val
-applyPF f x = Set.getSing $ Set.lookupSet x f
-
 ----- Verse computation type -----
 empty    :: ASet a => M(a)
 inj      :: ASet a => XSet(a) → M(a)
@@ -378,43 +385,46 @@ one(s,vs) = fold(op,empty,s)
   where op :: (XSet(Env), M(Env)) → M(Env)
         op(d,rest) = inj(d) ⎩*⎭ (inj(compl(d \\ vs)) ⎧*⎫ rest)
 
-concat :: ASet a => [M(a)] → M(a)
+concat :: ASet a =>
+          [M(a)] → M(a)
 concat [] = empty
 concat (s:ss) = s ++ concat ss
 
 ---------------------------
 
-ε :: Term → Iden → Iden → M(Env)
-ε (U_)      u v = inj (u .=. v)
-ε (Var x)   u v = inj (u .=. v /\ v .=. x)
-ε (Int k)   u v = inj (u .=. v /\ v .=  I k)
-ε (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
-ε (x :=  t) u v = inj (x .=. v) ⎧*⎫ ε (t) u v
-ε (x :-> t) u v = inj (x .=. u) ⎧*⎫ ε (t) u v
-ε (Exists x)u v = inj (u .=. v /\ v .=. x)
+-- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
+
+ɩℰ :: Term → Iden → Iden → M(Env)
+ɩℰ (U_)      u v = inj (u .=. v)
+ɩℰ (Var x)   u v = inj (u .=. v /\ v .=. x)
+ɩℰ (Int k)   u v = inj (u .=. v /\ v .=  I k)
+ɩℰ (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
+ɩℰ (x :=  t) u v = inj (x .=. v) ⎧*⎫ ɩℰ (t) u v
+ɩℰ (x :-> t) u v = inj (x .=. u) ⎧*⎫ ɩℰ (t) u v
+ɩℰ (Exists x)u v = inj (u .=. v /\ v .=. x)
 -- Array
-ε (t₁ :|:   t₂) u v = ε (t₁) u v ++  ε (t₂) u v
-ε (t₁ :|||: t₂) u v = ε (t₁) u v ⎩*⎭ ε (t₂) u v
-ε (t₁ :=:   t₂) u v = ε (t₁) u v ⎧*⎫ ε (t₂) u v
--- XXX ε (t₁ :~>   t₂) u v = ε (t₁) u w ⎧*⎫ ε (t₂) w v \\\ [w] where [w] = fresh ["w"] [t₁, t₂, Var u, Var v]
-ε (t₁ :>    t₂) u v = cC(t₁)     ⎧*⎫ ε (t₂) u v
-ε (t₁ `Where` t₂) u v = ε (t₁) u v ⎧*⎫ cC (t₂)
-ε (t₁ :..   t₂) u v = inj(u .=. v) ⎧*⎫ ε (t₁) p₁ q₁ ⎧*⎫ ε (t₂) p₂ q₂ ⎧*⎫
+ɩℰ (t₁ :|:   t₂) u v = ɩℰ (t₁) u v ++  ɩℰ (t₂) u v
+ɩℰ (t₁ :|||: t₂) u v = ɩℰ (t₁) u v ⎩*⎭ ɩℰ (t₂) u v
+ɩℰ (t₁ :=:   t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩℰ (t₂) u v
+-- XXX ɩℰ (t₁ :~>   t₂) u v = ɩℰ (t₁) u w ⎧*⎫ ɩℰ (t₂) w v \\\ [w] where [w] = fresh ["w"] [t₁, t₂, Var u, Var v]
+ɩℰ (t₁ :>    t₂) u v = ɩ𝒞 (t₁)     ⎧*⎫ ɩℰ (t₂) u v
+ɩℰ (t₁ `Where` t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩ𝒞 (t₂)
+ɩℰ (t₁ :..   t₂) u v = inj(u .=. v) ⎧*⎫ ɩℰ (t₁) p₁ q₁ ⎧*⎫ ɩℰ (t₂) p₂ q₂ ⎧*⎫
   unionS[ concat[ inj(v .=: (X q₁ + i) /\ i .<= (X q₁ - X q₂))  | i ← [0..n]] | n ← allN ]
   \\\ [p₁, q₁, p₂, q₂]
   where [p₁, q₁, p₂, q₂] = fresh ["p1","q1","p2","q2"] [t₁, t₂, Var u, Var v]
-ε (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ε (t₁) f g ⎧*⎫ ε (t₂) p q ⎧*⎫ dF g q v)
+ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
                       \\\ [f,g,p,q]
   where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
-ε (Rng t)       u v = ε (t) p q ⎧*⎫ dF q u v \\\ [p,q]
+ɩℰ (Rng t)       u v = ɩℰ (t) p q ⎧*⎫ ɩℱ q u v \\\ [p,q]
   where [p,q] = fresh ["p","q"] [t,Var u, Var v]
-ε (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ bB (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ bB (t₂) u v)
-  where xs = iI(t₀); s₀ = one(cC(t₀),xs)
-ε (Block t) u v = bB (t) u v
-ε (For t₀ t₁) u v = fold(op,z,cC(t₀))
+ɩℰ (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ ɩℬ (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ ɩℬ (t₂) u v)
+  where xs = iI(t₀); s₀ = one(ɩ𝒞(t₀),xs)
+ɩℰ (Block t) u v = ɩℬ (t) u v
+ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
         xs             = iI(t₀)
-        s₁ :: M(Env) = bB(t₁) p q
+        s₁ :: M(Env) = ɩℬ(t₁) p q
         z  :: M(Env) = inj(u .=: nil /\ v .=: nil)
         op :: (XSet(Env), M(Env)) → M(Env)
         op(d,m)        =     inj(u .=: (u₁ ⨄ u₂) /\ v .=: (v₁ ⨄ v₂))
@@ -424,7 +434,7 @@ concat (s:ss) = s ++ concat ss
                          \\\ [u₁,u₂,v₁,v₂]
 {-
 -- Using piSM
-ε (Fun(tₐ)(q)(ω)(tb)) f h =
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
  inj
   [ ρ
   | ρ ← allEnvs
@@ -443,16 +453,16 @@ concat (s:ss) = s ++ concat ss
     funs :: Env → Set (m (Val, Env))
     funs(ρ) = piSM(domvs, rngfun)
       where
-        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ε (tₐ) x w
+        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
         domvs :: m(Val)
         domvs = mapM(\ρ→ρ(x), dom)
         rngfun :: Val → Set(Env)
-        rngfun(xv) = bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ε (tb) j z)
+        rngfun(xv) = bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
                                   | aρ ← collapse(dom), aρ(x) == xv
                                   ]
                             
 -- Using piM
-ε (Fun(tₐ)(q)(ω)(tb)) f h =
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
  unionS
   [ mapFilterS(\(fun :: m(Val, Env)) → [ ρ | ρ(f) == F (xfn fun x z)
                                                , ρ(h) == F (xfn fun w j) ]
@@ -471,26 +481,26 @@ concat (s:ss) = s ++ concat ss
     funs :: Env → m (m (Val, Env))
     funs(ρ) = piM(domvs, rngfun)
       where
-        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ε (tₐ) x w
+        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
         domvs :: m(Val)
         domvs = mapM(\ρ→ρ(x), dom)
         rngfun :: Val → M(Env)
         rngfun(xv) =
-                inj (bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ε (tb) j z)
+                inj (bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
                                   | aρ ← collapse(dom), aρ(x) == xv
                                   ])
 -}
-ε t _ _ = error $ "ε: " P.++ show t
+ɩℰ t _ _ = error $ "ɩℰ: " P.++ show t
 
-cC :: Term → M(Env)
-cC (t) = ε (t) p q \\\ [p, q]
+ɩ𝒞 :: Term → M(Env)
+ɩ𝒞 (t) = ɩℰ (t) p q \\\ [p, q]
   where [p,q] = fresh ["p","q"] [t]
 
-bB :: Term → Iden → Iden → M(Env)
-bB (t) u v = ε (t) u v \\\ iI(t)
+ɩℬ :: Term → Iden → Iden → M(Env)
+ɩℬ (t) u v = ɩℰ (t) u v \\\ iI(t)
 
-dF :: Iden → Iden → Iden → M(Env)
-dF f x r =
+ɩℱ :: Iden → Iden → Iden → M(Env)
+ɩℱ f x r =
   unionS [ mapS (\ (prs :: Val ⇀ Val) →
                             (f .= vf /\ ((x :⇒ r) ⭄ prs)), ff)
                   | vf@(F(Fn ff)) ← allVals ]
@@ -503,5 +513,5 @@ mapFilterS = undefined
 -}
 
 den :: Term -> ENV
-den t = collapse $ ε (Block t) u v
+den t = collapse $ ɩℰ (Block t) u v
   where [u, v] = fresh ["u", "v"] [t]
