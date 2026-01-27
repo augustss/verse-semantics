@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -13,6 +15,7 @@
 module SemClass where
 import Prelude hiding((++), map, concat, pi, not, (>>=), mapM)
 import qualified Prelude as P
+import Data.Char
 import qualified Data.List as L
 import Control.Applicative(Alternative)
 import Data.Kind
@@ -22,6 +25,7 @@ import qualified EQD
 
 -----
 
+{-
 -- Totally abstract M
 data M a
 instance Eq (M a)
@@ -42,27 +46,32 @@ unionS = undefined
 -}
 collapse(s) = undefined
 mapM = undefined
+-}
 
 -----
 
-{-
-type M a = Set a
+
+type M a = XSet a
 empty = ø
 inj(d) = d
 (++) = (∪)
-fold(k,z,s) = k(s,z)
 (⎧*⎫) = (∩)
 (⎩*⎭) = (∪)
 (⊍) = (∪)
-unionS = (⋃)
+unionS s | Set.isEmpty s = empty
+unionS s = Set.foldSet (∪) s
+fold(k,z,s) = k(s,z)
+collapse(s) = s
+mapM = error "XSet mapM"
 {-
   piSM     :: (Set(a), a → Set(b)) → Set(Set(a :⇒ b))
   piSM(s,f) = [ g | g ← allFuns, dom(g) == s, (x:⇒y) ← g, y ∈ f(x) ]
   piM = piSM
 -}
-collapse(s) = s
-mapM = mapSet
--}
+
+-----
+
+
 
 -----
 
@@ -87,10 +96,14 @@ pattern U_ :: Term
 pattern U_ <- (F.Variable (F.isSrcUnderscore -> True))
 pattern Var :: Iden -> Term
 pattern Var i = F.Variable i
+pattern Prim :: Op -> Term
+pattern Prim o = F.EPrim o
 pattern (:=) :: Iden -> Term -> Term
 pattern i := t = F.DefineE i t
 pattern (:|:) :: Term -> Term -> Term
 pattern t1 :|: t2 = F.Choice t1 t2
+pattern (:|||:) :: Term -> Term -> Term
+pattern t1 :|||: t2 <- F.ApplyD (F.Variable (F.Ident _ "operator'|||'")) (F.Array [t1, t2])
 pattern (:=:) :: Term -> Term -> Term
 pattern t1 :=: t2 = F.Unify t1 t2
 --pattern (:~>) :: Term -> Term -> Term
@@ -116,6 +129,8 @@ pattern Int :: Z -> Term
 pattern Int k = F.Lit (F.LInt k)
 pattern Block :: Term -> Term
 pattern Block t = F.Block t
+pattern Exists :: Iden -> Term
+pattern Exists i = F.DefineV i
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] -> [Term] -> [Iden]
@@ -130,12 +145,47 @@ fresh ss ts = snd $ L.mapAccumL f (concatMap F.getAllBinders ts) ss
 iI :: Term → Set Iden
 iI = mkSet . F.getVisibleBinders
 
------ Val -----
-data Val = I Z | F Fn
-  deriving (Eq, Ord, Show)
+----- primops -----
 
-data Fn = Fn (M (Val, Val))
-  deriving (Eq, Ord, Show)
+dP :: Op -> Fn
+dP F.Neg = fun[funNegate]
+dP F.IsInt = fun[funInt]
+{-
+dP Gt = fun[funGt]
+dP Lt = fun[funLt]
+dP Add = fun[funAdd]
+dP Sub = fun[funSub]
+dP Mul = fun[funMul]
+dP Div = fun[funDiv]
+-}
+dP p = error $ "dP undefined " P.++ show p
+
+knownFuns :: [(Fn, String)]
+knownFuns = [ (dP o, P.map toLower (show o)) | o <- [F.Neg, F.IsInt] ]
+
+fun :: [Val ⇀ Val] -> Fn
+fun = Fn . concat . P.map inj
+
+funNegate :: Val ⇀ Val
+funNegate = [(I i, I ((-i) `mod` numZ)) | i <- allZ ]
+
+funInt :: Val ⇀ Val
+funInt = [(I i, I i) | i <- allZ ]
+
+----- Val -----
+
+data Val = I Z | F Fn
+  deriving (Eq, Ord)
+instance Show Val where
+  showsPrec p (I i) = showsPrec p i
+  showsPrec p (F f) = showsPrec p f
+
+data Fn = Fn (M (Val :⇒ Val))
+  deriving (Eq, Ord)
+
+instance Show Fn where
+  show f | Just s <- P.lookup f knownFuns = s
+  show (Fn f) = "Fn" P.++ show f
 
 type a ⇀ b = Set(a :⇒ b)   -- partial functions from a to b
 dom :: (a ⇀ b) → Set(a)
@@ -153,18 +203,42 @@ allZ = mkSet [i | i <- [0 .. numZ-1] ]
 
 allVals :: Set(Val)
 allVals = [ I i | i <- allZ ]
---        ∪ mkSet [ ... allFuns ... ]
+        ∪ [ F f | f <- allFuns ]
 
-allFuns :: Set(a ⇀ b)
-allFuns = undefined
+allFuns :: Set(Fn)
+allFuns = [ fun[funInt], fun[funNegate] ]
 
 ----- XSet -----
-type family XSet a = r | r -> a where
-  XSet Env = ENV
-  XSet a   = Set(a)
 
-class IsEmpty a where
-  isEmpty :: a -> Bool
+type ASet :: Type -> Constraint
+class (Eq (XSet a)) => ASet a where
+  type XSet a = r | r -> a
+  ø :: XSet(a)
+  isEmpty :: XSet(a) -> Bool
+  (∪) :: XSet(a) → XSet(a) → XSet(a)
+  (∩) :: XSet(a) → XSet(a) → XSet(a)
+
+instance ASet Env where
+  type XSet Env = ENV
+  ø = EQD.false
+  (∪) = (EQD.\/)
+  (∩) = (EQD./\)
+  isEmpty x = x == EQD.false
+
+instance ASet Val where
+  type XSet Val = Set Val
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+
+instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
+  type XSet (a, b) = Set (a, b)
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  
 
 ----- Set -----
 -- Adapter for Set module
@@ -175,14 +249,14 @@ type Set = Set.Set
 a ∉ as = P.not (Set.member a as)
 (∈) :: (Eq a) => a → Set a → Bool
 a ∈ as = Set.member a as
-ø :: Set a
-ø = Set.empty
-(∪) :: Set(a) → Set(a) → Set(a)
-(∪) = Set.union
-(∩) :: (Eq a) => Set(a) → Set(a) → Set(a)
-(∩) = Set.intersect
-(⋃) :: Set(Set(a)) → Set(a)
-(⋃) = Set.bigUnion
+--ø :: Set a
+--ø = Set.empty
+--(∪) :: Set(a) → Set(a) → Set(a)
+--(∪) = Set.union
+--(∩) :: (Eq a) => Set(a) → Set(a) → Set(a)
+--(∩) = Set.intersect
+--(⋃) :: Set(Set(a)) → Set(a)
+--(⋃) = Set.bigUnion
 sing :: a → Set a
 sing = Set.singleton
 mapSet :: (a → b, Set(a)) → Set(b)
@@ -192,19 +266,11 @@ bigIntersect = Set.bigIntersect
 mkSet :: [a] -> Set a
 mkSet = Set.mkSet
 
-instance IsEmpty (Set a) where
-  isEmpty = Set.isEmpty
-
 ----- Iden -----
 type Iden = F.Ident
 
 ----- Env -----
 data Env
-instance Eq Env
-instance Ord Env
-
-allEnvs :: Set(Env)    -- set of all environments
-allEnvs = undefined
 
 ----- Simple values -----
 data Atom = V Val | X Iden | AOp Op [Atom] | ATup [Atom]
@@ -259,31 +325,37 @@ infixl 3 /\
 (.<=) :: Atom → Atom → ENV
 (.<=) = undefined
 
-(⭄) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
-(⭄) = undefined
+unionENVs :: [ENV] -> ENV
+unionENVs = P.foldr (\/) cempty
 
-instance IsEmpty ENV where
-  isEmpty x = x == cempty
+-- Environments where the pair (x :⇒ y) is in the function f
+(⭄) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
+(x :⇒ y) ⭄ f =
+  unionENVs [ x .= u /\ y .= v | u <- Set.toList allVals, Just v <- [applyPF f u] ]
+
+-- Apply a partial function
+applyPF :: (Val ⇀ Val) -> Val -> Maybe Val
+applyPF f x = Set.getSing $ Set.lookupSet x f
 
 ----- Verse computation type -----
-empty    :: M(a)
-inj      :: XSet(a) → M(a)
-(++)     :: M(a) → M(a) → M(a)
-(⎧*⎫)    :: Ord a => M(a) → M(a) → M(a)
-(⎩*⎭)    :: M(a) → M(a) → M(a)
-(⊍)      :: M(a) → M(a) → M(a)
-unionS   :: Set(M(a)) → M(a)
+empty    :: ASet a => M(a)
+inj      :: ASet a => XSet(a) → M(a)
+(++)     :: ASet a => M(a) → M(a) → M(a)
+(⎧*⎫)    :: ASet a => M(a) → M(a) → M(a)
+(⎩*⎭)    :: ASet a => M(a) → M(a) → M(a)
+(⊍)      :: ASet a => M(a) → M(a) → M(a)
+unionS   :: (ASet a, Ord (M a)) => Set(M(a)) → M(a)
 --  mapS     :: (Set(a) → Set(b), m(a)) → m(b)
-fold     :: ((XSet(a), M(b)) → M(b), M(b), M(a)) → M(b)
+fold     :: ASet a => ((XSet(a), M(b)) → M(b), M(b), M(a)) → M(b)
 {-
   piSM     :: (m(a), a → Set(b)) → Set(m(a :⇒ b))
   piM      :: (m(a), a → m(b)) → m(m(a :⇒ b))
 -}
-collapse :: M(a) → XSet(a)
+collapse :: (ASet a) => M(a) → XSet(a)
 mapM     :: (a→b, M(a)) → M(b)
 
 -- Derived functions
-mapS :: (XSet(a) → XSet(b), M(a)) → M(b)
+mapS :: (ASet a, ASet b) => (XSet(a) → XSet(b), M(a)) → M(b)
 mapS(f, s) = fold( \(x,t)→inj(f(x)) ++ t, empty, s )
 
 infixl 5 \\\
@@ -294,7 +366,7 @@ s \\\ vs = --mapS (\ d → d \\ vs, s)
 not :: M(Env) → M(Env)
 not(s) = inj(compl(collapse(s)))
 
-prune :: forall a . (Ord a, IsEmpty (XSet a)) =>
+prune :: forall a . (ASet a) =>
          M(a) → M(a)
 prune(s) = fold(op,empty,s)
   where op :: (XSet(a),M(a)) → M(a)
@@ -306,62 +378,23 @@ one(s,vs) = fold(op,empty,s)
   where op :: (XSet(Env), M(Env)) → M(Env)
         op(d,rest) = inj(d) ⎩*⎭ (inj(compl(d \\ vs)) ⎧*⎫ rest)
 
-concat :: [M(a)] → M(a)
+concat :: ASet a => [M(a)] → M(a)
 concat [] = empty
 concat (s:ss) = s ++ concat ss
 
----------------------------
-
-{-
-newtype SeqSet a = S [Set(a)]
-(⩂) :: SeqSet a → SeqSet a → SeqSet a  -- dodgy union
-(⩂) = undefined
-
-instance Comp SeqSet where
-  empty = S [ø]
-  inj(d) = S [d]
-  S s ++ S t = S (s P.++ t)
-  S s ⎧*⎫ S t = S [ d₁ ∩ d₂ | d₁ ← s, d₂ ← t ]
-  (⎩*⎭) = (⩂)
-  (⊍) = (⩂)
-  unionS(ss) = error "infinite dodgy union"
-  mapS(f,S s) = S [ mapS(f,x) | x ← s ]
-  fold(k,z,S[]) = z
-  fold(k,z,S(x:xs)) = k(x,fold(k,z,S xs))
-  piSM = error "???"
-  collapse(S[]) = ø
-  collapse(S(x:xs)) = x ∪ collapse(S xs)
-
----------------------------
-
-data Tree a = L(Set(a)) | Tree(a) :∪ Tree(a) | Tree(a) :++ Tree(a)
-(>>=) :: Tree(a) → (Set(a) → Tree(b)) → Tree(b)
-(>>=) = undefined
-
-instance Comp Tree where
-  empty = L ø
-  inj(d) = L d
-  (++) = (:++)
-  s ⎧*⎫ t = s >>= \d₁→ t >>= \d₂→ L (d₁ ∩ d₂)
-  s ⎩*⎭ t = s >>= \d₁→ t >>= \d₂→ L (d₁ ∪ d₂)
-  (⊍) = (:∪)
-  unionS = error "??"
-  mapS(f,s) = s >>= \d→ inj(f(d))
-  fold(k,z,s) = error "??"
-  piSM = error "???"
-  collapse = error "collapse"
--}
 ---------------------------
 
 ε :: Term → Iden → Iden → M(Env)
 ε (U_)      u v = inj (u .=. v)
 ε (Var x)   u v = inj (u .=. v /\ v .=. x)
 ε (Int k)   u v = inj (u .=. v /\ v .=  I k)
--- prim
+ε (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
 ε (x :=  t) u v = inj (x .=. v) ⎧*⎫ ε (t) u v
 ε (x :-> t) u v = inj (x .=. u) ⎧*⎫ ε (t) u v
+ε (Exists x)u v = inj (u .=. v /\ v .=. x)
 -- Array
 ε (t₁ :|:   t₂) u v = ε (t₁) u v ++  ε (t₂) u v
+ε (t₁ :|||: t₂) u v = ε (t₁) u v ⎩*⎭ ε (t₂) u v
 ε (t₁ :=:   t₂) u v = ε (t₁) u v ⎧*⎫ ε (t₂) u v
 -- XXX ε (t₁ :~>   t₂) u v = ε (t₁) u w ⎧*⎫ ε (t₂) w v \\\ [w] where [w] = fresh ["w"] [t₁, t₂, Var u, Var v]
 ε (t₁ :>    t₂) u v = cC(t₁)     ⎧*⎫ ε (t₂) u v
@@ -447,6 +480,7 @@ instance Comp Tree where
                                   | aρ ← collapse(dom), aρ(x) == xv
                                   ])
 -}
+ε t _ _ = error $ "ε: " P.++ show t
 
 cC :: Term → M(Env)
 cC (t) = ε (t) p q \\\ [p, q]
@@ -456,9 +490,11 @@ bB :: Term → Iden → Iden → M(Env)
 bB (t) u v = ε (t) u v \\\ iI(t)
 
 dF :: Iden → Iden → Iden → M(Env)
-dF f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
+dF f x r =
+  unionS [ mapS (\ (prs :: Val ⇀ Val) →
                             (f .= vf /\ ((x :⇒ r) ⭄ prs)), ff)
                   | vf@(F(Fn ff)) ← allVals ]
+
 -- 
 
 {-

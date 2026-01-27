@@ -204,6 +204,7 @@ library verse-densem
                       ENVDesugar
                       PomSet
                       PomPom
+                      SemClass
                       ValueP
                       ENVP
                       EQD

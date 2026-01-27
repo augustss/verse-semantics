@@ -30,6 +30,7 @@ module Set(
   anySet,
   cross,
   unzip3Set,
+  lookupSet,
   ) where
 import Control.Applicative
 import Data.List(intercalate, sort, groupBy, sortBy, partition)
@@ -191,3 +192,6 @@ instance (Ord a) => IsList (Set a) where
   type Item (Set a) = a
   fromList = mkSet
   toList = toList'
+
+lookupSet :: Eq a => a -> Set (a, b) -> Set b
+lookupSet x (S xys) = S [ y | (x', y) <- xys, x == x' ]

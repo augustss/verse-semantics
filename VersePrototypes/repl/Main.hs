@@ -221,11 +221,12 @@ theCommandSet = CommandSet
       , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetterCore getCore)
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
-      , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
+      , Cmd "old-densem [EXPR]"    "Evaluate [last] expression"            cDensem
       , Cmd "dls-densem [EXPR]"    "Evaluate [last] expression"            cDlsDensem
       , Cmd "tim-densem [EXPR]"    "Evaluate [last] expression"            cTimDensem
       , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
       , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
+      , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cSemClassDensem
       , Cmd "ppom [EXPR]"          "Evaluate [last] expression"            cPomPomDensem
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
