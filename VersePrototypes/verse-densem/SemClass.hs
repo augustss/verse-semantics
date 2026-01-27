@@ -18,6 +18,7 @@ import Control.Applicative(Alternative)
 import Data.Kind
 import qualified FrontEnd.Expr as F
 import qualified Set
+import qualified EQD
 
 -----
 
@@ -113,6 +114,8 @@ pattern Where :: Term -> Term -> Term
 pattern t1 `Where` t2 = F.Where t1 t2
 pattern Int :: Z -> Term
 pattern Int k = F.Lit (F.LInt k)
+pattern Block :: Term -> Term
+pattern Block t = F.Block t
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] -> [Term] -> [Iden]
@@ -196,7 +199,7 @@ instance IsEmpty (Set a) where
 type Iden = F.Ident
 
 ----- Env -----
-type Env = Iden → Val
+data Env
 instance Eq Env
 instance Ord Env
 
@@ -230,27 +233,26 @@ oneTuple :: Iden → Atom
 oneTuple x = ATup [X x]
 
 ----- ENV, constraints -----
-data ENV
-instance Eq ENV
+type ENV = EQD.EQD Iden Val
 cempty :: ENV
-cempty = undefined
+cempty = EQD.false
 univ :: ENV
-univ = undefined
+univ = EQD.true
 compl :: ENV → ENV
-compl = undefined
+compl = EQD.nt
 infixl 5 \\
 (\\) :: ENV → Set(Iden) → ENV
-(\\) = undefined
+(\\) e is = EQD.qexis (Set.toList is) e
 infixl 2 \/
 (\/) :: ENV → ENV → ENV
-(\/) = undefined
+(\/) = (EQD.\/)
 infixl 3 /\
 (/\) :: ENV → ENV → ENV
-(/\) = undefined
+(/\) = (EQD./\)
 (.=.) :: Iden → Iden → ENV
-(.=.) = undefined
+(.=.) = (EQD.=~)
 (.=) :: Iden → Val → ENV
-(.=) = undefined
+(.=) = (EQD.=:)
 
 (.=:) :: Iden → Atom → ENV
 (.=:) = undefined
@@ -375,6 +377,7 @@ instance Comp Tree where
   where [p,q] = fresh ["p","q"] [t,Var u, Var v]
 ε (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ bB (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ bB (t₂) u v)
   where xs = iI(t₀); s₀ = one(cC(t₀),xs)
+ε (Block t) u v = bB (t) u v
 ε (For t₀ t₁) u v = fold(op,z,cC(t₀))
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
         xs             = iI(t₀)
@@ -451,7 +454,6 @@ cC (t) = ε (t) p q \\\ [p, q]
 
 bB :: Term → Iden → Iden → M(Env)
 bB (t) u v = ε (t) u v \\\ iI(t)
-  where [p,q] = fresh ["p","q"] [t]
 
 dF :: Iden → Iden → Iden → M(Env)
 dF f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
@@ -459,6 +461,11 @@ dF f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
                   | vf@(F(Fn ff)) ← allVals ]
 -- 
 
+{-
 mapFilterS :: (a → Set(b), M(a)) → M(b)
 mapFilterS = undefined
+-}
 
+den :: Term -> ENV
+den t = collapse $ ε (Block t) u v
+  where [u, v] = fresh ["u", "v"] [t]
