@@ -1,10 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 module Set(
   Set,
   singleton,
   intersect,
+  bigIntersect,
   union,
   unions,
+  bigUnion,
   difference,
   isEmpty,
   empty,
@@ -33,6 +36,7 @@ import Data.List(intercalate, sort, groupBy, sortBy, partition)
 import qualified Data.Maybe as M
 import qualified Data.Set as S
 import GHC.Stack
+import GHC.Exts(IsList(..))
 
 -- Sets as lists with duplicates so it can be a monad.
 
@@ -73,8 +77,15 @@ union (S a) (S b) = S (a ++ b)
 unions :: [Set a] -> Set a
 unions = foldr union empty
 
+bigUnion :: Set (Set a) -> Set a
+bigUnion (S ss) = unions ss
+
 intersect :: Eq a => Set a -> Set a -> Set a
 intersect (S as) (S bs) = S [ a | a <- as, a `elem` bs ]
+
+bigIntersect :: Eq a => Set (Set a) -> Set a
+bigIntersect (S []) = error "bigIntersect: empty"
+bigIntersect (S ss) = foldr1 intersect ss
 
 difference :: Eq a => Set a -> Set a -> Set a
 difference (S as) (S bs) = S [ a | a <- as, a `notElem` bs ]
@@ -82,10 +93,16 @@ difference (S as) (S bs) = S [ a | a <- as, a `notElem` bs ]
 isSubsetOf :: Eq a => Set a -> Set a -> Bool
 isSubsetOf (S as) (S bs) = all (\ a -> a `elem` bs) as
 
+{-
 mkSet :: Ord a => [a] -> Set a
 mkSet as@[] = S as    -- small speedup
 mkSet as@[_] = S as   -- small speedup
 mkSet s = S (nub s)
+-}
+
+-- We don't care about duplicates
+mkSet :: [a] -> Set a
+mkSet = S
 
 -- Only use this if all elements of the list are distinct
 mkSetUnsafe :: [a] -> Set a
@@ -97,8 +114,8 @@ getSing s =
     [x] -> Just x
     _ -> Nothing
 
-toList :: Ord a => Set a -> [a]
-toList (S axs) = unDup $ sort axs
+toList' :: Ord a => Set a -> [a]
+toList' (S axs) = unDup $ sort axs
   where
     unDup (x:y:xs) | x == y    =     unDup (y:xs)
                    | otherwise = x : unDup (y:xs)
@@ -170,3 +187,7 @@ nub = go S.empty
     | x `S.member` seen = go seen xs
     | otherwise         = x : go (S.insert x seen) xs
 
+instance (Ord a) => IsList (Set a) where
+  type Item (Set a) = a
+  fromList = mkSet
+  toList = toList'
