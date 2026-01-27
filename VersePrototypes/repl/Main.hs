@@ -32,6 +32,7 @@ import qualified TimE (den)
 import qualified SLS (den)
 import qualified Pom (den)
 import qualified PomPom (denS, ForUnionMode(..), ForUnitMode(..), IfUnionMode(..), Config(..), defaultConfig)
+import qualified SemClass (den)
 import ENVDesugar (envDesugar)
 
 -- Epic libraries
@@ -568,6 +569,23 @@ cPomDensem
        ; e_ds <- eSlsDesugar e_ess
        ; let res = Pom.den e_ds
        ; let den_sem = addHeader "Pom Den-sem" $ text $ show res
+       ; displayDoc den_sem
+{-
+       ; let resU = Pom.denU e_ds
+       ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
+       ; displayDoc den_semU
+-}
+       ; return () }
+
+cSemClassDensem :: CmdRunner CState
+cSemClassDensem
+  = getInputExpr $ \e s ->
+    tryIt (\_ -> pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- eSlsDesugar e_ess
+       ; let res = SemClass.den e_ds
+       ; let den_sem = addHeader "M Den-sem" $ text $ show res
        ; displayDoc den_sem
 {-
        ; let resU = Pom.denU e_ds
