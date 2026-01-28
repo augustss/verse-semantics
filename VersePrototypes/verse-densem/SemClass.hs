@@ -16,7 +16,9 @@
 module SemClass where
 import Prelude hiding((++), map, concat, pi, not, (>>=), mapM)
 import qualified Prelude as P
-import Data.Char
+import qualified Control.Monad as M
+import qualified Data.Maybe as P
+import qualified Data.Char as P
 import qualified Data.List as L
 import Control.Applicative(Alternative)
 import Data.Kind
@@ -162,7 +164,7 @@ dP Div = fun[funDiv]
 dP p = error $ "dP undefined " P.++ show p
 
 knownFuns :: [(Fn, String)]
-knownFuns = [ (dP o, P.map toLower (show o)) | o <- [F.Neg, F.IsInt] ]
+knownFuns = [ (dP o, P.map P.toLower (show o)) | o <- [F.Neg, F.IsInt] ]
 
 fun :: [Val ⇀ Val] -> Fn
 fun = Fn . concat . P.map inj
@@ -180,10 +182,12 @@ applyPF f x = Set.getSing $ Set.lookupSet x f
 ----- Val -----
 
 data Val = I Z | F Fn
+  | T [Val]                                -- XXX tuples, temporary
   deriving (Eq, Ord)
 instance Show Val where
   showsPrec p (I i) = showsPrec p i
   showsPrec p (F f) = showsPrec p f
+  showsPrec _ (T vs) = showString $ "〈" P.++ L.intercalate "," (P.map show vs) P.++ "〉"
 
 data Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
@@ -209,6 +213,7 @@ allZ = mkSet [i | i <- [0 .. numZ-1] ]
 allVals :: Set(Val)
 allVals = [ I i | i <- allZ ]
         ∪ [ F f | f <- allFuns ]
+--        ∪ [ T t | t <- allTuples ]
 
 allFuns :: Set(Fn)
 allFuns = [ fun[funInt], fun[funNegate] ]
@@ -302,13 +307,53 @@ instance Num (Atom) where
   x * y = AOp F.Mul [x, y]
   fromInteger = V . I
 
+{-
 (⨄) :: Iden → Iden → Atom
 x ⨄ y = AOp F.ArrApp [X x, X y]
+-}
+(⊕) :: Atom -> Atom -> Atom
+x ⊕ y = AOp F.ArrApp [x, y]
+
 nil :: Atom
 nil = ATup []
 
 oneTuple :: Iden → Atom
 oneTuple x = ATup [X x]
+
+type AEnv = [(Iden, Val)]
+
+atomEval :: AEnv -> Atom -> Maybe Val
+atomEval r (X x)      = P.lookup x r
+atomEval _ (V v)      = Just v
+atomEval r (ATup as)  = T <$> P.mapM (atomEval r) as
+atomEval r (AOp o as) =
+  case (o, P.mapM (atomEval r) as) of
+    (F.Neg, Just [I i])        -> Just $ I $ (-i)    `mod` numZ
+    (F.Add, Just [I i1, I i2]) -> Just $ I $ (i1+i2) `mod` numZ
+    (F.Sub, Just [I i1, I i2]) -> Just $ I $ (i1-i2) `mod` numZ
+    (F.Mul, Just [I i1, I i2]) -> Just $ I $ (i1*i2) `mod` numZ
+    (F.Div, Just [I i1, I i2]) -> Just $ I $ (i1 `div` i2)
+    _                          -> Nothing
+
+atomVars :: Atom -> [Iden]
+atomVars (X x) = [x]
+atomVars (V _) = []
+atomVars (ATup  as) = P.foldr L.union [] (P.map atomVars as)
+atomVars (AOp o as) = P.foldr L.union [] (P.map atomVars as)
+
+atomEnvs :: [Atom] -> [([Val], AEnv)]
+atomEnvs as =
+  let aenvs = P.map (P.zip is) (M.replicateM (length is) $ Set.toList allVals)
+      is = P.foldr L.union [] $ P.map atomVars as
+  in  [ (vs, r) | r <- aenvs, Just vs <- [P.mapM (atomEval r) as] ]
+
+atomEnvToENV :: AEnv -> ENV
+atomEnvToENV = foldr (/\) univ . P.map (uncurry (.=))
+
+(.==) :: Iden → Atom → ENV
+i .== a = unionENVs [ i .= v /\ atomEnvToENV r | ([v], r) <- atomEnvs [a] ]
+(.<=) :: Atom → Atom → ENV
+a1 .<= a2 = unionENVs [ atomEnvToENV r | ([I v1, I v2], r) <- atomEnvs [a1, a2], v1 <= v2 ]
 
 ----- ENV, constraints -----
 type ENV = EQD.EQD Iden Val
@@ -332,17 +377,12 @@ infixl 3 /\
 (.=) :: Iden → Val → ENV
 (.=) = (EQD.=:)
 
-(.=:) :: Iden → Atom → ENV
-(.=:) = undefined
-(.<=) :: Atom → Atom → ENV
-(.<=) = undefined
-
 unionENVs :: [ENV] -> ENV
 unionENVs = P.foldr (\/) cempty
 
 -- Environments where the pair (x :⇒ y) is in the function f
-(⭄) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
-(x :⇒ y) ⭄ f =
+(⋵) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
+(x :⇒ y) ⋵ f =
   unionENVs [ x .= u /\ y .= v | u <- Set.toList allVals, Just v <- [applyPF f u] ]
 
 ----- Verse computation type -----
@@ -411,7 +451,7 @@ concat (s:ss) = s ++ concat ss
 ɩℰ (t₁ :>    t₂) u v = ɩ𝒞 (t₁)     ⎧*⎫ ɩℰ (t₂) u v
 ɩℰ (t₁ `Where` t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩ𝒞 (t₂)
 ɩℰ (t₁ :..   t₂) u v = inj(u .=. v) ⎧*⎫ ɩℰ (t₁) p₁ q₁ ⎧*⎫ ɩℰ (t₂) p₂ q₂ ⎧*⎫
-  unionS[ concat[ inj(v .=: (X q₁ + i) /\ i .<= (X q₁ - X q₂))  | i ← [0..n]] | n ← allN ]
+  unionS[ concat[ inj(v .== (X q₁ + i) /\ i .<= (X q₂ - X q₁)) | i ← [0..n]] | n ← allN ]
   \\\ [p₁, q₁, p₂, q₂]
   where [p₁, q₁, p₂, q₂] = fresh ["p1","q1","p2","q2"] [t₁, t₂, Var u, Var v]
 ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
@@ -426,11 +466,11 @@ concat (s:ss) = s ++ concat ss
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
         xs             = iI(t₀)
         s₁ :: M(Env) = ɩℬ(t₁) p q
-        z  :: M(Env) = inj(u .=: nil /\ v .=: nil)
+        z  :: M(Env) = inj(u .== nil /\ v .== nil)
         op :: (XSet(Env), M(Env)) → M(Env)
-        op(d,m)        =     inj(u .=: (u₁ ⨄ u₂) /\ v .=: (v₁ ⨄ v₂))
-                         ⎧*⎫ ((inj(d) ⎧*⎫ s₁ ⎧*⎫ inj(u₁ .=: oneTuple(p) /\ v₁ .=: oneTuple(q)) \\\ [p,q])
-                              ⊍ (inj(compl(d \\ xs)) ⎧*⎫ inj(u₁ .=: nil /\ v₁ .=: nil)))
+        op(d,m)        =     inj(u .== (X u₁ ⊕ X u₂) /\ v .== (X v₁ ⊕ X v₂))
+                         ⎧*⎫ ((inj(d) ⎧*⎫ s₁ ⎧*⎫ inj(u₁ .== oneTuple(p) /\ v₁ .== oneTuple(q)) \\\ [p,q])
+                              ⊍ (inj(compl(d \\ xs)) ⎧*⎫ inj(u₁ .== nil /\ v₁ .== nil)))
                          ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                          \\\ [u₁,u₂,v₁,v₂]
 {-
@@ -491,7 +531,7 @@ concat (s:ss) = s ++ concat ss
                                   | aρ ← collapse(dom), aρ(x) == xv
                                   ])
 -}
-ɩℰ t _ _ = error $ "ɩℰ: " P.++ show t
+ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
 
 ɩ𝒞 :: Term → M(Env)
 ɩ𝒞 (t) = ɩℰ (t) p q \\\ [p, q]
@@ -501,9 +541,8 @@ concat (s:ss) = s ++ concat ss
 ɩℬ (t) u v = ɩℰ (t) u v \\\ iI(t)
 
 ɩℱ :: Iden → Iden → Iden → M(Env)
-ɩℱ f x r =
-  unionS [ mapS (\ (prs :: Val ⇀ Val) →
-                            (f .= vf /\ ((x :⇒ r) ⭄ prs)), ff)
+ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
+                            (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
                   | vf@(F(Fn ff)) ← allVals ]
 
 -- 
