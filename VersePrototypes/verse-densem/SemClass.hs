@@ -53,7 +53,7 @@ mapM = undefined
 
 -----
 
-
+{-
 type M a = XSet a
 empty = ø
 inj(d) = d
@@ -71,10 +71,33 @@ mapM = error "XSet mapM"
   piSM(s,f) = [ g | g ← allFuns, dom(g) == s, (x:⇒y) ← g, y ∈ f(x) ]
   piM = piSM
 -}
-
+-}
 -----
 
+data M a = M [XSet a]
+instance Eq (M a) where (==) = error "M ==: missing"
+instance Ord (M a) where compare = error "M compare: missing"
+instance (Show (XSet a)) => Show (M a) where
+  showsPrec _ (M []) = showString "EMPTY"
+  showsPrec p (M xs) = showParen (p > 0) $ showString $ L.intercalate " | " $ P.map show xs
+empty = M []
+inj(d) = M [d]
+M s ++ M t = M (s P.++ t)
+M s ⎧*⎫ M t = M [ d1 ∩ d2 | d1 <- s, d2 <- t ]
+M s ⎩*⎭ M t = M [ d1 ∪ d2 | d1 <- s, d2 <- t ]
+s ⊍ t = dzip((∪), [s,t])
+unionS ss = dzip((∪), ss)
+fold(k,z,M s) = P.foldr (curry k) z s
+collapse(M s) = unions s
+mapM = error "M XSet mapM"
 
+dzip :: ASet a => (XSet(a)->XSet(a)->XSet(a), Set(M(a))) -> M(a)
+dzip(f, xs) = M $ foldr (\ (M x) r -> zipLong f x r) [] (Set.toList xs)
+
+zipLong :: (a -> a -> a) -> [a] -> [a] -> [a]
+zipLong _ [] ys = ys
+zipLong _ xs [] = xs
+zipLong f (x:xs) (y:ys) = f x y : zipLong f xs ys
 
 -----
 
@@ -237,6 +260,7 @@ class (Eq (XSet a)) => ASet a where
   isEmpty :: XSet(a) -> Bool
   (∪) :: XSet(a) → XSet(a) → XSet(a)
   (∩) :: XSet(a) → XSet(a) → XSet(a)
+  unions :: [XSet(a)] -> XSet(a)
 
 instance ASet Env where
   type XSet Env = ENV
@@ -244,6 +268,7 @@ instance ASet Env where
   (∪) = (EQD.\/)
   (∩) = (EQD./\)
   isEmpty x = x == EQD.false
+  unions = P.foldr (EQD.\/) EQD.false
 
 instance ASet Val where
   type XSet Val = Set Val
@@ -251,6 +276,7 @@ instance ASet Val where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  unions = Set.unions
 
 instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
@@ -258,6 +284,7 @@ instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  unions = Set.unions
   
 instance (Ord a, ASet a) => ASet (Set(a)) where
   type XSet (Set a) = Set (Set(a))
@@ -265,6 +292,7 @@ instance (Ord a, ASet a) => ASet (Set(a)) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  unions = Set.unions
   
 
 ----- Set -----
@@ -444,8 +472,9 @@ concat :: ASet a =>
 concat [] = empty
 concat (s:ss) = s ++ concat ss
 
-bigStar :: [ENV] -> ENV
-bigStar = foldr (⎧*⎫) univ
+bigStar :: [M(Env)] -> M(Env)
+bigStar [] = error "bigStar: []"
+bigStar xs = P.foldr1 (⎧*⎫) xs
 
 ---------------------------
 
@@ -459,13 +488,13 @@ bigStar = foldr (⎧*⎫) univ
 ɩℰ (x :=  t) u v = inj (x .=. v) ⎧*⎫ ɩℰ (t) u v
 ɩℰ (x :-> t) u v = inj (x .=. u) ⎧*⎫ ɩℰ (t) u v
 ɩℰ (Exists x)u v = inj (u .=. v /\ v .=. x)
-ɩℰ (Array ts)u v = inj (u .== tup(us) /\ v .== tup(vs)) ⎧*⎫
-                   bigStar (zipWith3 ɩℰ ts us vs)
+ɩℰ (Array ts)u v = bigStar (inj(u .== tup(us) /\ v .== tup(vs)) :
+                            zipWith3 ɩℰ ts us vs)
                    \\\ mkSet (us P.++ vs)
   where us = fresh (P.map (const "u") ts) [Array ts, Var u, Var v]
         vs = fresh (P.map (const "v") ts) [Array ts, Var u, Var v]
-ɩℰ (t₁ :|:   t₂) u v = ɩℰ (t₁) u v ++  ɩℰ (t₂) u v
-ɩℰ (t₁ :|||: t₂) u v = ɩℰ (t₁) u v ⎩*⎭ ɩℰ (t₂) u v
+ɩℰ (t₁ :|:   t₂) u v = ɩℬ (t₁) u v ++  ɩℬ (t₂) u v
+ɩℰ (t₁ :|||: t₂) u v = ɩℬ (t₁) u v ⎩*⎭ ɩℬ (t₂) u v
 ɩℰ (t₁ :=:   t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩℰ (t₂) u v
 -- XXX ɩℰ (t₁ :~>   t₂) u v = ɩℰ (t₁) u w ⎧*⎫ ɩℰ (t₂) w v \\\ [w] where [w] = fresh ["w"] [t₁, t₂, Var u, Var v]
 ɩℰ (t₁ :>    t₂) u v = ɩ𝒞 (t₁)     ⎧*⎫ ɩℰ (t₂) u v
@@ -572,8 +601,8 @@ mapFilterS :: (a → Set(b), M(a)) → M(b)
 mapFilterS = undefined
 -}
 
-den :: Term -> ENV
-den t = collapse $ ɩℰ (Block t) u v
+den :: Term -> M(Env)
+den t = prune $ ɩℰ (Block t) u v
   where [u, v] = fresh ["u", "v"] [t]
 
 
@@ -581,5 +610,7 @@ x = F.Ident F.noLoc "x"
 y = F.Ident F.noLoc "y"
 u = F.Ident F.noLoc "u"
 v = F.Ident F.noLoc "v"
+eE = ɩℰ
+bB = ɩℬ
 
 main = print $ den $ Array [Int 1, Int 2]
