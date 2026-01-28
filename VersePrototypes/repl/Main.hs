@@ -32,6 +32,7 @@ import qualified TimE (den)
 import qualified SLS (den)
 import qualified Pom (den)
 import qualified PomPom (denS, ForUnionMode(..), ForUnitMode(..), IfUnionMode(..), Config(..), defaultConfig)
+import qualified SemClass (den)
 import ENVDesugar (envDesugar)
 
 -- Epic libraries
@@ -220,11 +221,12 @@ theCommandSet = CommandSet
       , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetterCore getCore)
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
-      , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
+      , Cmd "old-densem [EXPR]"    "Evaluate [last] expression"            cDensem
       , Cmd "dls-densem [EXPR]"    "Evaluate [last] expression"            cDlsDensem
       , Cmd "tim-densem [EXPR]"    "Evaluate [last] expression"            cTimDensem
       , Cmd "sls-densem [EXPR]"    "Evaluate [last] expression"            cSlsDensem
       , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
+      , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cSemClassDensem
       , Cmd "ppom [EXPR]"          "Evaluate [last] expression"            cPomPomDensem
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
@@ -568,6 +570,23 @@ cPomDensem
        ; e_ds <- eSlsDesugar e_ess
        ; let res = Pom.den e_ds
        ; let den_sem = addHeader "Pom Den-sem" $ text $ show res
+       ; displayDoc den_sem
+{-
+       ; let resU = Pom.denU e_ds
+       ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
+       ; displayDoc den_semU
+-}
+       ; return () }
+
+cSemClassDensem :: CmdRunner CState
+cSemClassDensem
+  = getInputExpr $ \e s ->
+    tryIt (\_ -> pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- eSlsDesugar e_ess
+       ; let res = SemClass.den e_ds
+       ; let den_sem = addHeader "M Den-sem" $ text $ show res
        ; displayDoc den_sem
 {-
        ; let resU = Pom.denU e_ds

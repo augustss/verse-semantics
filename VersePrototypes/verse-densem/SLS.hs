@@ -7,7 +7,7 @@ import Epic.List
 import FrontEnd.Expr hiding(Tuple)
 import ValueS
 import ENVS
-import Set
+import Set hiding(bigUnion, bigIntersect)
 --import Debug.Trace
 
 default ()
