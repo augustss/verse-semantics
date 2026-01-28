@@ -134,6 +134,8 @@ pattern Block :: Term -> Term
 pattern Block t = F.Block t
 pattern Exists :: Iden -> Term
 pattern Exists i = F.DefineV i
+pattern Array :: [Term] -> Term
+pattern Array as = F.Array as
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] -> [Term] -> [Iden]
@@ -213,10 +215,18 @@ allZ = mkSet [i | i <- [0 .. numZ-1] ]
 allVals :: Set(Val)
 allVals = [ I i | i <- allZ ]
         ∪ [ F f | f <- allFuns ]
---        ∪ [ T t | t <- allTuples ]
+        ∪ allTuples
 
 allFuns :: Set(Fn)
 allFuns = [ fun[funInt], fun[funNegate] ]
+
+-- 0, 1, 2-tuples of numbers
+allTuples :: Set(Val)
+allTuples = mkSet $ (P.concat :: [[Val]] -> [Val])
+  [ [ T []]
+  , [ T [I x] | x <- [0 .. numZ-1] ]
+  , [ T [I x, I y] | x <- [0 .. numZ-1], y <- [0 .. numZ-1] ]
+  ]
 
 ----- XSet -----
 
@@ -317,6 +327,9 @@ x ⊕ y = AOp F.ArrApp [x, y]
 nil :: Atom
 nil = ATup []
 
+tup :: [Iden] -> Atom
+tup vs = ATup (P.map X vs)
+
 oneTuple :: Iden → Atom
 oneTuple x = ATup [X x]
 
@@ -351,7 +364,7 @@ atomEnvToENV :: AEnv -> ENV
 atomEnvToENV = foldr (/\) univ . P.map (uncurry (.=))
 
 (.==) :: Iden → Atom → ENV
-i .== a = unionENVs [ i .= v /\ atomEnvToENV r | ([v], r) <- atomEnvs [a] ]
+i .== a = unionENVs [ i .= v /\ atomEnvToENV r | ([v], r) <- atomEnvs [a], v ∈ allVals ]
 (.<=) :: Atom → Atom → ENV
 a1 .<= a2 = unionENVs [ atomEnvToENV r | ([I v1, I v2], r) <- atomEnvs [a1, a2], v1 <= v2 ]
 
@@ -431,6 +444,9 @@ concat :: ASet a =>
 concat [] = empty
 concat (s:ss) = s ++ concat ss
 
+bigStar :: [ENV] -> ENV
+bigStar = foldr (⎧*⎫) univ
+
 ---------------------------
 
 -- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
@@ -443,7 +459,11 @@ concat (s:ss) = s ++ concat ss
 ɩℰ (x :=  t) u v = inj (x .=. v) ⎧*⎫ ɩℰ (t) u v
 ɩℰ (x :-> t) u v = inj (x .=. u) ⎧*⎫ ɩℰ (t) u v
 ɩℰ (Exists x)u v = inj (u .=. v /\ v .=. x)
--- Array
+ɩℰ (Array ts)u v = inj (u .== tup(us) /\ v .== tup(vs)) ⎧*⎫
+                   bigStar (zipWith3 ɩℰ ts us vs)
+                   \\\ mkSet (us P.++ vs)
+  where us = fresh (P.map (const "u") ts) [Array ts, Var u, Var v]
+        vs = fresh (P.map (const "v") ts) [Array ts, Var u, Var v]
 ɩℰ (t₁ :|:   t₂) u v = ɩℰ (t₁) u v ++  ɩℰ (t₂) u v
 ɩℰ (t₁ :|||: t₂) u v = ɩℰ (t₁) u v ⎩*⎭ ɩℰ (t₂) u v
 ɩℰ (t₁ :=:   t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩℰ (t₂) u v
@@ -555,3 +575,11 @@ mapFilterS = undefined
 den :: Term -> ENV
 den t = collapse $ ɩℰ (Block t) u v
   where [u, v] = fresh ["u", "v"] [t]
+
+
+x = F.Ident F.noLoc "x"
+y = F.Ident F.noLoc "y"
+u = F.Ident F.noLoc "u"
+v = F.Ident F.noLoc "v"
+
+main = print $ den $ Array [Int 1, Int 2]
