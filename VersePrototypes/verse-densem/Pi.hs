@@ -65,6 +65,7 @@ Set xys @@ x = head [ y | (x',y) <- xys, x'==x ]
 
 ----------------------------------------------------------------------
 
+{-
 class Alternative m => Power m where
   power :: m a -> m (Set a)
 
@@ -74,6 +75,7 @@ instance Power Set where
 instance Power [] where
   power []     = [ empty ]
   power (x:xs) = empty : [ ins x ys | ys <- xss ] ++ tail xss where xss = power xs
+-}
 
 class Alternative m => Collapse m where
   collapse :: m a -> Set a
@@ -111,21 +113,23 @@ instance Alternative M where
 instance Monad M where
   M xs >>= k = M [ y | x <- xs, let M ys = unionS $ fmap k x, y <- ys ]
 
+(+++) :: M a -> M a -> M a
+M xs +++ M ys = M (xs++ys)
+
 unionS :: Set (M a) -> M a
 unionS (Set xs) = M (sets xs)
  where
   sets :: [M a] -> [Set a]
-  sets xs
-    | null as   = []
-    | otherwise = Set as : sets ass
-   where
-    as  = concat [ a | M (Set a:_) <- xs ]
-    ass = [ M as | M (_:as) <- xs ]
+  sets xs =
+    case [ a | M (Set a:_) <- xs ] of
+      [] -> []
+      as -> Set (concat as) : sets [ M as | M (_:as) <- xs ]
 
 instance MonadPlus M where
   mzero = empty
   mplus = (<|>)
 
+{-
 instance Power M where
   power (M xss) =
     M [ Set (combo yss)
@@ -139,12 +143,33 @@ instance Power M where
       | s1 <- tail $ power as
       , s2 <- combo ss
       ]
+-}
+
+{-
+  power (M []) =
+    M [ empty ]
+
+  power (M (Set [] : ss)) =
+    power (M ss)
+
+  power (M (Set [x] : ss)) =
+    M (empty : [ ins x s | s <- rr ] ++ tail rr)
+   where
+    M rr = power (M ss)
+
+  power (M (Set (x:xs) : ss)) =
+   where
+    M rr = power (M (Set xs : ss)) 
+
+data Elt a = X | This a | Rest a
+ deriving ( Eq, Ord, Show )
+-}
 
 instance Collapse M where
   collapse (M xs) = Set [ x | Set ys <- xs, x <- ys ]
 
 ----------------------------------------------------------------------
-
+{-
 pi :: (MonadPlus m, Collapse m, Power m, Eq a) => m a -> m (a,b) -> m (m (a,b))
 pi dom rng =
   (\fun -> (\x -> (x, fun @@ x)) `fmap` dom) `fmap` funs
@@ -158,31 +183,148 @@ pi dom rng =
           (,) <$> dom <*> rng
 
   funs =
-    mfilter (\xys ->
-      qall (\x -> size (set [ y
-                            | (x',y) <-from$ xys
-                            , x==x'
-                            ]) == 1) as
-    ) xyss
+    mfilter (isFunction as) xyss
+
+
+isFunction as xys = qall (\x -> size (set [ y
+                         | (x',y) <-from$ xys
+                         , x==x'
+                         ]) == 1) as
+-}
 
 ----------------------------------------------------------------------
 -- examples
 
 -- fun(x:=1|2){ (x=1;(3|4)) | (x=2;5) }
-ex1 = pi [1,2] [(1,3),(1,4),(2,5)]
+ex 1 = pi (M [pure 1,pure 2])
+          (M [pure (1,3),pure (1,4),pure (2,5)])
 
 -- fun(x:=1|2){ (3|4|5) }
-ex2 = pi (M [pure 1, pure 2])
-         (M [ Set [(x,3)|x<-[1..2]]
-            , Set [(x,4)|x<-[1..2]]
-            , Set [(x,5)|x<-[1..2]]
-            ])
+ex 2 = pi (M [pure 1, pure 2])
+          (M [ Set [(x,3)|x<-[1..2]]
+             , Set [(x,4)|x<-[1..2]]
+             , Set [(x,5)|x<-[1..2]]
+             ])
+
+-- fun(x:=1|2){ (x|4|x+1) }
+ex 3 = pi (M [pure 1, pure 2])
+          (M [ Set [(x,x)|x<-[1..2]]
+             , Set [(x,4)|x<-[1..2]]
+             , Set [(x,x+1)|x<-[1..2]]
+             ])
 
 -- fun(x:=1|2){ x=1|x=2|fail }
-ex3 = pi (M [pure 1, pure 2])
-         (M [ Set [(1,1)]
-            , Set [(2,2)]
-            , Set []
-            ])
+ex 4 = pi (M [pure 1, pure 2])
+          (M [ Set [(1,1)]
+             , Set [(2,2)]
+             , Set []
+             ])
+
+-- fun(x:(even|odd)){ 3|x }
+ex 5 = pi (M [Set [0,2,4], Set [1,3]])
+          (M [ Set [(x,3)|x<-[0..4]]
+             , Set [(x,x)|x<-[0..4]]
+             ])
+
+-- fun(x:(even|odd)){ 3|x }
+ex 6 = pi (M [Set [1,2], Set [3]])
+          (M [ Set [(x,10)|x<-[1..3]]
+             , Set [(x,20)|x<-[1..3]]
+             ])
+
+ex 7 = pi d r 
+
+d = M [ Set [1,2,3] ]
+r = M [ Set [(x,7)|x<-[1,2]]
+      , Set [(x,8)|x<-[1,2]]
+      , Set [(x,9)|x<-[3]]
+--      , Set [(x,8)|x<-[3]]
+      ]
 
 
+main =
+  do sequence_
+       [ do putStrLn ("--EXAMPLE:" ++ show i ++ "--")
+            printEx (ex i)
+       | i <- [1..7]
+       ]
+  
+printEx (M xs) =
+  sequence_
+  [ printAlt x | x <- xs ]
+
+printAlt (Set []) = putStrLn "{}"
+printAlt (Set [x]) = putStrLn ("{ " ++ show x ++ " }")
+printAlt (Set xs) = sequence_ [ putStrLn ( (if i==0 then "{ " else "  ")
+                                        ++ show x ++ (if i==n-1 then " }" else ",")) | let n=length xs, (i,x) <- [0..] `zip` xs ]
+
+class Pi m where
+  pi :: Eq a => m a -> m (a,b) -> m (m (a,b))
+
+instance Pi Set where
+  pi (Set []) _ =
+    Set [ Set [] ]
+
+  pi (Set (x:xs)) (Set ys) =
+    Set [ Set ((x,y):xys)
+        | (x',y) <- ys
+        , x==x'
+        , Set xys <- unSet $ pi (Set xs) (Set ys)
+        ]
+
+unSet (Set xs) = xs
+
+instance Pi [] where
+  pi [] _ =
+    [[]]
+
+  pi (x:xs) ys =
+    [ (x,y):xys
+    | (x',y) <- ys
+    , x==x'
+    , xys <- pi xs ys
+    ]
+
+instance Pi M where
+  pi (M []) _ =
+    M [ Set [ M [] ] ]
+
+  pi (M [xs]) (M [ys]) =
+    M [ fmap (M . (:[])) $ pi xs ys ]
+
+  pi (M [xs]) (M []) =
+    M []
+
+  pi (M [Set xs]) (M (Set ys : yss)) =
+    M $ unM (pi (M [Set xs]) (M [Set ys]))
+     ++ unM (unionS (Set
+          [ (\f1 f2 -> unionS (Set [f1, f2]))
+        <$> pi (M [Set xs1]) (M [Set ys])
+        <*> pi (M [Set xs2]) (M yss)
+          | (xs1@(_:_),xs2@(_:_)) <- parts xs
+          ] 
+        ))
+     ++ unM (pi (M [Set xs]) (M yss))
+
+  pi (M (xs:xss)) rng =
+        (+++)
+    <$> pi (M [xs]) rng
+    <*> pi (M xss) rng
+
+{-    
+    M [ Set [ M (unM f1 ++ unM f2)
+            | f1 <- unSet fs1
+            , f2 <- unSet fs2
+            ]
+      | fs1 <- unM $ pi (M [xs]) rng
+      , fs2 <- unM $ pi (M xss) rng
+      ]
+-}
+
+unM (M xss) = xss
+
+parts []     = [([],[])]
+parts (x:xs) = [ (x:as,bs) | (as,bs) <- ps ]
+            ++ [ (as,x:bs) | (as,bs) <- ps ]
+ where
+  ps = parts xs
