@@ -388,6 +388,7 @@ atomEval r (AOp o as) =
     (F.Sub, Just [I i1, I i2]) -> Just $ I $ (i1-i2) `mod` numZ
     (F.Mul, Just [I i1, I i2]) -> Just $ I $ (i1*i2) `mod` numZ
     (F.Div, Just [I i1, I i2]) -> Just $ I $ (i1 `div` i2)
+    (F.ArrApp, Just[T xs1, T xs2]) -> Just $ T $ xs1 P.++ xs2
     _                          -> Nothing
 
 atomVars :: Atom -> [Iden]
