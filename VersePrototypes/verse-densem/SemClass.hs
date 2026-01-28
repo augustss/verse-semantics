@@ -75,8 +75,8 @@ mapM = error "XSet mapM"
 -----
 
 data M a = M [XSet a]
-instance Eq (M a) where (==) = error "M ==: missing"
-instance Ord (M a) where compare = error "M compare: missing"
+deriving instance Eq (XSet a) => Eq (M a)
+deriving instance Ord (XSet a) => Ord (M a)
 instance (Show (XSet a)) => Show (M a) where
   showsPrec _ (M []) = showString "EMPTY"
   showsPrec p (M xs) = showParen (p > 0) $ showString $ L.intercalate " | " $ P.map show xs
@@ -91,7 +91,7 @@ fold(k,z,M s) = P.foldr (curry k) z s
 collapse(M s) = unions s
 mapM = error "M XSet mapM"
 
-dzip :: ASet a => (XSet(a)->XSet(a)->XSet(a), Set(M(a))) -> M(a)
+dzip :: (ASet a) => (XSet(a)->XSet(a)->XSet(a), Set(M(a))) -> M(a)
 dzip(f, xs) = M $ foldr (\ (M x) r -> zipLong f x r) [] (Set.toList xs)
 
 zipLong :: (a -> a -> a) -> [a] -> [a] -> [a]
@@ -178,18 +178,16 @@ iI = mkSet . F.getVisibleBinders
 dP :: Op -> Fn
 dP F.Neg = fun[funNegate]
 dP F.IsInt = fun[funInt]
-{-
-dP Gt = fun[funGt]
-dP Lt = fun[funLt]
-dP Add = fun[funAdd]
-dP Sub = fun[funSub]
-dP Mul = fun[funMul]
-dP Div = fun[funDiv]
--}
+dP F.Add = fun[funAdd]
+dP F.Sub = fun[funSub]
+dP F.Mul = fun[funMul]
+dP F.Div = fun[funDiv]
+dP F.Gt = fun[funGt]
+dP F.Lt = fun[funLt]
 dP p = error $ "dP undefined " P.++ show p
 
 knownFuns :: [(Fn, String)]
-knownFuns = [ (dP o, P.map P.toLower (show o)) | o <- [F.Neg, F.IsInt] ]
+knownFuns = [ (dP o, P.map P.toLower (show o)) | o <- [F.Neg, F.IsInt, F.Add, F.Sub, F.Mul, F.Div, F.Gt, F.Lt] ]
 
 fun :: [Val ⇀ Val] -> Fn
 fun = Fn . concat . P.map inj
@@ -199,6 +197,24 @@ funNegate = [(I i, I ((-i) `mod` numZ)) | i <- allZ ]
 
 funInt :: Val ⇀ Val
 funInt = [(I i, I i) | i <- allZ ]
+
+funAdd :: Val ⇀ Val
+funAdd = [ (T [I x, I y], I ((x+y) `mod` numZ)) | x <- allZ, y <- allZ ]
+
+funSub :: Val ⇀ Val
+funSub = [ (T [I x, I y], I ((x-y) `mod` numZ)) | x <- allZ, y <- allZ ]
+
+funMul :: Val ⇀ Val
+funMul = [ (T [I x, I y], I ((x*y) `mod` numZ)) | x <- allZ, y <- allZ ]
+
+funDiv :: Val ⇀ Val
+funDiv = [ (T [I x, I y], I ((x `div` y) `mod` numZ)) | x <- allZ, y <- allZ, y /= 0 ]
+
+funGt :: Val ⇀ Val
+funGt = [ (T [I x, I y], I x) | x <- allZ, y <- allZ, x > y ]
+
+funLt :: Val ⇀ Val
+funLt = [ (T [I x, I y], I x) | x <- allZ, y <- allZ, x < y ]
 
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) -> Val -> Maybe Val
@@ -237,11 +253,11 @@ allZ = mkSet [i | i <- [0 .. numZ-1] ]
 
 allVals :: Set(Val)
 allVals = [ I i | i <- allZ ]
-        ∪ [ F f | f <- allFuns ]
+        ∪ allFuns
         ∪ allTuples
 
-allFuns :: Set(Fn)
-allFuns = [ fun[funInt], fun[funNegate] ]
+allFuns :: Set(Val)
+allFuns = mkSet [ F f | (f, _) <- knownFuns ]
 
 -- 0, 1, 2-tuples of numbers
 allTuples :: Set(Val)
@@ -254,13 +270,12 @@ allTuples = mkSet $ (P.concat :: [[Val]] -> [Val])
 ----- XSet -----
 
 type ASet :: Type -> Constraint
-class (Eq (XSet a)) => ASet a where
+class (Eq (XSet a), Ord (XSet a)) => ASet a where
   type XSet a = r | r -> a
   ø :: XSet(a)
   isEmpty :: XSet(a) -> Bool
   (∪) :: XSet(a) → XSet(a) → XSet(a)
   (∩) :: XSet(a) → XSet(a) → XSet(a)
-  unions :: [XSet(a)] -> XSet(a)
 
 instance ASet Env where
   type XSet Env = ENV
@@ -268,7 +283,6 @@ instance ASet Env where
   (∪) = (EQD.\/)
   (∩) = (EQD./\)
   isEmpty x = x == EQD.false
-  unions = P.foldr (EQD.\/) EQD.false
 
 instance ASet Val where
   type XSet Val = Set Val
@@ -276,7 +290,6 @@ instance ASet Val where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  unions = Set.unions
 
 instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
@@ -284,7 +297,6 @@ instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  unions = Set.unions
   
 instance (Ord a, ASet a) => ASet (Set(a)) where
   type XSet (Set a) = Set (Set(a))
@@ -292,7 +304,6 @@ instance (Ord a, ASet a) => ASet (Set(a)) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  unions = Set.unions
   
 
 ----- Set -----
@@ -320,6 +331,9 @@ bigIntersect :: Eq a => Set(Set(a)) → Set(a)
 bigIntersect = Set.bigIntersect
 mkSet :: [a] -> Set a
 mkSet = Set.mkSet
+
+unions :: ASet a => [XSet(a)] -> XSet(a)
+unions = P.foldr (∪) ø
 
 ----- Iden -----
 type Iden = F.Ident
