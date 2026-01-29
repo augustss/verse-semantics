@@ -25,8 +25,136 @@ import Data.Kind
 import qualified FrontEnd.Expr as F
 import qualified Set
 import qualified EQD
+import Debug.Trace
 
------
+-- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
+
+ɩℰ :: Term → Iden → Iden → M(Env)
+ɩℰ (U_)      u v = inj (u .=. v)
+ɩℰ (Var x)   u v = inj (u .=. v /\ v .=. x)
+ɩℰ (Int k)   u v = inj (u .=. v /\ v .=  I k)
+ɩℰ (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
+ɩℰ (x :=  t) u v = inj (x .=. v) ⎧*⎫ ɩℰ (t) u v
+ɩℰ (x :-> t) u v = inj (x .=. u) ⎧*⎫ ɩℰ (t) u v
+ɩℰ (Exists x)u v = inj (u .=. v /\ v .=. x)
+ɩℰ (Array ts)u v = bigStar (inj(u .== tup(us) /\ v .== tup(vs)) :
+                            zipWith3 ɩℰ ts us vs)
+                   \\\ mkSet (us P.++ vs)
+  where us = fresh (P.map (const "u") ts) [Array ts, Var u, Var v]
+        vs = fresh (P.map (const "v") ts) [Array ts, Var u, Var v]
+ɩℰ (t₁ :|:   t₂) u v = ɩℬ (t₁) u v ++  ɩℬ (t₂) u v
+ɩℰ (t₁ :|||: t₂) u v = ɩℬ (t₁) u v ⎩*⎭ ɩℬ (t₂) u v
+ɩℰ (t₁ :=:   t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩℰ (t₂) u v
+-- XXX ɩℰ (t₁ :~>   t₂) u v = ɩℰ (t₁) u w ⎧*⎫ ɩℰ (t₂) w v \\\ [w]
+--       where [w] = fresh ["w"] [t₁, t₂, Var u, Var v]
+ɩℰ (t₁ :>    t₂) u v = ɩ𝒞 (t₁)     ⎧*⎫ ɩℰ (t₂) u v
+ɩℰ (t₁ `Where` t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩ𝒞 (t₂)
+ɩℰ (t₁ :..   t₂) u v = inj(u .=. v) ⎧*⎫ ɩℰ (t₁) p₁ q₁ ⎧*⎫ ɩℰ (t₂) p₂ q₂ ⎧*⎫
+  unionS[ concat[ inj(v .== (X q₁ + i) /\ i .<= (X q₂ - X q₁)) | i ← [0..n]] | n ← allN ]
+  \\\ [p₁, q₁, p₂, q₂]
+  where [p₁, q₁, p₂, q₂] = fresh ["p1","q1","p2","q2"] [t₁, t₂, Var u, Var v]
+ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
+                      \\\ [f,g,p,q]
+  where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
+ɩℰ (Rng t)       u v = ɩℰ (t) p q ⎧*⎫ ɩℱ q u v \\\ [p,q]
+  where [p,q] = fresh ["p","q"] [t,Var u, Var v]
+ɩℰ (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ ɩℬ (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ ɩℬ (t₂) u v)
+  where xs = iI(t₀); s₀ = one(ɩ𝒞(t₀),xs)
+ɩℰ (Block t) u v = ɩℬ (t) u v
+ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
+  where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
+        xs           = iI(t₀)
+        s₁ :: M(Env) = ɩℬ(t₁) p q
+        z  :: M(Env) = inj(u .== nil /\ v .== nil)
+        op :: (XSet(Env), M(Env)) → M(Env)
+        op(d,m) =     inj(u .== (X u₁ ⊕ X u₂) /\ v .== (X v₁ ⊕ X v₂))
+                  ⎧*⎫ ((inj(d) ⎧*⎫ s₁ ⎧*⎫ inj(u₁ .== oneTuple(p) /\ v₁ .== oneTuple(q)) \\\ [p,q] \\\ xs)
+                      ⊍ (inj(compl(d \\ xs)) ⎧*⎫ inj(u₁ .== nil /\ v₁ .== nil)))
+                  ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
+                 \\\ [u₁,u₂,v₁,v₂]
+          
+{-
+-- Using piSM
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
+ inj
+  [ ρ
+  | ρ ← allEnvs
+  , fun ← funs(ρ)
+  , ρ(f) == F (xfn fun x z)
+  , ρ(h) == F (xfn fun w j)
+  ]
+  where
+    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+    avs = iI(tₐ)
+    bvs = iI(tb)
+
+    xfn :: m(Val, Env) → Iden → Iden → Fn m
+    xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
+    
+    funs :: Env → Set (m (Val, Env))
+    funs(ρ) = piSM(domvs, rngfun)
+      where
+        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+        domvs :: m(Val)
+        domvs = mapM(\ρ→ρ(x), dom)
+        rngfun :: Val → Set(Env)
+        rngfun(xv) = bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
+                                  | aρ ← collapse(dom), aρ(x) == xv
+                                  ]
+                            
+-- Using piM
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
+ unionS
+  [ mapFilterS(\(fun :: m(Val, Env)) → [ ρ | ρ(f) == F (xfn fun x z)
+                                               , ρ(h) == F (xfn fun w j) ]
+
+              ,funs(ρ))
+  | ρ ← allEnvs
+  ]
+  where
+    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+    avs = iI(tₐ)
+    bvs = iI(tb)
+
+    xfn :: m(Val, Env) → Iden → Iden → Fn m
+    xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
+    
+    funs :: Env → m (m (Val, Env))
+    funs(ρ) = piM(domvs, rngfun)
+      where
+        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+        domvs :: m(Val)
+        domvs = mapM(\ρ→ρ(x), dom)
+        rngfun :: Val → M(Env)
+        rngfun(xv) =
+                inj (bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
+                                  | aρ ← collapse(dom), aρ(x) == xv
+                                  ])
+-}
+-- ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
+
+ɩ𝒞 :: Term → M(Env)
+ɩ𝒞 (t) = ɩℰ (t) p q \\\ [p, q]
+  where [p,q] = fresh ["p","q"] [t]
+
+ɩℬ :: Term → Iden → Iden → M(Env)
+ɩℬ (t) u v = ɩℰ (t) u v \\\ iI(t)
+
+ɩℱ :: Iden → Iden → Iden → M(Env)
+ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
+                            (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
+                  | vf@(F(Fn ff)) ← allVals ]
+
+
+--------------------------------------------------------
+
+den :: Term -> M(Env)
+den t = prune $ ɩℰ (Block t) u v
+  where [u, v] = fresh ["u", "v"] [t]
+
+--------------------------------------------------------
+
+-- Below is all kinds of junk to make the semantics above look nice.
 
 {-
 -- Totally abstract M
@@ -77,9 +205,12 @@ mapM = error "XSet mapM"
 data M a = M [XSet a]
 deriving instance Eq (XSet a) => Eq (M a)
 deriving instance Ord (XSet a) => Ord (M a)
+deriving instance Show (XSet a) => Show (M a)
+{-
 instance (Show (XSet a)) => Show (M a) where
   showsPrec _ (M []) = showString "EMPTY"
   showsPrec p (M xs) = showParen (p > 0) $ showString $ L.intercalate " | " $ P.map show xs
+-}
 empty = M []
 inj(d) = M [d]
 M s ++ M t = M (s P.++ t)
@@ -130,6 +261,7 @@ pattern (:|:) :: Term -> Term -> Term
 pattern t1 :|: t2 = F.Choice t1 t2
 pattern (:|||:) :: Term -> Term -> Term
 pattern t1 :|||: t2 <- F.ApplyD (F.Variable (F.Ident _ "operator'|||'")) (F.Array [t1, t2])
+  where t1 :|||: t2 = F.ApplyD (F.Variable (F.Ident F.noLoc "operator'|||'")) (F.Array [t1, t2])
 pattern (:=:) :: Term -> Term -> Term
 pattern t1 :=: t2 = F.Unify t1 t2
 --pattern (:~>) :: Term -> Term -> Term
@@ -172,6 +304,16 @@ fresh ss ts = snd $ L.mapAccumL f (concatMap F.getAllBinders ts) ss
 -- All top level binders
 iI :: Term → Set Iden
 iI = mkSet . F.getVisibleBinders
+
+fvs :: Term → Set Iden
+fvs = mkSet . F.getFree
+
+type Aperture = F.Aperture
+pattern O = F.Open
+pattern C = F.Closed
+type Eff = F.Eff
+succeeds :: Eff
+succeeds = F.effSucceeds
 
 ----- primops -----
 
@@ -291,6 +433,13 @@ instance ASet Val where
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
 
+instance ASet Iden where
+  type XSet Iden = Set Iden
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+
 instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
   ø = Set.empty
@@ -397,10 +546,12 @@ atomVars (V _) = []
 atomVars (ATup  as) = P.foldr L.union [] (P.map atomVars as)
 atomVars (AOp o as) = P.foldr L.union [] (P.map atomVars as)
 
+mkAEnvs :: [Iden] -> [AEnv]
+mkAEnvs is = P.map (P.zip is) (M.replicateM (length is) $ Set.toList allVals)
+
 atomEnvs :: [Atom] -> [([Val], AEnv)]
 atomEnvs as =
-  let aenvs = P.map (P.zip is) (M.replicateM (length is) $ Set.toList allVals)
-      is = P.foldr L.union [] $ P.map atomVars as
+  let aenvs = mkAEnvs $ P.foldr L.union [] $ P.map atomVars as
   in  [ (vs, r) | r <- aenvs, Just vs <- [P.mapM (atomEval r) as] ]
 
 atomEnvToENV :: AEnv -> ENV
@@ -493,139 +644,19 @@ bigStar xs = P.foldr1 (⎧*⎫) xs
 
 ---------------------------
 
--- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
-
-ɩℰ :: Term → Iden → Iden → M(Env)
-ɩℰ (U_)      u v = inj (u .=. v)
-ɩℰ (Var x)   u v = inj (u .=. v /\ v .=. x)
-ɩℰ (Int k)   u v = inj (u .=. v /\ v .=  I k)
-ɩℰ (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
-ɩℰ (x :=  t) u v = inj (x .=. v) ⎧*⎫ ɩℰ (t) u v
-ɩℰ (x :-> t) u v = inj (x .=. u) ⎧*⎫ ɩℰ (t) u v
-ɩℰ (Exists x)u v = inj (u .=. v /\ v .=. x)
-ɩℰ (Array ts)u v = bigStar (inj(u .== tup(us) /\ v .== tup(vs)) :
-                            zipWith3 ɩℰ ts us vs)
-                   \\\ mkSet (us P.++ vs)
-  where us = fresh (P.map (const "u") ts) [Array ts, Var u, Var v]
-        vs = fresh (P.map (const "v") ts) [Array ts, Var u, Var v]
-ɩℰ (t₁ :|:   t₂) u v = ɩℬ (t₁) u v ++  ɩℬ (t₂) u v
-ɩℰ (t₁ :|||: t₂) u v = ɩℬ (t₁) u v ⎩*⎭ ɩℬ (t₂) u v
-ɩℰ (t₁ :=:   t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩℰ (t₂) u v
--- XXX ɩℰ (t₁ :~>   t₂) u v = ɩℰ (t₁) u w ⎧*⎫ ɩℰ (t₂) w v \\\ [w] where [w] = fresh ["w"] [t₁, t₂, Var u, Var v]
-ɩℰ (t₁ :>    t₂) u v = ɩ𝒞 (t₁)     ⎧*⎫ ɩℰ (t₂) u v
-ɩℰ (t₁ `Where` t₂) u v = ɩℰ (t₁) u v ⎧*⎫ ɩ𝒞 (t₂)
-ɩℰ (t₁ :..   t₂) u v = inj(u .=. v) ⎧*⎫ ɩℰ (t₁) p₁ q₁ ⎧*⎫ ɩℰ (t₂) p₂ q₂ ⎧*⎫
-  unionS[ concat[ inj(v .== (X q₁ + i) /\ i .<= (X q₂ - X q₁)) | i ← [0..n]] | n ← allN ]
-  \\\ [p₁, q₁, p₂, q₂]
-  where [p₁, q₁, p₂, q₂] = fresh ["p1","q1","p2","q2"] [t₁, t₂, Var u, Var v]
-ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
-                      \\\ [f,g,p,q]
-  where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
-ɩℰ (Rng t)       u v = ɩℰ (t) p q ⎧*⎫ ɩℱ q u v \\\ [p,q]
-  where [p,q] = fresh ["p","q"] [t,Var u, Var v]
-ɩℰ (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ ɩℬ (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ ɩℬ (t₂) u v)
-  where xs = iI(t₀); s₀ = one(ɩ𝒞(t₀),xs)
-ɩℰ (Block t) u v = ɩℬ (t) u v
-ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
-  where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
-        xs             = iI(t₀)
-        s₁ :: M(Env) = ɩℬ(t₁) p q
-        z  :: M(Env) = inj(u .== nil /\ v .== nil)
-        op :: (XSet(Env), M(Env)) → M(Env)
-        op(d,m)        =     inj(u .== (X u₁ ⊕ X u₂) /\ v .== (X v₁ ⊕ X v₂))
-                         ⎧*⎫ ((inj(d) ⎧*⎫ s₁ ⎧*⎫ inj(u₁ .== oneTuple(p) /\ v₁ .== oneTuple(q)) \\\ [p,q])
-                              ⊍ (inj(compl(d \\ xs)) ⎧*⎫ inj(u₁ .== nil /\ v₁ .== nil)))
-                         ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
-                         \\\ [u₁,u₂,v₁,v₂]
-{-
--- Using piSM
-ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
- inj
-  [ ρ
-  | ρ ← allEnvs
-  , fun ← funs(ρ)
-  , ρ(f) == F (xfn fun x z)
-  , ρ(h) == F (xfn fun w j)
-  ]
-  where
-    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    avs = iI(tₐ)
-    bvs = iI(tb)
-
-    xfn :: m(Val, Env) → Iden → Iden → Fn m
-    xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
-    
-    funs :: Env → Set (m (Val, Env))
-    funs(ρ) = piSM(domvs, rngfun)
-      where
-        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-        domvs :: m(Val)
-        domvs = mapM(\ρ→ρ(x), dom)
-        rngfun :: Val → Set(Env)
-        rngfun(xv) = bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
-                                  | aρ ← collapse(dom), aρ(x) == xv
-                                  ]
-                            
--- Using piM
-ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
- unionS
-  [ mapFilterS(\(fun :: m(Val, Env)) → [ ρ | ρ(f) == F (xfn fun x z)
-                                               , ρ(h) == F (xfn fun w j) ]
-
-              ,funs(ρ))
-  | ρ ← allEnvs
-  ]
-  where
-    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    avs = iI(tₐ)
-    bvs = iI(tb)
-
-    xfn :: m(Val, Env) → Iden → Iden → Fn m
-    xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
-    
-    funs :: Env → m (m (Val, Env))
-    funs(ρ) = piM(domvs, rngfun)
-      where
-        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-        domvs :: m(Val)
-        domvs = mapM(\ρ→ρ(x), dom)
-        rngfun :: Val → M(Env)
-        rngfun(xv) =
-                inj (bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
-                                  | aρ ← collapse(dom), aρ(x) == xv
-                                  ])
--}
-ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
-
-ɩ𝒞 :: Term → M(Env)
-ɩ𝒞 (t) = ɩℰ (t) p q \\\ [p, q]
-  where [p,q] = fresh ["p","q"] [t]
-
-ɩℬ :: Term → Iden → Iden → M(Env)
-ɩℬ (t) u v = ɩℰ (t) u v \\\ iI(t)
-
-ɩℱ :: Iden → Iden → Iden → M(Env)
-ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
-                            (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
-                  | vf@(F(Fn ff)) ← allVals ]
-
--- 
-
-{-
-mapFilterS :: (a → Set(b), M(a)) → M(b)
-mapFilterS = undefined
--}
-
-den :: Term -> M(Env)
-den t = prune $ ɩℰ (Block t) u v
-  where [u, v] = fresh ["u", "v"] [t]
-
 
 x = F.Ident F.noLoc "x"
 y = F.Ident F.noLoc "y"
 u = F.Ident F.noLoc "u"
 v = F.Ident F.noLoc "v"
+p = F.Ident F.noLoc "p"
+q = F.Ident F.noLoc "q"
+u1 = F.Ident F.noLoc "u1"
+v1 = F.Ident F.noLoc "v1"
+u2 = F.Ident F.noLoc "u2"
+v2 = F.Ident F.noLoc "v2"
 eE = ɩℰ
 bB = ɩℬ
+cC = ɩ𝒞
 
 main = print $ den $ Array [Int 1, Int 2]
