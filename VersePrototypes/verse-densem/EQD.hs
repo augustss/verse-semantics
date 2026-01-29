@@ -15,6 +15,7 @@ module EQD
   , qexi, qexis
   , subst
   , support
+  , getSing
   )
  where
 
@@ -195,6 +196,15 @@ qexis (x:xs) p = qexi x (qexis xs p)
 
 nt :: (Ord x, Ord a) => EQD x a -> EQD x a
 nt (EQD as p) = EQD as (notVEQ p)
+
+-----------------------------------------------------------------------
+
+-- If x has the same value in all environments then return that.
+getSing :: (Ord x, Ord a) => x -> EQD x a -> Maybe a
+getSing x p =
+  case qexis (filter (/= x) (support p)) p of
+    EQD [a] (NODE _ [TRUE] FALSE) -> Just a
+    _ -> Nothing
 
 -----------------------------------------------------------------------
 
