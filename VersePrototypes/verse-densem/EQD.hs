@@ -16,6 +16,7 @@ module EQD
   , subst
   , support
   , getSing
+  , hasElem
   )
  where
 
@@ -205,6 +206,14 @@ getSing x p =
   case qexis (filter (/= x) (support p)) p of
     EQD [a] (NODE _ [TRUE] FALSE) -> Just a
     _ -> Nothing
+
+-- Is x=a part of the environment?
+hasElem :: (Ord x, Ord a) => x -> a -> EQD x a -> Bool
+hasElem x a p =
+  case qexis (filter (/= x) (support p)) p of
+    EQD as (NODE _ xs FALSE) | all (==TRUE)  xs -> a `elem` as
+    EQD as (NODE _ xs TRUE)  | all (==FALSE) xs -> a `notElem` as
+    p' -> error $ "hasElem: " -- ++ show (x, a, p')
 
 -----------------------------------------------------------------------
 
