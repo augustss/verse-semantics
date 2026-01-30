@@ -120,7 +120,8 @@ $$
 %    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
     \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b}) \rightarrow \Vm{b}
                           \rightarrow \Vm{a} \rightarrow \Vm{b}} \hspace{5mm} \text{Fold over choices} \\
-    \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{\Vm{\fpr{a}{b}}} \\
+%    \vmpi & : & \Vm{a} \rightarrow (a \rightarrow \Vm{b}) \rightarrow \Vm{\Vm{\fpr{a}{b}}} \\
+    \vmpi & : & \Vm{a} \rightarrow \Vm{a, b} \rightarrow \Vm{\Vm{a, b}} \\
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a}  & \text{Remove empty choices} \\
   \end{array}
   \\ \\
@@ -341,7 +342,7 @@ $$
  \semap{F}{|apply1N f x|}r  & = &
 \vmunions \begin{array}[t]{@@{}l}
            \,\{ \; \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; )\\
-           \vb \Fun(\ff : \Vm{\Val \times \Val} ) \in \Val \; \}
+           \vb \Fun(\ff : \Vm{\Val,\Val} ) \in \Val \; \}
            \end{array}
 \end{array} \\
 \\
@@ -385,34 +386,41 @@ $$
       & & \vmseq (m \vmseq \vminject \conBrack{u=u_2, v=v_2} \vmhide \{u,v\} ) \\
       & & \vmhide \{ u_1, u_2, v_1, v_2 \}
     \end{array}
-
+\end{array}
 \\
+\\
+
 % FUNCTIONS
-\multicolumn{3}{@@{}l}{\rulename{sfun} \; \hfill
-   \semess{E}{h}{f}{|functionOCX q t_a fx t_b|}} \\
-   & \multicolumn{3}{l}{\;\; = \vminject \begin{array}[t]{@@{}l@@{\;}l}
-     \{  & \rho \in \Env \\
-     \vb & |let| \begin{array}[t]{l}
-       |dom|:\Vm{\Env} \\
-       |dom| = (\vminject\{ \rho \} \vmhide \semap{I}{|t_a|} \vmhide \{p,w\}) \vmseq \semess{E}{p}{w}{t_a}
-       \end{array} \\
-     , & |fun| : \Vm{\Val,\Val} \\
-       & |fun| \in \vmpi \begin{array}[t]{@@{}l@@{\;}l}
-               ( & \vmmap( \lambda \rho. \rho(p), |dom| ) \\
-       , & \lambda val . \bigcap \begin{array}[t]{@@{}l@@{\;}l}
-                            \{ & (( \rho_0 \ENVhide (\{j,z\} \cup \semap{I}{t_b})) \cap \vmcollapse(\semess{E}{j}{z}{t_b}) \vmhide \semap{I}{t_a} \\
-                            \vb & \rho_0 \in \vmcollapse(|dom|), \envlk{\rho_0}{p} = val \; \} \; )
-                            \end{array}
-               \end{array} \\
-     , & |let| \begin{array}[t]{l}
-                   \ff, \hh :: \Vm{ \Val, \Val } \\
-                   \ff = \vmmap( \; \lambda (\_,\rho). (\envlk{\rho}{p}, \envlk{\rho}{z}),\; |fun|\; ) \\
-                   \hh = \vmmap( \; \lambda (\_,\rho). (\envlk{\rho}{w}, \envlk{\rho}{j}),\; |fun|\; ) \\
-                \end{array} \\
-     , & \envlk{\rho}{f} = \Fun(\ff) \\
-     , & \envlk{\rho}{h} = \Fun(\hh) \; \} \\
-  \end{array}
-  }
+\begin{array}{@@{}l@@{\;\;}c@@{\;\;}l}
+\multicolumn{3}{@@{}l}{\rulename{sfun} \;\;
+   \semess{E}{h}{f}{|functionOCX q at fx bt|}} \\
+
+& = & \vmunions \{\; \vmmapfilter( |keep|(\rho), |funs|(\rho)) \vb \rho \in \Env \;\} \\
+& \multicolumn{2}{@@{}l}{\text{where}} \\
+&& S_a :: \Vm{\Env} = \semess{E}{x}{w}{|at|} \\
+&& S_b :: \Vm{\Env} = \semess{E}{j}{z}{|bt|} \\[1mm]
+&& |funs| : \Env \rightarrow \Vm{ \Vm { \Val,(\Val,\Val,\Val)}}  \hspace{5mm} \# \; (x, (w,j,z)) \\
+&& |funs|(\rho) \begin{array}[t]{@@{}ll}
+     = & \vmpi(\; |domvs|, |rngvs| \;) \\
+     \multicolumn{2}{@@{}l}{\text{where}} \\
+     & |dom|:\Vm{\Env} \\
+     &  |dom| = (\vminject\{ \rho \} \vmhide \semap{I}{|at|} \vmhide \{x,w\}) \vmseq S_a \\[1mm]
+     & |domvs|:\Vm{\Val} \\
+     &  |domvs| = \vmmap(\, \lambda \rho.\, \envlk{\rho}{x}, \;|dom| \,) \\[1mm]
+     & |rngvs| :: \Vm{ \Val, (\Val,\Val,\Val) } \\
+     & |rngvs| = ??? \\[1mm] \\
+    \end{array} \\
+&& |keep| :: \Env \rightarrow \Vm{\Val, (\Val,\Val,\Val))} \rightarrow \powerset{ \Env }
+                        \hspace{5mm} \# \; \text{Singleton or empty}\\
+&& |keep|(\rho)(|fun|) = \left\{ \begin{array}{ll}
+                          \{ \rho \} & \text{if} \begin{array}[t]{l}
+                               \envlk{\rho}{f} = \Fun(\vmmap(\lambda (x,(\_,\_,z)).\, (x,z), \; |fun|)) \\
+                               \envlk{\rho}{h} = \Fun(\vmmap(\lambda (\_,(w,j,\_)).\, (w,j), \; |fun|)) \\
+                                           \end{array} \\
+                           \{  \} & \text{otherwise} \\
+                      \end{array} \right.
+
+
 \end{array}
 \end{array}
 $$

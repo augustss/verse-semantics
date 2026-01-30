@@ -211,7 +211,7 @@
 %format oftypeKW = "\vartriangleright"
 %format oftypefx (e) (fx) (t) = e "\vartriangleright\hspace{-1.3mm} \langle" fx "\rangle\," t
 %format colonfx fx t = :t "\hspace{-0.2mm} \langle" fx "\rangle"
-%format at = "\, @\!\!"
+%% %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
 %format beta = "\beta"
