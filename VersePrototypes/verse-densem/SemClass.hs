@@ -14,9 +14,10 @@
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE ViewPatterns #-}
 module SemClass where
-import Prelude hiding((++), map, concat, pi, not, (>>=), mapM)
+import Prelude hiding((++), map, concat, pi, not, mapM)
 import qualified Prelude as P
 import qualified Control.Monad as M
+import Control.Monad(guard)
 import qualified Data.Maybe as P
 import qualified Data.Char as P
 import qualified Data.List as L
@@ -73,6 +74,56 @@ import Debug.Trace
                   ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                  \\\ [u₁,u₂,v₁,v₂]
           
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
+  undefined
+{-
+  curry mapS aEnvsToENV $
+    (generateENVs (fvs(tₐ) ∪ fvs(tb))) `sbind` \ ρ ->
+      let dom :: M(Env)
+          dom = (inj (aEnvToENV ρ) \\\ iI(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+          domv :: M(Val)
+          domv = getValuesOf p dom
+          rngfun :: Val -> M(AEnv)
+          rngfun = undefined
+       in
+          piM(domv, rngfun) `mbind` \ (fun :: M(Val, AEnv)) ->
+          xpure (ρ `extend` [(f, F(xfun x z fun)), (h, F(xfun w j fun))])
+-}
+{-
+    [ ρ `extend` [(f, F(xfun x z fun)), (h, F(xfun w j fun))]
+    | ρ ← inj $
+          generateENVs (fvs(tₐ) ∪ fvs(tb))  -- all possible environments mapping free variables
+    , let dom :: M(Env)
+          dom = (inj (aEnvToENV ρ) \\\ iI(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+          domv :: M(Val)
+          domv = getValuesOf p dom
+          rngfun :: Val -> M(AEnv)
+          rngfun = undefined
+    , fun :: M(Val, AEnv) <- piM(domv, rngfun)
+    ]
+-}
+  where
+    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+    sbind :: Set(AEnv) -> (AEnv -> M(AEnv)) -> M(AEnv)
+    sbind = undefined
+    mbind :: M(a) -> (a -> M(AEnv)) -> M(AEnv)
+    mbind = undefined
+    xpure :: AEnv -> M(AEnv)
+    xpure = inj . Set.singleton
+
+xfun :: Iden -> Iden -> M(Val, AEnv) -> Fn
+xfun x y fun = Fn $ mapM' (\ (_, ρ) -> (ρ·x, ρ·y), fun)
+
+generateENVs :: Set(Iden) -> Set(AEnv)
+generateENVs = Set.mkSet . mkAEnvs . Set.toList 
+
+getValuesOf :: Iden -> M(Env) -> M(Val)
+getValuesOf x (M ps) = M $ P.map (getENVValuesOf p) ps
+
+-- All possible values of a variable in an ENV
+getENVValuesOf :: Iden -> ENV -> Set(Val)
+getENVValuesOf x p = [ v | v <- allVals, EQD.hasElem x v p ]
+
 {-
 -- Using piSM
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
@@ -106,7 +157,7 @@ import Debug.Trace
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
  unionS
   [ mapFilterS(\(fun :: m(Val, Env)) → [ ρ | ρ(f) == F (xfn fun x z)
-                                               , ρ(h) == F (xfn fun w j) ]
+                                           , ρ(h) == F (xfn fun w j) ]
 
               ,funs(ρ))
   | ρ ← allEnvs
@@ -202,7 +253,7 @@ mapM = error "XSet mapM"
 -}
 -----
 
-data M a = M [XSet a]
+newtype M a = M [XSet a]
 deriving instance Eq (XSet a) => Eq (M a)
 deriving instance Ord (XSet a) => Ord (M a)
 deriving instance Show (XSet a) => Show (M a)
@@ -220,7 +271,9 @@ s ⊍ t = dzip((∪), [s,t])
 unionS ss = dzip((∪), ss)
 fold(k,z,M s) = P.foldr (curry k) z s
 collapse(M s) = unions s
-mapM = error "M XSet mapM"
+mapM(f, M s) = undefined -- M $ P.map (mapXSet f) s
+mapM'(f, M s) = M $ P.map (fmap f) s
+piM = undefined
 
 dzip :: (ASet a) => (XSet(a)->XSet(a)->XSet(a), Set(M(a))) -> M(a)
 dzip(f, xs) = M $ foldr (\ (M x) r -> zipLong f x r) [] (Set.toList xs)
@@ -230,13 +283,16 @@ zipLong _ [] ys = ys
 zipLong _ xs [] = xs
 zipLong f (x:xs) (y:ys) = f x y : zipLong f xs ys
 
+--mapFilterS :: (a → Set(b), M(a)) → M(b)
+--mapFilterS = undefined
+
+{-
+instance Functor M
+instance Applicative M
+instance Monad M
+-}
+
 -----
-
---type M a = Set [a]
--- ...
-
------
-
 
 infix 2 ==>
 (==>) :: Bool → Bool → Bool
@@ -418,6 +474,7 @@ class (Eq (XSet a), Ord (XSet a)) => ASet a where
   isEmpty :: XSet(a) -> Bool
   (∪) :: XSet(a) → XSet(a) → XSet(a)
   (∩) :: XSet(a) → XSet(a) → XSet(a)
+  mapXSet :: (a → a) → XSet(a) → XSet(a)
 
 instance ASet Env where
   type XSet Env = ENV
@@ -425,6 +482,15 @@ instance ASet Env where
   (∪) = (EQD.\/)
   (∩) = (EQD./\)
   isEmpty x = x == EQD.false
+  mapXSet = error "mapSet EQD"
+
+instance ASet AEnv where
+  type XSet AEnv = Set AEnv
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  mapXSet = fmap
 
 instance ASet Val where
   type XSet Val = Set Val
@@ -432,6 +498,7 @@ instance ASet Val where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  mapXSet = fmap
 
 instance ASet Iden where
   type XSet Iden = Set Iden
@@ -439,6 +506,7 @@ instance ASet Iden where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  mapXSet = fmap
 
 instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
@@ -446,6 +514,7 @@ instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  mapXSet = fmap
   
 instance (Ord a, ASet a) => ASet (Set(a)) where
   type XSet (Set a) = Set (Set(a))
@@ -453,6 +522,7 @@ instance (Ord a, ASet a) => ASet (Set(a)) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
+  mapXSet = fmap
   
 
 ----- Set -----
@@ -488,7 +558,26 @@ unions = P.foldr (∪) ø
 type Iden = F.Ident
 
 ----- Env -----
-data Env
+data Env                   -- Just a placeholder
+
+newtype AEnv = Env [(Iden, Val)]   -- only used for functions
+  deriving (Eq, Ord, Show)
+
+(·) :: AEnv -> Iden -> Val
+Env kvs · x = P.fromMaybe (error $ "getSing " P.++ show x) $ P.lookup x kvs
+
+extend :: AEnv -> [(Iden, Val)] -> AEnv
+extend (Env kvs) kvs' = Env (kvs P.++ kvs')
+
+aEnvToENV :: AEnv -> ENV
+aEnvToENV (Env kvs) = foldr (/\) univ $ P.map (uncurry (.=)) kvs
+
+-- Make all possible environments with the given identifiers.
+mkAEnvs :: [Iden] -> [AEnv]
+mkAEnvs is = P.map (Env . P.zip is) (M.replicateM (length is) $ Set.toList allVals)
+
+aEnvsToENV :: Set(AEnv) -> ENV
+aEnvsToENV = foldr (\/) cempty . P.map aEnvToENV . Set.toList
 
 ----- Simple values -----
 data Atom = V Val | X Iden | AOp Op [Atom] | ATup [Atom]
@@ -524,10 +613,8 @@ tup vs = ATup (P.map X vs)
 oneTuple :: Iden → Atom
 oneTuple x = ATup [X x]
 
-type AEnv = [(Iden, Val)]
-
 atomEval :: AEnv -> Atom -> Maybe Val
-atomEval r (X x)      = P.lookup x r
+atomEval r (X x)      = Just (r · x)
 atomEval _ (V v)      = Just v
 atomEval r (ATup as)  = T <$> P.mapM (atomEval r) as
 atomEval r (AOp o as) =
@@ -546,21 +633,15 @@ atomVars (V _) = []
 atomVars (ATup  as) = P.foldr L.union [] (P.map atomVars as)
 atomVars (AOp o as) = P.foldr L.union [] (P.map atomVars as)
 
-mkAEnvs :: [Iden] -> [AEnv]
-mkAEnvs is = P.map (P.zip is) (M.replicateM (length is) $ Set.toList allVals)
-
 atomEnvs :: [Atom] -> [([Val], AEnv)]
 atomEnvs as =
-  let aenvs = mkAEnvs $ P.foldr L.union [] $ P.map atomVars as
-  in  [ (vs, r) | r <- aenvs, Just vs <- [P.mapM (atomEval r) as] ]
-
-atomEnvToENV :: AEnv -> ENV
-atomEnvToENV = foldr (/\) univ . P.map (uncurry (.=))
+  let envs = mkAEnvs $ P.foldr L.union [] $ P.map atomVars as
+  in  [ (vs, r) | r <- envs, Just vs <- [P.mapM (atomEval r) as] ]
 
 (.==) :: Iden → Atom → ENV
-i .== a = unionENVs [ i .= v /\ atomEnvToENV r | ([v], r) <- atomEnvs [a], v ∈ allVals ]
+i .== a = unionENVs [ i .= v /\ aEnvToENV r | ([v], r) <- atomEnvs [a], v ∈ allVals ]
 (.<=) :: Atom → Atom → ENV
-a1 .<= a2 = unionENVs [ atomEnvToENV r | ([I v1, I v2], r) <- atomEnvs [a1, a2], v1 <= v2 ]
+a1 .<= a2 = unionENVs [ aEnvToENV r | ([I v1, I v2], r) <- atomEnvs [a1, a2], v1 <= v2 ]
 
 ----- ENV, constraints -----
 type ENV = EQD.EQD Iden Val
@@ -587,6 +668,9 @@ infixl 3 /\
 unionENVs :: [ENV] -> ENV
 unionENVs = P.foldr (\/) cempty
 
+bigUnionENV :: Set(ENV) -> ENV
+bigUnionENV = unionENVs . Set.toList
+
 -- Environments where the pair (x :⇒ y) is in the function f
 (⋵) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
 (x :⇒ y) ⋵ f =
@@ -602,12 +686,11 @@ inj      :: ASet a => XSet(a) → M(a)
 unionS   :: (ASet a, Ord (M a)) => Set(M(a)) → M(a)
 --  mapS     :: (Set(a) → Set(b), m(a)) → m(b)
 fold     :: ASet a => ((XSet(a), M(b)) → M(b), M(b), M(a)) → M(b)
-{-
-  piSM     :: (m(a), a → Set(b)) → Set(m(a :⇒ b))
-  piM      :: (m(a), a → m(b)) → m(m(a :⇒ b))
--}
+piM      :: (M(a), a → M(b)) → M(M(a :⇒ b))
 collapse :: (ASet a) => M(a) → XSet(a)
 mapM     :: (a→b, M(a)) → M(b)
+--mapM     :: ASet a => (a→a, M(a)) → M(a)
+mapM'    :: ((a,b)→(c,d), M(a,b)) → M(c,d)
 
 -- Derived functions
 mapS :: (ASet a, ASet b) => (XSet(a) → XSet(b), M(a)) → M(b)
