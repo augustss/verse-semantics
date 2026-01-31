@@ -13,11 +13,11 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RebindableSyntax #-}
 module SemClass where
-import Prelude hiding((++), map, concat, pi, not, mapM)
+import Prelude hiding((++), map, concat, pi, not, mapM, return, (>>=), (>>))
 import qualified Prelude as P
 import qualified Control.Monad as M
-import Control.Monad(guard)
 import qualified Data.Maybe as P
 import qualified Data.Char as P
 import qualified Data.List as L
@@ -27,6 +27,8 @@ import qualified FrontEnd.Expr as F
 import qualified Set
 import qualified EQD
 import Debug.Trace
+--import qualified GHC.Exts as P
+import GHC.Exts
 
 -- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
 
@@ -60,11 +62,11 @@ import Debug.Trace
 ɩℰ (Rng t)       u v = ɩℰ (t) p q ⎧*⎫ ɩℱ q u v \\\ [p,q]
   where [p,q] = fresh ["p","q"] [t,Var u, Var v]
 ɩℰ (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ ɩℬ (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ ɩℬ (t₂) u v)
-  where xs = iI(t₀); s₀ = one(ɩ𝒞(t₀),xs)
+  where xs = bvs(t₀); s₀ = one(ɩ𝒞(t₀),xs)
 ɩℰ (Block t) u v = ɩℬ (t) u v
 ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
-        xs           = iI(t₀)
+        xs           = bvs(t₀)
         s₁ :: M(Env) = ɩℬ(t₁) p q
         z  :: M(Env) = inj(u .== nil /\ v .== nil)
         op :: (XSet(Env), M(Env)) → M(Env)
@@ -75,54 +77,75 @@ import Debug.Trace
                  \\\ [u₁,u₂,v₁,v₂]
           
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
-  undefined
+  unionSM envs $ \ ρ →
+    let aρm :: M(Env)
+        aρm = ([ρ] \\\ bvs(tₐ) \\\ [p,w]) ⎧*⎫ ɩℰ (tₐ) x w
+    in  [ ρ `extend` [(f, F fm), (h, F hm)]
+        | pairm :: M(Val, Env) ←
+            piM ([xρ·p | xρ ← aρm ],
+                 \ (p :: Val) → intersectM [yρ | yρ←aρm, yρ·x == p]
+                                            (\ aρ → ([aρ] \\\ bvs(tb) \\\ [j,z]) ⎧*⎫ ɩℰ (tb) j z
+                                            )
+                )
+        , let fm = Fn $ prune [(cρ·x :⇒ cρ·z) | (_,cρ) ← pairm]
+        , let hm = Fn $ prune [(cρ·w :⇒ cρ·j) | (_,cρ) ← pairm]
+        ]
+  where
+    envs = generateENVs (fvs(tₐ) ∪ fvs(tb))
+    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+
+unionSM :: Set(a) → (a → M(b)) → M(b)
+unionSM = undefined
+intersectM :: M(a) → (a → M(b)) → M(b)
+intersectM = undefined
+
 {-
   curry mapS aEnvsToENV $
-    (generateENVs (fvs(tₐ) ∪ fvs(tb))) `sbind` \ ρ ->
+    (generateENVs (fvs(tₐ) ∪ fvs(tb))) `sbind` \ ρ →
       let dom :: M(Env)
-          dom = (inj (aEnvToENV ρ) \\\ iI(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+          dom = (inj (aEnvToENV ρ) \\\ bvs(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
           domv :: M(Val)
           domv = getValuesOf p dom
-          rngfun :: Val -> M(AEnv)
+          rngfun :: Val → M(AEnv)
           rngfun = undefined
        in
-          piM(domv, rngfun) `mbind` \ (fun :: M(Val, AEnv)) ->
+          piM(domv, rngfun) `mbind` \ (fun :: M(Val, AEnv)) →
           xpure (ρ `extend` [(f, F(xfun x z fun)), (h, F(xfun w j fun))])
--}
 {-
     [ ρ `extend` [(f, F(xfun x z fun)), (h, F(xfun w j fun))]
     | ρ ← inj $
           generateENVs (fvs(tₐ) ∪ fvs(tb))  -- all possible environments mapping free variables
     , let dom :: M(Env)
-          dom = (inj (aEnvToENV ρ) \\\ iI(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+          dom = (inj (aEnvToENV ρ) \\\ bvs(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
           domv :: M(Val)
           domv = getValuesOf p dom
-          rngfun :: Val -> M(AEnv)
+          rngfun :: Val → M(AEnv)
           rngfun = undefined
-    , fun :: M(Val, AEnv) <- piM(domv, rngfun)
+    , fun :: M(Val, AEnv) ← piM(domv, rngfun)
     ]
 -}
   where
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    sbind :: Set(AEnv) -> (AEnv -> M(AEnv)) -> M(AEnv)
+    sbind :: Set(AEnv) → (AEnv → M(AEnv)) → M(AEnv)
     sbind = undefined
-    mbind :: M(a) -> (a -> M(AEnv)) -> M(AEnv)
+    mbind :: M(a) → (a → M(AEnv)) → M(AEnv)
     mbind = undefined
-    xpure :: AEnv -> M(AEnv)
+    xpure :: AEnv → M(AEnv)
     xpure = inj . Set.singleton
+-}
 
-xfun :: Iden -> Iden -> M(Val, AEnv) -> Fn
-xfun x y fun = Fn $ mapM' (\ (_, ρ) -> (ρ·x, ρ·y), fun)
+xfun :: Iden → Iden → M(Val, AEnv) → Fn
+xfun x y fun = Fn $ mapM' (\ (_, ρ) → (ρ·x, ρ·y), fun)
 
-generateENVs :: Set(Iden) -> Set(AEnv)
+generateENVs :: Set(Iden) → Set(AEnv)
 generateENVs = Set.mkSet . mkAEnvs . Set.toList 
 
-getValuesOf :: Iden -> M(Env) -> M(Val)
+getValuesOf :: Iden → M(Env) → M(Val)
 getValuesOf x (M ps) = M $ P.map (getENVValuesOf p) ps
 
 -- All possible values of a variable in an ENV
-getENVValuesOf :: Iden -> ENV -> Set(Val)
-getENVValuesOf x p = [ v | v <- allVals, EQD.hasElem x v p ]
+getENVValuesOf :: Iden → ENV → Set(Val)
+getENVValuesOf x p = [ v | v ← allVals, EQD.hasElem x v p ]
 
 {-
 -- Using piSM
@@ -136,8 +159,8 @@ getENVValuesOf x p = [ v | v <- allVals, EQD.hasElem x v p ]
   ]
   where
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    avs = iI(tₐ)
-    bvs = iI(tb)
+    avs = bvs(tₐ)
+    bvs = bvs(tb)
 
     xfn :: m(Val, Env) → Iden → Iden → Fn m
     xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
@@ -164,8 +187,8 @@ getENVValuesOf x p = [ v | v <- allVals, EQD.hasElem x v p ]
   ]
   where
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    avs = iI(tₐ)
-    bvs = iI(tb)
+    avs = bvs(tₐ)
+    bvs = bvs(tb)
 
     xfn :: m(Val, Env) → Iden → Iden → Fn m
     xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
@@ -189,7 +212,7 @@ getENVValuesOf x p = [ v | v <- allVals, EQD.hasElem x v p ]
   where [p,q] = fresh ["p","q"] [t]
 
 ɩℬ :: Term → Iden → Iden → M(Env)
-ɩℬ (t) u v = ɩℰ (t) u v \\\ iI(t)
+ɩℬ (t) u v = ɩℰ (t) u v \\\ bvs(t)
 
 ɩℱ :: Iden → Iden → Iden → M(Env)
 ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
@@ -199,7 +222,7 @@ getENVValuesOf x p = [ v | v <- allVals, EQD.hasElem x v p ]
 
 --------------------------------------------------------
 
-den :: Term -> M(Env)
+den :: Term → M(Env)
 den t = prune $ ɩℰ (Block t) u v
   where [u, v] = fresh ["u", "v"] [t]
 
@@ -265,8 +288,8 @@ instance (Show (XSet a)) => Show (M a) where
 empty = M []
 inj(d) = M [d]
 M s ++ M t = M (s P.++ t)
-M s ⎧*⎫ M t = M [ d1 ∩ d2 | d1 <- s, d2 <- t ]
-M s ⎩*⎭ M t = M [ d1 ∪ d2 | d1 <- s, d2 <- t ]
+M s ⎧*⎫ M t = M [ d1 ∩ d2 | d1 ← s, d2 ← t ]
+M s ⎩*⎭ M t = M [ d1 ∪ d2 | d1 ← s, d2 ← t ]
 s ⊍ t = dzip((∪), [s,t])
 unionS ss = dzip((∪), ss)
 fold(k,z,M s) = P.foldr (curry k) z s
@@ -275,10 +298,10 @@ mapM(f, M s) = undefined -- M $ P.map (mapXSet f) s
 mapM'(f, M s) = M $ P.map (fmap f) s
 piM = undefined
 
-dzip :: (ASet a) => (XSet(a)->XSet(a)->XSet(a), Set(M(a))) -> M(a)
-dzip(f, xs) = M $ foldr (\ (M x) r -> zipLong f x r) [] (Set.toList xs)
+dzip :: (ASet a) => (XSet(a)→XSet(a)→XSet(a), Set(M(a))) → M(a)
+dzip(f, xs) = M $ foldr (\ (M x) r → zipLong f x r) [] (Set.toList xs)
 
-zipLong :: (a -> a -> a) -> [a] -> [a] -> [a]
+zipLong :: (a → a → a) → [a] → [a] → [a]
 zipLong _ [] ys = ys
 zipLong _ xs [] = xs
 zipLong f (x:xs) (y:ys) = f x y : zipLong f xs ys
@@ -306,60 +329,60 @@ type Term = F.SrcEssential
 type Op = F.PrimOp
 
 pattern U_ :: Term
-pattern U_ <- (F.Variable (F.isSrcUnderscore -> True))
-pattern Var :: Iden -> Term
+pattern U_ ← (F.Variable (F.isSrcUnderscore → True))
+pattern Var :: Iden → Term
 pattern Var i = F.Variable i
-pattern Prim :: Op -> Term
+pattern Prim :: Op → Term
 pattern Prim o = F.EPrim o
-pattern (:=) :: Iden -> Term -> Term
+pattern (:=) :: Iden → Term → Term
 pattern i := t = F.DefineE i t
-pattern (:|:) :: Term -> Term -> Term
+pattern (:|:) :: Term → Term → Term
 pattern t1 :|: t2 = F.Choice t1 t2
-pattern (:|||:) :: Term -> Term -> Term
-pattern t1 :|||: t2 <- F.ApplyD (F.Variable (F.Ident _ "operator'|||'")) (F.Array [t1, t2])
+pattern (:|||:) :: Term → Term → Term
+pattern t1 :|||: t2 ← F.ApplyD (F.Variable (F.Ident _ "operator'|||'")) (F.Array [t1, t2])
   where t1 :|||: t2 = F.ApplyD (F.Variable (F.Ident F.noLoc "operator'|||'")) (F.Array [t1, t2])
-pattern (:=:) :: Term -> Term -> Term
+pattern (:=:) :: Term → Term → Term
 pattern t1 :=: t2 = F.Unify t1 t2
---pattern (:~>) :: Term -> Term -> Term
+--pattern (:~>) :: Term → Term → Term
 --pattern t1 :~> t2 = ???
-pattern (:->) :: Iden -> Term -> Term
+pattern (:->) :: Iden → Term → Term
 pattern i :-> t = F.DefineIE i t
-pattern (:>) :: Term -> Term -> Term
+pattern (:>) :: Term → Term → Term
 pattern t1 :> t2 = F.Seq t1 t2
-pattern (:..) :: Term -> Term -> Term
+pattern (:..) :: Term → Term → Term
 pattern t1 :.. t2 = F.ApplyD (F.EPrim F.DotDot) (F.Array [t1, t2])
-pattern (:@) :: Term -> Term -> Term
+pattern (:@) :: Term → Term → Term
 pattern t1 :@ t2 = F.ApplyD t1 t2
-pattern Rng :: Term -> Term
+pattern Rng :: Term → Term
 pattern Rng t = F.Range t
-pattern If :: Term -> Term -> Term -> Term
+pattern If :: Term → Term → Term → Term
 pattern If t1 t2 t3 = F.If3 t1 t2 t3
-pattern For :: Term -> Term -> Term
+pattern For :: Term → Term → Term
 pattern For t1 t2 = F.For2 t1 t2
 pattern Fun t1 q w t2 = F.Function q t1 w t2
-pattern Where :: Term -> Term -> Term
+pattern Where :: Term → Term → Term
 pattern t1 `Where` t2 = F.Where t1 t2
-pattern Int :: Z -> Term
+pattern Int :: Z → Term
 pattern Int k = F.Lit (F.LInt k)
-pattern Block :: Term -> Term
+pattern Block :: Term → Term
 pattern Block t = F.Block t
-pattern Exists :: Iden -> Term
+pattern Exists :: Iden → Term
 pattern Exists i = F.DefineV i
-pattern Array :: [Term] -> Term
+pattern Array :: [Term] → Term
 pattern Array as = F.Array as
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
-fresh :: [String] -> [Term] -> [Iden]
+fresh :: [String] → [Term] → [Iden]
 fresh ss ts = snd $ L.mapAccumL f (concatMap F.getAllBinders ts) ss
   where
-    f :: [Iden] -> String -> ([Iden], Iden)
+    f :: [Iden] → String → ([Iden], Iden)
     f is s = (i:is, i)
           where i = (free L.\\ is) !! 0         -- avoid head
-                free = [ F.Ident F.noLoc (s P.++ {-"_" ++-} i) | i <- "" : P.map show [1 :: Integer ..] ]
+                free = [ F.Ident F.noLoc (s P.++ {-"_" ++-} i) | i ← "" : P.map show [1 :: Integer ..] ]
 
 -- All top level binders
-iI :: Term → Set Iden
-iI = mkSet . F.getVisibleBinders
+bvs :: Term → Set Iden
+bvs = mkSet . F.getVisibleBinders
 
 fvs :: Term → Set Iden
 fvs = mkSet . F.getFree
@@ -373,7 +396,7 @@ succeeds = F.effSucceeds
 
 ----- primops -----
 
-dP :: Op -> Fn
+dP :: Op → Fn
 dP F.Neg = fun[funNegate]
 dP F.IsInt = fun[funInt]
 dP F.Add = fun[funAdd]
@@ -385,37 +408,37 @@ dP F.Lt = fun[funLt]
 dP p = error $ "dP undefined " P.++ show p
 
 knownFuns :: [(Fn, String)]
-knownFuns = [ (dP o, P.map P.toLower (show o)) | o <- [F.Neg, F.IsInt, F.Add, F.Sub, F.Mul, F.Div, F.Gt, F.Lt] ]
+knownFuns = [ (dP o, P.map P.toLower (show o)) | o ← [F.Neg, F.IsInt, F.Add, F.Sub, F.Mul, F.Div, F.Gt, F.Lt] ]
 
-fun :: [Val ⇀ Val] -> Fn
+fun :: [Val ⇀ Val] → Fn
 fun = Fn . concat . P.map inj
 
 funNegate :: Val ⇀ Val
-funNegate = [(I i, I ((-i) `mod` numZ)) | i <- allZ ]
+funNegate = [(I i, I ((-i) `mod` numZ)) | i ← allZ ]
 
 funInt :: Val ⇀ Val
-funInt = [(I i, I i) | i <- allZ ]
+funInt = [(I i, I i) | i ← allZ ]
 
 funAdd :: Val ⇀ Val
-funAdd = [ (T [I x, I y], I ((x+y) `mod` numZ)) | x <- allZ, y <- allZ ]
+funAdd = [ (T [I x, I y], I ((x+y) `mod` numZ)) | x ← allZ, y ← allZ ]
 
 funSub :: Val ⇀ Val
-funSub = [ (T [I x, I y], I ((x-y) `mod` numZ)) | x <- allZ, y <- allZ ]
+funSub = [ (T [I x, I y], I ((x-y) `mod` numZ)) | x ← allZ, y ← allZ ]
 
 funMul :: Val ⇀ Val
-funMul = [ (T [I x, I y], I ((x*y) `mod` numZ)) | x <- allZ, y <- allZ ]
+funMul = [ (T [I x, I y], I ((x*y) `mod` numZ)) | x ← allZ, y ← allZ ]
 
 funDiv :: Val ⇀ Val
-funDiv = [ (T [I x, I y], I ((x `div` y) `mod` numZ)) | x <- allZ, y <- allZ, y /= 0 ]
+funDiv = [ (T [I x, I y], I ((x `div` y) `mod` numZ)) | x ← allZ, y ← allZ, y /= 0 ]
 
 funGt :: Val ⇀ Val
-funGt = [ (T [I x, I y], I x) | x <- allZ, y <- allZ, x > y ]
+funGt = [ (T [I x, I y], I x) | x ← allZ, y ← allZ, x > y ]
 
 funLt :: Val ⇀ Val
-funLt = [ (T [I x, I y], I x) | x <- allZ, y <- allZ, x < y ]
+funLt = [ (T [I x, I y], I x) | x ← allZ, y ← allZ, x < y ]
 
 -- Apply a partial function
-applyPF :: (Val ⇀ Val) -> Val -> Maybe Val
+applyPF :: (Val ⇀ Val) → Val → Maybe Val
 applyPF f x = Set.getSing $ Set.lookupSet x f
 
 ----- Val -----
@@ -432,13 +455,14 @@ data Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
 
 instance Show Fn where
-  show f | Just s <- P.lookup f knownFuns = s
+  show f | Just s ← P.lookup f knownFuns = s
   show (Fn f) = "Fn" P.++ show f
 
 type a ⇀ b = Set(a :⇒ b)   -- partial functions from a to b
 dom :: (a ⇀ b) → Set(a)
 dom = fmap fst
 
+infix 1 :⇒
 type a :⇒ b = (a, b)       -- pairs used to form functions
 pattern a :⇒ b = (a, b)
 
@@ -447,34 +471,38 @@ numZ :: Z
 numZ = 4
 
 allZ :: Set Z
-allZ = mkSet [i | i <- [0 .. numZ-1] ]
+allZ = mkSet [i | i ← [0 .. numZ-1] ]
 
 allVals :: Set(Val)
-allVals = [ I i | i <- allZ ]
+allVals = [ I i | i ← allZ ]
         ∪ allFuns
         ∪ allTuples
 
 allFuns :: Set(Val)
-allFuns = mkSet [ F f | (f, _) <- knownFuns ]
+allFuns = mkSet [ F f | (f, _) ← knownFuns ]
 
 -- 0, 1, 2-tuples of numbers
 allTuples :: Set(Val)
-allTuples = mkSet $ (P.concat :: [[Val]] -> [Val])
+allTuples = mkSet $ (P.concat :: [[Val]] → [Val])
   [ [ T []]
-  , [ T [I x] | x <- [0 .. numZ-1] ]
-  , [ T [I x, I y] | x <- [0 .. numZ-1], y <- [0 .. numZ-1] ]
+  , [ T [I x] | x ← [0 .. numZ-1] ]
+  , [ T [I x, I y] | x ← [0 .. numZ-1], y ← [0 .. numZ-1] ]
   ]
 
 ----- XSet -----
 
-type ASet :: Type -> Constraint
+type ASet :: Type → Constraint
 class (Eq (XSet a), Ord (XSet a)) => ASet a where
-  type XSet a = r | r -> a
+  type XSet a = r | r → a
   ø :: XSet(a)
-  isEmpty :: XSet(a) -> Bool
+  isEmpty :: XSet(a) → Bool
   (∪) :: XSet(a) → XSet(a) → XSet(a)
   (∩) :: XSet(a) → XSet(a) → XSet(a)
-  mapXSet :: (a → a) → XSet(a) → XSet(a)
+--  mapXSet :: (a → a) → XSet(a) → XSet(a)
+  asing :: a → XSet a
+--  abind :: XSet a → (a → XSet(b)) → XSet(b)
+  setToXSet :: Set(a) → XSet(a)
+  xSetToSet :: XSet(a) → Set(a)
 
 instance ASet Env where
   type XSet Env = ENV
@@ -482,15 +510,42 @@ instance ASet Env where
   (∪) = (EQD.\/)
   (∩) = (EQD./\)
   isEmpty x = x == EQD.false
-  mapXSet = error "mapSet EQD"
+  asing = aEnvToENV
+  setToXSet = error "setToXSet Env"
+  xSetToSet = error "xSetToSet Env"
 
+{-
 instance ASet AEnv where
   type XSet AEnv = Set AEnv
   ø = Set.empty
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  mapXSet = fmap
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
+-}
+
+-- coulbe be more clever if it mattered
+instance ASet () where
+  type XSet () = Set ()
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
+
+instance ASet Integer where
+  type XSet Integer = Set Integer
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
 
 instance ASet Val where
   type XSet Val = Set Val
@@ -498,7 +553,9 @@ instance ASet Val where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  mapXSet = fmap
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
 
 instance ASet Iden where
   type XSet Iden = Set Iden
@@ -506,7 +563,9 @@ instance ASet Iden where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  mapXSet = fmap
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
 
 instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
@@ -514,7 +573,9 @@ instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  mapXSet = fmap
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
   
 instance (Ord a, ASet a) => ASet (Set(a)) where
   type XSet (Set a) = Set (Set(a))
@@ -522,8 +583,19 @@ instance (Ord a, ASet a) => ASet (Set(a)) where
   (∪) = Set.union
   (∩) = Set.intersect
   isEmpty = Set.isEmpty
-  mapXSet = fmap
-  
+  asing = Set.singleton
+  setToXSet = id  
+  xSetToSet = id
+
+instance (Ord (XSet a)) => ASet (M a) where
+  type XSet (M a) = Set (M(a))
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  asing = Set.singleton
+  setToXSet = id  
+  xSetToSet = id
 
 ----- Set -----
 -- Adapter for Set module
@@ -548,35 +620,35 @@ mapSet :: (a → b, Set(a)) → Set(b)
 mapSet(f,s) = fmap f s
 bigIntersect :: Eq a => Set(Set(a)) → Set(a)
 bigIntersect = Set.bigIntersect
-mkSet :: [a] -> Set a
+mkSet :: [a] → Set a
 mkSet = Set.mkSet
 
-unions :: ASet a => [XSet(a)] -> XSet(a)
+unions :: ASet a => [XSet(a)] → XSet(a)
 unions = P.foldr (∪) ø
 
 ----- Iden -----
 type Iden = F.Ident
 
 ----- Env -----
-data Env                   -- Just a placeholder
+type Env = AEnv
 
 newtype AEnv = Env [(Iden, Val)]   -- only used for functions
   deriving (Eq, Ord, Show)
 
-(·) :: AEnv -> Iden -> Val
+(·) :: AEnv → Iden → Val
 Env kvs · x = P.fromMaybe (error $ "getSing " P.++ show x) $ P.lookup x kvs
 
-extend :: AEnv -> [(Iden, Val)] -> AEnv
+extend :: AEnv → [(Iden, Val)] → AEnv
 extend (Env kvs) kvs' = Env (kvs P.++ kvs')
 
-aEnvToENV :: AEnv -> ENV
+aEnvToENV :: AEnv → ENV
 aEnvToENV (Env kvs) = foldr (/\) univ $ P.map (uncurry (.=)) kvs
 
 -- Make all possible environments with the given identifiers.
-mkAEnvs :: [Iden] -> [AEnv]
+mkAEnvs :: [Iden] → [AEnv]
 mkAEnvs is = P.map (Env . P.zip is) (M.replicateM (length is) $ Set.toList allVals)
 
-aEnvsToENV :: Set(AEnv) -> ENV
+aEnvsToENV :: Set(AEnv) → ENV
 aEnvsToENV = foldr (\/) cempty . P.map aEnvToENV . Set.toList
 
 ----- Simple values -----
@@ -584,7 +656,7 @@ data Atom = V Val | X Iden | AOp Op [Atom] | ATup [Atom]
   deriving (Eq, Ord, Show)
 
 allN :: Set(Atom)
-allN = [ V (I i) | i <- allZ, i >= 0 ]
+allN = [ V (I i) | i ← allZ, i >= 0 ]
 
 instance Enum (Atom) where
   toEnum = V . I . toInteger
@@ -601,47 +673,47 @@ instance Num (Atom) where
 (⨄) :: Iden → Iden → Atom
 x ⨄ y = AOp F.ArrApp [X x, X y]
 -}
-(⊕) :: Atom -> Atom -> Atom
+(⊕) :: Atom → Atom → Atom
 x ⊕ y = AOp F.ArrApp [x, y]
 
 nil :: Atom
 nil = ATup []
 
-tup :: [Iden] -> Atom
+tup :: [Iden] → Atom
 tup vs = ATup (P.map X vs)
 
 oneTuple :: Iden → Atom
 oneTuple x = ATup [X x]
 
-atomEval :: AEnv -> Atom -> Maybe Val
+atomEval :: AEnv → Atom → Maybe Val
 atomEval r (X x)      = Just (r · x)
 atomEval _ (V v)      = Just v
 atomEval r (ATup as)  = T <$> P.mapM (atomEval r) as
 atomEval r (AOp o as) =
   case (o, P.mapM (atomEval r) as) of
-    (F.Neg, Just [I i])        -> Just $ I $ (-i)    `mod` numZ
-    (F.Add, Just [I i1, I i2]) -> Just $ I $ (i1+i2) `mod` numZ
-    (F.Sub, Just [I i1, I i2]) -> Just $ I $ (i1-i2) `mod` numZ
-    (F.Mul, Just [I i1, I i2]) -> Just $ I $ (i1*i2) `mod` numZ
-    (F.Div, Just [I i1, I i2]) -> Just $ I $ (i1 `div` i2)
-    (F.ArrApp, Just[T xs1, T xs2]) -> Just $ T $ xs1 P.++ xs2
-    _                          -> Nothing
+    (F.Neg, Just [I i])        → Just $ I $ (-i)    `mod` numZ
+    (F.Add, Just [I i1, I i2]) → Just $ I $ (i1+i2) `mod` numZ
+    (F.Sub, Just [I i1, I i2]) → Just $ I $ (i1-i2) `mod` numZ
+    (F.Mul, Just [I i1, I i2]) → Just $ I $ (i1*i2) `mod` numZ
+    (F.Div, Just [I i1, I i2]) → Just $ I $ (i1 `div` i2)
+    (F.ArrApp, Just[T xs1, T xs2]) → Just $ T $ xs1 P.++ xs2
+    _                          → Nothing
 
-atomVars :: Atom -> [Iden]
+atomVars :: Atom → [Iden]
 atomVars (X x) = [x]
 atomVars (V _) = []
 atomVars (ATup  as) = P.foldr L.union [] (P.map atomVars as)
 atomVars (AOp o as) = P.foldr L.union [] (P.map atomVars as)
 
-atomEnvs :: [Atom] -> [([Val], AEnv)]
+atomEnvs :: [Atom] → [([Val], AEnv)]
 atomEnvs as =
   let envs = mkAEnvs $ P.foldr L.union [] $ P.map atomVars as
-  in  [ (vs, r) | r <- envs, Just vs <- [P.mapM (atomEval r) as] ]
+  in  [ (vs, r) | r ← envs, Just vs ← [P.mapM (atomEval r) as] ]
 
 (.==) :: Iden → Atom → ENV
-i .== a = unionENVs [ i .= v /\ aEnvToENV r | ([v], r) <- atomEnvs [a], v ∈ allVals ]
+i .== a = unionENVs [ i .= v /\ aEnvToENV r | ([v], r) ← atomEnvs [a], v ∈ allVals ]
 (.<=) :: Atom → Atom → ENV
-a1 .<= a2 = unionENVs [ aEnvToENV r | ([I v1, I v2], r) <- atomEnvs [a1, a2], v1 <= v2 ]
+a1 .<= a2 = unionENVs [ aEnvToENV r | ([I v1, I v2], r) ← atomEnvs [a1, a2], v1 <= v2 ]
 
 ----- ENV, constraints -----
 type ENV = EQD.EQD Iden Val
@@ -665,16 +737,16 @@ infixl 3 /\
 (.=) :: Iden → Val → ENV
 (.=) = (EQD.=:)
 
-unionENVs :: [ENV] -> ENV
+unionENVs :: [ENV] → ENV
 unionENVs = P.foldr (\/) cempty
 
-bigUnionENV :: Set(ENV) -> ENV
+bigUnionENV :: Set(ENV) → ENV
 bigUnionENV = unionENVs . Set.toList
 
 -- Environments where the pair (x :⇒ y) is in the function f
 (⋵) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
 (x :⇒ y) ⋵ f =
-  unionENVs [ x .= u /\ y .= v | u <- Set.toList allVals, Just v <- [applyPF f u] ]
+  unionENVs [ x .= u /\ y .= v | u ← Set.toList allVals, Just v ← [applyPF f u] ]
 
 ----- Verse computation type -----
 empty    :: ASet a => M(a)
@@ -721,12 +793,80 @@ concat :: ASet a =>
 concat [] = empty
 concat (s:ss) = s ++ concat ss
 
-bigStar :: [M(Env)] -> M(Env)
+bigStar :: [M(Env)] → M(Env)
 bigStar [] = error "bigStar: []"
 bigStar xs = P.foldr1 (⎧*⎫) xs
 
 ---------------------------
 
+type MyMonad :: (Type → Type) → Constraint
+class MyMonad m where
+  type MValid m a :: Constraint
+  return :: MValid m a => a → m a
+  (>>=)  :: (MValid m a, MValid m b) => m a → (a → m b) → m b
+  (>>)   :: (MValid m a, MValid m b) => m a → m b → m b
+  guard  :: Bool → m ()
+  a >> b = a >>= const b
+
+instance MyMonad [] where
+  type MValid [] a = ()
+  return = P.return
+  (>>=)  = (P.>>=)
+  (>>)   = (P.>>)
+  guard  = M.guard
+
+instance MyMonad Set where
+  type MValid Set a = ()
+  return = Set.singleton
+  (>>=)  = (P.>>=)
+  guard  = M.guard
+
+instance MyMonad M where
+  type MValid M a = (ASet a, Ord a)
+  return x = M [asing x]
+  -- Only allow comprehension syntax for fmap&filter like expressions.
+  (>>=) :: forall a b . (MValid M a, MValid M b) => M a → (a → M b) → M b
+  M (as :: [XSet a]) >>= k = M $ P.map xmap as
+    where purek :: a → Maybe b
+          purek x =
+            case k x of
+              M [s] | Just y ← Set.getSing (xSetToSet s) → Just y
+              M [] -> Nothing
+              _ → error "MyMonad M: k is not pure"
+          xmap :: XSet a → XSet b
+          xmap = setToXSet . Set.mapMaybe purek . xSetToSet
+  guard True = M [asing ()]
+  guard False = M []
+
+instance ASet a => IsList (M a) where
+  type Item (M a) = a
+  fromList [x] = M [asing x]
+  toList = undefined
+
+---------------------------
+{-
+pi :: Eq a => M(a) -> M(a,b) -> M(M(a,b))
+pi []           rng = [ [ [] ] ]
+pi [d]          rng = [ [ [f] | f⟵funs ] | funs ⟵ pi' d rng ]
+pi (dm1 : dom2) rng = liftA2 (++) (pi [dm1] rng) (pi dom2 rng)
+
+pi' :: Eq a => Set(a) -> M(a,b) -> M(Set(a,b))
+pi' d []           = [ [ [] ] | Set.isEmpty d ]
+pi' d [r]          = [ piSet d r ]
+pi' d (rg1 : rng2) =
+  pi' d [rg1]
+  ++
+  unionS { liftA2 Set.union (pi' d1 [rg1]) (pi' d2 rng2)
+         | (d1,d2) ⟵ Set.partitions(d)
+         , P.not (Set.isEmpty d1)
+         , P.not (Set.isEmpty d2)
+         }
+  ++
+  pi' d rng2
+
+piSet :: Set(a) -> Set(a,b) -> Set(Set(a,b))
+piSet = undefined
+-}
 
 x = F.Ident F.noLoc "x"
 y = F.Ident F.noLoc "y"
@@ -742,4 +882,8 @@ eE = ɩℰ
 bB = ɩℬ
 cC = ɩ𝒞
 
+test1 = [ (x,x) | x <- return 1, x==2 ] :: M (Integer, Integer)
+
 main = print $ den $ Array [Int 1, Int 2]
+
+--  cons(x:A,xs:[]A) = for(a:=0|1; y:if(a=0){array{x}else{ys}){y}

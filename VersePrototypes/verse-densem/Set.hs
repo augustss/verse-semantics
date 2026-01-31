@@ -17,6 +17,7 @@ module Set(
   sing,
   getSing,
   toList,
+  toList',
   forAll, forAllL,
   exists, existsL,
   maximumSet,
@@ -31,8 +32,10 @@ module Set(
   cross,
   unzip3Set,
   lookupSet,
+  partitions,
   ) where
 import Control.Applicative
+import Control.Monad
 import Data.List(intercalate, sort, groupBy, sortBy, partition)
 import qualified Data.Maybe as M
 import qualified Data.Set as S
@@ -195,3 +198,15 @@ instance (Ord a) => IsList (Set a) where
 
 lookupSet :: Eq a => a -> Set (a, b) -> Set b
 lookupSet x (S xys) = S [ y | (x', y) <- xys, x == x' ]
+
+partitions :: Ord a => Set a -> [(Set a, Set a)]
+partitions = map f . partitionM (const [False, True]) . toList'
+  where f (xs, ys) = (S xs, S ys)
+
+-- Should import from somewhere
+partitionM :: Monad m => (a -> m Bool) -> [a] -> m ([a], [a])
+partitionM f [] = pure ([], [])
+partitionM f (x:xs) = do
+    res <- f x
+    (as,bs) <- partitionM f xs
+    pure ([x | res]++as, [x | not res]++bs)
