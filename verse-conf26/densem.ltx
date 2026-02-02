@@ -110,12 +110,13 @@ $$
   \begin{array}{rcll}
     \vmempty & :: & \Vm{a} \\
     \vminject & :: & \powerset{a} \rightarrow \Vm{a} \\
-    \vmcat    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Ordered choice} \\
+    \vmappend    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Ordered choice} \\
     \vmseq    & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set intersection}\\
     \vminnerunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Inner-set union} \\
     \vmunion  & :: & \Vm{a} \rightarrow \Vm{a} \rightarrow \Vm{a} & \text{Unordered choice}\\
     \vmunions & :: & \powerset{\Vm{a}} \rightarrow \Vm{a}  & \text{Infinite unordered choice} \\
     \vmmap    & :: & (a \rightarrow b) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
+    \vmmaptwo    & :: & (a \rightarrow b \rightarrow c) \rightarrow \Vm{a} \rightarrow \Vm{b} \rightarrow \Vm{c} \\
 %    \vmmapset    & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
 %    \vmflatten & :: & \Vm{\powerset{a}} \rightarrow \Vm{a} \\
     \vmfold   & :: & \multicolumn{2}{l}{(\powerset{a} \rightarrow \Vm{b} \rightarrow \Vm{b}) \rightarrow \Vm{b}
@@ -129,7 +130,7 @@ $$
   \begin{array}{rclcl}
 %     \vmempty \vmbind k & = & \vmempty \\
      \vmempty \vmseq   s & = & \vmempty & = & s \vmseq \vmempty \\
-     \vmempty \vmcat   s & = & s        & = & s \vmcat \vmempty \\
+     \vmempty \vmappend   s & = & s        & = & s \vmappend \vmempty \\
      \vmempty \vmunion s & = & s        & = & s \vmunion \vmempty \\
      \vmcollapse(\vminject(s)) & = & s \\
   \end{array}
@@ -151,7 +152,7 @@ $$
 %    (\ENVhide) & :: & \Env \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
 %    \rho \ENVhide vs & = & \{ \rho' \in \Env \vb \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
     \vmmapset & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \powerset{b} \\
-    \vmmapset(f,s) & = & \vmfold( \; (\lambda x\, t. \, \vminject(f(x)) \vmcat t), \; \vmempty, \; s \;) \\[1mm]
+    \vmmapset(f,s) & = & \vmfold( \; (\lambda x\, t. \, \vminject(f(x)) \vmappend t), \; \vmempty, \; s \;) \\[1mm]
     (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \hspace{5mm}
         \text{Binds less tightly than $\vmseq$, $\vmunion$ etc} \\
     s \vmhide vs & = & \vmmapset( \; (\lambda \EV. \, \HIDE{\EV}{vs}),\; s \;) \\[1mm]
@@ -165,7 +166,7 @@ $$
          op :: \powerset{a} \rightarrow \Vm{a} \rightarrow \Vm{a} \\
          op( \EV, rest ) = \left\{ \begin{array}{ll}
                rest  & \text{if $\EV = \{\}$} \\
-               \vminject(\EV) \vmcat rest & \text{otherwise}
+               \vminject(\EV) \vmappend rest & \text{otherwise}
                \end{array} \right. \\
        \end{array} \\
     \\
@@ -180,7 +181,7 @@ $$
 \\
     \vmconcat & :: & [\Vm{a}] \rightarrow \Vm{a} \\
     \vmconcat(\, [] \, ) & = & \vmempty \\
-    \vmconcat(\, s:ss \, ) & = & s \vmcat \vmconcat(ss) \\
+    \vmconcat(\, s:ss \, ) & = & s \vmappend \vmconcat(ss) \\
     \end{array}
 
 \end{array}
@@ -202,7 +203,7 @@ $$
     \multicolumn{3}{l}{|type|\; \Vm{a} = \powerset{a}} \\[2mm]
     \vmempty & = & \{\} \\
     \vminject(\EV) & = & \EV \\
-    s \vmcat t  & = & s \cup t \\
+    s \vmappend t  & = & s \cup t \\
     \vmfold(k,z,s)   & = & k(s,z) \\
     \vmseq(s,t)   & =  & s \cap t \\
     \vminnerunion(s,t)  & = & s \cup t \\
@@ -215,7 +216,7 @@ $$
 
   \text{The Verse sequence monad $\VmSeq{\cdot}$ comes equipped with the following operations} \\
   \begin{array}{rcll}
-    \seqappend & :: & \VmSeq{a} \rightarrow \VmSeq{a} \rightarrow \VmSeq{a} \\
+    (\seqappend) & :: & \VmSeq{a} \rightarrow \VmSeq{a} \rightarrow \VmSeq{a} \\
     \sequnit & :: & a \rightarrow \VmSeq{a} \\
     (\seqbind) & :: & \VmSeq{a} \rightarrow (a \rightarrow \VmSeq{b} \rightarrow \VmSeq{b} \\
     \seqfold & :: & (a \rightarrow b \rightarrow b) \rightarrow b \rightarrow \VmSeq{a} \rightarrow  b \\
@@ -229,16 +230,21 @@ $$
     \multicolumn{3}{l}{|type|\; \Vm{a} = \VmSeq{\powerset{a}}} \\[2mm]
     \vmempty & = & \sequnit( \{\} ) \\
     \vminject(\EV) & = & \sequnit(\EV) \\
-    s \vmcat t  & = & \seqappend( s, t ) \\
+    s \vmappend t  & = & s \seqappend t \\
     \vmseq(s,t)   & =  & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \EV_1 \cap \EV_2\\
     \vminnerunion(s,t)  & = & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \EV_1 \cup \EV_2\\
 
-    \vmunion(s,t)  & = & \seqzip( \cup, \{ s, t \} )  &  \text{Dodgy union} \\
-    \vmunions(ss) & =  & \seqzip( \cup, ss )  &  \text{Infinite dodgy union} \\
+    \vmunion(s,t)    & = & \seqzip( \cup, \{ s, t \} )  &  \text{Dodgy union} \\
+    \vmunions(ss)    & = & \seqzip( \cup, ss )  &  \text{Infinite dodgy union} \\
+    \vmmap(f,s)      & = & s \seqbind \lambda \EV.\, \sequnit( \{ f(x) \vb x \in \EV \} ) \\
+    \vmmaptwo(f,s,t) & = & s \seqbind \lambda \EV_s.\, t \seqbind \lambda \EV_t. \sequnit( \{ f(x,y) \vb x \in \EV_s, y \in \EV_t \} ) \\
     \vmfold(k,z,s)   & = & \seqfold(k,z,s) \\
-    \vmpi & = & ??? \\
-    \vmcollapse( s ) & = & \seqfold( \cup, \{ \}, s )
+    \vmcollapse( s ) & = & \seqfold( \cup, \{ \}, s ) \\
+    \vmpi( \sequnit( \{\}) , r ) & = & \sequnit( \{ \vmempty \} ) \\
+    \vmpi( d_1 \seqappend d_2 ,r ) & = & \vmmaptwo( (\vmappend), \vmpi(d_1,r), \vmpi(d_2,r) ) \\
   \end{array}
+
+
 %   \textbf{Tree semantics}\\
 %   \begin{array}{rcll}
 %     \multicolumn{3}{l}{|type|\; \Vm{a} = \pomunit{\powerset{a}} \;
@@ -248,7 +254,7 @@ $$
 %     (\treebind) & = & \Vm{a} \rightarrow (\powerset{a} \rightarrow \Vm{b}) \rightarrow \Vm{b} \\
 %     \vmempty & = & [\{\}] \\
 %     \vminject(\EV) & = & [\EV] \\
-%     \vmcat(s,t)  & = & s \pomcat t \\
+%     \vmappend(s,t)  & = & s \pomcat t \\
 %     \vmseq(s,t)   & =  & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cap \EV_2\\
 %     \vminnerunion(s,t)  & = & s \treebind \lambda \EV_1.\, t \treebind \lambda \EV_2.\, \EV_1 \cup \EV_2\\
 %     \vmunion(s,t)  & =  & s \pomunion t \\
@@ -301,7 +307,7 @@ $$
 % Choice and failure
 \rulename{sfail} &  \semess{E}{u}{v}{|fail|} & = & \vmempty \\
 \rulename{schoice} &  \semess{E}{u}{v}{|t_1 `choice` t_2|}
-  & = & \semess{B}{u}{v}{t_1} \vmcat \semess{B}{u}{v}{t_2} \\
+  & = & \semess{B}{u}{v}{t_1} \vmappend \semess{B}{u}{v}{t_2} \\
 % \rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
 %   & = & \semess{B}{u}{v}{t_1} \vmunion \semess{B}{u}{v}{t_2} \\
 
