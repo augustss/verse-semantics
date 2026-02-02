@@ -826,6 +826,8 @@ instance MyMonad M where
   return x = M [asing x]
   -- Only allow comprehension syntax for fmap&filter like expressions.
   (>>=) :: forall a b . (MValid M a, MValid M b) => M a → (a → M b) → M b
+  M xs >>= k = M [ y | (x :: XSet a) <- xs, let M ys = unionS $ fmap k (xSetToSet x), y <- ys ]
+{-
   M (as :: [XSet a]) >>= k = M $ P.map xmap as
     where purek :: a → Maybe b
           purek x =
@@ -835,6 +837,7 @@ instance MyMonad M where
               _ → error "MyMonad M: k is not pure"
           xmap :: XSet a → XSet b
           xmap = setToXSet . Set.mapMaybe purek . xSetToSet
+-}
   guard True = M [asing ()]
   guard False = M []
 
@@ -844,29 +847,99 @@ instance ASet a => IsList (M a) where
   toList = undefined
 
 ---------------------------
-{-
-pi :: Eq a => M(a) -> M(a,b) -> M(M(a,b))
-pi []           rng = [ [ [] ] ]
-pi [d]          rng = [ [ [f] | f⟵funs ] | funs ⟵ pi' d rng ]
-pi (dm1 : dom2) rng = liftA2 (++) (pi [dm1] rng) (pi dom2 rng)
 
-pi' :: Eq a => Set(a) -> M(a,b) -> M(Set(a,b))
-pi' d []           = [ [ [] ] | Set.isEmpty d ]
-pi' d [r]          = [ piSet d r ]
-pi' d (rg1 : rng2) =
-  pi' d [rg1]
+{-
+pi :: forall a b . (ASet a, ASet (a, b), Ord a, Ord b) => M(a) -> M(a,b) -> M(M(a,b))
+pi (M [])           rng = [ inj Set.empty ]
+pi (M [d])          rng = [ inj (setToXSet fun) | (fun :: Set(a,b)) <- pi' (xSetToSet d) rng ]
+pi (M (dm1 : dom2)) rng = --liftA2 (++) (pi (M [dm1]) rng) (pi (M dom2) rng)
+                          [ x1 ++ x2 | x1 <- pi (M [dm1]) rng, x2 <- pi (M dom2) rng ]
+
+pi' :: (ASet a, ASet (a, b), Ord a, Ord b) =>  Set(a) -> M(a,b) -> M(Set(a,b))
+pi' d (M [])           = [ Set.empty | Set.isEmpty d ]
+{-
+pi' d (M [r])          = [ piSet d r ]
+pi' d (M (rg1 : rng2)) =
+  pi' d (M [rg1])
   ++
-  unionS { liftA2 Set.union (pi' d1 [rg1]) (pi' d2 rng2)
-         | (d1,d2) ⟵ Set.partitions(d)
+  _unionS [ liftA2 {-(∪)-}Set.union (pi' d1 (M [rg1])) (pi' d2 (M rng2))
+         | (d1, d2) <- Set.partitions(d)
          , P.not (Set.isEmpty d1)
          , P.not (Set.isEmpty d2)
-         }
+         ]
   ++
-  pi' d rng2
-
-piSet :: Set(a) -> Set(a,b) -> Set(Set(a,b))
-piSet = undefined
+  pi' d (M rng2)
 -}
+
+piSet :: (Ord a, Ord b) => Set(a) -> Set(a,b) -> Set(a ⇀ b)
+piSet s t =
+  case toList s of
+    [] -> [ [] ]                 -- singleton set with an empty set
+    (x:xs) ->  [ Set.add (x :⇒ y) xysSet
+               | (x', y) <- t
+               , x == x'
+               , xysSet <- piSet (mkSet xs) t
+               ]
+-}
+
+class Pi m where
+  pi :: (ASet a, ASet b, Ord a, Ord b) => m a -> m (a,b) -> m (m (a,b))
+
+instance Pi Set where
+  pi s _ | Set.isEmpty s =
+    [ [] ]
+  pi (toList -> (x:xs)) ys =
+    [ Set.add (x,y) xys
+    | (x',y) <- ys
+    , x == x'
+    , xys <- pi (mkSet xs) ys
+    ]
+
+instance Pi [] where
+  pi [] _ =
+    [[]]
+
+  pi (x:xs) ys =
+    [ (x,y):xys
+    | (x',y) <- ys
+    , x==x'
+    , xys <- pi xs ys
+    ]
+
+instance Pi M where
+  pi :: forall a b . (ASet a, ASet b, Ord a, Ord b) => M a -> M (a,b) -> M (M (a,b))
+  pi (M []) _ =
+    M [ [ M [] ] ]
+
+  pi (M [xs]) (M [ys]) =
+    M [ fmap (M . (:[])) $ pi (xSetToSet xs) (xSetToSet ys) ]
+
+  pi (M [xs]) (M []) =
+    M []
+  pi (M [(xs :: XSet a)]) (M ((ys :: XSet(a,b)) : yss)) =
+        pi (M [xs]) (M [ys])
+     ++ unionS middle
+     ++ pi (M [xs]) (M yss)
+     where middle :: Set(M(M(a,b)))
+           middle = [ [ unionS [f1, f2] | f1 <- pi (M [xs1]) (M [ys])
+                                        , f2 <- pi (M [xs2]) (M yss) ]
+                    | (xs1, xs2) <- parts xs
+                    , P.not (isEmpty xs1) && P.not (isEmpty xs2)
+                    ]
+
+  pi (M (xs:xss)) rng =
+    [ x ++ y | x <- pi (M [xs]) rng, y <- pi (M xss) rng ]
+
+parts :: (ASet a, Ord a) => XSet(a) -> Set(XSet(a), XSet(a))
+parts = fmap (\ (s1,s2) -> (setToXSet s1, setToXSet s2)) . Set.partitions . xSetToSet
+
+xSetToList :: (ASet a, Ord a) => XSet a -> [a]
+xSetToList = Set.toList' . xSetToSet
+
+listToXSet :: (ASet a, Ord a) => [a] -> XSet a
+listToXSet = setToXSet . mkSet
+
+-----------------------------------------
 
 x = F.Ident F.noLoc "x"
 y = F.Ident F.noLoc "y"
@@ -887,3 +960,4 @@ test1 = [ (x,x) | x <- return 1, x==2 ] :: M (Integer, Integer)
 main = print $ den $ Array [Int 1, Int 2]
 
 --  cons(x:A,xs:[]A) = for(a:=0|1; y:if(a=0){array{x}else{ys}){y}
+

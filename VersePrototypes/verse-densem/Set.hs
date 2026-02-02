@@ -3,6 +3,7 @@
 module Set(
   Set,
   singleton,
+  add,
   intersect,
   bigIntersect,
   union,
@@ -96,6 +97,9 @@ difference (S as) (S bs) = S [ a | a <- as, a `notElem` bs ]
 
 isSubsetOf :: Eq a => Set a -> Set a -> Bool
 isSubsetOf (S as) (S bs) = all (\ a -> a `elem` bs) as
+
+add :: a -> Set a -> Set a
+add a (S as) = S (a:as)
 
 {-
 mkSet :: Ord a => [a] -> Set a
@@ -199,8 +203,8 @@ instance (Ord a) => IsList (Set a) where
 lookupSet :: Eq a => a -> Set (a, b) -> Set b
 lookupSet x (S xys) = S [ y | (x', y) <- xys, x == x' ]
 
-partitions :: Ord a => Set a -> [(Set a, Set a)]
-partitions = map f . partitionM (const [False, True]) . toList'
+partitions :: Ord a => Set a -> Set (Set a, Set a)
+partitions = S . map f . partitionM (const [False, True]) . toList'
   where f (xs, ys) = (S xs, S ys)
 
 -- Should import from somewhere
