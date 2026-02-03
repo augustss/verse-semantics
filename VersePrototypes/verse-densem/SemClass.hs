@@ -381,6 +381,12 @@ knownFuns =
        , (fun[fun0to1], "f0to1")
        , (fun[funEven], "even")
        , (fun[funOdd], "odd")
+       -- 
+       , (fun[funBin], "bin")
+       , (fun[funBinInv], "binInv")
+       , (fun[funBinCon0], "binCon0")
+       , (fun[funBinCon1], "binCon1")
+       , (fun[funBinHO1], "binHO1")
        ]
 
 knownFunsF :: [(String, Fn)]
@@ -426,13 +432,33 @@ funPred :: Val ⇀ Val
 funPred = [(I i, I ((i - 1) `mod` numZ)) | i ← allZ ]
 
 funConst0 :: Val ⇀ Val
-funConst0 = [(I 0, I 0)]
+funConst0 = [(I i, I 0) | i ← allZ ]
 
 funConst1 :: Val ⇀ Val
-funConst1 = [(I 1, I 1)]
+funConst1 = [(I i, I 1) | i ← allZ ]
 
+-- All functions with domain and range {0,1}
 fun0to1 :: Val ⇀ Val
 fun0to1 = [(I 0, I 1)]
+
+funBin :: Val ⇀ Val
+funBin = [(I 0, I 0), (I 1, I 1)]
+
+funBinInv :: Val ⇀ Val
+funBinInv = [(I 0, I 1), (I 1, I 0)]
+
+funBinCon0 :: Val ⇀ Val
+funBinCon0 = [(I 0, I 0), (I 1, I 0)]
+
+funBinCon1 :: Val ⇀ Val
+funBinCon1 = [(I 0, I 1), (I 1, I 1)]
+
+funBinHO1 :: Val ⇀ Val
+funBinHO1 = [(fcn "binCon0", I 0),(fcn "bin", I 0),(fcn "binInv", I 1),(fcn "binCon1", I 1)]
+
+fcn :: String -> Val
+fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
+
 
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) → Val → Maybe Val
