@@ -15,7 +15,6 @@ module EQD
   , qexi, qexis
   , subst
   , support
-  , getSing
   , hasElem
   )
  where
@@ -200,14 +199,16 @@ nt (EQD as p) = EQD as (notVEQ p)
 
 -----------------------------------------------------------------------
 
+{-
 -- If x has the same value in all environments then return that.
 getSing :: (Ord x, Ord a) => x -> EQD x a -> Maybe a
 getSing x p =
   case qexis (filter (/= x) (support p)) p of
     EQD [a] (NODE _ [TRUE] FALSE) -> Just a
     _ -> Nothing
+-}
 
--- Is x=a part of the environment?
+-- Is x=a element of the environment?
 hasElem :: (Ord x, Ord a) => x -> a -> EQD x a -> Bool
 hasElem x a p =
   case qexis (filter (/= x) (support p)) p of
