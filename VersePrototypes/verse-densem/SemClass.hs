@@ -61,6 +61,7 @@ import qualified Epic.List as L
   unionS[ concat[ inj(v .== (X q₁ + i) /\ i .<= (X q₂ - X q₁)) | i ← [0..n]] | n ← allN ]
   \\\ [p₁, q₁, p₂, q₂]
   where [p₁, q₁, p₂, q₂] = fresh ["p1","q1","p2","q2"] [t₁, t₂, Var u, Var v]
+ɩℰ (Var (F.Ident _ "ci") :@ t₂) u v = choiceIndex t₂ u v
 ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
                       \\\ [f,g,p,q]
   where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
@@ -131,6 +132,19 @@ import qualified Epic.List as L
                             (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
                   | vf@(F(Fn ff)) ← allVals ]
 
+choiceIndex :: Term -> Iden -> Iden -> M(Env)
+choiceIndex at i x = unionSM (generateENVs (fvs(at))) $ \ ρ ->
+  let aρm :: M(Env)
+      aρm = prune(([ρ] \\\ bvs(at) \\\ [j]) ⎧*⎫ ɩℰ(at) j y \\\ [i,j,y])
+      M (aρs :: [XSet(Env)]) = aρm
+  in  M [ aρ /\ (i .= I k) /\ (x .= I k) | (aρ :: XSet(Env), k) <- zip aρs [0..] ]
+  where [j,y] = fresh ["j","y"] [at]
+
+{-
+        ε⟦choice_index{at}⟧ix := ∪(ρ:env). 
+            let(aρm:=Prune((<ρ>-BVS[at]-{j,y}) * ε⟦at⟧jy - {i})).
+                <aρ | i:ℕm, i<|aρm|m, aρ:aρm_i * <bρ:env | bρ.i=i>>
+-}
 
 --------------------------------------------------------
 
@@ -326,7 +340,7 @@ bvs = mkSet . F.getVisibleBinders
 
 fvs :: Term → Set Iden
 fvs = mkSet . filter (\ (F.Ident _ s) -> s `notElem` globals) . F.getFree
-  where globals = "operator'|||'" : P.map P.fst knownFunsF
+  where globals = "operator'|||'" : "ci" : P.map P.fst knownFunsF
 
 type Aperture = F.Aperture
 pattern O = F.Open
@@ -911,6 +925,8 @@ u1 = F.Ident F.noLoc "u1"
 v1 = F.Ident F.noLoc "v1"
 u2 = F.Ident F.noLoc "u2"
 v2 = F.Ident F.noLoc "v2"
+
+ci = F.Ident F.noLoc "ci"
 eE = ɩℰ
 bB = ɩℬ
 cC = ɩ𝒞
