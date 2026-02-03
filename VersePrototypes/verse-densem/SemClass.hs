@@ -83,13 +83,15 @@ import qualified Epic.List as L
                  \\\ [u₁,u₂,v₁,v₂]
           
 ɩℰ (Fun(tₐ)(C)(ω)(tb)) h f | ω == succeeds =
+--  trace("enns=" P.++ show envs) $
+--  trace("allfuns=" P.++ show (P.map funs (Set.toList' envs))) $
   unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
   where
 
     sa :: M(Env)
-    sa = ɩℰ (tₐ) x w
+    sa = ɩℰ (tₐ) x w   -- pu=x, pv=w
     sb :: M(Env)
-    sb = ɩℰ (tb) j z
+    sb = ɩℰ (tb) j z   -- ru=j, rv=z
 
     funs :: Env -> M(M(Val,(Val,Val,Val)))   -- (x,(w,j,z))
     funs(ρ) = piM(domvs, rngvs)
@@ -101,16 +103,19 @@ import qualified Epic.List as L
         rngvs :: M(Val,(Val,Val,Val))
         rngvs = unionSM(xSetToSet(collapse(domvs))) $ \ xv ->
                 intersectSM[aρ | aρ <- xSetToSet(collapse(dom)), aρ·x == xv] $ \ aρ ->
+--                trace("rng xv=" P.++ show xv P.++ " aρ=" P.++ show aρ P.++ " * " P.++ show (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb)) $
                 [ (xv, (bρ·w, bρ·j, bρ·z)) | bρ <- ([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb ]
 
     keep :: Env -> M(Val,(Val,Val,Val)) -> Set(Env)
     keep(ρ)(fun) --x | ρ·f == F fm && ρ·h == F hm = [ρ]
                  | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm), (h, F hm)] ]
                  | otherwise                  = []
-      where fm = Fn $ mapM'(\(x,(_,_,z))->(x,z), fun)
-            hm = Fn $ mapM'(\(_,(w,j,_))->(w,j), fun)
+      where fm = Fn $ mapM'(\(x,(_,_,z))->(x,z), fun')
+            hm = Fn $ mapM'(\(_,(w,j,_))->(w,j), fun')
+            fun' = prune(fun)
 
     -----
+    envs :: Set(AEnv)
     envs = generateENVs (favs ∪ (fbvs `Set.difference` bavs) ) -- ∪ [f, h])
     favs = fvs(tₐ)
     bavs = bvs(tₐ)
@@ -127,8 +132,10 @@ import qualified Epic.List as L
 ɩℬ :: Term → Iden → Iden → M(Env)
 ɩℬ (t) u v = ɩℰ (t) u v \\\ bvs(t)
 
+-- XXX only include Env where f succeeds somewhere?
 ɩℱ :: Iden → Iden → Iden → M(Env)
-ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
+ɩℱ f x r = --prune $  -- XXX
+           unionS [ mapS (\ (prs :: Val ⇀ Val) →
                             (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
                   | vf@(F(Fn ff)) ← allVals ]
 
@@ -367,7 +374,8 @@ dP p = error $ "dP undefined " P.++ show p
 knownFuns :: [(Fn, String)]
 knownFuns =
        [ (dP o, P.map P.toLower (show o)) | o ← [F.Neg, F.IsInt, F.Add, F.Sub, F.Mul, F.Div, F.Gt, F.Lt] ]
-  P.++ [ (fun[funSucc], "succ"), (fun[funPred], "pred")
+  P.++ [ (fun[funSucc], "succ")
+       , (fun[funPred], "pred")
        , (fun[funConst0], "const0")
        , (fun[funConst1], "const1")
        , (fun[fun0to1], "f0to1")
@@ -480,6 +488,7 @@ allVals :: Set(Val)
 allVals = [ I i | i ← allZ ]
         ∪ allFuns
         ∪ allTuples
+-- test        ∪ [ F (fun[funInt]), T [I 0, I 0] ]
 
 allFuns :: Set(Val)
 allFuns = mkSet [ F f | (f, _) ← knownFuns ]
@@ -931,20 +940,31 @@ listToXSet = setToXSet . mkSet
 
 -----------------------------------------
 
+
 x = F.Ident F.noLoc "x"
 y = F.Ident F.noLoc "y"
+z = F.Ident F.noLoc "z"
+w = F.Ident F.noLoc "w"
+j = F.Ident F.noLoc "j"
 u = F.Ident F.noLoc "u"
 v = F.Ident F.noLoc "v"
 p = F.Ident F.noLoc "p"
 q = F.Ident F.noLoc "q"
+f = F.Ident F.noLoc "f"
 u1 = F.Ident F.noLoc "u1"
 v1 = F.Ident F.noLoc "v1"
 u2 = F.Ident F.noLoc "u2"
 v2 = F.Ident F.noLoc "v2"
+fsucc = F.Ident F.noLoc "succ"
+int = Prim F.IsInt
+apa = F.Ident F.noLoc "apa"
+
 
 eE = ɩℰ
 bB = ɩℬ
 cC = ɩ𝒞
+fF = ɩℱ
+
 cint :: Term
 cint = Rng (Prim F.IsInt)
 
