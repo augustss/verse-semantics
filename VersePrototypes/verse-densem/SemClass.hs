@@ -61,7 +61,7 @@ import qualified Epic.List as L
   unionS[ concat[ inj(v .== (X q₁ + i) /\ i .<= (X q₂ - X q₁)) | i ← [0..n]] | n ← allN ]
   \\\ [p₁, q₁, p₂, q₂]
   where [p₁, q₁, p₂, q₂] = fresh ["p1","q1","p2","q2"] [t₁, t₂, Var u, Var v]
-ɩℰ (Var (F.Ident _ "ci") :@ t₂) u v = choiceIndex t₂ u v
+ɩℰ (ChIx t)      u v = choiceIndex t u v
 ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
                       \\\ [f,g,p,q]
   where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
@@ -324,6 +324,8 @@ pattern Array :: [Term] → Term
 pattern Array as = F.Array as
 pattern Fail :: Term
 pattern Fail = F.Fail
+pattern ChIx :: Term -> Term
+pattern ChIx t = F.ChoiceIndex t
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] → [Term] → [Iden]
@@ -340,7 +342,7 @@ bvs = mkSet . F.getVisibleBinders
 
 fvs :: Term → Set Iden
 fvs = mkSet . filter (\ (F.Ident _ s) -> s `notElem` globals) . F.getFree
-  where globals = "operator'|||'" : "ci" : P.map P.fst knownFunsF
+  where globals = "operator'|||'" : P.map P.fst knownFunsF
 
 type Aperture = F.Aperture
 pattern O = F.Open
@@ -940,7 +942,6 @@ v1 = F.Ident F.noLoc "v1"
 u2 = F.Ident F.noLoc "u2"
 v2 = F.Ident F.noLoc "v2"
 
-ci = F.Ident F.noLoc "ci"
 eE = ɩℰ
 bB = ɩℬ
 cC = ɩ𝒞

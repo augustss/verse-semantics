@@ -195,6 +195,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
 
+  | ChoiceIndex SrcExpr            -- choice_index{e}
+
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
 
@@ -733,6 +735,7 @@ instance Pretty SrcExpr where
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
+          ChoiceIndex e -> text "choice_index" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec lvl p s <+> text "in", indent $ braces (pPrintPrec lvl 0 e)]
 
@@ -874,6 +877,7 @@ compos f e@(MVLam { mvl_dom = e1, mvl_rng = e2 })
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
+compos f (ChoiceIndex e)    = ChoiceIndex <$> f e
 compos f (Splice e)         = Splice <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
@@ -940,6 +944,7 @@ getVisibleBinders = go
     go (Range e)      = go e
     go (Guard e1 _)   = go e1
     go (Truth e)      = go e
+    go (ChoiceIndex e)= go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
@@ -975,6 +980,7 @@ getFree = fvs_blk
     fvs (Wrong {})        = []
     fvs (Array es)        = concatMap fvs es
     fvs (Truth e)         = fvs e
+    fvs (ChoiceIndex e)   = fvs e
     fvs (Tuple es)        = concatMap fvs es
     fvs (EffAttr e _)     = fvs e
     fvs (PrefixOp _ e)    = fvs e
