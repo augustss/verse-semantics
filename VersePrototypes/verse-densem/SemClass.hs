@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -30,17 +31,20 @@ import Debug.Trace
 --import qualified GHC.Exts as P
 import GHC.Exts
 import GHC.Stack
+import qualified Epic.List as L
 
 -- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
 
 ɩℰ :: Term → Iden → Iden → M(Env)
 ɩℰ (U_)      u v = inj (u .=. v)
+ɩℰ (Var (F.Ident _ s)) u v | Just fn <- P.lookup s knownFunsF = inj (u .=. v /\ v .= F fn)
 ɩℰ (Var x)   u v = inj (u .=. v /\ v .=. x)
 ɩℰ (Int k)   u v = inj (u .=. v /\ v .=  I k)
 ɩℰ (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
 ɩℰ (x :=  t) u v = inj (x .=. v) ⎧*⎫ ɩℰ (t) u v
 ɩℰ (x :-> t) u v = inj (x .=. u) ⎧*⎫ ɩℰ (t) u v
 ɩℰ (Exists x)u v = inj (u .=. v /\ v .=. x)
+ɩℰ (Fail)    u v = empty
 ɩℰ (Array ts)u v = bigStar (inj(u .== tup(us) /\ v .== tup(vs)) :
                             zipWith3 ɩℰ ts us vs)
                    \\\ mkSet (us P.++ vs)
@@ -77,170 +81,43 @@ import GHC.Stack
                   ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                  \\\ [u₁,u₂,v₁,v₂]
           
-ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
-  trace ("envs=" P.++ show envs) $
-  unionSM envs $ \ ρ →
-    let aρm :: M(Env)
-        aρm = ([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-    in  trace ("ρ=" P.++ show ρ P.++ " aρm=" P.++ show aρm) $
-        [ ρ `extend` [(f, F fm), (h, F hm)]
-        | pairm :: M(Val, Env) ←
-            piM (allValuesOf x aρm,
-                 -- [ xρ·p | xρ <- aρm ],
-                 \ (xv :: Val) →
-                   intersectM (prune [yρ | yρ <- aρm, yρ·x == xv])
-                              (\ aρ → 
-                                 let r = ([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ ɩℰ (tb) j z
-                                 in --trace("isectfun 1 aρ=" P.++ show aρ) $
-                                    --trace("isectfun 2 r="  P.++ show r) $
-                                    r -- (inj (x .= I 1 /\ w .= I 1 /\ j .= I 1))
-                              )
-                )
-        , let fm = Fn $ prune [(cρ·x :⇒ cρ·z) | (_,cρ) ← pairm]
-        , let hm = Fn $ prune [(cρ·w :⇒ cρ·j) | (_,cρ) ← pairm]
---        , ρ·f == F fm
---        , ρ·h == F hm
-        , isFunction fm
-        , isFunction hm
-        ]
+ɩℰ (Fun(tₐ)(C)(ω)(tb)) f h | ω == succeeds =
+  unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
   where
-    envs = generateENVs (favs ∪ (fbvs `Set.difference` bavs) {-∪ [f, h]-})
+
+    sa :: M(Env)
+    sa = ɩℰ (tₐ) x w
+    sb :: M(Env)
+    sb = ɩℰ (tb) j z
+
+    funs :: Env -> M(M(Val,(Val,Val,Val)))   -- (x,(w,j,z))
+    funs(ρ) = piM(domvs, rngvs)
+      where
+        dom :: M(Env)
+        dom = ([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ sa
+        domvs :: M(Val)
+        domvs = allValuesOf x dom
+        rngvs :: M(Val,(Val,Val,Val))
+        rngvs = unionSM(xSetToSet(collapse(domvs))) $ \ xv ->
+                intersectSM[aρ | aρ <- xSetToSet(collapse(dom)), aρ·x == xv] $ \ aρ ->
+                [ (xv, (bρ·w, bρ·j, bρ·z)) | bρ <- ([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb ]
+
+    keep :: Env -> M(Val,(Val,Val,Val)) -> Set(Env)
+    keep(ρ)(fun) --x | ρ·f == F fm && ρ·h == F hm = [ρ]
+                 | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm), (h, F hm)] ]
+                 | otherwise                  = []
+      where fm = Fn $ mapM'(\(x,(_,_,z))->(x,z), fun)
+            hm = Fn $ mapM'(\(_,(w,j,_))->(w,j), fun)
+
+    -----
+    envs = generateENVs (favs ∪ (fbvs `Set.difference` bavs) ) -- ∪ [f, h])
     favs = fvs(tₐ)
     bavs = bvs(tₐ)
     fbvs = fvs(tb)
     bbvs = bvs(tb)
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
---    xpiM a b = trace ("piM(" P.++ show a P.++ ", " P.++ show b P.++ ")") (piM a b)
 
-isFunction :: Fn -> Bool
-isFunction (Fn m) =
-  let s = collapse m
-      d = fmap fst s
-  in  Set.cardinality s == Set.cardinality d
-
-allValuesOf :: Iden -> M(Env) -> M(Val)
-allValuesOf x (M ss) = M (P.map f ss)
-  where f s = [ v | v <- allVals, EQD.hasElem x v s ]
-
-unionSM :: (ASet a, ASet b) => Set(a) → (a → M(b)) → M(b)
-unionSM s f = unionS (fmap f s)
-
-intersectM :: (ASet a, ASet b, Show (XSet a), Show (XSet b)) => M(a) → (a → M(b)) → M(b)
-intersectM (M [s]) f =
-  trace ("intersectM 1 " P.++ show s) $
-  trace ("intersectM 2 " P.++ show (fmap f (xSetToSet s))) $
-  let r = dzip((∩), fmap f (xSetToSet s))
-  in  trace ("intersectM 3 " P.++ show r) r
-intersectM m _ = empty
-  -- error $ "intersectM: " P.++ show m
-
-{-
-  curry mapS aEnvsToENV $
-    (generateENVs (fvs(tₐ) ∪ fvs(tb))) `sbind` \ ρ →
-      let dom :: M(Env)
-          dom = (inj (aEnvToENV ρ) \\\ bvs(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-          domv :: M(Val)
-          domv = getValuesOf p dom
-          rngfun :: Val → M(AEnv)
-          rngfun = undefined
-       in
-          piM(domv, rngfun) `mbind` \ (fun :: M(Val, AEnv)) →
-          xpure (ρ `extend` [(f, F(xfun x z fun)), (h, F(xfun w j fun))])
-{-
-    [ ρ `extend` [(f, F(xfun x z fun)), (h, F(xfun w j fun))]
-    | ρ ← inj $
-          generateENVs (fvs(tₐ) ∪ fvs(tb))  -- all possible environments mapping free variables
-    , let dom :: M(Env)
-          dom = (inj (aEnvToENV ρ) \\\ bvs(tₐ) \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-          domv :: M(Val)
-          domv = getValuesOf p dom
-          rngfun :: Val → M(AEnv)
-          rngfun = undefined
-    , fun :: M(Val, AEnv) ← piM(domv, rngfun)
-    ]
--}
-  where
-    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    sbind :: Set(AEnv) → (AEnv → M(AEnv)) → M(AEnv)
-    sbind = undefined
-    mbind :: M(a) → (a → M(AEnv)) → M(AEnv)
-    mbind = undefined
-    xpure :: AEnv → M(AEnv)
-    xpure = inj . Set.singleton
--}
-
-xfun :: Iden → Iden → M(Val, AEnv) → Fn
-xfun x y fun = Fn $ mapM' (\ (_, ρ) → (ρ·x, ρ·y), fun)
-
-generateENVs :: Set(Iden) → Set(AEnv)
-generateENVs = Set.mkSet . mkAEnvs . Set.toList 
-
-getValuesOf :: Iden → M(Env) → M(Val)
-getValuesOf x (M ps) = M $ P.map (getENVValuesOf x) ps
-
--- All possible values of a variable in an ENV
-getENVValuesOf :: Iden → ENV → Set(Val)
-getENVValuesOf x p = [ v | v ← allVals, EQD.hasElem x v p ]
-
-{-
--- Using piSM
-ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
- inj
-  [ ρ
-  | ρ ← allEnvs
-  , fun ← funs(ρ)
-  , ρ(f) == F (xfn fun x z)
-  , ρ(h) == F (xfn fun w j)
-  ]
-  where
-    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    avs = bvs(tₐ)
-    bvs = bvs(tb)
-
-    xfn :: m(Val, Env) → Iden → Iden → Fn m
-    xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
-    
-    funs :: Env → Set (m (Val, Env))
-    funs(ρ) = piSM(domvs, rngfun)
-      where
-        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-        domvs :: m(Val)
-        domvs = mapM(\ρ→ρ(x), dom)
-        rngfun :: Val → Set(Env)
-        rngfun(xv) = bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
-                                  | aρ ← collapse(dom), aρ(x) == xv
-                                  ]
-                            
--- Using piM
-ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
- unionS
-  [ mapFilterS(\(fun :: m(Val, Env)) → [ ρ | ρ(f) == F (xfn fun x z)
-                                           , ρ(h) == F (xfn fun w j) ]
-
-              ,funs(ρ))
-  | ρ ← allEnvs
-  ]
-  where
-    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
-    avs = bvs(tₐ)
-    bvs = bvs(tb)
-
-    xfn :: m(Val, Env) → Iden → Iden → Fn m
-    xfn fun x y = Fn ( prune(mapM(\(_,ρc) → (ρc(x),ρc(y)),fun)) )
-    
-    funs :: Env → m (m (Val, Env))
-    funs(ρ) = piM(domvs, rngfun)
-      where
-        dom :: m(Env) = (inj(sing(ρ)) \\\ avs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
-        domvs :: m(Val)
-        domvs = mapM(\ρ→ρ(x), dom)
-        rngfun :: Val → M(Env)
-        rngfun(xv) =
-                inj (bigIntersect [ (sing(aρ) \\ [j,z] \\ bvs) ∩ collapse(ɩℰ (tb) j z)
-                                  | aρ ← collapse(dom), aρ(x) == xv
-                                  ])
--}
--- ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
+ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
 
 ɩ𝒞 :: Term → M(Env)
 ɩ𝒞 (t) = ɩℰ (t) p q \\\ [p, q]
@@ -264,6 +141,30 @@ den t = prune $ ɩℰ (Block t) u v
 --------------------------------------------------------
 
 -- Below is all kinds of junk to make the semantics above look nice.
+
+
+unionSM :: (ASet a, ASet b) => Set(a) → (a → M(b)) → M(b)
+unionSM s f = unionS (fmap f s)
+
+intersectSM :: forall a b . (ASet a, ASet b) => Set(a) -> (a -> M(b)) -> M(b)
+intersectSM s f = dzip((∩), fmap f s)
+
+mapFilter :: forall a b . (ASet a, ASet b) => (a → Set(b), M(a)) → M(b)
+mapFilter (f, M (xs :: [XSet(a)])) = M [ setToXSet $ Set.bigUnion (fmap f (xSetToSet x)) | (x :: XSet(a)) <- xs ]
+
+isFunction :: Fn -> Bool
+isFunction (Fn (M xs)) =
+  let d = P.map fst $ concatMap (toList . xSetToSet) xs
+  in  P.not (L.anySame d)
+
+allValuesOf :: Iden -> M(Env) -> M(Val)
+allValuesOf x (M ss) = M (P.map f ss)
+  where f s = [ v | v <- allVals, EQD.hasElem x v s ]
+
+generateENVs :: Set(Iden) → Set(AEnv)
+generateENVs = Set.mkSet . mkAEnvs . Set.toList 
+
+--------------------------------------------------------
 
 {-
 -- Totally abstract M
@@ -314,7 +215,9 @@ mapM = error "XSet mapM"
 newtype M a = M [XSet a]
 deriving instance Eq (XSet a) => Eq (M a)
 deriving instance Ord (XSet a) => Ord (M a)
-deriving instance Show (XSet a) => Show (M a)
+--deriving instance Show (XSet a) => Show (M a)
+instance Show (XSet a) => Show (M a) where
+  show (M xs) = show xs
 {-
 instance (Show (XSet a)) => Show (M a) where
   showsPrec _ (M []) = showString "EMPTY"
@@ -329,14 +232,9 @@ s ⊍ t = dzip((∪), [s,t])
 unionS ss = dzip((∪), ss)
 fold(k,z,M s) = P.foldr (curry k) z s
 collapse(M s) = unions s
-mapM(f, M s) = undefined -- M $ P.map (mapXSet f) s
+mapM(f, M s) = undefined -- M $ P.map ( f) s
 mapM'(f, M s) = M $ P.map (fmap f) s
-piM (s, f) =
-  trace ("piM 1" P.++ show s) $
-  trace ("piM 2" P.++ show (inj (collapse s))) $
-  trace ("piM 3" P.++ show t) $
-  (pi s t)
-  where t = [ (a, b) | a <- inj (collapse s), b <- f a ]
+piM (s, t) = pi s t
 
 dzip :: (ASet a) => (XSet(a)→XSet(a)→XSet(a), Set(M(a))) → M(a)
 dzip(f, xs) = M $ foldr (\ (M x) r → zipLong f x r) [] (Set.toList xs)
@@ -379,7 +277,7 @@ pattern i := t = F.DefineE i t
 pattern (:|:) :: Term → Term → Term
 pattern t1 :|: t2 = F.Choice t1 t2
 pattern (:|||:) :: Term → Term → Term
-pattern t1 :|||: t2 ← F.ApplyD (F.Variable (F.Ident _ "operator'|||'")) (F.Array [t1, t2])
+pattern t1 :|||: t2 ← F.ApplyD (F.Variable (F.Ident _       "operator'|||'")) (F.Array [t1, t2])
   where t1 :|||: t2 = F.ApplyD (F.Variable (F.Ident F.noLoc "operator'|||'")) (F.Array [t1, t2])
 pattern (:=:) :: Term → Term → Term
 pattern t1 :=: t2 = F.Unify t1 t2
@@ -410,6 +308,8 @@ pattern Exists :: Iden → Term
 pattern Exists i = F.DefineV i
 pattern Array :: [Term] → Term
 pattern Array as = F.Array as
+pattern Fail :: Term
+pattern Fail = F.Fail
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] → [Term] → [Iden]
@@ -425,7 +325,8 @@ bvs :: Term → Set Iden
 bvs = mkSet . F.getVisibleBinders
 
 fvs :: Term → Set Iden
-fvs = mkSet . F.getFree
+fvs = mkSet . filter (\ (F.Ident _ s) -> s `notElem` globals) . F.getFree
+  where globals = "operator'|||'" : P.map P.fst knownFunsF
 
 type Aperture = F.Aperture
 pattern O = F.Open
@@ -454,7 +355,12 @@ knownFuns =
        , (fun[funConst0], "const0")
        , (fun[funConst1], "const1")
        , (fun[fun0to1], "f0to1")
+       , (fun[funEven], "even")
+       , (fun[funOdd], "odd")
        ]
+
+knownFunsF :: [(String, Fn)]
+knownFunsF = P.map (\(x,y)->(y,x)) knownFuns
 
 fun :: [Val ⇀ Val] → Fn
 fun = Fn . concat . P.map inj
@@ -464,6 +370,12 @@ funNegate = [(I i, I ((-i) `mod` numZ)) | i ← allZ ]
 
 funInt :: Val ⇀ Val
 funInt = [(I i, I i) | i ← allZ ]
+
+funEven :: Val ⇀ Val
+funEven = [(I i, I i) | i ← allZ, even i ]
+
+funOdd :: Val ⇀ Val
+funOdd = [(I i, I i) | i ← allZ, odd i ]
 
 funAdd :: Val ⇀ Val
 funAdd = [ (T [I x, I y], I ((x+y) `mod` numZ)) | x ← allZ, y ← allZ ]
@@ -576,12 +488,9 @@ instance ASet Env where
   xSetToSet :: ENV -> Set(Env)
   xSetToSet e = mkSet $ P.map f $ EQD.mcubes e
     where
-      f = Env . P.map (\ (EQD.Var x, EQD.Val v, True) -> (x, v))
-{-
-  xSetToSet s = [ env | env <- mkSet $ mkAEnvs $ EQD.support s, env `envElem` s ]
-    where envElem :: Env -> ENV -> Bool
-          envElem e s = P.not $ isEmpty $ asing e ∩ s
--}
+      f = Env . P.map g
+      g (EQD.Var x, EQD.Val v, True) = (x, v)
+      g x = error $ "xSetToSet: unimplemented " P.++ show x
 
 {-
 instance ASet AEnv where
@@ -638,6 +547,16 @@ instance ASet Iden where
 
 instance (ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
+  ø = Set.empty
+  (∪) = Set.union
+  (∩) = Set.intersect
+  isEmpty = Set.isEmpty
+  asing = Set.singleton
+  setToXSet = id
+  xSetToSet = id
+  
+instance (ASet a, ASet b, ASet c) => ASet (a, b, c) where
+  type XSet (a, b, c) = Set (a, b, c)
   ø = Set.empty
   (∪) = Set.union
   (∩) = Set.intersect
@@ -829,9 +748,9 @@ unionS   :: (ASet a, Ord (M a)) => Set(M(a)) → M(a)
 --  mapS     :: (Set(a) → Set(b), m(a)) → m(b)
 fold     :: ASet a => ((XSet(a), M(b)) → M(b), M(b), M(a)) → M(b)
 --piM      :: (M(a), a → M(b)) → M(M(a :⇒ b))
-piM      :: ASet b => (M(Val), Val → M(b)) → M(M(Val :⇒ b))
+piM      :: (ASet a, ASet b) => (M(a), M(a,b)) → M(M(a :⇒ b))
 collapse :: (ASet a) => M(a) → XSet(a)
-mapM     :: (a→b, M(a)) → M(b)
+mapM     :: (ASet a, ASet b, HasCallStack) => (a→b, M(a)) → M(b)
 --mapM     :: ASet a => (a→a, M(a)) → M(a)
 mapM'    :: ((a,b)→(c,d), M(a,b)) → M(c,d)
 
@@ -897,8 +816,9 @@ instance MyMonad M where
   return x = M [asing x]
   -- Only allow comprehension syntax for fmap&filter like expressions.
   (>>=) :: forall a b . (HasCallStack, MValid M a, MValid M b) => M a → (a → M b) → M b
---  M xs >>= k = M [ y | (x :: XSet a) <- xs, let M ys = unionS $ fmap k (xSetToSet x), y <- ys ]
 
+  M xs >>= k = M [ y | (x :: XSet a) <- xs, let M ys = unionS $ fmap k (xSetToSet x), y <- ys ]
+{-
   M (as :: [XSet a]) >>= k = M $ P.map xmap as
     where purek :: HasCallStack => a → Maybe b
           purek x =
@@ -908,7 +828,7 @@ instance MyMonad M where
               _ → error "MyMonad M: k is not pure"
           xmap :: XSet a → XSet b
           xmap = setToXSet . Set.mapMaybe purek . xSetToSet
-
+-}
   guard True = M [asing ()]
   guard False = M []
 
@@ -947,7 +867,7 @@ instance Pi [] where
 
 instance Pi M where
   pi :: forall a b . (ASet a, ASet b) => M a -> M (a,b) -> M (M (a,b))
-  pi x y | trace("pi M " P.++ show(x,y)) False = undefined
+--  pi x y | trace("pi M " P.++ show(x,y)) False = undefined
   pi (M []) _ =
     M [ [ M [] ] ]
 
@@ -994,8 +914,8 @@ v2 = F.Ident F.noLoc "v2"
 eE = ɩℰ
 bB = ɩℬ
 cC = ɩ𝒞
-dint :: Iden -> Term
-dint x = x := Rng (Prim F.IsInt)
+cint :: Term
+cint = Rng (Prim F.IsInt)
 
 plus :: Term -> Term -> Term
 plus x y = (Prim F.Add) :@ Array[x,y]
