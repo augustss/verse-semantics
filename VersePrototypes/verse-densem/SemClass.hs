@@ -82,7 +82,7 @@ import qualified Epic.List as L
                   ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                  \\\ [u₁,u₂,v₁,v₂]
           
-ɩℰ (Fun(tₐ)(C)(ω)(tb)) f h | ω == succeeds =
+ɩℰ (Fun(tₐ)(C)(ω)(tb)) h f | ω == succeeds =
   unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
   where
 
