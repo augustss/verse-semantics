@@ -213,7 +213,9 @@ hasElem x a p =
   case qexis (filter (/= x) (support p)) p of
     EQD as (NODE _ xs FALSE) | all (==TRUE)  xs -> a `elem` as
     EQD as (NODE _ xs TRUE)  | all (==FALSE) xs -> a `notElem` as
-    p' -> error $ "hasElem: " -- ++ show (x, a, p')
+    EQD _  FALSE                                -> False
+    EQD _  TRUE                                 -> True
+    p' -> error $ "hasElem: " -- ++ show (p, x, a, p')
 
 -----------------------------------------------------------------------
 

@@ -17,6 +17,7 @@ module Set(
   mkSet, mkSetUnsafe,
   sing,
   getSing,
+  cardinality,
   toList,
   toList',
   forAll, forAllL,
@@ -24,6 +25,7 @@ module Set(
   maximumSet,
   minimumSet,
   foldSet,
+  foldSetE,
   mapMaybe,
   toListBy,
   maybeToSet,
@@ -118,9 +120,12 @@ mkSetUnsafe = S
 
 getSing :: (Ord a) => Set a -> Maybe a
 getSing s =
-  case toList s of
+  case toList' s of
     [x] -> Just x
     _ -> Nothing
+
+cardinality :: (Ord a) => Set a -> Int
+cardinality = length . toList'
 
 toList' :: Ord a => Set a -> [a]
 toList' (S axs) = unDup $ sort axs
@@ -156,6 +161,10 @@ sing x = S [x]
 foldSet :: (HasCallStack, Ord a) => (a -> a -> a) -> Set a -> a
 foldSet _ (S []) = error "foldSet"
 foldSet f s = foldl1 f (toList s)
+
+foldSetE :: (HasCallStack, Ord a) => (a -> a -> a) -> a -> Set a -> a
+foldSetE _ z (S []) = z
+foldSetE f _ s      = foldl1 f (toList s)
 
 mapMaybe :: (a -> Maybe b) -> Set a -> Set b
 mapMaybe f (S xs) = S (M.mapMaybe f xs)

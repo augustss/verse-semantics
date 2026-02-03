@@ -29,6 +29,7 @@ import qualified EQD
 import Debug.Trace
 --import qualified GHC.Exts as P
 import GHC.Exts
+import GHC.Stack
 
 -- Use the prefix ɩ to work around Haskell's limitation of starting with a lowercase letter.
 
@@ -77,27 +78,61 @@ import GHC.Exts
                  \\\ [u₁,u₂,v₁,v₂]
           
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) f h =
+  trace ("envs=" P.++ show envs) $
   unionSM envs $ \ ρ →
     let aρm :: M(Env)
-        aρm = ([ρ] \\\ bvs(tₐ) \\\ [p,w]) ⎧*⎫ ɩℰ (tₐ) x w
-    in  [ ρ `extend` [(f, F fm), (h, F hm)]
+        aρm = ([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ ɩℰ (tₐ) x w
+    in  trace ("ρ=" P.++ show ρ P.++ " aρm=" P.++ show aρm) $
+        [ ρ `extend` [(f, F fm), (h, F hm)]
         | pairm :: M(Val, Env) ←
-            piM ([xρ·p | xρ ← aρm ],
-                 \ (p :: Val) → intersectM [yρ | yρ←aρm, yρ·x == p]
-                                            (\ aρ → ([aρ] \\\ bvs(tb) \\\ [j,z]) ⎧*⎫ ɩℰ (tb) j z
-                                            )
+            piM (allValuesOf x aρm,
+                 -- [ xρ·p | xρ <- aρm ],
+                 \ (xv :: Val) →
+                   intersectM (prune [yρ | yρ <- aρm, yρ·x == xv])
+                              (\ aρ → 
+                                 let r = ([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ ɩℰ (tb) j z
+                                 in --trace("isectfun 1 aρ=" P.++ show aρ) $
+                                    --trace("isectfun 2 r="  P.++ show r) $
+                                    r -- (inj (x .= I 1 /\ w .= I 1 /\ j .= I 1))
+                              )
                 )
         , let fm = Fn $ prune [(cρ·x :⇒ cρ·z) | (_,cρ) ← pairm]
         , let hm = Fn $ prune [(cρ·w :⇒ cρ·j) | (_,cρ) ← pairm]
+--        , ρ·f == F fm
+--        , ρ·h == F hm
+        , isFunction fm
+        , isFunction hm
         ]
   where
-    envs = generateENVs (fvs(tₐ) ∪ fvs(tb))
+    envs = generateENVs (favs ∪ (fbvs `Set.difference` bavs) {-∪ [f, h]-})
+    favs = fvs(tₐ)
+    bavs = bvs(tₐ)
+    fbvs = fvs(tb)
+    bbvs = bvs(tb)
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+--    xpiM a b = trace ("piM(" P.++ show a P.++ ", " P.++ show b P.++ ")") (piM a b)
 
-unionSM :: Set(a) → (a → M(b)) → M(b)
-unionSM = undefined
-intersectM :: M(a) → (a → M(b)) → M(b)
-intersectM = undefined
+isFunction :: Fn -> Bool
+isFunction (Fn m) =
+  let s = collapse m
+      d = fmap fst s
+  in  Set.cardinality s == Set.cardinality d
+
+allValuesOf :: Iden -> M(Env) -> M(Val)
+allValuesOf x (M ss) = M (P.map f ss)
+  where f s = [ v | v <- allVals, EQD.hasElem x v s ]
+
+unionSM :: (ASet a, ASet b) => Set(a) → (a → M(b)) → M(b)
+unionSM s f = unionS (fmap f s)
+
+intersectM :: (ASet a, ASet b, Show (XSet a), Show (XSet b)) => M(a) → (a → M(b)) → M(b)
+intersectM (M [s]) f =
+  trace ("intersectM 1 " P.++ show s) $
+  trace ("intersectM 2 " P.++ show (fmap f (xSetToSet s))) $
+  let r = dzip((∩), fmap f (xSetToSet s))
+  in  trace ("intersectM 3 " P.++ show r) r
+intersectM m _ = empty
+  -- error $ "intersectM: " P.++ show m
 
 {-
   curry mapS aEnvsToENV $
@@ -141,7 +176,7 @@ generateENVs :: Set(Iden) → Set(AEnv)
 generateENVs = Set.mkSet . mkAEnvs . Set.toList 
 
 getValuesOf :: Iden → M(Env) → M(Val)
-getValuesOf x (M ps) = M $ P.map (getENVValuesOf p) ps
+getValuesOf x (M ps) = M $ P.map (getENVValuesOf x) ps
 
 -- All possible values of a variable in an ENV
 getENVValuesOf :: Iden → ENV → Set(Val)
@@ -296,7 +331,12 @@ fold(k,z,M s) = P.foldr (curry k) z s
 collapse(M s) = unions s
 mapM(f, M s) = undefined -- M $ P.map (mapXSet f) s
 mapM'(f, M s) = M $ P.map (fmap f) s
-piM = undefined
+piM (s, f) =
+  trace ("piM 1" P.++ show s) $
+  trace ("piM 2" P.++ show (inj (collapse s))) $
+  trace ("piM 3" P.++ show t) $
+  (pi s t)
+  where t = [ (a, b) | a <- inj (collapse s), b <- f a ]
 
 dzip :: (ASet a) => (XSet(a)→XSet(a)→XSet(a), Set(M(a))) → M(a)
 dzip(f, xs) = M $ foldr (\ (M x) r → zipLong f x r) [] (Set.toList xs)
@@ -408,7 +448,13 @@ dP F.Lt = fun[funLt]
 dP p = error $ "dP undefined " P.++ show p
 
 knownFuns :: [(Fn, String)]
-knownFuns = [ (dP o, P.map P.toLower (show o)) | o ← [F.Neg, F.IsInt, F.Add, F.Sub, F.Mul, F.Div, F.Gt, F.Lt] ]
+knownFuns =
+       [ (dP o, P.map P.toLower (show o)) | o ← [F.Neg, F.IsInt, F.Add, F.Sub, F.Mul, F.Div, F.Gt, F.Lt] ]
+  P.++ [ (fun[funSucc], "succ"), (fun[funPred], "pred")
+       , (fun[funConst0], "const0")
+       , (fun[funConst1], "const1")
+       , (fun[fun0to1], "f0to1")
+       ]
 
 fun :: [Val ⇀ Val] → Fn
 fun = Fn . concat . P.map inj
@@ -437,6 +483,21 @@ funGt = [ (T [I x, I y], I x) | x ← allZ, y ← allZ, x > y ]
 funLt :: Val ⇀ Val
 funLt = [ (T [I x, I y], I x) | x ← allZ, y ← allZ, x < y ]
 
+funSucc :: Val ⇀ Val
+funSucc = [(I i, I ((i + 1) `mod` numZ)) | i ← allZ ]
+
+funPred :: Val ⇀ Val
+funPred = [(I i, I ((i - 1) `mod` numZ)) | i ← allZ ]
+
+funConst0 :: Val ⇀ Val
+funConst0 = [(I 0, I 0)]
+
+funConst1 :: Val ⇀ Val
+funConst1 = [(I 1, I 1)]
+
+fun0to1 :: Val ⇀ Val
+fun0to1 = [(I 0, I 1)]
+
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) → Val → Maybe Val
 applyPF f x = Set.getSing $ Set.lookupSet x f
@@ -451,7 +512,7 @@ instance Show Val where
   showsPrec p (F f) = showsPrec p f
   showsPrec _ (T vs) = showString $ "〈" P.++ L.intercalate "," (P.map show vs) P.++ "〉"
 
-data Fn = Fn (M (Val :⇒ Val))
+newtype Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
 
 instance Show Fn where
@@ -492,7 +553,7 @@ allTuples = mkSet $ (P.concat :: [[Val]] → [Val])
 ----- XSet -----
 
 type ASet :: Type → Constraint
-class (Eq (XSet a), Ord (XSet a)) => ASet a where
+class (Eq (XSet a), Ord (XSet a), Ord a, Show a, Show (XSet a)) => ASet a where
   type XSet a = r | r → a
   ø :: XSet(a)
   isEmpty :: XSet(a) → Bool
@@ -502,7 +563,7 @@ class (Eq (XSet a), Ord (XSet a)) => ASet a where
   asing :: a → XSet a
 --  abind :: XSet a → (a → XSet(b)) → XSet(b)
   setToXSet :: Set(a) → XSet(a)
-  xSetToSet :: XSet(a) → Set(a)
+  xSetToSet :: HasCallStack => XSet(a) → Set(a)
 
 instance ASet Env where
   type XSet Env = ENV
@@ -511,8 +572,16 @@ instance ASet Env where
   (∩) = (EQD./\)
   isEmpty x = x == EQD.false
   asing = aEnvToENV
-  setToXSet = error "setToXSet Env"
-  xSetToSet = error "xSetToSet Env"
+  setToXSet = Set.foldSetE (∪) ø . fmap asing
+  xSetToSet :: ENV -> Set(Env)
+  xSetToSet e = mkSet $ P.map f $ EQD.mcubes e
+    where
+      f = Env . P.map (\ (EQD.Var x, EQD.Val v, True) -> (x, v))
+{-
+  xSetToSet s = [ env | env <- mkSet $ mkAEnvs $ EQD.support s, env `envElem` s ]
+    where envElem :: Env -> ENV -> Bool
+          envElem e s = P.not $ isEmpty $ asing e ∩ s
+-}
 
 {-
 instance ASet AEnv where
@@ -567,7 +636,7 @@ instance ASet Iden where
   setToXSet = id
   xSetToSet = id
 
-instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
+instance (ASet a, ASet b) => ASet (a, b) where
   type XSet (a, b) = Set (a, b)
   ø = Set.empty
   (∪) = Set.union
@@ -577,7 +646,7 @@ instance (Ord a, Ord b, ASet a, ASet b) => ASet (a, b) where
   setToXSet = id
   xSetToSet = id
   
-instance (Ord a, ASet a) => ASet (Set(a)) where
+instance (ASet a) => ASet (Set(a)) where
   type XSet (Set a) = Set (Set(a))
   ø = Set.empty
   (∪) = Set.union
@@ -587,7 +656,7 @@ instance (Ord a, ASet a) => ASet (Set(a)) where
   setToXSet = id  
   xSetToSet = id
 
-instance (Ord (XSet a)) => ASet (M a) where
+instance (Ord (XSet a), Show (XSet a)) => ASet (M a) where
   type XSet (M a) = Set (M(a))
   ø = Set.empty
   (∪) = Set.union
@@ -635,7 +704,7 @@ type Env = AEnv
 newtype AEnv = Env [(Iden, Val)]   -- only used for functions
   deriving (Eq, Ord, Show)
 
-(·) :: AEnv → Iden → Val
+(·) :: HasCallStack => AEnv → Iden → Val
 Env kvs · x = P.fromMaybe (error $ "getSing " P.++ show x) $ P.lookup x kvs
 
 extend :: AEnv → [(Iden, Val)] → AEnv
@@ -652,6 +721,7 @@ aEnvsToENV :: Set(AEnv) → ENV
 aEnvsToENV = foldr (\/) cempty . P.map aEnvToENV . Set.toList
 
 ----- Simple values -----
+
 data Atom = V Val | X Iden | AOp Op [Atom] | ATup [Atom]
   deriving (Eq, Ord, Show)
 
@@ -758,7 +828,8 @@ inj      :: ASet a => XSet(a) → M(a)
 unionS   :: (ASet a, Ord (M a)) => Set(M(a)) → M(a)
 --  mapS     :: (Set(a) → Set(b), m(a)) → m(b)
 fold     :: ASet a => ((XSet(a), M(b)) → M(b), M(b), M(a)) → M(b)
-piM      :: (M(a), a → M(b)) → M(M(a :⇒ b))
+--piM      :: (M(a), a → M(b)) → M(M(a :⇒ b))
+piM      :: ASet b => (M(Val), Val → M(b)) → M(M(Val :⇒ b))
 collapse :: (ASet a) => M(a) → XSet(a)
 mapM     :: (a→b, M(a)) → M(b)
 --mapM     :: ASet a => (a→a, M(a)) → M(a)
@@ -802,10 +873,10 @@ bigStar xs = P.foldr1 (⎧*⎫) xs
 type MyMonad :: (Type → Type) → Constraint
 class MyMonad m where
   type MValid m a :: Constraint
-  return :: MValid m a => a → m a
-  (>>=)  :: (MValid m a, MValid m b) => m a → (a → m b) → m b
-  (>>)   :: (MValid m a, MValid m b) => m a → m b → m b
-  guard  :: Bool → m ()
+  return :: (HasCallStack, MValid m a) => a → m a
+  (>>=)  :: (HasCallStack, MValid m a, MValid m b) => m a → (a → m b) → m b
+  (>>)   :: (HasCallStack, MValid m a, MValid m b) => m a → m b → m b
+  guard  :: (HasCallStack) => Bool → m ()
   a >> b = a >>= const b
 
 instance MyMonad [] where
@@ -822,14 +893,14 @@ instance MyMonad Set where
   guard  = M.guard
 
 instance MyMonad M where
-  type MValid M a = (ASet a, Ord a)
+  type MValid M a = (ASet a)
   return x = M [asing x]
   -- Only allow comprehension syntax for fmap&filter like expressions.
-  (>>=) :: forall a b . (MValid M a, MValid M b) => M a → (a → M b) → M b
-  M xs >>= k = M [ y | (x :: XSet a) <- xs, let M ys = unionS $ fmap k (xSetToSet x), y <- ys ]
-{-
+  (>>=) :: forall a b . (HasCallStack, MValid M a, MValid M b) => M a → (a → M b) → M b
+--  M xs >>= k = M [ y | (x :: XSet a) <- xs, let M ys = unionS $ fmap k (xSetToSet x), y <- ys ]
+
   M (as :: [XSet a]) >>= k = M $ P.map xmap as
-    where purek :: a → Maybe b
+    where purek :: HasCallStack => a → Maybe b
           purek x =
             case k x of
               M [s] | Just y ← Set.getSing (xSetToSet s) → Just y
@@ -837,7 +908,7 @@ instance MyMonad M where
               _ → error "MyMonad M: k is not pure"
           xmap :: XSet a → XSet b
           xmap = setToXSet . Set.mapMaybe purek . xSetToSet
--}
+
   guard True = M [asing ()]
   guard False = M []
 
@@ -848,44 +919,12 @@ instance ASet a => IsList (M a) where
 
 ---------------------------
 
-{-
-pi :: forall a b . (ASet a, ASet (a, b), Ord a, Ord b) => M(a) -> M(a,b) -> M(M(a,b))
-pi (M [])           rng = [ inj Set.empty ]
-pi (M [d])          rng = [ inj (setToXSet fun) | (fun :: Set(a,b)) <- pi' (xSetToSet d) rng ]
-pi (M (dm1 : dom2)) rng = --liftA2 (++) (pi (M [dm1]) rng) (pi (M dom2) rng)
-                          [ x1 ++ x2 | x1 <- pi (M [dm1]) rng, x2 <- pi (M dom2) rng ]
-
-pi' :: (ASet a, ASet (a, b), Ord a, Ord b) =>  Set(a) -> M(a,b) -> M(Set(a,b))
-pi' d (M [])           = [ Set.empty | Set.isEmpty d ]
-{-
-pi' d (M [r])          = [ piSet d r ]
-pi' d (M (rg1 : rng2)) =
-  pi' d (M [rg1])
-  ++
-  _unionS [ liftA2 {-(∪)-}Set.union (pi' d1 (M [rg1])) (pi' d2 (M rng2))
-         | (d1, d2) <- Set.partitions(d)
-         , P.not (Set.isEmpty d1)
-         , P.not (Set.isEmpty d2)
-         ]
-  ++
-  pi' d (M rng2)
--}
-
-piSet :: (Ord a, Ord b) => Set(a) -> Set(a,b) -> Set(a ⇀ b)
-piSet s t =
-  case toList s of
-    [] -> [ [] ]                 -- singleton set with an empty set
-    (x:xs) ->  [ Set.add (x :⇒ y) xysSet
-               | (x', y) <- t
-               , x == x'
-               , xysSet <- piSet (mkSet xs) t
-               ]
--}
 
 class Pi m where
-  pi :: (ASet a, ASet b, Ord a, Ord b) => m a -> m (a,b) -> m (m (a,b))
+  pi :: (ASet a, ASet b) => m a -> m (a,b) -> m (m (a,b))
 
 instance Pi Set where
+--  pi s t | trace("pi Set " P.++ show(s, t)) False = undefined
   pi s _ | Set.isEmpty s =
     [ [] ]
   pi (toList -> (x:xs)) ys =
@@ -907,7 +946,8 @@ instance Pi [] where
     ]
 
 instance Pi M where
-  pi :: forall a b . (ASet a, ASet b, Ord a, Ord b) => M a -> M (a,b) -> M (M (a,b))
+  pi :: forall a b . (ASet a, ASet b) => M a -> M (a,b) -> M (M (a,b))
+  pi x y | trace("pi M " P.++ show(x,y)) False = undefined
   pi (M []) _ =
     M [ [ M [] ] ]
 
@@ -918,7 +958,7 @@ instance Pi M where
     M []
   pi (M [(xs :: XSet a)]) (M ((ys :: XSet(a,b)) : yss)) =
         pi (M [xs]) (M [ys])
-     ++ unionS middle
+--     ++ unionS middle
      ++ pi (M [xs]) (M yss)
      where middle :: Set(M(M(a,b)))
            middle = [ [ unionS [f1, f2] | f1 <- pi (M [xs1]) (M [ys])
@@ -930,13 +970,13 @@ instance Pi M where
   pi (M (xs:xss)) rng =
     [ x ++ y | x <- pi (M [xs]) rng, y <- pi (M xss) rng ]
 
-parts :: (ASet a, Ord a) => XSet(a) -> Set(XSet(a), XSet(a))
+parts :: (ASet a) => XSet(a) -> Set(XSet(a), XSet(a))
 parts = fmap (\ (s1,s2) -> (setToXSet s1, setToXSet s2)) . Set.partitions . xSetToSet
 
-xSetToList :: (ASet a, Ord a) => XSet a -> [a]
+xSetToList :: (ASet a) => XSet a -> [a]
 xSetToList = Set.toList' . xSetToSet
 
-listToXSet :: (ASet a, Ord a) => [a] -> XSet a
+listToXSet :: (ASet a) => [a] -> XSet a
 listToXSet = setToXSet . mkSet
 
 -----------------------------------------
@@ -954,6 +994,11 @@ v2 = F.Ident F.noLoc "v2"
 eE = ɩℰ
 bB = ɩℬ
 cC = ɩ𝒞
+dint :: Iden -> Term
+dint x = x := Rng (Prim F.IsInt)
+
+plus :: Term -> Term -> Term
+plus x y = (Prim F.Add) :@ Array[x,y]
 
 test1 = [ (x,x) | x <- return 1, x==2 ] :: M (Integer, Integer)
 
