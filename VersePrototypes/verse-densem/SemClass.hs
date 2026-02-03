@@ -431,12 +431,22 @@ applyPF f x = Set.getSing $ Set.lookupSet x f
 ----- Val -----
 
 data Val = I Z | F Fn
-  | T [Val]                                -- XXX tuples, temporary
   deriving (Eq, Ord)
 instance Show Val where
   showsPrec p (I i) = showsPrec p i
-  showsPrec p (F f) = showsPrec p f
   showsPrec _ (T vs) = showString $ "〈" P.++ L.intercalate "," (P.map show vs) P.++ "〉"
+  showsPrec p (F f) = showsPrec p f
+
+pattern T :: [Val] -> Val
+pattern T vs <- (getTuple -> Just vs)
+  where
+    T xs = F $ fun $ zipWith (PFSing . I) [0..] xs
+
+getTuple :: Val -> Maybe [Val]
+getTuple (I _) = Nothing
+getTuple (F (Fn (M xs))) = M.zipWithM f [0..] xs
+  where f i s | PFSing (I i') y <- s, i == i' = Just y
+        f _ _ = Nothing
 
 newtype Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
@@ -444,6 +454,10 @@ newtype Fn = Fn (M (Val :⇒ Val))
 instance Show Fn where
   show f | Just s ← P.lookup f knownFuns = s
   show (Fn f) = "Fn" P.++ show f
+
+pattern PFSing :: Val -> Val -> (Val ⇀ Val)
+pattern PFSing x y <- (Set.getSing -> Just (x, y))
+  where PFSing x y = Set.sing (x, y)
 
 type a ⇀ b = Set(a :⇒ b)   -- partial functions from a to b
 dom :: (a ⇀ b) → Set(a)
