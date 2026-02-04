@@ -82,7 +82,7 @@ import qualified Epic.List as L
                   ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                  \\\ [u₁,u₂,v₁,v₂]
           
-ɩℰ (Fun(tₐ)(C)(ω)(tb)) h f | ω == succeeds =
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) h f | ω == succeeds =
 --  trace("enns=" P.++ show envs) $
 --  trace("allfuns=" P.++ show (P.map funs (Set.toList' envs))) $
   unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
@@ -108,11 +108,10 @@ import qualified Epic.List as L
 
     keep :: Env -> M(Val,(Val,Val,Val)) -> Set(Env)
     keep(ρ)(fun) --x | ρ·f == F fm && ρ·h == F hm = [ρ]
-                 | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm), (h, F hm)] ]
+                 | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm'), (h, F hm')] | (fm', hm') <- openClose(q, fm, hm) ]
                  | otherwise                  = []
-      where fm = Fn $ mapM'(\(x,(_,_,z))->(x,z), fun')
-            hm = Fn $ mapM'(\(_,(w,j,_))->(w,j), fun')
-            fun' = prune(fun)
+      where fm = Fn $ mapM'(\(x,(_,_,z))->(x,z), fun)
+            hm = Fn $ mapM'(\(_,(w,j,_))->(w,j), fun)
 
     -----
     envs :: Set(AEnv)
@@ -124,6 +123,22 @@ import qualified Epic.List as L
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
 
 ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
+
+openClose :: (Aperture, Fn, Fn) -> Set(Fn, Fn)
+openClose(C, Fn f, Fn h) = [(Fn $ prune f, Fn $ prune h)]
+openClose(O, f, h) =
+  -- pick all f' and h' that agree on f and h on their domain,
+  -- if outside the domain f' and h' must agree with each other
+  [ (f', h')
+  | F f' <- allVals
+  , F h' <- allVals
+  , Set.forAll allVals $ \ x ->
+      let fx = applyM f x
+          hx = applyM h x
+      in  (if nonEmpty hx then hx == applyM h' x else True) &&
+          (if nonEmpty fx then fx == applyM f' x else applyM f' x == applyM h' x)
+  ]
+            
 
 ɩ𝒞 :: Term → M(Env)
 ɩ𝒞 (t) = ɩℰ (t) p q \\\ [p, q]
@@ -463,6 +478,9 @@ fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) → Val → Maybe Val
 applyPF f x = Set.getSing $ Set.lookupSet x f
+
+applyM :: Fn -> Val -> M Val
+applyM (Fn (M pfs)) x = M $ P.map (\ pf -> Set.maybeToSet $ applyPF pf x) pfs
 
 ----- Val -----
 
@@ -838,6 +856,9 @@ prune(s) = fold(op,empty,s)
         op(d,rest) | isEmpty d = rest
                    | otherwise = inj(d) ++ rest
 
+nonEmpty :: ASet a => M(a) -> Bool
+nonEmpty = (/= empty) . prune
+
 one :: (M(Env), Set(Iden)) → M(Env)
 one(s,vs) = fold(op,empty,s)
   where op :: (XSet(Env), M(Env)) → M(Env)
@@ -851,6 +872,12 @@ concat (s:ss) = s ++ concat ss
 bigStar :: [M(Env)] → M(Env)
 bigStar [] = error "bigStar: []"
 bigStar xs = P.foldr1 (⎧*⎫) xs
+
+---------------------------
+
+ifThenElse :: Bool -> a -> a -> a
+ifThenElse True  t f = t
+ifThenElse False t f = f
 
 ---------------------------
 
@@ -1003,3 +1030,11 @@ main = print $ den $ Array [Int 1, Int 2]
 
 --  cons(x:A,xs:[]A) = for(a:=0|1; y:if(a=0){array{x}else{ys}){y}
 
+{-
+where OpenClosedExtensions(open  ,fm,hm) :=
+  { fm1&hm1:m(any)
+  | fm=<(pu,rv):fm1 | fm(pu)<>{}>
+  , hm=<(pv,j):hm1 | hm(pv)<>{}>
+  , ∀(pu:any, fm(pu)={}). fm1(pu)=hm1(pu)
+  }
+-}
