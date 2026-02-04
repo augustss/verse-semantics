@@ -107,7 +107,7 @@ expToSrcExpr' _ (R.Char32 c)         = Src.Lit (Src.LChar c)
 expToSrcExpr' _ (R.Lam e1 oc eff e2) = Src.Function ap_ (lexp e1) rs (lexp e2)
   where
     -- we only pass closed functions for now. See issue #96
-    ap_ = case oc of { R.O -> Src.Closed; R.C -> Src.Closed }
+    ap_ = case oc of { R.O -> Src.Open; R.C -> Src.Closed }
     rs = refImplEffToSrcEff eff
 expToSrcExpr' l (R.InfixColonEqual _ q (L l' x) e) | ok q = Src.InfixOp (Src.Variable (ident l' x)) (inOp l ":=") (lexp e)
   where ok R.Var = False

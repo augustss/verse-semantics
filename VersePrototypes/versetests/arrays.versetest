@@ -13,86 +13,86 @@ verify("ArrayV1c", pass) { a := for{1..3}; Length[a] = 3 }
 
 # ArrayV2-ArrayV4: prefix'[]' unimplemented
 verify("ArrayV2", pass) { ([]int)[ array{1,2} ] }
-verify("ArrayV3", pass) { f():[]int := array{1,2,3} }
-verify("ArrayV4", pass) { f():[]int := array{1,2,3} }
+verify("ArrayV3", pass) { f()<closed>:[]int := array{1,2,3} }
+verify("ArrayV4", pass) { f()<closed>:[]int := array{1,2,3} }
 
 
-verify("arr1", pass){ f( x:[]int ) : []int := x }
-verify("arr2", pass){ f( x:[]nat ) : []int := x }
+verify("arr1", pass){ f( x:[]int )<closed> : []int := x }
+verify("arr2", pass){ f( x:[]nat )<closed> : []int := x }
 
 # for-loops
-verify("arr-for1", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x } }
-verify("arr-for2", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x+1 } }
+verify("arr-for1", pass){ f( a:[]int )<closed> : []int := for( i:int; x := a[i] ){ x } }
+verify("arr-for2", pass){ f( a:[]int )<closed> : []int := for( i:int; x := a[i] ){ x+1 } }
 
 # arr-for3b filters the array elements
 # arr-for3c has a choice in the range
-verify("arr-for3a", pass){ f( n:int ) : []int := for(i:=1..n){i} }
-verify("arr-for3b", pass){ f( n:int ) : []int := for(i:=1..n; i>3){i} }
-verify("arr-for3c", pass){ f( n:int ) : int := Length [ all { for(i:=1..n){i | i+1} } ] }
+verify("arr-for3a", pass){ f( n:int )<closed> : []int := for(i:=1..n){i} }
+verify("arr-for3b", pass){ f( n:int )<closed> : []int := for(i:=1..n; i>3){i} }
+verify("arr-for3c", pass){ f( n:int )<closed> : int := Length [ all { for(i:=1..n){i | i+1} } ] }
 
 # Indexing
-verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
-verify("arr-index2", pass){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
-verify("arr-index3", pass){ f( x:[]nat )<succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
-verify("arr-index4", pass){ f( x:[]nat where x[0] )<succeeds> : nat := x[0] }
+verify("arr-index1", pass){ f( x:[]nat )<closed><decides> : nat := x[0] }
+verify("arr-index2", pass){ f( x:[]nat where Length[x] > 0 )<closed><succeeds> : nat := x[0] }
+verify("arr-index3", pass){ f( x:[]nat )<closed><succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
+verify("arr-index4", pass){ f( x:[]nat where x[0] )<closed><succeeds> : nat := x[0] }
 # arr-index5: lam is not valid syntax
 #testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
 verify("arr-index6", pass){
-   f( x:[]nat, i:nat )<succeeds> : nat
+   f( x:[]nat, i:nat )<closed><succeeds> : nat
       := if (Length[x]>i) then {x[i]} else {88} }
   # arr-index6 requires reasoning about array bounds
 
-verify("dotdot1", pass){ f(n:int)<decides> := 3=1..n }
+verify("dotdot1", pass){ f(n:int)<closed><decides> := 3=1..n }
   # dotdot1 requires knowing that 1..n --> Choose(n){inrange(1,n)} --> all are unique
 
 # arr5: does isArr$ on the same thing twice, returning an array of the same length
 verify("arr5a", pass )
-    { f( x:[]nat )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
+    { f( x:[]nat )<closed><succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
     # arr5: does isArr$ on the same thing twice, returning an array of the same length
 verify("arr5b", pass )
-    { f( x:any )<succeeds>:int := { if (y:=([]int)[x]; z:=([]nat)[x])
+    { f( x:any )<closed><succeeds>:int := { if (y:=([]int)[x]; z:=([]nat)[x])
                                     then {Length[y]=Length[z]}
                                     else { 0 } } }
 
 # Array unification
 verify("arr-uni1", pass){
-    f( x:[]int, y:[]int )<decides>:int := { if (x=y) then { Length[x]=Length[y] } else 99 } }
+    f( x:[]int, y:[]int )<closed><decides>:int := { if (x=y) then { Length[x]=Length[y] } else 99 } }
 
-verify("arr-uni2a", fail){ f( x:[]int, y:[]string )<fails>:int := (x=y) }
+verify("arr-uni2a", fail){ f( x:[]int, y:[]string )<closed><fails>:int := (x=y) }
   # arr-uni2a: Should be rejected because arrays might be empty
-verify("arr-uni2b", pass){ f( x:[]int, y:[]string where Length[y]>0 )<fails>:int := { (x=y);0 } }
-verify("arr-uni2c", pass){ f( x:int, y:string )<fails>:int := (x=y) }
+verify("arr-uni2b", pass){ f( x:[]int, y:[]string where Length[y]>0 )<closed><fails>:int := { (x=y);0 } }
+verify("arr-uni2c", pass){ f( x:int, y:string )<closed><fails>:int := (x=y) }
   # arr-uni2a,2b: we can see that the arrays have disjoint types
   #               => guaranteed to fail unless arrays are empty
 
-verify("arr-uni3", fail){ f( x:[]int, y:[]int )<fails>:int := (x=y) }
-verify("arr-uni3a", fail){ f( x:[]int, y:[]int )<succeeds>:int := if (x=y) then fail else 77 }
+verify("arr-uni3", fail){ f( x:[]int, y:[]int )<closed><fails>:int := (x=y) }
+verify("arr-uni3a", fail){ f( x:[]int, y:[]int )<closed><succeeds>:int := if (x=y) then fail else 77 }
   # arr-uni3,3a: here the arrays have non-disjoint types
 
 verify("funny1", pass){
-  f( n:int )<decides> := {x := y+1; n>3; y:=7; x} }
+  f( n:int )<closed><decides> := {x := y+1; n>3; y:=7; x} }
 
-verify("arr-nest1", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1 } } }
-verify("arr-nest2", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1|2 } } }
-verify("arr-nest3", pass){ f( n:int ) : [][]type{1|2} := all{ for(i:=1..n){ 1|2 } } }
+verify("arr-nest1", pass){ f( x:[]int )<closed> : []([]int) := all{ for( y:x ){ 1 } } }
+verify("arr-nest2", pass){ f( x:[]int )<closed> : []([]int) := all{ for( y:x ){ 1|2 } } }
+verify("arr-nest3", pass){ f( n:int )<closed> : [][]type{1|2} := all{ for(i:=1..n){ 1|2 } } }
 
 # arr-fail1: RHS fails for n>=1; but returns empty array for n <= 0, hence decides
-verify("arr-fail1", pass){ f( n:int )<decides>  : []int = for(i:=1..n){fail} }
-verify("arr-fail2", pass){ f( n:int where n<=0 )<succeeds>    : []int = for(i:=1..n){fail} }
+verify("arr-fail1", pass){ f( n:int )<closed><decides>  : []int = for(i:=1..n){fail} }
+verify("arr-fail2", pass){ f( n:int where n<=0 )<closed><succeeds>    : []int = for(i:=1..n){fail} }
   # arr-fail2: if n<=0, f successfully returns an empty array, hence succeeds
-verify("arr-fail2a", pass){ f( n:int where n>0 )<fails>    : []int = for(i:=1..n){fail} }
+verify("arr-fail2a", pass){ f( n:int where n>0 )<closed><fails>    : []int = for(i:=1..n){fail} }
   # arr-fail2a: Since n>0 this always fails
-verify("arr-fail3", fail)        { f( n:int )<succeeds> : []int = for(i:=1..n){fail} }
+verify("arr-fail3", fail)        { f( n:int )<closed><succeeds> : []int = for(i:=1..n){fail} }
 
-verify("arr-elem1", pass,broken){ f(n:int):[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
-verify("arr-elem2", pass,broken){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
-verify("arr-elem3", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+verify("arr-elem1", pass,broken){ f(n:int)<closed>:[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
+verify("arr-elem2", pass,broken){ f(n:int)<closed>:[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+verify("arr-elem3", fail){ f(n:int)<closed>:type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
 
 # dotdot in the domain
 # needs verify( choose ) rule (implemented now)
-verify("dom-dotdot1", pass){ f( n:int, x:=1..n ):int := x }
+verify("dom-dotdot1", pass){ f( n:int, x:=1..n )<closed>:int := x }
 
 # size approximating sizes correctly?
 # I have no idea why these fail
 #verify("arrmapexp", pass){ f(n:int where n>0) := { (h := lam i {i+1}); arrMap$[ h, all{1..n} ] } }
-verify("choosefilter", pass, broken){ f(n:int where n >= 0) := { Length[all{i:=1..n}] = n } }
+verify("choosefilter", pass, broken){ f(n:int where n >= 0)<closed> := { Length[all{i:=1..n}] = n } }
