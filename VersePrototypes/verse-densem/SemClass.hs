@@ -506,8 +506,11 @@ newtype Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
 
 instance Show Fn where
-  show f | Just s ← P.lookup f knownFuns = s
-  show (Fn f) = "Fn" P.++ show f
+  show f@(Fn xys) =
+    case P.lookup f knownFuns of
+      Nothing -> fn
+      Just s -> s P.++ "≡" P.++ fn
+    where fn = "Fn" P.++ show xys
 
 pattern PFSing :: Val -> Val -> (Val ⇀ Val)
 pattern PFSing x y <- (Set.getSing -> Just (x, y))
