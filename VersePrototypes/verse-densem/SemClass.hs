@@ -435,6 +435,12 @@ knownFuns =
        , (fun[funBinCon0], "binCon0")
        , (fun[funBinCon1], "binCon1")
        , (fun[funBinHO1], "binHO1")
+
+       , (fun[funSel0of1], "sel0of1")
+       , (fun[funSel0of2], "sel0of2")
+       , (fun[funSel1of2], "sel1of2")
+       , (fun[funSel0of1or2], "sel0of1or2")
+       , (fun[funTupCon0], "tupcon0")
        ]
 
 knownFunsF :: [(String, Fn)]
@@ -459,65 +465,82 @@ rel :: [Val ⇀ Val] → Rl
 rel = Rl . concat . P.map inj
 
 funNegate :: Val ⇀ Val
-funNegate = [(I i, I ((-i) `mod` numZ)) | i ← allZ ]
+funNegate = [(i,-i) | i ← allInts ]
 
 funInt :: Val ⇀ Val
-funInt = [(I i, I i) | i ← allZ ]
+funInt = [(i, i) | i ← allInts ]
 
 funEven :: Val ⇀ Val
-funEven = [(I i, I i) | i ← allZ, even i ]
+funEven = [(i, i) | i ← allInts, even i ]
 
 funOdd :: Val ⇀ Val
-funOdd = [(I i, I i) | i ← allZ, odd i ]
+funOdd = [(i, i) | i ← allInts, odd i ]
 
 funAdd :: Val ⇀ Val
-funAdd = [ (T [I x, I y], I ((x+y) `mod` numZ)) | x ← allZ, y ← allZ ]
+funAdd = [ (T [x, y], x+y) | x ← allInts, y ← allInts ]
 
 funSub :: Val ⇀ Val
-funSub = [ (T [I x, I y], I ((x-y) `mod` numZ)) | x ← allZ, y ← allZ ]
+funSub = [ (T [x, y], x-y) | x ← allInts, y ← allInts ]
 
 funMul :: Val ⇀ Val
-funMul = [ (T [I x, I y], I ((x*y) `mod` numZ)) | x ← allZ, y ← allZ ]
+funMul = [ (T [x, y], x*y) | x ← allInts, y ← allInts ]
 
 funDiv :: Val ⇀ Val
-funDiv = [ (T [I x, I y], I ((x `div` y) `mod` numZ)) | x ← allZ, y ← allZ, y /= 0 ]
+funDiv = [ (T [x, y], x `div` y) | x ← allInts, y ← allInts, y /= 0 ]
 
 funGt :: Val ⇀ Val
-funGt = [ (T [I x, I y], I x) | x ← allZ, y ← allZ, x > y ]
+funGt = [ (T [x, y], x) | x ← allInts, y ← allInts, x > y ]
 
 funLt :: Val ⇀ Val
-funLt = [ (T [I x, I y], I x) | x ← allZ, y ← allZ, x < y ]
+funLt = [ (T [x, y], x) | x ← allInts, y ← allInts, x < y ]
 
 funSucc :: Val ⇀ Val
-funSucc = [(I i, I ((i + 1) `mod` numZ)) | i ← allZ ]
+funSucc = [(i, i + 1) | i ← allInts ]
 
 funPred :: Val ⇀ Val
-funPred = [(I i, I ((i - 1) `mod` numZ)) | i ← allZ ]
+funPred = [(i, i - 1) | i ← allInts ]
 
 funConst0 :: Val ⇀ Val
-funConst0 = [(I i, I 0) | i ← allZ ]
+funConst0 = [(i, 0) | i ← allInts ]
 
 funConst1 :: Val ⇀ Val
-funConst1 = [(I i, I 1) | i ← allZ ]
+funConst1 = [(i, 1) | i ← allInts ]
 
 -- All functions with domain and range {0,1}
 fun0to1 :: Val ⇀ Val
-fun0to1 = [(I 0, I 1)]
+fun0to1 = [(0, 1)]
 
 funBin :: Val ⇀ Val
-funBin = [(I 0, I 0), (I 1, I 1)]
+funBin = [(0, 0), (1, 1)]
 
 funBinInv :: Val ⇀ Val
-funBinInv = [(I 0, I 1), (I 1, I 0)]
+funBinInv = [(0, 1), (1, 0)]
 
 funBinCon0 :: Val ⇀ Val
-funBinCon0 = [(I 0, I 0), (I 1, I 0)]
+funBinCon0 = [(0, 0), (1, 0)]
 
 funBinCon1 :: Val ⇀ Val
-funBinCon1 = [(I 0, I 1), (I 1, I 1)]
+funBinCon1 = [(0, 1), (1, 1)]
 
 funBinHO1 :: Val ⇀ Val
-funBinHO1 = [(fcn "binCon0", I 0),(fcn "bin", I 0),(fcn "binInv", I 1),(fcn "binCon1", I 1)]
+funBinHO1 = [(fcn "binCon0", 0),(fcn "bin", 0),(fcn "binInv", 1),(fcn "binCon1", 1)]
+
+funSel0of1 :: Val ⇀ Val
+funSel0of1 = [ (T[i], i) | i <- allInts ]
+
+funSel0of2 :: Val ⇀ Val
+funSel0of2 = [ (T[i, j], i) | i <- allInts, j <- allInts ]
+
+funSel1of2 :: Val ⇀ Val
+funSel1of2 = [ (T[i, j], j) | i <- allInts, j <- allInts ]
+
+funTupCon0 :: Val ⇀ Val
+funTupCon0 = [ (T[i], 0) | i <- allInts ]
+
+funSel0of1or2 :: Val ⇀ Val
+funSel0of1or2 = funSel0of1 `Set.union` funSel0of2
+
+                
 
 fcn :: String -> Val
 fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
@@ -525,23 +548,23 @@ fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
 -- Some random relation
 -- rel(1|||3){2|0}
 rel1 :: [Val ⇀ Val]
-rel1 = [ [(I 1, I 2),(I 3, I 2)],
-         [(I 1, I 0),(I 3, I 0)] ]
+rel1 = [ [(1, 2),(3, 2)],
+         [(1, 0),(3, 0)] ]
 
 -- rel(x:int){x}
 relInt :: [Val ⇀ Val]
-relInt = [ [ (I 0, I 0),(I 1, I 1),(I 2, I 2),(I 3, I 3) ] ]
+relInt = [ [ (i, i) | i <- allInts ] ]
 
 -- rel(x:int){x|x+1}
 relIntSucc :: [Val ⇀ Val]
-relIntSucc = [ [ (I 0, I 0),(I 1, I 1),(I 2, I 2),(I 3, I 3) ]
-             , [ (I 0, I 1),(I 1, I 2),(I 2, I 3),(I 3, I 0) ] ]
+relIntSucc = [ [ (i, i) | i <- allInts ]
+             , [ (i, i+1) | i <- allInts ] ]
 
 relInts :: [Val ⇀ Val]
-relInts = [ [ (T [], I 0) ], [ (T [], I 1) ], [ (T [], I 2) ], [ (T [], I 3) ] ]
+relInts = [ [ (T [], i) | i <- allInts ] ]
              
 rel1or2 :: [Val ⇀ Val]
-rel1or2 = [ [ (T [], I 1) ], [ (T [], I 2) ] ]
+rel1or2 = [ [ (T [], 1) ], [ (T [], 2) ] ]
              
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) → Val → Maybe Val
@@ -554,6 +577,7 @@ applyM (Fn (M pfs)) x = M $ P.map (\ pf -> Set.maybeToSet $ applyPF pf x) pfs
 
 data Val = I Z | F Fn | R Rl
   deriving (Eq, Ord)
+
 instance Show Val where
   showsPrec p (I i) = showsPrec p i
   showsPrec _ (T vs) = showString $ "〈" P.++ L.intercalate "," (P.map show vs) P.++ "〉"
@@ -570,6 +594,29 @@ getTuple (F (Fn (M xs))) = M.zipWithM f [0..] xs
   where f i s | PFSing (I i') y <- s, i == i' = Just y
         f _ _ = Nothing
 getTuple _ = Nothing
+
+instance P.Num Val where
+  I x + I y = I ((x+y) `mod` numZ)
+  I x - I y = I ((x-y) `mod` numZ)
+  I x * I y = I ((x*y) `mod` numZ)
+  fromInteger = I
+
+instance P.Real Val where
+  toRational (I i) = toRational i
+
+instance P.Integral Val where
+  mod (I x) (I y) = I (mod x y)
+  div (I x) (I y) = I (div x y)
+  toInteger (I i) = i
+  quotRem x y = (div x y, mod x y)
+
+instance P.Bounded Val where
+  minBound = I 0
+  maxBound = I (numZ - 1)
+
+instance P.Enum Val where
+  enumFrom n = enumFromTo n maxBound
+  enumFromTo (I l) (I h) = P.map I [l .. h]
 
 newtype Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
@@ -616,6 +663,9 @@ allVals = [ I i | i ← allZ ]
         ∪ allTuples
         ∪ allRels
 -- test        ∪ [ F (fun[funInt]), T [I 0, I 0] ]
+
+allInts :: Set(Val)
+allInts = [0 .. maxBound]
 
 allFuns :: Set(Val)
 allFuns = mkSet [ F f | (f, _) ← knownFuns ]
