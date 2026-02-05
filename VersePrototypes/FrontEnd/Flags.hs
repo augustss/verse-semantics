@@ -29,6 +29,7 @@ data Flags = Flags
   , fDsUniform      :: !Bool   -- Desugar Essential->Mini in a "uniform" way
                                -- i.e. without using "\bullet"
   , fUseLibParser   :: !Bool
+  , fQuiet          :: !Bool   -- be less verbose
   }
   deriving (Show)
 
@@ -53,6 +54,7 @@ defaultFlags = Flags
   , fAllAsIter      = False
   , fDsUniform      = False
   , fUseLibParser   = False
+  , fQuiet          = False
   }
 
 data ReportError = ErrError | ErrWarning | ErrNone

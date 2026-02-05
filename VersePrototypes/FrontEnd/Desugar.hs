@@ -225,6 +225,7 @@ sDesugarExpr = ds
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
     ds (Macro1 (Ident _ "type") _ e) = do { e' <- ds e; encodeType e' }
+    ds (Macro1 (Ident _ "rtype") _ e) = do { e' <- ds e; encodeRType e' }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one
@@ -250,13 +251,18 @@ sDesugarExpr = ds
                           -- DefineV, DefineE, Unify, EPrim, etc
 
 encodeType :: SrcEssential -> DsM SrcEssential
- -- Encodes type{e}, returning  fun(x:=e}{x}
- -- You might think that a more direct desugaring would be
---      type{t} --> \x. x=t
--- using a ICFP lambda.
--- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
+  -- Encodes type{e}, returning  fun(x:=e){x}
+  -- You might think that a more direct desugaring would be
+  --      type{t} --> \x. x=t
+  -- using a ICFP lambda.
+  -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 encodeType e = do { x <- newIdent noLoc "x"
                   ; return (Function Closed (eDefine x e) effSucceeds (Variable x)) }
+
+encodeRType :: SrcEssential -> DsM SrcEssential
+  -- Encodes type{e}, returning  relation(x:=e){x}
+encodeRType e = do { x <- newIdent noLoc "x"
+                   ; return (Relation (eDefine x e) effSucceeds (Variable x)) }
 
 --------------------------------------
 -- Patterns

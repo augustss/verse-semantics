@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module FrontEnd.Expr(
-      Loc, noLoc, mkLoc
+      Loc, noLoc, mkLoc, pattern AnyLoc
 
     , Ident(..), identLoc, identString
     , SrcExpr(..), Lit(..), Path(..)
@@ -138,6 +138,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
                                        -- This is a valid expression; eg <exists x, exists y>
                                        -- is like (exists x; exists y; <x,y>)
   | Function Aperture SrcExpr Eff SrcBlk -- function(e)<eff>{e}
+  | Relation          SrcExpr Eff SrcBlk -- relation(e)<eff>{e}
 
   | OfType SrcExpr Eff SrcExpr       -- e |>{fx} t
                                      -- Empty [Eff] means "all effects" (not none!)
@@ -194,8 +195,6 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Exists [Ident] SrcExpr         -- exists xs . e
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
-
-  | ChoiceIndex SrcExpr            -- choice_index{e}
 
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
@@ -412,6 +411,10 @@ mkLoc f l c = SourcePos f (mkPos l) (mkPos c)
 
 instance Pretty Loc where
   pPrintPrec _ _ = text . sourcePosPretty
+
+pattern AnyLoc :: Loc
+pattern AnyLoc <- _
+  where AnyLoc = noLoc
 
 --------------------------------------------------------
 --               Ident
@@ -675,6 +678,8 @@ instance Pretty SrcExpr where
                   split_args acc b                    = (reverse acc, b)
 
                   ppArs (q, e, rs) = parens (ppArg e) <> pPrint q <> pPrint rs
+          Relation e1 _fxs e2 -> maybeParens (p > 0) $ sep [text "rel" <+> parens (ppr 0 e1),
+                                                            indent $ braces (ppr 0 e2)]
 
           Blk es       -> braces $ ppSeq lvl es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -685,7 +690,7 @@ instance Pretty SrcExpr where
           MAlias i t e -> ppVRA "alias" i t e
 
           Macro1 (Ident _ m) rs e  -> cat [ text m <> ppEffs rs, indent (ppB e) ]
-          Macro2 (Ident _ m) e1 e2 -> cat [text m <> parens (ppr 0 e1), indent (ppB e2)]
+          Macro2 (Ident _ m) e1 e2 -> cat [ text m <> parens (ppr 0 e1), indent (ppB e2)]
           Return e                 -> maybeParens (p>0) $ text "return" <+> ppr 2 e
 
           ----
@@ -735,7 +740,6 @@ instance Pretty SrcExpr where
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
-          ChoiceIndex e -> text "choice_index" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec lvl p s <+> text "in", indent $ braces (pPrintPrec lvl 0 e)]
 
@@ -843,6 +847,7 @@ compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
 compos f (Case2 e b)        = Case2 <$> f e <*> f b
 compos f (Function q e fx b)= Function q <$> f e <*> pure fx <*> f b
+compos f (Relation   e fx b)= Relation   <$> f e <*> pure fx <*> f b
 compos f (Blk es)           = Blk <$> traverse f es
 compos f (Option me)        = Option <$> traverse f me
 compos f (Parens e)         = Parens <$> f e
@@ -877,7 +882,6 @@ compos f e@(MVLam { mvl_dom = e1, mvl_rng = e2 })
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
-compos f (ChoiceIndex e)    = ChoiceIndex <$> f e
 compos f (Splice e)         = Splice <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
@@ -944,7 +948,6 @@ getVisibleBinders = go
     go (Range e)      = go e
     go (Guard e1 _)   = go e1
     go (Truth e)      = go e
-    go (ChoiceIndex e)= go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
@@ -953,6 +956,7 @@ getVisibleBinders = go
     go Let{}      = []  -- nothing visible from a let
     go Choice{}   = []
     go Function{} = []
+    go Relation{} = []
     go MVLam{}    = []
     go Check {}   = []  -- check<fx>{ e } is a new scope
     go Some{}     = []  -- Ditto some(e), one{e}, all{e}
@@ -980,7 +984,7 @@ getFree = fvs_blk
     fvs (Wrong {})        = []
     fvs (Array es)        = concatMap fvs es
     fvs (Truth e)         = fvs e
-    fvs (ChoiceIndex e)   = fvs e
+    fvs (Macro2 (Ident _ "relation") e1 e2)  = (fvs e1 ++ fvs e2) `remove` getVisibleBinders e1
     fvs (Tuple es)        = concatMap fvs es
     fvs (EffAttr e _)     = fvs e
     fvs (PrefixOp _ e)    = fvs e
@@ -995,8 +999,7 @@ getFree = fvs_blk
     fvs (Verify is e)     = fvs e `remove` is
     fvs (Macro1 _ _ e)    = fvs e
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
-    fvs (For2 e1 e2)      = (fvs e1 ++ fvs e2)
-                            `remove` getVisibleBinders e1
+    fvs (For2 e1 e2)      = (fvs e1 ++ fvs e2) `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
     fvs (Range e)         = fvs_blk e
@@ -1013,6 +1016,9 @@ getFree = fvs_blk
                             bs = getVisibleBinders e1
 
     fvs (Function _ arg _ body)
+      = (fvs arg ++ fvs_blk body) `remove` getVisibleBinders arg
+
+    fvs (Relation   arg _ body)
       = (fvs arg ++ fvs_blk body) `remove` getVisibleBinders arg
 
     fvs (MVLam { mvl_i = i, mvl_wrap = wrap, mvl_dom = e1, mvl_rng = e2 })
@@ -1048,6 +1054,7 @@ getVar (Set _ _ e)      = getVar e
 getVar (MVar i t e)     = i : maybe [] getVar t ++ maybe [] getVar e
 getVar (Range e)        = getVar e
 getVar Function{}       = []
+getVar Relation{}       = []
 getVar (Exists _ e)     = getVar e
 getVar (Verify _ e)     = getVar e
 getVar (OfType e _ t)   = getVar e ++ getVar t

@@ -38,6 +38,7 @@ import qualified Epic.List as L
 ɩℰ :: Term → Iden → Iden → M(Env)
 ɩℰ (U_)      u v = inj (u .=. v)
 ɩℰ (Var (F.Ident _ s)) u v | Just fn <- P.lookup s knownFunsF = inj (u .=. v /\ v .= F fn)
+ɩℰ (Var (F.Ident _ s)) u v | Just fn <- P.lookup s knownRelsF = inj (u .=. v /\ v .= R fn)
 ɩℰ (Var x)   u v = inj (u .=. v /\ v .=. x)
 ɩℰ (Int k)   u v = inj (u .=. v /\ v .=  I k)
 ɩℰ (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
@@ -82,6 +83,34 @@ import qualified Epic.List as L
                   ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                  \\\ [u₁,u₂,v₁,v₂]
           
+ɩℰ (Rel(tₐ)(ω)(tb)) h f | ω == succeeds =
+--  <ρ:env | ρ.h=ρ.f=ZF_VerseFunction(Prune(<(aρ.au,aρ.bv) | aρ:(<ρ>-BVS[at]-{au,av,bu,bv}) * ε⟦at⟧au av * ε⟦bt⟧bu bv>))>
+--  unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
+  inj $ setToXSet [ ρ `extend` [(h, R r), (f, R r)]
+         | ρ <- envs
+         , let r = Rl $ prune [ (aρ·x, aρ·z) | aρ <- ([ρ] \\\ bavs \\\ [x,w,j,z]) ⎧*⎫ sa ⎧*⎫ sb ]
+         ]
+  where
+    sa :: M(Env)
+    sa = ɩℰ (tₐ) x w   -- pu=x, pv=w
+    sb :: M(Env)
+    sb = ɩℰ (tb) j z   -- ru=j, rv=z
+
+{-
+    keep :: Env -> M(Val,Val) -> Set(Env)
+    keep(ρ)(fun) = [ρ `extend` [(f, R rm), (h, R rm)]]
+      where rm = Rl $ prune fun
+-}
+
+    ------
+    envs :: Set(AEnv)
+    envs = generateENVs (favs ∪ (fbvs `Set.difference` bavs) ) -- ∪ [f, h])
+    favs = fvs(tₐ)
+    bavs = bvs(tₐ)
+    fbvs = fvs(tb)
+    bbvs = bvs(tb)
+    [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) h f | ω == succeeds =
 --  trace("enns=" P.++ show envs) $
 --  trace("allfuns=" P.++ show (P.map funs (Set.toList' envs))) $
@@ -110,8 +139,8 @@ import qualified Epic.List as L
     keep(ρ)(fun) --x | ρ·f == F fm && ρ·h == F hm = [ρ]
                  | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm'), (h, F hm')] | (fm', hm') <- openClose(q, fm, hm) ]
                  | otherwise                  = []
-      where fm = Fn $ mapM'(\(x,(_,_,z))->(x,z), fun)
-            hm = Fn $ mapM'(\(_,(w,j,_))->(w,j), fun)
+      where fm = Fn $ prune $ mapM'(\(x,(_,_,z))->(x,z), fun)
+            hm = Fn $ prune $ mapM'(\(_,(w,j,_))->(w,j), fun)
 
     -----
     envs :: Set(AEnv)
@@ -125,7 +154,7 @@ import qualified Epic.List as L
 ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
 
 openClose :: (Aperture, Fn, Fn) -> Set(Fn, Fn)
-openClose(C, Fn f, Fn h) = [(Fn $ prune f, Fn $ prune h)]
+openClose(C, Fn f, Fn h) = [(Fn f, Fn h)]
 openClose(O, f, h) =
   -- pick all f' and h' that agree on f and h on their domain,
   -- if outside the domain f' and h' must agree with each other
@@ -148,11 +177,15 @@ openClose(O, f, h) =
 ɩℬ (t) u v = ɩℰ (t) u v \\\ bvs(t)
 
 -- XXX only include Env where f succeeds somewhere?
+-- f[x] = r
 ɩℱ :: Iden → Iden → Iden → M(Env)
 ɩℱ f x r = --prune $  -- XXX
            unionS [ mapS (\ (prs :: Val ⇀ Val) →
                             (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
-                  | vf@(F(Fn ff)) ← allVals ]
+                  | Just (vf, ff) ← fmap fr allVals ]
+   where fr (a@(F (Fn xys))) = Just (a, xys)
+         fr (a@(R (Rl xys))) = Just (a, xys)
+         fr _ = Nothing
 
 choiceIndex :: Term -> Iden -> Iden -> M(Env)
 choiceIndex at i x = unionSM (generateENVs (fvs(at))) $ \ ρ ->
@@ -313,8 +346,7 @@ pattern i := t = F.DefineE i t
 pattern (:|:) :: Term → Term → Term
 pattern t1 :|: t2 = F.Choice t1 t2
 pattern (:|||:) :: Term → Term → Term
-pattern t1 :|||: t2 ← F.ApplyD (F.Variable (F.Ident _       "operator'|||'")) (F.Array [t1, t2])
-  where t1 :|||: t2 = F.ApplyD (F.Variable (F.Ident F.noLoc "operator'|||'")) (F.Array [t1, t2])
+pattern t1 :|||: t2 = F.ApplyD (F.Variable (F.Ident F.AnyLoc "operator'|||'")) (F.Array [t1, t2])
 pattern (:=:) :: Term → Term → Term
 pattern t1 :=: t2 = F.Unify t1 t2
 --pattern (:~>) :: Term → Term → Term
@@ -347,7 +379,8 @@ pattern Array as = F.Array as
 pattern Fail :: Term
 pattern Fail = F.Fail
 pattern ChIx :: Term -> Term
-pattern ChIx t = F.ChoiceIndex t
+pattern ChIx t = F.Macro1 (F.Ident F.AnyLoc "choice_index") [] t
+pattern Rel t1 w t2 = F.Relation t1 w t2
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] → [Term] → [Iden]
@@ -364,7 +397,7 @@ bvs = mkSet . F.getVisibleBinders
 
 fvs :: Term → Set Iden
 fvs = mkSet . filter (\ (F.Ident _ s) -> s `notElem` globals) . F.getFree
-  where globals = "operator'|||'" : P.map P.fst knownFunsF
+  where globals = "operator'|||'" : P.map P.fst knownFunsF P.++ P.map P.fst knownRelsF
 
 type Aperture = F.Aperture
 pattern O = F.Open
@@ -407,8 +440,23 @@ knownFuns =
 knownFunsF :: [(String, Fn)]
 knownFunsF = P.map (\(x,y)->(y,x)) knownFuns
 
+knownRels :: [(Rl, String)]
+knownRels =
+  [ (rel rel1, "rel1")
+  , (rel relInt, "relInt")
+  , (rel relIntSucc, "relIntSucc")
+  , (rel relInts, "relInts")
+  , (rel rel1or2, "rel1or2")
+  ]
+
+knownRelsF :: [(String, Rl)]
+knownRelsF = P.map (\(x,y)->(y,x)) knownRels
+
 fun :: [Val ⇀ Val] → Fn
 fun = Fn . concat . P.map inj
+
+rel :: [Val ⇀ Val] → Rl
+rel = Rl . concat . P.map inj
 
 funNegate :: Val ⇀ Val
 funNegate = [(I i, I ((-i) `mod` numZ)) | i ← allZ ]
@@ -474,7 +522,27 @@ funBinHO1 = [(fcn "binCon0", I 0),(fcn "bin", I 0),(fcn "binInv", I 1),(fcn "bin
 fcn :: String -> Val
 fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
 
+-- Some random relation
+-- rel(1|||3){2|0}
+rel1 :: [Val ⇀ Val]
+rel1 = [ [(I 1, I 2),(I 3, I 2)],
+         [(I 1, I 0),(I 3, I 0)] ]
 
+-- rel(x:int){x}
+relInt :: [Val ⇀ Val]
+relInt = [ [ (I 0, I 0),(I 1, I 1),(I 2, I 2),(I 3, I 3) ] ]
+
+-- rel(x:int){x|x+1}
+relIntSucc :: [Val ⇀ Val]
+relIntSucc = [ [ (I 0, I 0),(I 1, I 1),(I 2, I 2),(I 3, I 3) ]
+             , [ (I 0, I 1),(I 1, I 2),(I 2, I 3),(I 3, I 0) ] ]
+
+relInts :: [Val ⇀ Val]
+relInts = [ [ (T [], I 0) ], [ (T [], I 1) ], [ (T [], I 2) ], [ (T [], I 3) ] ]
+             
+rel1or2 :: [Val ⇀ Val]
+rel1or2 = [ [ (T [], I 1) ], [ (T [], I 2) ] ]
+             
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) → Val → Maybe Val
 applyPF f x = Set.getSing $ Set.lookupSet x f
@@ -484,12 +552,13 @@ applyM (Fn (M pfs)) x = M $ P.map (\ pf -> Set.maybeToSet $ applyPF pf x) pfs
 
 ----- Val -----
 
-data Val = I Z | F Fn
+data Val = I Z | F Fn | R Rl
   deriving (Eq, Ord)
 instance Show Val where
   showsPrec p (I i) = showsPrec p i
   showsPrec _ (T vs) = showString $ "〈" P.++ L.intercalate "," (P.map show vs) P.++ "〉"
   showsPrec p (F f) = showsPrec p f
+  showsPrec p (R r) = showsPrec p r
 
 pattern T :: [Val] -> Val
 pattern T vs <- (getTuple -> Just vs)
@@ -497,10 +566,10 @@ pattern T vs <- (getTuple -> Just vs)
     T xs = F $ fun $ zipWith (PFSing . I) [0..] xs
 
 getTuple :: Val -> Maybe [Val]
-getTuple (I _) = Nothing
 getTuple (F (Fn (M xs))) = M.zipWithM f [0..] xs
   where f i s | PFSing (I i') y <- s, i == i' = Just y
         f _ _ = Nothing
+getTuple _ = Nothing
 
 newtype Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
@@ -524,6 +593,16 @@ infix 1 :⇒
 type a :⇒ b = (a, b)       -- pairs used to form functions
 pattern a :⇒ b = (a, b)
 
+newtype Rl = Rl (M (Val :⇒ Val))
+  deriving (Eq, Ord)
+
+instance Show Rl where
+  show r@(Rl xys) =
+    case P.lookup r knownRels of
+      Nothing -> rl
+      Just s -> s P.++ "≡" P.++ rl
+    where rl = "Rl" P.++ show xys
+
 ----- "all" values -----
 numZ :: Z
 numZ = 4
@@ -535,10 +614,14 @@ allVals :: Set(Val)
 allVals = [ I i | i ← allZ ]
         ∪ allFuns
         ∪ allTuples
+        ∪ allRels
 -- test        ∪ [ F (fun[funInt]), T [I 0, I 0] ]
 
 allFuns :: Set(Val)
 allFuns = mkSet [ F f | (f, _) ← knownFuns ]
+
+allRels :: Set(Val)
+allRels = mkSet [ R f | (f, _) ← knownRels ]
 
 -- 0, 1, 2-tuples of numbers
 allTuples :: Set(Val)
@@ -1007,6 +1090,7 @@ v = F.Ident F.noLoc "v"
 p = F.Ident F.noLoc "p"
 q = F.Ident F.noLoc "q"
 f = F.Ident F.noLoc "f"
+r = F.Ident F.noLoc "r"
 u1 = F.Ident F.noLoc "u1"
 v1 = F.Ident F.noLoc "v1"
 u2 = F.Ident F.noLoc "u2"

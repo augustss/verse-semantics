@@ -340,6 +340,7 @@ flagTable =
   [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
   ,("trace-eval",  (fTraceEval,    \ b s -> s{fTraceEval=b}))
   ,("ds-uniform",  (fDsUniform,    \ b s -> s{fDsUniform=b}))
+  ,("quiet",       (fQuiet,        \ b s -> s{fQuiet=b}))
 --  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
 --  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
 --  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
@@ -428,10 +429,11 @@ runGetter err_result getter
              (runD flags err_result (getter flags e))
 
 getEssential :: Flags -> SrcExpr -> DsM SrcEssential
-getEssential _ e_parsed
+getEssential flg e_parsed
   = do { e_prel <- addPrelude e_parsed
        ; e_ess  <- sDesugarExpr e_prel
-       ; printWithHdr "Essential" (pPrint e_ess)
+       ; when (not $ fQuiet flg) $
+           printWithHdr "Essential" (pPrint e_ess)
        ; return e_ess }
 
 getMini :: Flags -> SrcExpr -> DsM SrcMini
@@ -518,10 +520,11 @@ cDlsDensem
 dlsDenSemDesugar :: SrcExpr -> IO CExp
 dlsDenSemDesugar = return . edenSemDS . srcExprToExp
 
-eSlsDesugar :: SrcEssential -> IO SrcEssential
-eSlsDesugar e = do
+eSlsDesugar :: Flags -> SrcEssential -> IO SrcEssential
+eSlsDesugar flg e = do
   let e_ds = envDesugar e
-  displayDoc $ addHeader "ENV desugar" $ pPrint e_ds
+  when (not $ fQuiet flg) $
+    displayDoc $ addHeader "ENV desugar" $ pPrint e_ds
   --print e_ds
   return e_ds
 
@@ -531,7 +534,7 @@ cTimDensem
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- eSlsDesugar e_ess
+       ; e_ds <- eSlsDesugar flags e_ess
        ; let res = TimE.den e_ds
        ; let den_sem = addHeader "Tim Den-sem" $ text $ show res
 {-
@@ -549,7 +552,7 @@ cSlsDensem
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- eSlsDesugar e_ess
+       ; e_ds <- eSlsDesugar flags e_ess
        ; let res = SLS.den e_ds
        ; let den_sem = addHeader "Sls Den-sem" $ text $ show res
 {-
@@ -567,7 +570,7 @@ cPomDensem
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- eSlsDesugar e_ess
+       ; e_ds <- eSlsDesugar flags e_ess
        ; let res = Pom.den e_ds
        ; let den_sem = addHeader "Pom Den-sem" $ text $ show res
        ; displayDoc den_sem
@@ -584,10 +587,13 @@ cSemClassDensem
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- eSlsDesugar e_ess
+       ; e_ds <- eSlsDesugar flags e_ess
        ; let res = SemClass.den e_ds
        ; let den_sem = addHeader "M Den-sem" $ text $ show res
-       ; displayDoc den_sem
+       ; if fQuiet flags then
+           displayDoc $ text $ show res
+         else
+           displayDoc den_sem
 {-
        ; let resU = Pom.denU e_ds
        ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
@@ -603,7 +609,7 @@ cPomPomDensem
              cfg = PomPom.Config { PomPom.forUnionMode = cs_pp_forunion s, PomPom.forUnitMode = cs_pp_forunit s,
                                    PomPom.ifUnionMode = cs_pp_ifunion s, PomPom.useTree = cs_pp_tree s }
        ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- eSlsDesugar e_ess
+       ; e_ds <- eSlsDesugar flags e_ess
        ; (res, dtrace) <- PomPom.denS cfg (fTraceEval flags) e_ds
        ; let den_sem = addHeader settings $ text res
              settings = printf "PomPom (forUnion=%s forUnit=%s ifUnion=%s useTree=%s)"
