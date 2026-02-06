@@ -583,11 +583,11 @@ rel1or2 :: [Val ⇀ Val]
 rel1or2 = [ [ (T [], 1) ], [ (T [], 2) ] ]
              
 -- Apply a partial function
-applyPF :: (Val ⇀ Val) → Val → Maybe Val
-applyPF f x = Set.getSing $ Set.lookupSet x f
+applyPF :: (Val ⇀ Val) → Val → Set(Val)
+applyPF f x = Set.lookupSet x f
 
 applyM :: Fn -> Val -> M Val
-applyM (Fn (M pfs)) x = M $ P.map (\ pf -> Set.maybeToSet $ applyPF pf x) pfs
+applyM (Fn (M pfs)) x = M $ P.map (\ pf -> applyPF pf x) pfs
 
 ----- Val -----
 
@@ -967,10 +967,10 @@ unionENVs = P.foldr (\/) cempty
 bigUnionENV :: Set(ENV) → ENV
 bigUnionENV = unionENVs . Set.toList
 
--- Environments where the pair (x :⇒ y) is in the function f
+-- Environments where the pair (x :⇒ y) is in the function/relation f
 (⋵) :: (Iden :⇒ Iden) → (Val ⇀ Val) → ENV
 (x :⇒ y) ⋵ f =
-  unionENVs [ x .= u /\ y .= v | u ← Set.toList allVals, Just v ← [applyPF f u] ]
+  bigUnionENV [ x .= u /\ y .= v | u ← allVals, v ← applyPF f u ]
 
 ----- Verse computation type -----
 empty    :: ASet a => M(a)
