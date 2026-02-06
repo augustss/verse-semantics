@@ -449,6 +449,9 @@ knownFunsF = P.map (\(x,y)->(y,x)) knownFuns
 knownRels :: [(Rl, String)]
 knownRels =
   [ (rel rel1, "rel1")
+  , (rel rel2, "rel2")
+  , (rel rel3, "rel3")
+  , (rel rel4, "rel4")
   , (rel relInt, "relInt")
   , (rel relIntSucc, "relIntSucc")
   , (rel relInts, "relInts")
@@ -546,10 +549,23 @@ fcn :: String -> Val
 fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
 
 -- Some random relation
--- rel(1|||3){2|0}
+-- rel(0|||1){2|||3}
 rel1 :: [Val ⇀ Val]
-rel1 = [ [(1, 2),(3, 2)],
-         [(1, 0),(3, 0)] ]
+rel1 = [ [(0,2),(0,3),(1,2),(1,3) ] ]
+
+-- rel(0|||1){2|3}
+rel2 :: [Val ⇀ Val]
+rel2 = [ [(0,2),(1,2)]
+       , [(0,3),(1,3)] ]
+
+-- rel(0|1){2|||3}
+rel3 :: [Val ⇀ Val]
+rel3 = [ [(0,2),(0,3)]
+       , [(1,2),(1,3)] ]
+
+-- rel(0|1){2|3}
+rel4 :: [Val ⇀ Val]
+rel4 = [ [(0,2)], [(0,3)], [(1,2)], [(1,3)] ]
 
 -- rel(x:int){x}
 relInt :: [Val ⇀ Val]
