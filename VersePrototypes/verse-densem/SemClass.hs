@@ -443,6 +443,8 @@ knownFuns =
        , (fun[funSel1of2], "sel1of2")
        , (fun[funSel0of1or2], "sel0of1or2")
        , (fun[funTupCon0], "tupcon0")
+
+       , (fun[fun1to2], "f1to2")
        ]
 
 knownFunsF :: [(String, Fn)]
@@ -458,6 +460,7 @@ knownRels =
   , (rel relIntSucc, "relIntSucc")
   , (rel relInts, "relInts")
   , (rel rel1or2, "rel1or2")
+  , (rel relBin, "relBin")
   ]
 
 knownRelsF :: [(String, Rl)]
@@ -510,6 +513,9 @@ funConst0 = [(i, 0) | i ← allInts ]
 
 funConst1 :: Val ⇀ Val
 funConst1 = [(i, 1) | i ← allInts ]
+
+fun1to2 :: Val ⇀ Val
+fun1to2 = [(1, 2)]
 
 -- All functions with domain and range {0,1}
 fun0to1 :: Val ⇀ Val
@@ -583,6 +589,9 @@ relInts = [ [ (T [], i) | i <- allInts ] ]
              
 rel1or2 :: [Val ⇀ Val]
 rel1or2 = [ [ (T [], 1) ], [ (T [], 2) ] ]
+             
+relBin :: [Val ⇀ Val]
+relBin = [ [ (0, 0), (1, 1) ] ]
              
 -- Apply a partial function
 applyPF :: (Val ⇀ Val) → Val → Set(Val)
@@ -697,6 +706,8 @@ allTuples = mkSet $ (P.concat :: [[Val]] → [Val])
   [ [ T []]
   , [ T [I x] | x ← [0 .. numZ-1] ]
   , [ T [I x, I y] | x ← [0 .. numZ-1], y ← [0 .. numZ-1] ]
+  -- triples make it very slow
+  -- , [ T [I x, I y, I z] | x ← [0 .. numZ-1], y ← [0 .. numZ-1], z <- [0 .. numZ-1] ]
   ]
 
 ----- XSet -----

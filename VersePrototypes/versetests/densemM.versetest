@@ -57,3 +57,19 @@ testds("Tall3",  mon, pass) {for {(x=1;w=1) | (x=2;w=2)} }
   {"[{{u=v=<>,w/=1,w/=2}}U{{u=v=<>,x/=1,x/=2}}U{{u=v=<>,x=2,w/=2}}U{{u=v=<>,w=2,x/=2}}U{{u=v=<1>,w=x=1}}U{{u=v=<2>,w=x=2}}]"}
 #>
 
+testds("fun1", mon, pass) { function(1)<closed>{2} }                      {"[{{u=v=f1to2=Fn[{(1,2)}]}}]"}
+testds("fun2", mon, pass) { function(fail)<closed>{2} }                   {"[{{u=v=<>}}]"} # XXX empty function
+testds("fun3", mon, pass) { function(1)<closed>{fail} }                   {"[]"}
+testds("fun4", mon, pass) { function(x:int)<closed>{x+1} }                {"[{{u=v=succ=Fn[{(0,1),(1,2),(2,3),(3,0)}]}}]"}
+testds("fun5", mon, pass) { function(x:prefix'-')<closed>{x} }            {"[{{u=isint=Fn[{(0,0),(1,1),(2,2),(3,3)}],v=neg=Fn[{(0,0),(1,3),(2,2),(3,1)}]}}]"}
+testds("fun6", mon, pass) { function(x:nat where x<2)<closed>{x} }        {"[{{u=v=bin=Fn[{(0,0),(1,1)}]}}]"}
+testds("fun7", mon, pass) { rtype{x:nat where x<2} }                      {"[{{u=v=relBin=Rl[{(0,0),(1,1)}]}}]"}
+testds("fun8", mon, pass) { ltTwo:=rtype{x:nat where x<2}; :ltTwo}        {"[{{u=v=0}}U{{u=v=1}}]"}
+testds("fun9a",mon, pass){ function(y:rtype{x:nat where x<2})<closed>{y}} {"[{{u=v=bin=Fn[{(0,0),(1,1)}]}}]"}
+# fun9 is very slow
+testds("fun9", mon, pass, skip) { ltTwo:=rtype{x:nat where x<2};
+                            function(y:ltTwo)<closed>{y} }                {"[{{u=v=F({0->0,1->1})}}]"}
+testds("fun10",mon, pass) { x:=1; function(x)<closed>{2} }                {"[{{u=v=f1to2=Fn[{(1,2)}]}}]"}
+testds("fun11",mon, pass) { function(1)<closed>{x=2} }                    {"[{{u=v=f1to2=Fn[{(1,2)}],x=2}}]"}
+
+testds("mfun1", mon, pass) { f:=((1,2) ||| (1,0)); f[0] }                 {"[{{u=v=1}}]"}
