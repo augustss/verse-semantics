@@ -1,0 +1,59 @@
+<#
+testds("var",    mon, pass) {x=1}                                 {"[{{u=v=x=1}}]"}
+testds("arith1", mon, pass) {2}                                   {"[{{u=v=2}}]"}
+testds("arith2", mon, pass) {x:=1; x}                             {"[{{u=v=1}}]"}
+testds("arith3", mon, pass) {1+2}                                 {"[{{u=v=3}}]"}
+testds("arith3", mon, pass) {1-2}                                 {"[{{u=v=3}}]"}   # mod 4
+testds("arith4", mon, pass) {1*2}                                 {"[{{u=v=2}}]"}
+testds("arith5", mon, pass) {3/2}                                 {"[{{u=v=1}}]"}
+testds("arith6", mon, pass) {1/0}                                 {"[]"}
+testds("arith7", mon, pass) {3>3}                                 {"[]"}
+testds("arith8", mon, pass) {3>2}                                 {"[{{u=v=3}}]"}
+testds("tup1",   mon, pass) {array{1;2}}                          {"[{{u=v=<1,2>}}]"}
+testds("tup2",   mon, pass) {array{}}                             {"[{{u=v=<>}}]"}
+testds("choice1",mon, pass) {1|2}                                 {"[{{u=v=1}},{{u=v=2}}]"}
+testds("choice2",mon, pass) {(1=2)|2}                             {"[{{u=v=2}}]"}
+testds("if1",    mon, pass) {if(0){1}else{2}}                     {"[{{u=v=1}}]"}
+testds("if2",    mon, pass) {if(0=1){1}else{2}}                   {"[{{u=v=2}}]"}
+testds("if2b",   mon, pass) {if(fail){1}else{2}}                  {"[{{u=v=2}}]"}
+testds("if3",    mon, pass) {if(x:=1|2){x}else{3}}                {"[{{u=v=1}}]"}
+testds("if4",    mon, pass) {if(x:=1|2){x=2}else{3}}              {"[]"}
+testds("if5",    mon, pass) {if(0){1|2}else{3}}                   {"[{{u=v=1}},{{u=v=2}}]"}
+testds("if6",    mon, pass) {x:any; if(x=0){1}else{2}}            {"[{{u=v=1}}U{{u=v=2}}]"}
+testds("if7",    mon, pass) {x:any; if(x=0|3){1}else{2}}          {"[{{u=v=1}}U{{u=v=2}}]"}
+
+testds("Tif1a",    mon, pass) {if(x:=1|2){x=2}else{3}}              {"[]"}
+testds("Tif1b",    mon, pass) {if(x:=1|2){x=1}else{3}}              {"[{{u=v=1}}]"}
+
+testds("Tif2-1",   mon, pass) {x:int; x=1; if(x=1|2){x=2}else{3}}   {"[]"}
+testds("Tif2-2",   mon, pass) {x:int; x=2; if(x=1|2){x=2}else{3}}   {"[{{u=v=2}}]"}
+testds("Tif2-3",   mon, pass) {x:int; x=3; if(x=1|2){x=2}else{3}}   {"[{{u=v=3}}]"}
+
+# Tests -4 to -6 are same as -1 to -3, but with the unification of x later
+testds("Tif2-4",   mon, pass) {x:int; r:=if(x=1|2){x=2}else{3}; x=1; r}   {"[]"}
+testds("Tif2-5",   mon, pass) {x:int; r:=if(x=1|2){x=2}else{3}; x=2; r}   {"[{{u=v=2}}]"}
+
+testds("Tif3",   mon, pass) {if(x:=1|2){x}else{fail}}              {"[{{u=v=1}}]"}
+testds("Tif4",   mon, pass) {if(x:=1|2){x | x}else{fail}}          {"[{{u=v=1}},{{u=v=1}}]"}
+
+# Note that in Tif5-1 the x is free, since the bindings in the choice do not escape the choice.
+testds("Tif5-1", mon, pass) {if( (x:=2)|(y:=1) ){x}else{fail}}       {"[{{u=v=x}}]"}
+testds("Tif5-2", mon, pass)         {x:nat; y:nat; if(x=7|y=3){x}else{fail}} {"[{{u=v=3}}]"}
+
+testds("Tif6-1", mon, pass) {x:int; if(x=1){1}else{0}; x=(2|1)}    {"[{{u=v=2}},{{u=v=1}}]"}
+testds("Tif6-2", mon, pass) {x:int; if(x=2){1}else{0}; x=(2|1)}    {"[{{u=v=2}},{{u=v=1}}]"}
+
+# The crucial thing here is that Tim1a and Tim1b have the same RHS.
+# Ditto Tim2a and Tim2b
+testds("Tim1a", mon, pass) {x:=1|2}          {"[{{u=v=1}},{{u=v=2}}]"}
+testds("Tim1b", mon, pass) {x:=1|2; x=1|||2} {"[{{u=v=1}},{{u=v=2}}]"}
+testds("Tim2a", mon, pass) {x:=1|||2}        {"[{{u=v=1}}U{{u=v=2}}]"}
+testds("Tim2b", mon, pass) {x:=1|||2; x=1|2} {"[{{u=v=1}},{{u=v=2}}]"}
+
+testds("Tall1", mon, pass)  {for {(x:=1|2)}}           {"[{{u=v=<1,2>}}]"}
+testds("Tall2a", mon, pass) {for {(x:=1|2; x>0)}}    {"[{{u=v=<1,2>}}]"}
+testds("Tall2b", mon, pass) {for {(x:=1|2; x>1)}}    {"[{{u=v=<2>}}]"}
+testds("Tall3",  mon, pass) {for {(x=1;w=1) | (x=2;w=2)} }
+  {"[{{u=v=<>,w/=1,w/=2}}U{{u=v=<>,x/=1,x/=2}}U{{u=v=<>,x=2,w/=2}}U{{u=v=<>,w=2,x/=2}}U{{u=v=<1>,w=x=1}}U{{u=v=<2>,w=x=2}}]"}
+#>
+
