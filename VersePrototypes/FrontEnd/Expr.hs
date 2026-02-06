@@ -995,6 +995,7 @@ getFree = fvs_blk
     fvs (Unify e1 e2)     = fvs e1 ++ fvs e2
     fvs (Choice b1 b2)    = fvs_blk b1 ++ fvs_blk b2
     fvs (Seq e1 e2)       = fvs e1 ++ fvs e2
+    fvs (Where e1 e2)     = fvs e1 ++ fvs e2
     fvs (Exists is e)     = fvs e `remove` is
     fvs (Verify is e)     = fvs e `remove` is
     fvs (Macro1 _ _ e)    = fvs e

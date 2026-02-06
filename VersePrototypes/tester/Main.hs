@@ -41,6 +41,7 @@ import SExpC(srcExprToExp)
 import qualified TimE   (den)
 import qualified Pom    (den)
 import qualified PomPom (denS, defaultConfig)
+import qualified SemClass (den)
 import ENVDesugar (envDesugar)
 
 import Epic.Print hiding ( (<>) )
@@ -200,7 +201,7 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     }
     deriving (Show)
 
-data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS | PPM_DS   -- denotational semantic functions
+data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS | PPM_DS | MON_DS   -- denotational semantic functions
 instance Show TestRunner where
   -- INFO: Ideally these should correspond to their respective commands in the
   -- repl just without the ':' prefix, i.e., dls-densem here is :dls-densem in
@@ -213,6 +214,7 @@ instance Show TestRunner where
   show ELS_DS = "els"
   show POM_DS = "pom"
   show PPM_DS = "ppo"
+  show MON_DS = "mon"
 
 instance Read TestRunner where
   readsPrec _ s =    [(Tim_DS, r) | ("tim", r) <- lex s]
@@ -221,6 +223,7 @@ instance Read TestRunner where
                   ++ [(ELS_DS, r) | ("els", r) <- lex s]
                   ++ [(POM_DS, r) | ("pom", r) <- lex s]
                   ++ [(PPM_DS, r) | ("ppo", r) <- lex s]
+                  ++ [(MON_DS, r) | ("ppo", r) <- lex s]
 
 data TestType =
   TPass | TFail | TLoop                -- Expected behaviour
@@ -457,6 +460,7 @@ evalDenSem flags test e = do
           Just DLS_DS -> go >=> fmap showASCII . edenSem . edenSemDS . srcExprToExp
           Just SLS_DS -> error "SLS densem not implemented yet. Sorry!"
           Just ELS_DS -> go >=> denSemDesugar >=> fmap showASCII . denSem
+          Just MON_DS -> fmap (showASCII . SemClass.den . envDesugar) . go
 
 -- Hackily replace some Unicode characters
 showASCII :: Show a => a -> String
@@ -464,6 +468,10 @@ showASCII = concatMap ascii . show
   where ascii '\8746' = "U"
         ascii '\8800' = "/="
         ascii '\8709' = "EMPTY"
+        ascii '\10629' = "{{"
+        ascii '\10630' = "}}"
+        ascii '\12296' = "<"
+        ascii '\12297' = ">"
         ascii '\n' = ""
         ascii c = [c]
 
@@ -826,6 +834,7 @@ pTestRunner = V.choice
     , V.pKeyword "els" *> pure ELS_DS
     , V.pKeyword "pom" *> pure POM_DS
     , V.pKeyword "ppo" *> pure PPM_DS
+    , V.pKeyword "mon" *> pure MON_DS
     ] <* V.pComma
 
 
