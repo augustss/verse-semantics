@@ -417,7 +417,7 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
+srcToCore :: HasCallStack => FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e
   = do { e1 :: SrcCore <- FrontEnd.desugar flags add_verification e
        ; FrontEnd.convertToPrepdCore flags e1 }
@@ -472,6 +472,7 @@ showASCII = concatMap ascii . show
         ascii '\10630' = "}}"
         ascii '\12296' = "<"
         ascii '\12297' = ">"
+        ascii '\8801' = "="
         ascii '\n' = ""
         ascii c = [c]
 
@@ -499,7 +500,7 @@ timSkip ('S' : _) = TimNone
 timSkip s         = TimError s
 
 ----------------------------
-runTest :: TestFlags -> Test -> IO TestRes
+runTest :: HasCallStack => TestFlags -> Test -> IO TestRes
 runTest tflg test@(TestVerify _ e)     = doTestCatchingExn tflg test e (Array [])
 runTest tflg test@(TestDenSem _ e1 e2) = doTestCatchingExn tflg test e1 e2
 runTest tflg test@(TestEvalEq _ e1 e2) = doTestCatchingExn tflg test e1 e2
@@ -522,7 +523,8 @@ doTestCatchingExn tflg test p1 p2
   | otherwise
   = do { catch (doTest tflg test p1 p2)
                (\e -> do { exn_handler e
-                         ; pure (TestRes { tr_info = info, tr_outcome = TO_Excn }) }) }
+                         ; pure (TestRes { tr_info = info, tr_outcome = TO_Excn }) })
+        }
   where
     info        = testInfo test
     test_herald = testHerald test
@@ -544,7 +546,10 @@ doTest tflg test src1 src2 = do
            flags     = if isDenSemTest test then flags1{ fReportError = ErrNone } else flags1
            add_verif = desugarForVerification test
 
-     ; core1 <- srcToCore flags add_verif src1
+     ; core1 <-
+       -- Don't convert to core for densem tests.  This is so ugly
+       if isDenSemTest test then return Core.Fail
+                            else srcToCore flags add_verif src1
 
      -- Display the desugared output
      ; when (showDesugared tflg) $

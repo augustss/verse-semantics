@@ -47,7 +47,7 @@ import GHC.Stack
 -----------------------------------------------
 
 
-desugar :: Flags -> Bool -> SrcExpr -> IO SrcCore
+desugar :: HasCallStack => Flags -> Bool -> SrcExpr -> IO SrcCore
 -- If there is an error, report the error and return Fail
 desugar flgs add_verification e_parsed
   = runD flgs Fail $
@@ -719,7 +719,7 @@ So even when doing "uniform" desugaring, we use `NoInput` to say
 This little optimisation eliminates a huge amount of crap.
 -}
 
-essToMini :: Flags -> SrcEssential -> DsM SrcMini
+essToMini :: HasCallStack => Flags -> SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
 -- Fig 6 in verse-spec
 -- See Note [The Input parameter to essToMini]
