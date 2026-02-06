@@ -35,10 +35,11 @@ $
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |t_1 .. t_2|                 & \text{Multiple choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-&      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
+&      & \vb & |choiceindex |             & \text{Choice indexing} \\
 &      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
 % &      & \vb & |truth t|                  & \text{Truth value} \\
 &      & \vb & |functionOCX q t_1 fx t_2|  & \text{Function} \\
+&      & \vb & |relation t_1 t_2|  & \text{Relation} \\
 &      & \vb & |: t|                      & \text{Range} \\
 % &      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
 % &      & \vb & |check fx t|                & \text{Effects check} \\
@@ -56,7 +57,8 @@ $
 |squig x t_1 := t_2| & \rightarrow  & |x:any; t_1 := matches x t_2| \\
 |apply1 t_1 t_2 := t_3| & \rightarrow  & |t_1 := functionOCX open t_2 succeeds t_3| \\
 |apply1 t_1 t_2 (eff oc) (eff fx) := t_3| & \rightarrow  & |t_1 := functionOCX oc t_2 fx t_3| \\
-|type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
+|type^{t}| & \rightarrow & |relation (x:=t) x| & \text{fresh |x|}\\
+|fordo t_1 t_2| & \rightarrow & |functionOCX closed (choiceindex(t_1)) succeeds t_2| \\
 \end{array}
 
 \end{array}
