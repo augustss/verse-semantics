@@ -394,7 +394,7 @@
 %% -------Functions ---------------
 %format functionKW = "\textbf{fun}"
 %format relationKW = "\textbf{rel}"
-%format choiceindex = "\textbf{choiceIndex}"
+%format choiceindex (t) = "\textbf{choiceIndex}\{t\}"
 
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
 %format function (x) (rhs) = functionKW "(" x ")\{" rhs "\}"

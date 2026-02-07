@@ -175,6 +175,17 @@ $$
        \end{array} \\
     \\
 
+    \vmindex & :: & \Ident \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \hspace{4mm}
+        \text{Number each choice with $i=0$, $i=1$ etc} \\
+    \vmindex(i,s) & = & \vmfold(op, \vmempty, s)(0)  \\
+    & \multicolumn{2}{l}{\text{where}} \\
+    && \begin{array}[t]{@@{}l}
+         op :: \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Z \rightarrow \Vm{\Env} \\
+         op( \EV, \mathit{rest} )(k) = \vminject( \EV \cap \conBrack {{ i = k }}) \vmappend
+                              \mathit{rest}(k+1)
+       \end{array} \\
+    \\
+
     \vmone & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
     \vmone( s, vs ) & = & \vmfold( op, \{\}, s ) \\
     & \multicolumn{2}{l}{\text{where}} \\
@@ -379,11 +390,25 @@ $$
       \end{array}
 \\[5mm]
 
+\end{array} \\
+
+\begin{array}{@@{}l@@{\;\;}c@@{\;\;}l}
+
 % -------------- CHOICE-INDEX -----------------
-\multicolumn{2}{@@{}l}{\rulename{sindex} \; \hfill \semess{E}{u}{v}{|choiceindex t|}}
+\multicolumn{3}{@@{}l}{\rulename{sindex} \;\; \semess{E}{u}{v}{|choiceindex t|}} \\
   & = & \vmunions \begin{array}[t]{@@{}l@@{\,}l}
-         \{ & \rho \in ...
+  \{ & \vmindex( u, S ) \\
+  \vb & \rho \in \Env \\
+  , & |let| \; S :: \Vm{\Env}
+           = \vmprune( \; (\vminject( \{ \rho \} ) \vmhide \{ \semap{I}{t}, j, v \})
+                     \vmseq \semess{E}{j}{v}{t} \; ) \;\}\\
      \end{array} \\
+\\
+%  E[ choiceIndex( 8 | 7 | fail | 8 ) ] uv  = [ {{ u=0,v=8 }} | {{ u=1,v=7 }} | {{ u=2,v=8}}} ]
+
+%        ε⟦choice_index{at}⟧ix := ∪(ρ:env). 
+%            let(aρm:=Prune((<ρ>-BVS[at]-{j,y}) * ε⟦at⟧jy - {i})).
+%            <aρ | i:ℕm, i<|aρm|m, aρ:aρm_i * <bρ:env | bρ.i=i>>
 
 % FOR
 % ------------- Direct semantics for FOR ---------------
@@ -403,29 +428,28 @@ $$
 %       & & \vmseq (m \vmseq \vminject \conBrack{u=u_2, v=v_2} \vmhide \{u,v\} ) \\
 %       & & \vmhide \{ u_1, u_2, v_1, v_2 \}
 %     \end{array}
-\\
 
 % -------------- RELATIONS -----------------
-\multicolumn{2}{@@{}l}{\rulename{srel} \;\;
-  \semess{E}{h}{f}{|relation at bt|}}
-& = & ... \\
-% \vmunions \begin{array}[t]{@@{}l@@{\,}l}
-%      \{ & \rhor \in \Vm{\Val \times \Val}
-%      \vbvb & \vminject \conBrack{ h = f = \Rel(r) } \\
-%    \end{array}
-%
-% && 
-%   & & \multicolumn{2}{@@{}l}{\text{where}} \\
-%  & & & r :: \Vm{\Val \times \Val} \\
-% & && r = \vmprune( \vmmap( \lambda \rho. (\envlk{\rho}{u_a}, \envlk{\rho}{b_v}), \;
-%          \vminject( \{ \rho \} ) \vmseq \semess{E}{a_u}{a_v}{|at|}
-%                                 \vmseq \semess{E}{b_u}{b_v}{|bt|} 
- \\[2mm]
+\multicolumn{3}{@@{}l}{\rulename{srel} \;\;
+  \semess{E}{h}{f}{|relation at bt|}} \\
+    & = & \vminject 
+            \begin{array}[t]{@@{}l@@{\;}l}
+              \{ & \rho \in \Env \hfill \{u_a,v_a,u_b,v_b\} \not\in \freevars{at,bt,h,f} \\
+              \vbvb & |let|\; S :: \Vm{ \Env } =
+                           \begin{array}[t]{@@{}l}
+                             \vminject( \{ \rho \} ) \vmhide \{ u_a, v_a, \semap{I}{at} \} \\
+                             \vmseq \semess{E}{u_a}{v_a}{|at|} \vmhide \{ u_b,v_b,\semap{I}{bt} \} \\
+                             \vmseq \semess{E}{u_b}{v_b}{|bt|} )
+                             \end{array} \\
+               , & \envlk{\rho}{h} = \envlk{\rho}{f}
+                           = \Rel( \vmmap(\; \lambda \rho. (\envlk{\rho}{u_a},\envlk{\rho}{v_b} ),\;
+                           \vmprune(S) \;))\; \}
+           \end{array}
+            \\
+            \\
 
-\end{array} \\
 
 % -------------- FUNCTIONS -----------------
-\begin{array}{@@{}l@@{\;\;}c@@{\;\;}l}
 \multicolumn{3}{@@{}l}{\rulename{sfun} \;\;
    \semess{E}{h}{f}{|functionOCX q at fx bt|}} \\
 & = & \vmunions \{\; \rho \in \Env \; \vbvb \; \vmmapfilter( |keep|(\rho), |funs|(\rho)) \;\} \\
