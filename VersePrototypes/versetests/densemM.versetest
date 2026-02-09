@@ -54,6 +54,7 @@ testds("Tall2a", mon, pass) {for {(x:=1|2; x>0)}}    {"[{{u=v=<1,2>}}]"}
 testds("Tall2b", mon, pass) {for {(x:=1|2; x>1)}}    {"[{{u=v=<2>}}]"}
 testds("Tall3",  mon, pass) {for {(x=1;w=1) | (x=2;w=2)} }
   {"[{{u=v=<>,w/=1,w/=2}}U{{u=v=<>,x/=1,x/=2}}U{{u=v=<>,x=2,w/=2}}U{{u=v=<>,w=2,x/=2}}U{{u=v=<1>,w=x=1}}U{{u=v=<2>,w=x=2}}]"}
+testds("Tall3a", mon, pass) {for (x=1){0} } {"[{{u=v=<>,x/=1}}U{{u=v=<0>,x=1}}]"}
 
 testds("fun1", mon, pass) { function(1)<closed>{2} }                      {"[{{u=v=f1to2=Fn[{(1,2)}]}}]"}
 testds("fun2", mon, pass) { function(fail)<closed>{2} }                   {"[{{u=v=<>}}]"} # XXX empty function

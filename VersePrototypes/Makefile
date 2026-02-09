@@ -7,7 +7,7 @@ test:
 	cabal run tester -- versetests/verify.versetest -m 1600
 	cabal run tester -- versetests/meetings.versetest
 	cabal run tester -- versetests/arrays.versetest -m 3000
-	cabal run tester -- versetests/denSemM.versetest
+	cabal run tester -- versetests/densemM.versetest
 	# cabal run refimpltester -- commented out for now
 
 profile:

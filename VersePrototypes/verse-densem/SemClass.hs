@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -75,6 +76,8 @@ import qualified Epic.List as L
   where xs = bvs(t₀); s₀ = one(ɩ𝒞(t₀),xs)
 ɩℰ (Block t) u v = ɩℬ (t) u v
 
+#if 1
+-- direct semantics
 ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
         xs           = bvs(t₀)
@@ -86,11 +89,15 @@ import qualified Epic.List as L
                       ⊍ (inj(compl(d \\ xs)) ⎧*⎫ inj(u₁ .== nil /\ v₁ .== nil)))
                   ⎧*⎫ ((m ⎧*⎫ inj(u .=. u₂ /\ v .=. v₂)) \\\ [u,v])
                  \\\ [u₁,u₂,v₁,v₂]
-          
+#else
+-- using choice_index (almost compositional)
+ɩℰ (For t₀ t₁) u v = ɩℰ (Fun(ChIx(t₀))C succeeds t₁) u v
+#endif
+
 ɩℰ (Rel(tₐ)(ω)(tb)) h f | ω == succeeds =
   inj $ setToXSet [ ρ `extend` [(h, R r), (f, R r)]
          | ρ <- envs
-         , let r = Rl $ prune [ (aρ·x, aρ·z) | aρ <- ([ρ] \\\ bavs \\\ [x,w,j,z]) ⎧*⎫ sa ⎧*⎫ sb ]
+         , let r = Rl $ prune [ (aρ·x, aρ·z) | aρ <- ((([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ sa) \\\ bbvs \\\ [j, z]) ⎧*⎫ sb ]
          ]
   where
     sa :: M(Env)
@@ -110,6 +117,7 @@ import qualified Epic.List as L
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) h f | ω == succeeds =
 --  trace("enns=" P.++ show envs) $
 --  trace("allfuns=" P.++ show (P.map funs (Set.toList' envs))) $
+--  trace ("Fun " P.++ show (sa, favs, bavs, envs)) $
   unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
   where
 
@@ -185,7 +193,7 @@ openClose(O, f, h) =
 choiceIndex :: Term -> Iden -> Iden -> M(Env)
 choiceIndex at i x = unionSM (generateENVs (fvs(at))) $ \ ρ ->
   let aρm :: M(Env)
-      aρm = prune(([ρ] \\\ bvs(at) \\\ [j]) ⎧*⎫ ɩℰ(at) j y \\\ [i,j,y])
+      aρm = prune(([ρ] \\\ bvs(at) \\\ [j,y]) ⎧*⎫ ɩℰ(at) j y \\\ [i,j,y])
       M (aρs :: [XSet(Env)]) = aρm
   in  M [ aρ /\ (i .= I k) /\ (x .= I k) | (aρ :: XSet(Env), k) <- zip aρs [0..] ]
   where [j,y] = fresh ["j","y"] [at]
@@ -376,7 +384,7 @@ pattern Array as = F.Array as
 pattern Fail :: Term
 pattern Fail = F.Fail
 pattern ChIx :: Term -> Term
-pattern ChIx t = F.Macro1 (F.Ident F.AnyLoc "choice_index") [] t
+pattern ChIx t = F.ChoiceIndex t
 pattern Rel t1 w t2 = F.Relation t1 w t2
 pattern OfType t1 w t2 = F.OfType t1 w t2
 
@@ -747,7 +755,7 @@ allTuples = mkSet $ (P.concat :: [[Val]] → [Val])
   , [ T [I x] | x ← [0 .. numZ-1] ]
   , [ T [I x, I y] | x ← [0 .. numZ-1], y ← [0 .. numZ-1] ]
   -- triples make it very slow
-  -- , [ T [I x, I y, I z] | x ← [0 .. numZ-1], y ← [0 .. numZ-1], z <- [0 .. numZ-1] ]
+--  , [ T [I x, I y, I z] | x ← [0 .. numZ-1], y ← [0 .. numZ-1], z <- [0 .. numZ-1] ]
   ]
 
 ----- XSet -----
@@ -1000,13 +1008,13 @@ univ :: ENV
 univ = EQD.true
 compl :: ENV → ENV
 compl = EQD.nt
-infixl 5 \\
+infixl 5 \\ -- calm cpp
 (\\) :: ENV → Set(Iden) → ENV
 (\\) e is = EQD.qexis (Set.toList is) e
 infixl 2 \/
 (\/) :: ENV → ENV → ENV
 (\/) = (EQD.\/)
-infixl 3 /\
+infixl 3 /\ -- calm cpp
 (/\) :: ENV → ENV → ENV
 (/\) = (EQD./\)
 (.=.) :: Iden → Iden → ENV
@@ -1046,7 +1054,7 @@ mapM'    :: ((a,b)→(c,d), M(a,b)) → M(c,d)
 mapS :: (ASet a, ASet b) => (XSet(a) → XSet(b), M(a)) → M(b)
 mapS(f, s) = fold( \(x,t)→inj(f(x)) ++ t, empty, s )
 
-infixl 5 \\\
+infixl 5 \\\ -- calm cpp
 (\\\) :: M(Env) → Set(Iden) → M(Env)
 s \\\ vs = --mapS (\ d → d \\ vs, s)
            fold(\(d,t)→inj(d \\ vs) ++ t,empty,s)

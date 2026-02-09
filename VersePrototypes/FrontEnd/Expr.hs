@@ -173,6 +173,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Choice SrcBlk SrcBlk               -- e1 | e2
   | Unify SrcExpr SrcExpr              -- e1 = e2
   | EPrim PrimOp                       -- Primop
+  | ChoiceIndex SrcExpr                -- choice_index{e1}
 
   -- Mutable variables
   | Set SrcExpr Ident SrcExpr       -- set e1 = e2
@@ -701,6 +702,7 @@ instance Pretty SrcExpr where
           Unify e1 e2    -> pPrintPrec lvl p (InfixOp e1 (Op "=") e2)
           Fail           -> text "fail"
           Wrong s        -> text $ "WRONG'" ++ s ++ "'"
+          ChoiceIndex e  -> text "choice_index" <> braces (ppr 0 e)
 
           Range e     -> ppNormal (PrefixOp (Ident noLoc ":") e)
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
@@ -852,6 +854,7 @@ compos f (Blk es)           = Blk <$> traverse f es
 compos f (Option me)        = Option <$> traverse f me
 compos f (Parens e)         = Parens <$> f e
 compos f (Set e1 op e2)     = Set <$> f e1 <*> pure op <*> f e2
+compos f (ChoiceIndex b)    = ChoiceIndex <$> f b
 compos f (MVar i e1 e2)     = MVar i <$> traverse f e1 <*> traverse f e2
 compos f (MRef i e1 e2)     = MVar i <$> traverse f e1 <*> traverse f e2
 compos f (MAlias i e1 e2)   = MVar i <$> traverse f e1 <*> traverse f e2
@@ -948,6 +951,7 @@ getVisibleBinders = go
     go (Range e)      = go e
     go (Guard e1 _)   = go e1
     go (Truth e)      = go e
+    go (ChoiceIndex e)= go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
@@ -1010,6 +1014,7 @@ getFree = fvs_blk
     fvs (All e)           = fvs_blk e
     fvs (Guard e1 e2)     = fvs e1 ++ fvs_blk e2
     fvs (OfType e1 _ e2)  = fvs e1 ++ fvs_blk e2
+    fvs (ChoiceIndex e)   = fvs e
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
     fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs
@@ -1057,6 +1062,7 @@ getVar (MVar i t e)     = i : maybe [] getVar t ++ maybe [] getVar e
 getVar (Range e)        = getVar e
 getVar Function{}       = []
 getVar Relation{}       = []
+getVar (ChoiceIndex e)  = getVar e
 getVar (Exists _ e)     = getVar e
 getVar (Verify _ e)     = getVar e
 getVar (OfType e _ t)   = getVar e ++ getVar t
