@@ -66,11 +66,15 @@ import qualified Epic.List as L
 ɩℰ (t₁ :@    t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₁) f g ⎧*⎫ ɩℰ (t₂) p q ⎧*⎫ ɩℱ g q v)
                       \\\ [f,g,p,q]
   where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
+ɩℰ (OfType t₁ _ t₂) u v = (inj (u .=. v) ⎧*⎫ ɩℰ (t₂) f g ⎧*⎫ ɩℰ (t₁) p q ⎧*⎫ ɩℱ g q v)
+                      \\\ [f,g,p,q]
+  where [f,g,p,q] = fresh ["f","g","p","q"] [t₁, t₂, Var u, Var v]
 ɩℰ (Rng t)       u v = ɩℰ (t) p q ⎧*⎫ ɩℱ q u v \\\ [p,q]
   where [p,q] = fresh ["p","q"] [t,Var u, Var v]
 ɩℰ (If t₀ t₁ t₂) u v = (s₀ ⎧*⎫ ɩℬ (t₁) u v \\\ xs) ⊍ (not (s₀ \\\ xs) ⎧*⎫ ɩℬ (t₂) u v)
   where xs = bvs(t₀); s₀ = one(ɩ𝒞(t₀),xs)
 ɩℰ (Block t) u v = ɩℬ (t) u v
+
 ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
         xs           = bvs(t₀)
@@ -84,23 +88,15 @@ import qualified Epic.List as L
                  \\\ [u₁,u₂,v₁,v₂]
           
 ɩℰ (Rel(tₐ)(ω)(tb)) h f | ω == succeeds =
---  <ρ:env | ρ.h=ρ.f=ZF_VerseFunction(Prune(<(aρ.au,aρ.bv) | aρ:(<ρ>-BVS[at]-{au,av,bu,bv}) * ε⟦at⟧au av * ε⟦bt⟧bu bv>))>
---  unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
   inj $ setToXSet [ ρ `extend` [(h, R r), (f, R r)]
          | ρ <- envs
          , let r = Rl $ prune [ (aρ·x, aρ·z) | aρ <- ([ρ] \\\ bavs \\\ [x,w,j,z]) ⎧*⎫ sa ⎧*⎫ sb ]
          ]
   where
     sa :: M(Env)
-    sa = ɩℰ (tₐ) x w   -- pu=x, pv=w
+    sa = ɩℰ (tₐ) x w
     sb :: M(Env)
-    sb = ɩℰ (tb) j z   -- ru=j, rv=z
-
-{-
-    keep :: Env -> M(Val,Val) -> Set(Env)
-    keep(ρ)(fun) = [ρ `extend` [(f, R rm), (h, R rm)]]
-      where rm = Rl $ prune fun
--}
+    sb = ɩℰ (tb) j z
 
     ------
     envs :: Set(AEnv)
@@ -179,8 +175,7 @@ openClose(O, f, h) =
 -- XXX only include Env where f succeeds somewhere?
 -- f[x] = r
 ɩℱ :: Iden → Iden → Iden → M(Env)
-ɩℱ f x r = --prune $  -- XXX
-           unionS [ mapS (\ (prs :: Val ⇀ Val) →
+ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
                             (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
                   | Just (vf, ff) ← fmap fr allVals ]
    where fr (a@(F (Fn xys))) = Just (a, xys)
@@ -383,6 +378,7 @@ pattern Fail = F.Fail
 pattern ChIx :: Term -> Term
 pattern ChIx t = F.Macro1 (F.Ident F.AnyLoc "choice_index") [] t
 pattern Rel t1 w t2 = F.Relation t1 w t2
+pattern OfType t1 w t2 = F.OfType t1 w t2
 
 -- Make fresh identifiers from the templates ss, avoid identifiers in ts
 fresh :: [String] → [Term] → [Iden]
@@ -419,6 +415,9 @@ dP F.Mul = fun[funMul]
 dP F.Div = fun[funDiv]
 dP F.Gt = fun[funGt]
 dP F.Lt = fun[funLt]
+dP F.IsType = fun[funType]
+dP F.IsAny = fun[funAny]
+dP F.IsFun = fun[funFun]
 dP p = error $ "dP undefined " P.++ show p
 
 knownFuns :: [(Fn, String)]
@@ -445,10 +444,23 @@ knownFuns =
        , (fun[funTupCon0], "tupcon0")
 
        , (fun[fun1to2], "f1to2")
+
+       , (fun[funType0], "type0")
+       , (fun[funType1], "type1")
+       , (fun[funType2], "type2")
+       , (fun[funType3], "type3")
+
+       ]
+
+knownFuns' :: [(Fn, String)]
+knownFuns' = knownFuns P.++
+       [ (fun[funType], "type")
+       , (fun[funFun], "function")
+--       , (fun[funAny], "any")
        ]
 
 knownFunsF :: [(String, Fn)]
-knownFunsF = P.map (\(x,y)->(y,x)) knownFuns
+knownFunsF = P.map (\(x,y)->(y,x)) knownFuns'
 
 knownRels :: [(Rl, String)]
 knownRels =
@@ -471,6 +483,10 @@ fun = Fn . concat . P.map inj
 
 rel :: [Val ⇀ Val] → Rl
 rel = Rl . concat . P.map inj
+
+typ :: Set(Val) -> (Val ⇀ Val)
+typ vs = --Fn [fmap (\v -> (v,v)) vs]
+  fmap (\v -> v :⇒ v) vs
 
 funNegate :: Val ⇀ Val
 funNegate = [(i,-i) | i ← allInts ]
@@ -551,7 +567,27 @@ funTupCon0 = [ (T[i], 0) | i <- allInts ]
 funSel0of1or2 :: Val ⇀ Val
 funSel0of1or2 = funSel0of1 `Set.union` funSel0of2
 
-                
+-- same as <0>
+funType0 :: Val ⇀ Val
+funType0 = typ [0]
+
+funType1 :: Val ⇀ Val
+funType1 = typ [1]
+
+funType2 :: Val ⇀ Val
+funType2 = typ [2]
+
+funType3 :: Val ⇀ Val
+funType3 = typ [3]
+
+funType :: Val ⇀ Val
+funType = typ $ fmap (F . fun . (:[])) [ funInt, funBin, funType0, funType1, funType2, funType3 ]
+
+funFun :: Val ⇀ Val
+funFun = typ allFuns
+
+funAny :: Val ⇀ Val
+funAny = typ allVals
 
 fcn :: String -> Val
 fcn s = P.maybe (error $ "fcn " P.++ s) (\ f -> F f) $ P.lookup s knownFunsF
@@ -650,7 +686,7 @@ newtype Fn = Fn (M (Val :⇒ Val))
 
 instance Show Fn where
   show f@(Fn xys) =
-    case P.lookup f knownFuns of
+    case P.lookup f knownFuns' of
       Nothing -> fn
       Just s -> s P.++ "≡" P.++ fn
     where fn = "Fn" P.++ show xys
@@ -686,7 +722,7 @@ allZ = mkSet [i | i ← [0 .. numZ-1] ]
 
 allVals :: Set(Val)
 allVals = [ I i | i ← allZ ]
-        ∪ allFuns
+        ∪ allFuns'
         ∪ allTuples
         ∪ allRels
 -- test        ∪ [ F (fun[funInt]), T [I 0, I 0] ]
@@ -696,6 +732,10 @@ allInts = [0 .. maxBound]
 
 allFuns :: Set(Val)
 allFuns = mkSet [ F f | (f, _) ← knownFuns ]
+
+-- including any, type, function which are "impredicative"
+allFuns' :: Set(Val)
+allFuns' = mkSet [ F f | (f, _) ← knownFuns' ]
 
 allRels :: Set(Val)
 allRels = mkSet [ R f | (f, _) ← knownRels ]

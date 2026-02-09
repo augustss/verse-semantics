@@ -1009,6 +1009,7 @@ getFree = fvs_blk
     fvs (One e)           = fvs_blk e
     fvs (All e)           = fvs_blk e
     fvs (Guard e1 e2)     = fvs e1 ++ fvs_blk e2
+    fvs (OfType e1 _ e2)  = fvs e1 ++ fvs_blk e2
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
     fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs

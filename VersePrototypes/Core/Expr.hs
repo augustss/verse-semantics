@@ -470,7 +470,7 @@ data PrimOp
 
    -- Type tests
  | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
- | IsComp | IsAny
+ | IsComp | IsAny | IsType
 
  deriving
    ( Eq, Ord, Bounded, Enum, Show, Data )
@@ -505,6 +505,7 @@ primOpString IsTru    = "isTru$"
 primOpString IsFun    = "isFun$"
 primOpString IsGround = "isGround$"
 primOpString IsAny    = "isAny$"
+primOpString IsType   = "isType$"
 
 primOpCanFail :: PrimOp -> Bool
 
@@ -521,6 +522,7 @@ primOpCanFail IsArr  = True
 primOpCanFail IsFun  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
+primOpCanFail IsType = True
 primOpCanFail ArrApp = True
 primOpCanFail DotDot = True  -- Can fail when unification fails
 
@@ -545,6 +547,7 @@ primOpIsTypeTest IsChar = True
 primOpIsTypeTest IsTru  = True
 primOpIsTypeTest IsArr  = True
 primOpIsTypeTest IsFun  = True
+primOpIsTypeTest IsType = True
 primOpIsTypeTest IsComp = False  -- Not really a type test
 primOpIsTypeTest _      = False
 
