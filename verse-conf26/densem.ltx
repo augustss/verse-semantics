@@ -136,22 +136,8 @@ $$
      \vmcollapse(\vminject(s)) & = & s \\
   \end{array}
 \\ \\
-%   \textbf{Monad comprehensions} \\
-%  \text{The Verse monad enjoys the usual monad-comprehension notation:} \\
-%  \begin{array}{rcl}
-%    \vmcompL e \vmcompR & = & \vmreturn(e) \\
-%    \vmcompL e_1 \vb e_2, \; Q \vmcompR
-%       & = & |if| \; e_2 \; |then| \; \vmcompL e_1 \vb Q \vmcompR \; |else|\; \vmempty \\
-%    \vmcompL e_1 \vb x \leftarrow e_2, \; Q \vmcompR & = & e_2 \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
-%    \vmcompL e_1 \vb x \in e_2, \; Q \vmcompR & = & \vminject(e_2) \vmbind \lambda x. \vmcompL e_1 \vb Q \vmcompR \\
-%  \end{array}
-% \\ \\
   \textbf{Derived functions} \\
   \begin{array}{rcl}
-%     \vmflatmap & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
-%     \vmflatmap(f,s) & = & \vmflatten(\; \vmmap( f, s ) \; ) \\[1mm]
-%    (\ENVhide) & :: & \Env \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
-%    \rho \ENVhide vs & = & \{ \rho' \in \Env \vb \forall x \not\in vs \Rightarrow \rho(x) = \rho'(x) \} \\[1mm]
     \vmmapset & :: & (\powerset{a} \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
     \vmmapset(f,s) & = & \vmfold( \; (\lambda x\, t. \, \vminject(f(x)) \vmappend t), \; \vmempty, \; s \;) \\[1mm]
     (\vmhide) & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \Vm{\Env} \hspace{5mm}
@@ -160,9 +146,31 @@ $$
     \vmnot      & :: & \Vm{\Env} \rightarrow \Vm{\Env} \\
     \vmnot(s) & = & \vminject( \conCompl( \vmcollapse(s))) \\[1mm]
 
+    \vmconcat & :: & [\Vm{a}] \rightarrow \Vm{a} \\
+    \vmconcat(\, [] \, ) & = & \vmempty \\
+    \vmconcat(\, s:ss \, ) & = & s \vmappend \vmconcat(ss) \\
+
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
     \vmcollapse(s) & = & \vmfold( \cup, \{\}, s ) \\[1mm]
 
+    \vmmapfilter & :: & (a \rightarrow \powerset{b}) -> \Vm{a} -> \Vm{b} \\
+    \vmmapfilter( f, S ) & = & \mathit{flatten}(\; \vmmap( f, S ) \; ) \\
+    & \multicolumn{2}{l}{\text{where}} \\
+    && \begin{array}[t]{@@{}l}
+         \mathit{flatten} :: \Vm{\powerset{b}} \rightarrow \Vm{b} \\
+         \mathit{flatten}( S ) = \vmmapset( \bigcup, \; S )
+       \end{array} \\
+
+\end{array}
+\end{array}
+$$
+\caption{The Verse computation type $\Vm{\cdot}$}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+  \begin{array}{rcll}
     \vmprune & :: & \Vm{a} \rightarrow \Vm{a} \\
     \vmprune(s) & = & \vmfold(op, \vmempty, s)  \\
     & \multicolumn{2}{l}{\text{where}} \\
@@ -175,8 +183,15 @@ $$
        \end{array} \\
     \\
 
+    \vmtelescope & :: & \powerset{\Ident} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env}  \\
+    \vmtelescope( xs, S ) & = & \vmunions \{ \; \vmprune( \; \vminject( \HIDE{\{\rho\}}{xs}) \vmseq S \;)
+    \vb \rho \in \Env \} \\[1mm]
+
+    \vmtelescope( xs, S ) & = & \text{Do we need a new operation on $\Vm{\cdot}?$} \\
+    \\
+
     \vmindex & :: & \Ident \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \hspace{4mm}
-        \text{Number each choice with $i=0$, $i=1$ etc} \\
+    \text{Number each choice with $i=0$, $i=1$ etc} \\
     \vmindex(i,s) & = & \vmfold(op, \vmempty, s)(0)  \\
     & \multicolumn{2}{l}{\text{where}} \\
     && \begin{array}[t]{@@{}l}
@@ -186,22 +201,20 @@ $$
        \end{array} \\
     \\
 
-    \vmone & :: & \Vm{\Env} \rightarrow \powerset{\Ident} \rightarrow \powerset{\Env} \\
-    \vmone( s, vs ) & = & \vmfold( op, \{\}, s ) \\
+    \vmone & :: & \powerset{\Ident} \rightarrow \Vm{\Env} \rightarrow \powerset{\Env} \\
+    \vmone( vs, S ) & = & \vmfold( \lambda \EV\,\_.\, \EV, \; \{\}, \;S ) \\[1mm]
+\text{or} \hfill    \vmone( vs, S ) & = & \vmfold( op, \{\}, \vmtelescope( vs, S) ) \\
     & \multicolumn{2}{l}{\text{where}} \\
     && \begin{array}[t]{@@{}l}
          op :: \powerset{\Env} \rightarrow \powerset{\Env} \rightarrow \powerset{\Env} \\
          op( \EV, rest ) = \EV \cup ((\conCompl( \HIDE{\EV}{vs})) \cap rest )
        \end{array} \\
 \\
-    \vmconcat & :: & [\Vm{a}] \rightarrow \Vm{a} \\
-    \vmconcat(\, [] \, ) & = & \vmempty \\
-    \vmconcat(\, s:ss \, ) & = & s \vmappend \vmconcat(ss) \\
     \end{array}
 
 \end{array}
 $$
-\caption{The Verse computation type}
+\caption{More derived functions for $\Vm{\cdot}$}
 \end{figure}
 
 % ------------------------------------------------------------------------------------
@@ -224,6 +237,7 @@ $$
     \vminnerunion(s,t)  & = & s \cup t \\
     \vmunion(s,t)  & =  & s \cup t \\
     \vmunions(ss) & =  & \bigcup_{s \in ss}s \\
+    \vmintersects(ss) & =  & \bigcap_{s \in ss}s \\
     \vmpi(s, F) & = & \{ g \in \parfun{a}{b} \vb \dom(g)=s, \forall (\fpr{x}{y}) \in g. \; y \in F(x) \} \\
   \end{array}
   \\ \\
@@ -245,13 +259,14 @@ $$
     \vmempty & = & \sequnit( \{\} ) \\
     \vminject(\EV) & = & \sequnit(\EV) \\
     s \vmappend t  & = & s \seqappend t \\
-    \vmseq(s,t)   & =  & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \EV_1 \cap \EV_2\\
-    \vminnerunion(s,t)  & = & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \EV_1 \cup \EV_2\\
+    \vmseq(s,t)   & =  & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \sequnit(\EV_1 \cap \EV_2)\\
+    \vminnerunion(s,t)  & = & s \seqbind \lambda \EV_1.\, t \seqbind \lambda \EV_2.\, \sequnit(\EV_1 \cup \EV_2)\\
 
-    \vmunion(s,t)    & = & \seqzip( \cup, \{ s, t \} )  &  \text{Dodgy union} \\
-    \vmunions(ss)    & = & \seqzip( \cup, ss )  &  \text{Infinite dodgy union} \\
+    \vmunion(s,t)    & = & \vmunions( \{ s, t \} ) \\
+    \vmunions(ss)    & = & \seqzip( \bigcup, ss )  \hspace{1cm} \text{where $\bigcup :: \powerset{\powerset{a}} \rightarrow \powerset{a}$} \\
+    \vmintersects(ss)& = & \seqzip( \bigcap, ss ) \hfill \text{where $\bigcap :: \powerset{\powerset{a}} \rightarrow \powerset{a}$} \\
     \vmmap(f,s)      & = & s \seqbind \lambda \EV.\, \sequnit( \{ f(x) \vb x \in \EV \} ) \\
-    \vmmaptwo(f,s,t) & = & s \seqbind \lambda \EV_s.\, t \seqbind \lambda \EV_t. \sequnit( \{ f(x,y) \vb x \in \EV_s, y \in \EV_t \} ) \\
+    \vmmaptwo(f,s,t) & = & \multicolumn{2}{@@{}l}{s \seqbind \lambda \EV_s.\, t \seqbind \lambda \EV_t. \sequnit( \{ f(x,y) \vb x \in \EV_s, y \in \EV_t \} )} \\
     \vmfold(k,z,s)   & = & \seqfold(k,z,s) \\[2mm]
     \vmpi( \sequnit( \{\}) , r ) & = & \sequnit( \{ \vmempty \} ) \\
     \vmpi( \sequnit( \EV_d) , \sequnit( \EV_r ) )
@@ -386,7 +401,7 @@ $$
         (\vminject(\EV) \vmseq \semess{B}{u}{v}{t_1} \vmhide xs)
             \vmunion
           (\vminject(\conCompl( \HIDE{\EV}{xs} )) \vmseq \semess{B}{u}{v}{t_2}) \\
-        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; \EV = \vmone( \semap{C}{|t_0|}, xs )
+        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; \EV = \vmone( xs, \semap{C}{|t_0|} )
       \end{array}
 \\[5mm]
 
@@ -396,13 +411,15 @@ $$
 
 % -------------- CHOICE-INDEX -----------------
 \multicolumn{3}{@@{}l}{\rulename{sindex} \;\; \semess{E}{u}{v}{|choiceindex t|}} \\
-  & = & \vmunions \begin{array}[t]{@@{}l@@{\,}l}
-  \{ & \vmindex( u, S ) \\
-  \vb & \rho \in \Env \\
-  , & |let| \; S :: \Vm{\Env}
-           = \vmprune( \; (\vminject( \{ \rho \} ) \vmhide \{ \semap{I}{t}, j, v \})
-                     \vmseq \semess{E}{j}{v}{t} \; ) \;\}\\
-     \end{array} \\
+& = & \vmindex( \; u, \; \vmtelescope( \semap{I}{t}, \semess{E}{j}{v}{t} \vmhide \{j\} ) \; )
+      \hspace{1cm} j \not\in \freevars{t,u,v} \\
+%   & = & \vmunions \begin{array}[t]{@@{}l@@{\,}l}
+%   \{ & \vmindex( u, S ) \\
+%   \vb & \rho \in \Env \\
+%   , & |let| \; S :: \Vm{\Env}
+%           = \vmprune( \; (\vminject( \{ \rho \} ) \vmhide \{ \semap{I}{t}, j, v \})
+%                     \vmseq \semess{E}{j}{v}{t} \; ) \;\}\\
+%     \end{array} \\
 \\
 %  E[ choiceIndex( 8 | 7 | fail | 8 ) ] uv  = [ {{ u=0,v=8 }} | {{ u=1,v=7 }} | {{ u=2,v=8}}} ]
 
@@ -435,10 +452,10 @@ $$
     & = & \vminject 
             \begin{array}[t]{@@{}l@@{\;}l}
               \{ & \rho \in \Env \hfill \{u_a,v_a,u_b,v_b\} \not\in \freevars{at,bt,h,f} \\
-              \vbvb & |let|\; S :: \Vm{ \Env } =
+              \vb & |let|\; S :: \Vm{ \Env } =
                            \begin{array}[t]{@@{}l}
-                             \vminject( \{ \rho \} ) \vmhide \{ u_a, v_a, \semap{I}{at} \} \\
-                             \vmseq \semess{E}{u_a}{v_a}{|at|} \vmhide \{ u_b,v_b,\semap{I}{bt} \} \\
+                             (\vminject( \{ \rho \} ) \vmhide \{ u_a, v_a, \semap{I}{at} \} \\
+                             \; \vmseq \semess{E}{u_a}{v_a}{|at|}) \vmhide \{ u_b,v_b,\semap{I}{bt} \} \\
                              \vmseq \semess{E}{u_b}{v_b}{|bt|} )
                              \end{array} \\
                , & \envlk{\rho}{h} = \envlk{\rho}{f}
