@@ -153,7 +153,7 @@ $$
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
     \vmcollapse(s) & = & \vmfold( \cup, \{\}, s ) \\[1mm]
 
-    \vmmapfilter & :: & (a \rightarrow \powerset{b}) -> \Vm{a} -> \Vm{b} \\
+    \vmmapfilter & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
     \vmmapfilter( f, S ) & = & \mathit{flatten}(\; \vmmap( f, S ) \; ) \\
     & \multicolumn{2}{l}{\text{where}} \\
     && \begin{array}[t]{@@{}l}
@@ -187,7 +187,7 @@ $$
     \vmtelescope( xs, S ) & = & \vmunions \{ \; \vmprune( \; \vminject( \HIDE{\{\rho\}}{xs}) \vmseq S \;)
     \vb \rho \in \Env \} \\[1mm]
 
-    \vmtelescope( xs, S ) & = & \text{Do we need a new operation on $\Vm{\cdot}?$} \\
+    \vmtelescope( xs, S ) & = & \text{Do we need a new operation on $\Vm{\cdot}, e.g. \mathbf{caseM}?$} \\
     \\
 
     \vmindex & :: & \Ident \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \hspace{4mm}
@@ -202,8 +202,8 @@ $$
     \\
 
     \vmone & :: & \powerset{\Ident} \rightarrow \Vm{\Env} \rightarrow \powerset{\Env} \\
-    \vmone( vs, S ) & = & \vmfold( \lambda \EV\,\_.\, \EV, \; \{\}, \;S ) \\[1mm]
-\text{or} \hfill    \vmone( vs, S ) & = & \vmfold( op, \{\}, \vmtelescope( vs, S) ) \\
+    \vmone( vs, S ) & = & \vmfold( \lambda \EV\,\_.\, \EV, \; \{\}, \;\vmtelescope( vs, S) ) \\[1mm]
+\text{or} \hfill    \vmone( vs, S ) & = & \vmfold( op, \{\}, S ) \\
     & \multicolumn{2}{l}{\text{where}} \\
     && \begin{array}[t]{@@{}l}
          op :: \powerset{\Env} \rightarrow \powerset{\Env} \rightarrow \powerset{\Env} \\
@@ -229,6 +229,17 @@ $$
   \text{ {\bf Set semantics} -- a language with no ``choice'' operator}\\
   \begin{array}{rcll}
     \multicolumn{3}{l}{|type|\; \Vm{a} = \powerset{a}} \\[2mm]
+
+    \multicolumn{3}{l}{\textbf{Operations on sets}} \\
+    \cup & :: & \powerset{a} \rightarrow \powerset{a} \rightarrow \powerset{a} & \text{Union} \\
+    \cap & :: & \powerset{a} \rightarrow \powerset{a} \rightarrow \powerset{a} & \text{Intersection} \\
+    \bigcup & :: & \powerset{\powerset{a}} \rightarrow \powerset{a} & \text{Big-union} \\
+    \bigcap & :: & \powerset{\powerset{a}} \rightarrow \powerset{a} & \text{Big-intersection} \\
+    \setpi & :: & \powerset{a} \rightarrow (a \rightarrow \powerset{b}) \rightarrow \powerset{ \parfun{a}{b} }\\
+    \setpi( s, F ) & = & \{ g \in \parfun{a}{b} \vb \dom(g)=s, \forall (\fpr{x}{y}) \in g. \; y \in F(x) \} \\
+    \\
+
+    \multicolumn{3}{l}{\textbf{Implementation of $\Vm{a} = \powerset{a}$}} \\
     \vmempty & = & \{\} \\
     \vminject(\EV) & = & \EV \\
     s \vmappend t  & = & s \cup t \\
@@ -236,11 +247,20 @@ $$
     \vmseq(s,t)   & =  & s \cap t \\
     \vminnerunion(s,t)  & = & s \cup t \\
     \vmunion(s,t)  & =  & s \cup t \\
-    \vmunions(ss) & =  & \bigcup_{s \in ss}s \\
-    \vmintersects(ss) & =  & \bigcap_{s \in ss}s \\
-    \vmpi(s, F) & = & \{ g \in \parfun{a}{b} \vb \dom(g)=s, \forall (\fpr{x}{y}) \in g. \; y \in F(x) \} \\
+    \vmunions(ss) & =  & \bigcup ss \\
+    \vmintersects(ss) & =  & \bigcap ss \\
+    \vmpi(s, F) & = & \setpi( s, F )
   \end{array}
-  \\ \\
+\end{array}
+$$
+\caption{Set semantics, no choice}
+\end{figure}
+
+\begin{figure}
+$$
+  \begin{array}{l}
+  \textbf{Sequence-of-set semantics}\\
+  |type|\; \Vm{a} = \VmSeq{\powerset{a}} \\[2mm]
 
   \text{The Verse non-empty-sequence monad $\VmSeq{\cdot}$ comes equipped with the following operations} \\
   \begin{array}{rcll}
@@ -253,9 +273,8 @@ $$
   \end{array}
 \\ \\
 
-  \textbf{Sequence-of-set semantics}\\
+  \textbf{Implementation of $\Vm{a} = \VmSeq{\powerset{a}}$} \\
   \begin{array}{rcll}
-    \multicolumn{3}{l}{|type|\; \Vm{a} = \VmSeq{\powerset{a}}} \\[2mm]
     \vmempty & = & \sequnit( \{\} ) \\
     \vminject(\EV) & = & \sequnit(\EV) \\
     s \vmappend t  & = & s \seqappend t \\
@@ -270,7 +289,7 @@ $$
     \vmfold(k,z,s)   & = & \seqfold(k,z,s) \\[2mm]
     \vmpi( \sequnit( \{\}) , r ) & = & \sequnit( \{ \vmempty \} ) \\
     \vmpi( \sequnit( \EV_d) , \sequnit( \EV_r ) )
-        & = & \sequnit( \{ \vmempty \} ) \\
+        & = & ...todo... \\
     \vmpi( d_1 \seqappend d_2 ,r ) & = & \vmmaptwo( (\vmappend),\; \vmpi(d_1,r),\; \vmpi(d_2,r) ) \\
   \end{array}
 
@@ -297,7 +316,7 @@ $$
 %   \end{array}
 \end{array}
 $$
-\caption{Instances of the Verse computation type}
+\caption{Sequence-of-set semantics}
 \end{figure}
 
 % ------------------------------------------------------------------------------------
@@ -377,10 +396,11 @@ $$
  \semap{F}{|apply1N f x|}r & : & \VmENV \\
  \semap{F}{|apply1N f x|}r  & = &
 \vmunions \begin{array}[t]{@@{}l@@{\,}l}
-           \{ & \Fun(\ff : \Vm{\Val,\Val} ) \in \Val \\
-           \vbvb & \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; )  \; \}
+           \{ & \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; ) \\
+           \vb & v \in \Val, \; \ff \in \Vm{\Val,\Val} \\
+           , & v = \Fun(\ff) \vee v = \Rel(\ff) \; \}
            \end{array}
-\end{array} \\
+\end{array} 
 \\
 
 \end{array}
@@ -411,7 +431,7 @@ $$
 
 % -------------- CHOICE-INDEX -----------------
 \multicolumn{3}{@@{}l}{\rulename{sindex} \;\; \semess{E}{u}{v}{|choiceindex t|}} \\
-& = & \vmindex( \; u, \; \vmtelescope( \semap{I}{t}, \semess{E}{j}{v}{t} \vmhide \{j\} ) \; )
+& = & \vmindex( \; u, \; \vmtelescope( \semap{I}{t}, \; \semess{E}{j}{v}{t} \vmhide \{j\} ) \; )
       \hspace{1cm} j \not\in \freevars{t,u,v} \\
 %   & = & \vmunions \begin{array}[t]{@@{}l@@{\,}l}
 %   \{ & \vmindex( u, S ) \\
@@ -469,11 +489,11 @@ $$
 % -------------- FUNCTIONS -----------------
 \multicolumn{3}{@@{}l}{\rulename{sfun} \;\;
    \semess{E}{h}{f}{|functionOCX q at fx bt|}} \\
-& = & \vmunions \{\; \rho \in \Env \; \vbvb \; \vmmapfilter( |keep|(\rho), |funs|(\rho)) \;\} \\
+& = & \vmunions \{\; \vmmapfilter( |keep|(\rho), |funs|(\rho)) \vb  \rho \in \Env \;\} \\
 & \multicolumn{2}{@@{}l}{\text{where}} \\
 && S_a :: \Vm{\Env} = \semess{E}{x}{w}{|at|} \\
 && S_b :: \Vm{\Env} = \semess{E}{j}{z}{|bt|} \\[1mm]
-&& |funs| : \Env \rightarrow \Vm{ \Vm { \Val,(\Val,\Val,\Val)}}  \hspace{5mm} \# \; (x, (w,j,z)) \\
+&& |funs| : \Env \rightarrow \Vm{ \Vm { \Val,\Env}}  \hspace{5mm} \# \; (x, (w,j,z)) \\
 && |funs|(\rho) \begin{array}[t]{@@{}ll}
      = & \vmpi(\; |domvs|, |rngvs| \;) \\
      \multicolumn{2}{@@{}l}{\text{where}} \\
@@ -481,24 +501,36 @@ $$
      & |dom| = (\vminject\{ \rho \} \vmhide \semap{I}{|at|} \vmhide \{x,w\}) \vmseq S_a \\[1mm]
      & |domvs|:\Vm{\Val} \\
      & |domvs| = \vmmap(\, \lambda \rho.\, \envlk{\rho}{x}, \;|dom| \,) \\[1mm]
-     & |rngvs| :: \Vm{ \Val, (\Val,\Val,\Val) } \\
+
+     & |rngvs| :: \Vm{ \Val, \Env } \\
      & |rngvs| = \vmunions \begin{array}[t]{@@{}l@@{\,}l}
-       \{ & xv \in \vmcollapse( |domvs| ) \\
-       \vbvb & \vmintersects \begin{array}[t]{@@{}l@@{\,}l}
-         \{ &  \rho \in \vmcollapse( |dom| ), \envlk{\rho}{x} = xv \\
-         \vbvb & \vmmap \begin{array}[t]{@@{}l@@{\,}l}
-           ( & \lambda \rho'. (xv, (\envlk{\rho'}{w}, \envlk{\rho'}{j}, \envlk{\rho'}{w})) \\
-           , & (\vminject( \{ \rho \} ) \vmhide \semap{I}{|bt|}) \vmseq S_b \; ) \; \} \; \}\\
-           \end{array}
-        \end{array}
+       \{ & \vmintersects \begin{array}[t]{@@{}l@@{\,}l}
+         \{ &   (\vminject( \{ \rho \} ) \vmhide \semap{I}{|bt|}) \vmseq S_b \\
+         \vb & \rho \in \vmcollapse( |dom| ), \envlk{\rho}{x} = xv \; \}\\
+        \end{array} \\
+       \vb & xv \in \vmcollapse( |domvs| )  \; \}\\
     \end{array} \\
-  \end{array} \\
-&& |keep| :: \Env \rightarrow \Vm{\Val, (\Val,\Val,\Val))} \rightarrow \powerset{ \Env }
+
+% rngvs grabbing triples
+%     & |rngvs| :: \Vm{ \Val, (\Val,\Val,\Val) } \\
+%     & |rngvs| = \vmunions \begin{array}[t]{@@{}l@@{\,}l}
+%       \{ & xv \in \vmcollapse( |domvs| ) \\
+%       \vbvb & \vmintersects \begin{array}[t]{@@{}l@@{\,}l}
+%         \{ &  \rho \in \vmcollapse( |dom| ), \envlk{\rho}{x} = xv \\
+%         \vbvb & \vmmap \begin{array}[t]{@@{}l@@{\,}l}
+%           ( & \lambda \rho'. (xv, (\envlk{\rho'}{w}, \envlk{\rho'}{j}, \envlk{\rho'}{w})) \\
+%           , & (\vminject( \{ \rho \} ) \vmhide \semap{I}{|bt|}) \vmseq S_b \; ) \; \} \; \}\\
+%           \end{array}
+%        \end{array}
+%    \end{array} \\
+
+  \end{array} \\ \\[-2mm]
+&& |keep| :: \Env \rightarrow \Vm{\Val,\Env} \rightarrow \powerset{ \Env }
                         \hspace{5mm} \# \; \text{Singleton or empty}\\
 && |keep|(\rho)(|fun|) = \left\{ \begin{array}{ll}
                           \{ \rho \} & \text{if} \begin{array}[t]{l}
-                               \envlk{\rho}{f} = \Fun(\vmmap(\lambda (x,(\_,\_,z)).\, (x,z), \; |fun|)) \\
-                               \envlk{\rho}{h} = \Fun(\vmmap(\lambda (\_,(w,j,\_)).\, (w,j), \; |fun|)) \\
+                               \envlk{\rho}{f} = \Fun(\vmmap(\lambda (x,\rho').\, (x,\envlk{\rho'}{z}), \; \vmprune(|fun|))) \\
+                               \envlk{\rho}{h} = \Fun(\vmmap(\lambda (\_,\rho').\, (\envlk{\rho'}{w},\envlk{\rho'}{j}), \; \vmprune(|fun|))) \\
                                            \end{array} \\
                            \{  \} & \text{otherwise} \\
                       \end{array} \right.
