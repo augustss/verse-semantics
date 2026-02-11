@@ -12,6 +12,7 @@ module Set(
   difference,
   isEmpty,
   empty,
+  emptySet,
   member,
   isSubsetOf,
   mkSet, mkSetUnsafe,
@@ -67,6 +68,9 @@ instance (Show a, Ord a) => Show (Set a) where
 -- Control.Applicative defines it
 --empty :: Set a
 --empty = S []
+
+emptySet :: Set a
+emptySet = S []
 
 singleton :: a -> Set a
 singleton a = S [a]
