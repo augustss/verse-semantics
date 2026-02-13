@@ -133,6 +133,10 @@ $$
      \vmempty \vmseq   s & = & \vmempty & = & s \vmseq \vmempty \\
      \vmempty \vmappend   s & = & s        & = & s \vmappend \vmempty \\
      \vmempty \vmunion s & = & s        & = & s \vmunion \vmempty \\
+     \vmunions( \{ \} ) & = & \vmempty \\
+     \vmintersects( \{ \} ) & = & \vmempty \\
+     \vmfold(k, z, \vmempty) & = &  z \\
+     \vmfold(k, z, s \vmappend t) & = &  \vmfold( k, \vmfold(k,z,t), s)  \\
      \vmcollapse(\vminject(s)) & = & s \\
   \end{array}
 \\ \\
@@ -396,7 +400,7 @@ $$
  \semap{F}{|apply1N f x|}r & : & \VmENV \\
  \semap{F}{|apply1N f x|}r  & = &
 \vmunions \begin{array}[t]{@@{}l@@{\,}l}
-           \{ & \vmmapset(\; \lambda prs. \conBrack{ f = \Fun(\ff), \fpr{x}{r} \in prs }, \ff \; ) \\
+           \{ & \vmmapset(\; \lambda prs. \conBrack{ f = v, \; \fpr{x}{r} \in prs }, \ff \; ) \\
            \vb & v \in \Val, \; \ff \in \Vm{\Val,\Val} \\
            , & v = \Fun(\ff) \vee v = \Rel(\ff) \; \}
            \end{array}
