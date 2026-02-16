@@ -57,7 +57,7 @@ testds("Tall3",  mon, pass) {for {(x=1;w=1) | (x=2;w=2)} }
 testds("Tall3a", mon, pass) {for (x=1){0} } {"[{{u=v=<>,x/=1}}U{{u=v=<0>,x=1}}]"}
 
 testds("fun1", mon, pass) { function(1)<closed>{2} }                      {"[{{u=v=f1to2=Fn[{(1,2)}]}}]"}
-testds("fun2", mon, pass) { function(fail)<closed>{2} }                   {"[{{u=v=<>}}]"} # XXX empty function
+testds("fun2", mon, pass) { function(fail)<closed>{2} }                   {"[{{u=v=<>}}]"} # empty function
 testds("fun3", mon, pass) { function(1)<closed>{fail} }                   {"[]"}
 testds("fun4", mon, pass) { function(x:int)<closed>{x+1} }                {"[{{u=v=succ=Fn[{(0,1),(1,2),(2,3),(3,0)}]}}]"}
 testds("fun5", mon, pass) { function(x:prefix'-')<closed>{x} }            {"[{{u=isint=Fn[{(0,0),(1,1),(2,2),(3,3)}],v=neg=Fn[{(0,0),(1,3),(2,2),(3,1)}]}}]"}
@@ -84,8 +84,46 @@ testds("hoovl1",mon,pass) { f1:=function(array{x:int})<open>{x};
 # cfun1 is a set of 4 functions
 testds("cfun1",mon, pass) { function(2|||3)<closed>{0|||1} }              {"[{{u=v=Fn[{(2,0),(3,0)}]}}U{{u=v=Fn[{(2,0),(3,1)}]}}U{{u=v=Fn[{(2,1),(3,0)}]}}U{{u=v=Fn[{(2,1),(3,1)}]}}]"}
 # cfun2 is a sequence of 2 functions
-testds("cfun2",mon, pass) { function(2|||3)<closed>{0|  1} }              {"[{{u=v=Fn[{(2,0),(3,0)}]}},{{u=v=Fn[{(2,1),(3,1)}]}}]"}
+testds("cfun2",mon, pass) { function(2|||3)<closed>{0|  1} }              {"[{{u=v=Fn[{(2,0),(3,0)}]}},{{u=v=Fn[{(2,0),(3,1)}]}}U{{u=v=Fn[{(2,1),(3,0)}]}},{{u=v=Fn[{(2,1),(3,1)}]}}]"}
 # cfun3 is a set of 4 functions, each iterating
 testds("cfun3",mon, pass) { function(2|  3)<closed>{0|||1} }              {"[{{u=v=Fn[{(2,0)},{(3,0)}]}}U{{u=v=Fn[{(2,0)},{(3,1)}]}}U{{u=v=Fn[{(2,1)},{(3,0)}]}}U{{u=v=Fn[{(2,1)},{(3,1)}]}}]"}
 # cfun4 is a sequence of 4 functions, each iterating
 testds("cfun4",mon, pass) { function(2|  3)<closed>{0|  1} }              {"[{{u=v=Fn[{(2,0)},{(3,0)}]}},{{u=v=Fn[{(2,0)},{(3,1)}]}},{{u=v=Fn[{(2,1)},{(3,0)}]}},{{u=v=Fn[{(2,1)},{(3,1)}]}}]"}
+
+# fn1: empty domain, empty range
+testds("fn1", mon, pass) { function(0=1)<closed>{2=3} }                 {"[{{u=v=<>}}]"}
+# fn2: empty domain, nonempty range
+testds("fn2", mon, pass) { function(0=1)<closed>{2} }                   {"[{{u=v=<>}}]"}
+# fn3: nonempty domain, empty range
+testds("fn3", mon, pass) { function(0)<closed>{2=3} }                   {"[]"}
+# fn3: nonempty domain, nonempty range
+testds("fn4", mon, pass) { function(0)<closed>{0} }                     {"[{{u=v=<0>}}]"}
+
+# fn5: ordered choice domain, no choice range
+testds("fn5", mon, pass) { function(0|1)<closed>{2} }                   {"[{{u=v=<2,2>}}]"}
+# fn6: no choice domain, ordered choice range
+testds("fn5", mon, pass) { function(0)<closed>{2|3} }                   {"[{{u=v=<2>}},{{u=v=<3>}}]"}
+# fn7: ordered choice domain, ordered choice range
+testds("fn5", mon, pass) { function(0|1)<closed>{2|3} }                 {"[{{u=v=<2,2>}},{{u=v=<2,3>}},{{u=v=<3,2>}},{{u=v=<3,3>}}]"}
+
+# fn5: unordered choice domain, no choice range
+testds("fn5", mon, pass) { function(0|||1)<closed>{2} }                 {"[{{u=v=Fn[{(0,2),(1,2)}]}}]"}
+# fn6: no choice domain, unordered choice range
+testds("fn5", mon, pass) { function(0)<closed>{2|||3} }                 {"[{{u=v=<2>}}U{{u=v=<3>}}]"}
+# fn7: unordered choice domain, unordered choice range
+testds("fn5", mon, pass) { function(0|||1)<closed>{2|||3} }
+  {"[{{u=v=Fn[{(0,2),(1,2)}]}}U{{u=v=Fn[{(0,2),(1,3)}]}}U{{u=v=Fn[{(0,3),(1,2)}]}}U{{u=v=Fn[{(0,3),(1,3)}]}}]"}
+
+# fn8: ordered choice domain, unordered choice range
+testds("fn8", mon, pass) { function(0|1)<closed>{2|||3} }
+  {"[{{u=v=<2,2>}}U{{u=v=<2,3>}}U{{u=v=<3,2>}}U{{u=v=<3,3>}}]"}
+# fn9: unordered choice domain, ordered choice range
+testds("fn9", mon, pass) { function(0|||1)<closed>{2|3} }
+  {"[{{u=v=Fn[{(0,2),(1,2)}]}},{{u=v=Fn[{(0,2),(1,3)}]}}U{{u=v=Fn[{(0,3),(1,2)}]}},{{u=v=Fn[{(0,3),(1,3)}]}}]"}
+
+# fn10: free, constrained variable in the domain
+testds("fn10", mon, pass) { function(0 where (a=1))<closed>{2} }
+  {"[{{a=0,u=v=<>}}U{{a=1,u=v=<2>}}U{{a=2,u=v=<>}}U{{a=3,u=v=<>}}]"}
+# fn11: free, constrained variable in the range
+testds("fn11", mon, pass) { function(0)<closed>{2 where (a=1)} } {"[{{a=1,u=v=<2>}}]"}
+

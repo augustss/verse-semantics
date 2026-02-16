@@ -127,7 +127,8 @@ import qualified Epic.List as L
     sb = ɩℰ (tb) j z   -- ru=j, rv=z
 
     funs :: Env -> M(M(Val,(Val,Val,Val)))   -- (x,(w,j,z))
-    funs(ρ) = piM(domvs, rngvs)
+    funs(ρ) =
+      piM(domvs, rngvs)
       where
         dom :: M(Env)
         dom = ([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ sa
@@ -207,8 +208,11 @@ choiceIndex at i x = unionSM (generateENVs (fvs(at))) $ \ ρ ->
 --------------------------------------------------------
 
 den :: Term → M(Env)
-den t = prune $ ɩℰ (Block t) u v
+den t = pruneX $ ɩℰ (Block t) u v
   where [u, v] = fresh ["u", "v"] [t]
+
+pruneX :: M(Env) -> M(Env)
+pruneX (M ss) = M $ filter (/= cempty) ss
 
 --------------------------------------------------------
 
@@ -295,12 +299,13 @@ instance (Show (XSet a)) => Show (M a) where
   showsPrec _ (M []) = showString "EMPTY"
   showsPrec p (M xs) = showParen (p > 0) $ showString $ L.intercalate " | " $ P.map show xs
 -}
-empty = M []
+empty = M [ø]
 inj(d) = M [d]
+s ++ t | t == empty = s
 M s ++ M t = M (s P.++ t)
 M s ⎧*⎫ M t = M [ d1 ∩ d2 | d1 ← s, d2 ← t ]
-M[] ⎩*⎭   t = t
-s   ⎩*⎭ M[] = s
+-- M[] ⎩*⎭   t = t
+-- s   ⎩*⎭ M[] = s
 M s ⎩*⎭ M t = M [ d1 ∪ d2 | d1 ← s, d2 ← t ]
 s ⊍ t = dzip((∪), [s,t])
 unionS ss = dzip((∪), ss)
@@ -658,9 +663,12 @@ instance Show Val where
 pattern T :: [Val] -> Val
 pattern T vs <- (getTuple -> Just vs)
   where
+    T [] = F $ fun [ Set.empty ]
     T xs = F $ fun $ zipWith (PFSing . I) [0..] xs
 
 getTuple :: Val -> Maybe [Val]
+getTuple (F (Fn (M []))) = error "getTuple []"
+getTuple (F (Fn (M [e]))) | Set.isEmpty e = Just []
 getTuple (F (Fn (M xs))) = M.zipWithM f [0..] xs
   where f i s | PFSing (I i') y <- s, i == i' = Just y
         f _ _ = Nothing
@@ -1173,17 +1181,22 @@ instance Pi [] where
 instance Pi M where
   pi :: forall a b . (ASet a, ASet b) => M a -> M (a,b) -> M (M (a,b))
 --  pi x y | trace("pi M " P.++ show(x,y)) False = undefined
+  pi mx _ | mx == empty =
+    M [ [ empty ] ]
   pi (M []) _ =
-    M [ [ M [] ] ]
+    M [ [ empty ] ]
 
-  pi (M [xs]) (M [ys]) =
+  pi mx@(M [xs]) my | mx /= empty && my == empty =
+    empty
+  pi mx@(M [xs]) (M []) | mx /= empty =
+    empty
+
+  pi mx@(M [xs]) my@(M [ys]) | mx /= empty && my /= empty =
     M [ fmap (M . (:[])) $ pi (xSetToSet xs) (xSetToSet ys) ]
 
-  pi (M [xs]) (M []) =
-    M []
-  pi (M [(xs :: XSet a)]) (M ((ys :: XSet(a,b)) : yss)) =
+  pi mx@(M [xs]) (M (ys : yss)) | mx /= empty =
         pi (M [xs]) (M [ys])
---     ++ unionS middle
+     ++ unionS middle
      ++ pi (M [xs]) (M yss)
      where middle :: Set(M(M(a,b)))
            middle = [ [ unionS [f1, f2] | f1 <- pi (M [xs1]) (M [ys])
@@ -1237,6 +1250,9 @@ cint = Rng (Prim F.IsInt)
 
 plus :: Term -> Term -> Term
 plus x y = (Prim F.Add) :@ Array[x,y]
+
+greater :: Term -> Term -> Term
+greater x y = (Prim F.Gt) :@ Array[x,y]
 
 test1 = [ (x,x) | x <- return 1, x==2 ] :: M (Integer, Integer)
 
