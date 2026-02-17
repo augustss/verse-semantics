@@ -76,7 +76,7 @@ import qualified Epic.List as L
   where xs = bvs(t₀); s₀ = one(ɩ𝒞(t₀),xs)
 ɩℰ (Block t) u v = ɩℬ (t) u v
 
-#if 1
+#if 0
 -- direct semantics
 ɩℰ (For t₀ t₁) u v = fold(op,z,ɩ𝒞(t₀))
   where [p,q,u₁,u₂,v₁,v₂]  = fresh ["p","q","u1","u2","v1","v2"] [t₀, t₁, Var u, Var v]
@@ -457,6 +457,8 @@ knownFuns =
        , (fun[funSel1of2], "sel1of2")
        , (fun[funSel0of1or2], "sel0of1or2")
        , (fun[funTupCon0], "tupcon0")
+       , (fun[funIdPair], "idPair")
+       , (fun[funPSPair], "PSPair")
 
        , (fun[fun1to2], "f1to2")
 
@@ -585,6 +587,12 @@ funTupCon0 = [ (T[i], 0) | i <- allInts ]
 
 funSel0of1or2 :: Val ⇀ Val
 funSel0of1or2 = funSel0of1 `Set.union` funSel0of2
+
+funIdPair :: Val ⇀ Val
+funIdPair = [ (T[i,j], T[i,j]) | i <- allInts, j <- allInts ]
+
+funPSPair :: Val ⇀ Val
+funPSPair = [ (T[i,j], T[i-1,j+1]) | i <- allInts, j <- allInts ]
 
 funHOTest :: Val ⇀ Val
 funHOTest = [(fcn "binCon0", 3),(fcn "bin", 3),(fcn "binInv", 3),(fcn "binCon1", 3)]
