@@ -196,4 +196,13 @@ testds("arrty2", mon, pass) { f(a:=for(x:=0|1){if(x=0){:pred}else{:succ}})<close
 # arrty3: test on a concrete value
 testds("arrty3", mon, pass) { f(a:=for(x:=0|1){if(x=0){:pred}else{:succ}})<closed>:=a; f[1,1] } {"[{{u=v=<0,2>}}]"}
 
+# funty1: a function that transforms the argument
+testds("funty1", mon, pass) { function(:max1)<closed>{:binInv} }
+ {"[{{u=binCon0=Fn[{(0,0),(1,0)}],v=const1=Fn[{(0,1),(1,1),(2,1),(3,1)}]}}U{{u=bin=Fn[{(0,0),(1,1)}],v=binInvX=Fn[{(0,1),(1,0),(2,0),(3,0)}]}}U{{u=binInv=Fn[{(0,1),(1,0)}],v=max1=Fn[{(0,0),(1,1),(2,1),(3,1)}]}}U{{u=binCon1=Fn[{(0,1),(1,1)}],v=const0=Fn[{(0,0),(1,0),(2,0),(3,0)}]}}]"}
+# funty2: use it as an argument type
+testds("funty2", mon, pass) { f(g:=function(:max1)<closed>{:binInv})<closed>:=g[1] }
+  {"[{{u=HOTest1=Fn[{(const0=Fn[{(0,0),(1,0),(2,0),(3,0)}],0),(max1=Fn[{(0,0),(1,1),(2,1),(3,1)}],1),(binInvX=Fn[{(0,1),(1,0),(2,0),(3,0)}],0),(const1=Fn[{(0,1),(1,1),(2,1),(3,1)}],1)}],v=HOTest2=Fn[{(binCon0=Fn[{(0,0),(1,0)}],1),(bin=Fn[{(0,0),(1,1)}],0),(binInv=Fn[{(0,1),(1,0)}],1),(binCon1=Fn[{(0,1),(1,1)}],0)}]}}]"}
+# funty3: try it
+testds("funty3", mon, pass) { f(g:=function(:max1)<closed>{:binInv})<closed>:=g[2]; (f[bin], f[binInv]) }  {"[{{u=v=<0,1>}}]"}
+
 

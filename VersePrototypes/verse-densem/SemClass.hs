@@ -451,6 +451,10 @@ knownFuns =
        , (fun[funBinHO1], "binHO1")
        , (fun[funHOTest], "HOTest")
        , (fun[funBinCon2], "binCon2")
+       , (fun[funMax1], "max1")
+       , (fun[funBinInvX], "binInvX")
+       , (fun[funHOTest1], "HOTest1")
+       , (fun[funHOTest2], "HOTest2")
 
        , (fun[funSel0of1], "sel0of1")
        , (fun[funSel0of2], "sel0of2")
@@ -561,6 +565,9 @@ funBin = [(0, 0), (1, 1)]
 funBinInv :: Val ⇀ Val
 funBinInv = [(0, 1), (1, 0)]
 
+funBinInvX :: Val ⇀ Val
+funBinInvX = [(0, 1), (1, 0), (2, 0), (3, 0)]
+
 funBinCon0 :: Val ⇀ Val
 funBinCon0 = [(0, 0), (1, 0)]
 
@@ -569,6 +576,9 @@ funBinCon1 = [(0, 1), (1, 1)]
 
 funBinCon2 :: Val ⇀ Val
 funBinCon2 = [(0, 2), (1, 2)]
+
+funMax1 :: Val ⇀ Val
+funMax1 = [(0,0), (1,1), (2,1), (3,1)]
 
 funBinHO1 :: Val ⇀ Val
 funBinHO1 = [(fcn "binCon0", 0),(fcn "bin", 0),(fcn "binInv", 1),(fcn "binCon1", 1)]
@@ -596,6 +606,12 @@ funPSPair = [ (T[i,j], T[i-1,j+1]) | i <- allInts, j <- allInts ]
 
 funHOTest :: Val ⇀ Val
 funHOTest = [(fcn "binCon0", 3),(fcn "bin", 3),(fcn "binInv", 3),(fcn "binCon1", 3)]
+
+funHOTest1 :: Val ⇀ Val
+funHOTest1 = [(fcn "const0", 0), (fcn "max1", 1), (fcn "binInvX", 0), (fcn "const1", 1)]
+
+funHOTest2 :: Val ⇀ Val
+funHOTest2 = [(fcn "binCon0", 1), (fcn "bin", 0), (fcn "binInv", 1), (fcn "binCon1", 0)]
 
 -- same as <0>
 funType0 :: Val ⇀ Val
