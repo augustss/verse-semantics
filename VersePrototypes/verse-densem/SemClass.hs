@@ -408,7 +408,7 @@ bvs = mkSet . F.getVisibleBinders
 
 fvs :: Term → Set Iden
 fvs = mkSet . filter (\ (F.Ident _ s) -> s `notElem` globals) . F.getFree
-  where globals = "operator'|||'" : P.map P.fst knownFunsF P.++ P.map P.fst knownRelsF
+  where globals = "_" : "operator'|||'" : P.map P.fst knownFunsF P.++ P.map P.fst knownRelsF
 
 type Aperture = F.Aperture
 pattern O = F.Open

@@ -205,4 +205,5 @@ testds("funty2", mon, pass) { f(g:=function(:max1)<closed>{:binInv})<closed>:=g[
 # funty3: try it
 testds("funty3", mon, pass) { f(g:=function(:max1)<closed>{:binInv})<closed>:=g[2]; (f[bin], f[binInv]) }  {"[{{u=v=<0,1>}}]"}
 
-
+testds("unify1", mon, pass) { (_,2) = (1, _) }                                                             {"[{{u=v=<1,2>}}]"}
+testds("unify2", mon, pass) { f(0 where x:int)<closed>:= (if(x=0){(_,2)}else{(1, _)}) }                    {"[{{u=v=<<1,2>>}}]"}
