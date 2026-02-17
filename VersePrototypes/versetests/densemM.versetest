@@ -52,9 +52,9 @@ testds("Tim2b", mon, pass) {x:=1|||2; x=1|2} {"[{{u=v=1}},{{u=v=2}}]"}
 testds("Tall1", mon, pass)  {for {(x:=1|2)}}           {"[{{u=v=<1,2>}}]"}
 testds("Tall2a", mon, pass) {for {(x:=1|2; x>0)}}    {"[{{u=v=<1,2>}}]"}
 testds("Tall2b", mon, pass) {for {(x:=1|2; x>1)}}    {"[{{u=v=<2>}}]"}
-testds("Tall3",  mon, pass) {for {(x=1;w=1) | (x=2;w=2)} }
-  {"[{{u=v=<>,w/=1,w/=2}}U{{u=v=<>,x/=1,x/=2}}U{{u=v=<>,x=2,w/=2}}U{{u=v=<>,w=2,x/=2}}U{{u=v=<1>,w=x=1}}U{{u=v=<2>,w=x=2}}]"}
-testds("Tall3a", mon, pass) {for (x=1){0} } {"[{{u=v=<>,x/=1}}U{{u=v=<0>,x=1}}]"}
+testds("Tall3",  mon, pass) {bin[x]; bin[w]; for {(x=0;w=0) | (x=1;w=1)} }
+  {"[{{u=v=<>,w=0,x=1}}U{{u=v=<>,w=1,x=0}}U{{u=v=<0>,w=x=0}}U{{u=v=<1>,w=x=1}}]"}
+testds("Tall3a", mon, pass) {bin[x]; for (x=1){0} } {"[{{u=v=<>,x=0}}U{{u=v=<0>,x=1}}]"}
 
 testds("fun1", mon, pass) { function(1)<closed>{2} }                      {"[{{u=v=f1to2=Fn[{(1,2)}]}}]"}
 testds("fun2", mon, pass) { function(fail)<closed>{2} }                   {"[{{u=v=<>}}]"} # empty function
@@ -72,15 +72,20 @@ testds("fun11",mon, pass) { function(1)<closed>{x=2} }                    {"[{{u
 
 testds("mfun1", mon, pass) { f:=((1,2) ||| (1,0)); f[0] }                 {"[{{u=v=1}}]"}
 
+# ho1: simple higher order function (arrays are functions)
 testds("ho1",  mon, pass) { function(array{x:int})<closed>{x} }           {"[{{u=v=sel0of1=Fn[{(<0>,0),(<1>,1),(<2>,2),(<3>,3)}]}}]"}
+# ho1: call HO with function having the exact domain
 testds("ho2",  mon, pass) { f:=function(array{x:int})<closed>{x}; f[array{3}] }  {"[{{u=v=3}}]"}
+# ho1: call HO with function having a too big domain, failure
 testds("ho3",  mon, pass) { f:=function(array{x:int})<closed>{x}; f[array{3,1}] }  {"[]"}
+# hoovl1: unify 2 open functions
 testds("hoovl1",mon,pass) { f1:=function(array{x:int})<open>{x};
                             f2:=function(array{x:int,y:int})<open>{x};
 			    f1=f2;
 			    (f1[array{3}], f1[array{3,2}])
 			  }                                               {"[{{u=v=<3,3>}}]"}
 
+<#
 # cfun1 is a set of 4 functions
 testds("cfun1",mon, pass) { function(2|||3)<closed>{0|||1} }              {"[{{u=v=Fn[{(2,0),(3,0)}]}}U{{u=v=Fn[{(2,0),(3,1)}]}}U{{u=v=Fn[{(2,1),(3,0)}]}}U{{u=v=Fn[{(2,1),(3,1)}]}}]"}
 # cfun2 is a sequence of 2 functions
@@ -89,6 +94,7 @@ testds("cfun2",mon, pass) { function(2|||3)<closed>{0|  1} }              {"[{{u
 testds("cfun3",mon, pass) { function(2|  3)<closed>{0|||1} }              {"[{{u=v=Fn[{(2,0)},{(3,0)}]}}U{{u=v=Fn[{(2,0)},{(3,1)}]}}U{{u=v=Fn[{(2,1)},{(3,0)}]}}U{{u=v=Fn[{(2,1)},{(3,1)}]}}]"}
 # cfun4 is a sequence of 4 functions, each iterating
 testds("cfun4",mon, pass) { function(2|  3)<closed>{0|  1} }              {"[{{u=v=Fn[{(2,0)},{(3,0)}]}},{{u=v=Fn[{(2,0)},{(3,1)}]}},{{u=v=Fn[{(2,1)},{(3,0)}]}},{{u=v=Fn[{(2,1)},{(3,1)}]}}]"}
+#>
 
 # fn1: empty domain, empty range
 testds("fn1", mon, pass) { function(0=1)<closed>{2=3} }                 {"[{{u=v=<>}}]"}
@@ -102,28 +108,82 @@ testds("fn4", mon, pass) { function(0)<closed>{0} }                     {"[{{u=v
 # fn5: ordered choice domain, no choice range
 testds("fn5", mon, pass) { function(0|1)<closed>{2} }                   {"[{{u=v=<2,2>}}]"}
 # fn6: no choice domain, ordered choice range
-testds("fn5", mon, pass) { function(0)<closed>{2|3} }                   {"[{{u=v=<2>}},{{u=v=<3>}}]"}
+testds("fn6", mon, pass) { function(0)<closed>{2|3} }                   {"[{{u=v=<2>}},{{u=v=<3>}}]"}
 # fn7: ordered choice domain, ordered choice range
-testds("fn5", mon, pass) { function(0|1)<closed>{2|3} }                 {"[{{u=v=<2,2>}},{{u=v=<2,3>}},{{u=v=<3,2>}},{{u=v=<3,3>}}]"}
+testds("fn7", mon, pass) { function(0|1)<closed>{2|3} }                 {"[{{u=v=<2,2>}},{{u=v=<2,3>}},{{u=v=<3,2>}},{{u=v=<3,3>}}]"}
 
-# fn5: unordered choice domain, no choice range
-testds("fn5", mon, pass) { function(0|||1)<closed>{2} }                 {"[{{u=v=Fn[{(0,2),(1,2)}]}}]"}
-# fn6: no choice domain, unordered choice range
-testds("fn5", mon, pass) { function(0)<closed>{2|||3} }                 {"[{{u=v=<2>}}U{{u=v=<3>}}]"}
-# fn7: unordered choice domain, unordered choice range
-testds("fn5", mon, pass) { function(0|||1)<closed>{2|||3} }
-  {"[{{u=v=Fn[{(0,2),(1,2)}]}}U{{u=v=Fn[{(0,2),(1,3)}]}}U{{u=v=Fn[{(0,3),(1,2)}]}}U{{u=v=Fn[{(0,3),(1,3)}]}}]"}
+# fn8: unordered choice domain, no choice range
+testds("fn8", mon, pass) { function(0|||1)<closed>{2} }                 {"[{{u=v=binCon2=Fn[{(0,2),(1,2)}]}}]"}
+# fn9: no choice domain, unordered choice range
+testds("fn9", mon, pass) { function(0)<closed>{2|||3} }                 {"[{{u=v=<2>}}U{{u=v=<3>}}]"}
+# fn10: unordered choice domain, unordered choice range
+testds("fn10", mon, pass) { function(0|||1)<closed>{2|||3} }
+  {"[{{u=v=binCon2=Fn[{(0,2),(1,2)}]}}U{{u=v=Fn[{(0,2),(1,3)}]}}U{{u=v=Fn[{(0,3),(1,2)}]}}U{{u=v=Fn[{(0,3),(1,3)}]}}]"}
 
-# fn8: ordered choice domain, unordered choice range
-testds("fn8", mon, pass) { function(0|1)<closed>{2|||3} }
+# fn11: ordered choice domain, unordered choice range
+testds("fn11", mon, pass) { function(0|1)<closed>{2|||3} }
   {"[{{u=v=<2,2>}}U{{u=v=<2,3>}}U{{u=v=<3,2>}}U{{u=v=<3,3>}}]"}
-# fn9: unordered choice domain, ordered choice range
-testds("fn9", mon, pass) { function(0|||1)<closed>{2|3} }
-  {"[{{u=v=Fn[{(0,2),(1,2)}]}},{{u=v=Fn[{(0,2),(1,3)}]}}U{{u=v=Fn[{(0,3),(1,2)}]}},{{u=v=Fn[{(0,3),(1,3)}]}}]"}
+# fn12: unordered choice domain, ordered choice range
+testds("fn12", mon, pass) { function(0|||1)<closed>{2|3} }
+  {"[{{u=v=binCon2=Fn[{(0,2),(1,2)}]}},{{u=v=Fn[{(0,2),(1,3)}]}}U{{u=v=Fn[{(0,3),(1,2)}]}},{{u=v=Fn[{(0,3),(1,3)}]}}]"}
 
-# fn10: free, constrained variable in the domain
-testds("fn10", mon, pass) { function(0 where (a=1))<closed>{2} }
+# fn13: free, constrained variable in the domain
+testds("fn13", mon, pass) { int[a]; function(0 where (a=1))<closed>{2} }
   {"[{{a=0,u=v=<>}}U{{a=1,u=v=<2>}}U{{a=2,u=v=<>}}U{{a=3,u=v=<>}}]"}
-# fn11: free, constrained variable in the range
-testds("fn11", mon, pass) { function(0)<closed>{2 where (a=1)} } {"[{{a=1,u=v=<2>}}]"}
+# fn14: free, constrained variable in the range
+testds("fn15", mon, pass) { function(0)<closed>{2 where (a=1)} } {"[{{a=1,u=v=<2>}}]"}
 
+# sho1a: the function used for the HO tests: all functions on 0/1 to 0/1
+testds("sho1a", mon, pass) { f:=function(0|||1)<closed>{0|||1} }
+  {"[{{u=v=binCon0=Fn[{(0,0),(1,0)}]}}U{{u=v=bin=Fn[{(0,0),(1,1)}]}}U{{u=v=binInv=Fn[{(0,1),(1,0)}]}}U{{u=v=binCon1=Fn[{(0,1),(1,1)}]}}]"}
+# sho1b: HO function
+testds("sho1b", mon, pass) { g:=function(f:=function(0|||1)<closed>{0|||1})<closed>{3} }
+  {"[{{u=v=HOTest=Fn[{(binCon0=Fn[{(0,0),(1,0)}],3),(bin=Fn[{(0,0),(1,1)}],3),(binInv=Fn[{(0,1),(1,0)}],3),(binCon1=Fn[{(0,1),(1,1)}],3)}]}}]"}
+# sho1c: call with a too small domain
+testds("sho1c", mon, pass) { g:=function(f:=function(0|||1)<closed>{0|||1})<closed>{3};
+                             h:=function(0)<closed>{1};
+                             g[h] }                                        {"[]"}
+# sho1d: call with a exact domain
+testds("sho1d", mon, pass) { g:=function(f:=function(0|||1)<closed>{0|||1})<closed>{3};
+                             h:=function(0|||1)<closed>{1};
+                             g[h] }                                        {"[{{u=v=3}}]"}
+# sho1e: call with too big domain
+testds("sho1e", mon, pass) { g:=function(f:=function(0|||1)<closed>{0|||1})<closed>{3};
+                             h:=function(0|||1|||2|||3)<closed>{1};
+                             g[h] }                                        {"[]"}
+# sho1f: call with too big range
+testds("sho1f", mon, pass) { g:=function(f:=function(0|||1)<closed>{0|||1})<closed>{3};
+                             h:=function(0|||1)<closed>{2};
+                             g[h] }                                        {"[]"}
+# sho1g: call with an open function with a too small domain
+# this succeeds because among the open functions there are those that have the right domain.
+# since the function argument is never called, it doesn't matter that we are in the open part.
+testds("sho1g", mon, pass) { g:=function(f:=function(0|||1)<closed>{0|||1})<closed>{3};
+                             h:=function(0)<open>{1};
+                             g[h] }                                        {"[{{u=v=3}}]"}
+
+# sho2a: type of bin functions
+testds("sho2a", mon, pass) { type{function(:bin)<closed>{:bin}} }
+  {"[{{u=v=typeBinFcn=Fn[{(binCon0=Fn[{(0,0),(1,0)}],binCon0=Fn[{(0,0),(1,0)}]),(bin=Fn[{(0,0),(1,1)}],bin=Fn[{(0,0),(1,1)}]),(binInv=Fn[{(0,1),(1,0)}],binInv=Fn[{(0,1),(1,0)}]),(binCon1=Fn[{(0,1),(1,1)}],binCon1=Fn[{(0,1),(1,1)}])}]}}]"}
+# sho2b: test typeBinFcn
+testds("sho2b", mon, pass) { binfcn:= type{function(:bin)<closed>{:bin}};
+                             f:binfcn;
+			     f=function(:bin)<closed>{1}
+                           }                                                            {"[{{u=v=binCon1=Fn[{(0,1),(1,1)}]}}]"}
+# define ho
+testds("sho2c", mon, pass) { binfcn:= type{function(:bin)<closed>{:bin}};
+                             ho(g:binfcn)<closed>:=g[0]
+			   }
+ {"[{{u=v=binHO1=Fn[{(binCon0=Fn[{(0,0),(1,0)}],0),(bin=Fn[{(0,0),(1,1)}],0),(binInv=Fn[{(0,1),(1,0)}],1),(binCon1=Fn[{(0,1),(1,1)}],1)}]}}]"}
+# call ho with a function with the correct domain
+testds("sho2d", mon, pass) { binfcn:= type{function(:bin)<closed>{:bin}};
+                             ho(g:binfcn)<closed>:=g[0];
+			     ho[function(0|||1)<closed>{1}]
+			   }                                                           {"[{{u=v=1}}]"}
+# call ho with an open function with a too small domain.
+# The open part will give various results when called with a 0.
+testds("sho2e", mon, pass) { binfcn:= type{function(:bin)<closed>{:bin}};
+                             ho(g:binfcn)<closed>:=g[0];
+			     ho[function(1)<open>{1}]
+			   }                                                           {"[{{u=v=0}}U{{u=v=1}}]"}
+			   

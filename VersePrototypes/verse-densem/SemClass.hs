@@ -449,6 +449,8 @@ knownFuns =
        , (fun[funBinCon0], "binCon0")
        , (fun[funBinCon1], "binCon1")
        , (fun[funBinHO1], "binHO1")
+       , (fun[funHOTest], "HOTest")
+       , (fun[funBinCon2], "binCon2")
 
        , (fun[funSel0of1], "sel0of1")
        , (fun[funSel0of2], "sel0of2")
@@ -463,6 +465,7 @@ knownFuns =
        , (fun[funType2], "type2")
        , (fun[funType3], "type3")
 
+       , (fun[funTypeBinFcn], "typeBinFcn")
        ]
 
 knownFuns' :: [(Fn, String)]
@@ -562,6 +565,9 @@ funBinCon0 = [(0, 0), (1, 0)]
 funBinCon1 :: Val ⇀ Val
 funBinCon1 = [(0, 1), (1, 1)]
 
+funBinCon2 :: Val ⇀ Val
+funBinCon2 = [(0, 2), (1, 2)]
+
 funBinHO1 :: Val ⇀ Val
 funBinHO1 = [(fcn "binCon0", 0),(fcn "bin", 0),(fcn "binInv", 1),(fcn "binCon1", 1)]
 
@@ -580,6 +586,9 @@ funTupCon0 = [ (T[i], 0) | i <- allInts ]
 funSel0of1or2 :: Val ⇀ Val
 funSel0of1or2 = funSel0of1 `Set.union` funSel0of2
 
+funHOTest :: Val ⇀ Val
+funHOTest = [(fcn "binCon0", 3),(fcn "bin", 3),(fcn "binInv", 3),(fcn "binCon1", 3)]
+
 -- same as <0>
 funType0 :: Val ⇀ Val
 funType0 = typ [0]
@@ -592,6 +601,9 @@ funType2 = typ [2]
 
 funType3 :: Val ⇀ Val
 funType3 = typ [3]
+
+funTypeBinFcn :: Val ⇀ Val
+funTypeBinFcn = typ [fcn "binCon0", fcn "bin", fcn "binInv", fcn "binCon1"]
 
 funType :: Val ⇀ Val
 funType = typ $ fmap (F . fun . (:[])) [ funInt, funBin, funType0, funType1, funType2, funType3 ]
@@ -742,6 +754,10 @@ allVals = [ I i | i ← allZ ]
         ∪ allTuples
         ∪ allRels
 -- test        ∪ [ F (fun[funInt]), T [I 0, I 0] ]
+
+-- smaller set used to create environments.
+someVals :: Set(Val)
+someVals = allVals
 
 allInts :: Set(Val)
 allInts = [0 .. maxBound]
@@ -938,7 +954,7 @@ aEnvToENV (Env kvs) = foldr (/\) univ $ P.map (uncurry (.=)) kvs
 
 -- Make all possible environments with the given identifiers.
 mkAEnvs :: [Iden] → [AEnv]
-mkAEnvs is = P.map (Env . P.zip is) (M.replicateM (length is) $ Set.toList allVals)
+mkAEnvs is = P.map (Env . P.zip is) (M.replicateM (length is) $ Set.toList someVals)
 
 aEnvsToENV :: Set(AEnv) → ENV
 aEnvsToENV = foldr (\/) cempty . P.map aEnvToENV . Set.toList
@@ -1236,6 +1252,7 @@ v1 = F.Ident F.noLoc "v1"
 u2 = F.Ident F.noLoc "u2"
 v2 = F.Ident F.noLoc "v2"
 fsucc = F.Ident F.noLoc "succ"
+fpred = F.Ident F.noLoc "pred"
 int = Prim F.IsInt
 apa = F.Ident F.noLoc "apa"
 
