@@ -241,7 +241,8 @@ piM        :: (M(a), M(a,b)) → M(M(a,b))
 
 -- Derived functions
 mapS :: (Set(a) → Set(b), M(a)) → M(b)
-mapS(f, s) = foldM( \(x,t)→inj(f(x)) ++ t, emptyM, s )
+--mapS(f, s) = foldM( \(x,t)→inj(f(x)) ++ t, emptyM, s )
+mapS(f, M (S ss)) = M (S (P.map f ss))
 
 infixl 5 \\\ -- calm cpp
 (\\\) :: M(Env) → Set(Iden) → M(Env)
@@ -275,8 +276,8 @@ concat (s:ss) = s ++ concat ss
 emptyM           = M $ unitS(ø)
 inj(d)           = M $ unitS(d)
 M s ++  M t      = M $ s `appS` t
-M s ⎧*⎫ M t      = M $ s >>= \ d1 -> t >>= \ d2 -> unitS(d1 ∩ d2)
-M s ⎩*⎭ M t      = M $ s >>= \ d1 -> t >>= \ d2 -> unitS(d1 ∪ d2)
+M s ⎧*⎫ M t     = M $ s >>= \ d1 -> t >>= \ d2 -> unitS(d1 ∩ d2)
+M s ⎩*⎭ M t     = M $ s >>= \ d1 -> t >>= \ d2 -> unitS(d1 ∪ d2)
 M s ⊍   M t      = M $ dzipS(bigUnion, [s,t])
 unionS ss        = M $ dzipS(bigUnion, fmap unM ss)
 intersectS ss    = M $ dzipS(bigIntersect, fmap unM ss)
@@ -321,8 +322,13 @@ instance M.Monad M where
 --------------------------------------------------------
 -- Set operations
 
-data Set a = SSet { unSSet :: Set.Set a } | ESet (EQD.EQD Iden Val)
+data Set a = SSet (Set.Set a) | ESet (EQD.EQD Iden Val)
   deriving(Eq, Ord)
+
+unSSet :: HasCallStack => Set a -> Set.Set a
+unSSet (SSet s) = s
+unSSet (ESet e) | e == EQD.false = Set.emptySet
+unSSet (ESet e) = error $ "unSSet " P.++ show e
 
 instance (Show a, Ord a) => Show (Set a) where
   showsPrec p (SSet s) = showsPrec p s
@@ -338,12 +344,13 @@ mkSet        ::          [a] -> Set(a)    -- XXX maybe overload
 (∈)          :: Ord a => a → Set(a) → Bool
 lookupSet    :: Ord a => a -> Set (a, b) -> Set b
 foldSetE     :: Ord a => (a -> a -> a) -> a -> Set(a) -> a
-bigUnion     :: Ord a => Set(Set(a)) -> Set(a)
+bigUnion     :: (HasCallStack, Ord a) => Set(Set(a)) -> Set(a)
 bigIntersect :: Ord a => Set(Set(a)) -> Set(a)
 minus        :: Ord a => Set(a) → Set(a) → Set(a)
 forAll       ::          Set(a) -> (a -> Bool) -> Bool
 
-ø = SSet Set.emptySet
+--ø = SSet Set.emptySet
+ø = ESet EQD.false
 isEmptySet (SSet s) = Set.isEmpty s
 isEmptySet (ESet e) = e == EQD.false
 SSet s ∪ SSet t = SSet (s `Set.union` t)
@@ -353,18 +360,20 @@ ESet s ∪ ESet t = ESet (s EQD.\/ t)
 
 SSet s ∩ SSet t = SSet (s `Set.intersect` t)
 ESet s ∩ ESet t = ESet (s EQD./\ t)
---SSet s ∩ ESet t = ESet (envsToENV s /\ t)
-ESet s ∩ SSet t = ESet (s /\ envsToENV (toEnvs t))
-s ∩ t = error $ "intersect " P.++ show (s,t)
+SSet s ∩ ESet t = ESet (envsToEQD (toEnvs s) EQD./\ t)
+ESet s ∩ SSet t = ESet (s EQD./\ envsToEQD (toEnvs t))
+-- s ∩ t = error $ "intersect " P.++ show (s,t)
 
 sing x = SSet (Set.sing x)
 getSing (SSet s) = Set.getSing s
-getSing (ESet e) = undefined
+getSing (ESet e) | e == EQD.false = Nothing
+                 | otherwise = undefined
 mkSet xs = SSet (Set.mkSet xs)
 a ∈ (SSet as) = Set.member a as
 lookupSet x (SSet s) = SSet (Set.lookupSet x s)
 foldSetE f z (SSet s) = Set.foldSetE f z s
 bigUnion (SSet s) = SSet $ Set.bigUnion $ fmap unSSet s
+bigUnion (ESet e) = error $ "bigUnion " P.++ show e
 bigIntersect (SSet s) = SSet $ Set.bigIntersect $ fmap unSSet s
 minus (SSet a) (SSet b) = SSet (Set.difference a b)
 forAll (SSet s) f = Set.forAll s f
@@ -381,6 +390,7 @@ instance A.Applicative Set where
 
 instance Monad Set where
   SSet m >>= k = SSet $ Set.bigUnion $ fmap (unSSet . k) m
+  ESet e >>= k | e == EQD.false = SSet [] >>= k
 
 instance Ord a => IsList (Set a) where
   type Item (Set a) = a
@@ -406,11 +416,11 @@ Env kvs · x = P.fromMaybe (error $ "getSing " P.++ show x) $ P.lookup x kvs
 extend :: Env → [(Iden, Val)] → Env
 extend (Env kvs) kvs' = Env (kvs P.++ kvs')
 
-envToENV :: Env → ENV
-envToENV (Env kvs) = L.foldr (/\) univ $ P.map (P.uncurry (.=)) kvs
+envToEQD :: Env → EQD
+envToEQD (Env kvs) = L.foldr (EQD./\) EQD.true $ P.map (P.uncurry (EQD.=:)) kvs
 
-envsToENV :: Set.Set(Env) → ENV
-envsToENV = Set.foldSetE (\/) cempty . fmap envToENV
+envsToEQD :: Set.Set(Env) → EQD
+envsToEQD = Set.foldSetE (EQD.\/) EQD.false . fmap envToEQD
 
 generateENVs :: Set(Iden) → Set(Env)
 generateENVs = mkSet . mkEnvs . Set.toList 
@@ -422,6 +432,7 @@ mkEnvs is = P.map (Env . P.zip is) (M.replicateM (L.length is) $ Set.toList allV
 --------------------------------------------------------
 -- ENV operations
 
+type EQD = EQD.EQD Iden Val
 type ENV = Set Env
 cempty :: ENV
 cempty = ESet EQD.false
@@ -513,9 +524,9 @@ atomEnvs as =
   in  [ (vs, r) | r ← envs, Just vs ← [P.mapM (atomEval r) as] ]
 
 (.==) :: Iden → Atom → ENV
-i .== a = unionENVs [ i .= v /\ envToENV r | ([v], r) ← atomEnvs [a], v ∈ allVals ]
+i .== a = unionENVs [ i .= v /\ ESet (envToEQD r) | ([v], r) ← atomEnvs [a], v ∈ allVals ]
 (.<=) :: Atom → Atom → ENV
-a1 .<= a2 = unionENVs [ envToENV r | ([I v1, I v2], r) ← atomEnvs [a1, a2], v1 <= v2 ]
+a1 .<= a2 = unionENVs [ ESet (envToEQD r) | ([I v1, I v2], r) ← atomEnvs [a1, a2], v1 <= v2 ]
 
 --------------------------------------------------------
 -- Sequence operations
@@ -534,9 +545,17 @@ foldS :: (((a,b)->b), b, S(a)) -> b
 foldS(f,z,S s) = L.foldr (P.curry f) z s
 --dzipS :: (Set(a) -> a, Set(S(a))) -> S(a)
 dzipS :: Ord a => (Set(Set(a)) -> Set(a), Set(S(Set(a)))) -> S(Set(a))
-dzipS(f, s) = fmap f (dodgy s)
 numberS :: S(a) -> S(Z, a)
 numberS (S s) = S $ L.zip [0..] s
+
+dzipS(f, SSet s) | Set.isEmpty s = unitS ø
+                 | otherwise = P.foldl1 (dodgy2 (\ x y -> f [x,y])) (Set.toList' s)
+
+dodgy2 :: (Set(a) -> Set(a) -> Set(a)) -> S(Set(a)) -> S(Set(a)) -> S(Set(a))
+dodgy2 f (S x) (S y) = S (zipLong x y)
+  where zipLong [] ys = ys
+        zipLong xs [] = xs
+        zipLong (x:xs) (y:ys) = (x `f` y) : zipLong xs ys
 
 dodgy :: Ord a => Set(S(a)) -> S(Set(a))
 dodgy s = foldSetE unionLongS (unitS ø) (fmap (fmap sing) s)
