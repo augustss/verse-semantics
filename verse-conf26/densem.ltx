@@ -130,6 +130,7 @@ $$
   \textbf{Desirable laws} \\
   \begin{array}{rclcl}
 %     \vmempty \vmbind k & = & \vmempty \\
+     \vminject( \{ \} ) & = & \vmempty \\
      \vmempty \vmseq   s & = & \vmempty & = & s \vmseq \vmempty \\
      \vmempty \vmappend   s & = & s        & = & s \vmappend \vmempty \\
      \vmempty \vmunion s & = & s        & = & s \vmunion \vmempty \\
@@ -157,13 +158,11 @@ $$
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
     \vmcollapse(s) & = & \vmfold( \cup, \{\}, s ) \\[1mm]
 
+    \vmflatten & :: & \Vm{\powerset{b}} \rightarrow \Vm{b} \\
+    \vmflatten( S ) & = & \vmmapset( \bigcup, \; S ) \\[1mm]
+
     \vmmapfilter & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
-    \vmmapfilter( f, S ) & = & \mathit{flatten}(\; \vmmap( f, S ) \; ) \\
-    & \multicolumn{2}{l}{\text{where}} \\
-    && \begin{array}[t]{@@{}l}
-         \mathit{flatten} :: \Vm{\powerset{b}} \rightarrow \Vm{b} \\
-         \mathit{flatten}( S ) = \vmmapset( \bigcup, \; S )
-       \end{array} \\
+    \vmmapfilter( f, S ) & = & \vmflatten(\; \vmmap( f, S ) \; ) \\
 
 \end{array}
 \end{array}
