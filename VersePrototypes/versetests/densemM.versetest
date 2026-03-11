@@ -62,7 +62,7 @@ testds("fun3", mon, pass) { function(1)<closed>{fail} }                   {"[]"}
 testds("fun4", mon, pass) { function(x:int)<closed>{x+1} }                {"[{{u=v=succ=Fn[{(0,1),(1,2),(2,3),(3,0)}]}}]"}
 testds("fun5", mon, pass) { function(x:prefix'-')<closed>{x} }            {"[{{u=isint=Fn[{(0,0),(1,1),(2,2),(3,3)}],v=neg=Fn[{(0,0),(1,3),(2,2),(3,1)}]}}]"}
 testds("fun6", mon, pass) { function(x:nat where x<2)<closed>{x} }        {"[{{u=v=bin=Fn[{(0,0),(1,1)}]}}]"}
-testds("fun7", mon, pass) { rtype{x:nat where x<2} }                      {"[{{u=v=relBin=Rl[{(0,0),(1,1)}]}}]"}
+testds("fun7", mon, pass) { rtype{x:nat where x<2} }                      {"[{{u=v=bin=Fn[{(0,0),(1,1)}]}}]"}
 testds("fun8", mon, pass) { ltTwo:=rtype{x:nat where x<2}; :ltTwo}        {"[{{u=v=0}}U{{u=v=1}}]"}
 testds("fun9a",mon, pass){ function(y:rtype{x:nat where x<2})<closed>{y}} {"[{{u=v=bin=Fn[{(0,0),(1,1)}]}}]"}
 testds("fun9", mon, pass) { ltTwo:=rtype{x:nat where x<2};

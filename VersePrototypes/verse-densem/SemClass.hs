@@ -39,7 +39,6 @@ import qualified Epic.List as L
 ɩℰ :: Term → Iden → Iden → M(Env)
 ɩℰ (U_)      u v = inj (u .=. v)
 ɩℰ (Var (F.Ident _ s)) u v | Just fn <- P.lookup s knownFunsF = inj (u .=. v /\ v .= F fn)
-ɩℰ (Var (F.Ident _ s)) u v | Just fn <- P.lookup s knownRelsF = inj (u .=. v /\ v .= R fn)
 ɩℰ (Var x)   u v = inj (u .=. v /\ v .=. x)
 ɩℰ (Int k)   u v = inj (u .=. v /\ v .=  I k)
 ɩℰ (Prim o)  u v = inj (u .=. v /\ v .=  F (dP o))
@@ -95,9 +94,9 @@ import qualified Epic.List as L
 #endif
 
 ɩℰ (Rel(tₐ)(ω)(tb)) h f | ω == succeeds =
-  inj $ setToXSet [ ρ `extend` [(h, R r), (f, R r)]
+  inj $ setToXSet [ ρ `extend` [(h, F r), (f, F r)]
          | ρ <- envs
-         , let r = Rl $ prune [ (aρ·x, aρ·z) | aρ <- ((([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ sa) \\\ bbvs \\\ [j, z]) ⎧*⎫ sb ]
+         , let r = Fn $ prune [ (aρ·x, aρ·z) | aρ <- ((([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ sa) \\\ bbvs \\\ [j, z]) ⎧*⎫ sb ]
          ]
   where
     sa :: M(Env)
@@ -186,10 +185,7 @@ openClose(O, f, h) =
 ɩℱ :: Iden → Iden → Iden → M(Env)
 ɩℱ f x r = unionS [ mapS (\ (prs :: Val ⇀ Val) →
                             (f .= vf /\ ((x :⇒ r) ⋵ prs)), ff)
-                  | Just (vf, ff) ← fmap fr allVals ]
-   where fr (a@(F (Fn xys))) = Just (a, xys)
-         fr (a@(R (Rl xys))) = Just (a, xys)
-         fr _ = Nothing
+                  | vf@(F (Fn ff)) ← allVals ]
 
 choiceIndex :: Term -> Iden -> Iden -> M(Env)
 choiceIndex at i x = unionSM (generateENVs (fvs(at))) $ \ ρ ->
@@ -484,7 +480,7 @@ knownFuns' = knownFuns P.++
 knownFunsF :: [(String, Fn)]
 knownFunsF = P.map (\(x,y)->(y,x)) knownFuns'
 
-knownRels :: [(Rl, String)]
+knownRels :: [(Fn, String)]
 knownRels =
   [ (rel rel1, "rel1")
   , (rel rel2, "rel2")
@@ -497,14 +493,14 @@ knownRels =
   , (rel relBin, "relBin")
   ]
 
-knownRelsF :: [(String, Rl)]
+knownRelsF :: [(String, Fn)]
 knownRelsF = P.map (\(x,y)->(y,x)) knownRels
 
 fun :: [Val ⇀ Val] → Fn
 fun = Fn . concat . P.map inj
 
-rel :: [Val ⇀ Val] → Rl
-rel = Rl . concat . P.map inj
+rel :: [Val ⇀ Val] → Fn
+rel = fun
 
 typ :: Set(Val) -> (Val ⇀ Val)
 typ vs = --Fn [fmap (\v -> (v,v)) vs]
@@ -687,14 +683,13 @@ applyM (Fn (M pfs)) x = M $ P.map (\ pf -> applyPF pf x) pfs
 
 ----- Val -----
 
-data Val = I Z | F Fn | R Rl
+data Val = I Z | F Fn
   deriving (Eq, Ord)
 
 instance Show Val where
   showsPrec p (I i) = showsPrec p i
   showsPrec _ (T vs) = showString $ "〈" P.++ L.intercalate "," (P.map show vs) P.++ "〉"
   showsPrec p (F f) = showsPrec p f
-  showsPrec p (R r) = showsPrec p r
 
 pattern T :: [Val] -> Val
 pattern T vs <- (getTuple -> Just vs)
@@ -738,7 +733,7 @@ newtype Fn = Fn (M (Val :⇒ Val))
 
 instance Show Fn where
   show f@(Fn xys) =
-    case P.lookup f knownFuns' of
+    case P.lookup f (knownFuns' P.++ knownRels) of
       Nothing -> fn
       Just s -> s P.++ "≡" P.++ fn
     where fn = "Fn" P.++ show xys
@@ -754,16 +749,6 @@ dom = fmap fst
 infix 1 :⇒
 type a :⇒ b = (a, b)       -- pairs used to form functions
 pattern a :⇒ b = (a, b)
-
-newtype Rl = Rl (M (Val :⇒ Val))
-  deriving (Eq, Ord)
-
-instance Show Rl where
-  show r@(Rl xys) =
-    case P.lookup r knownRels of
-      Nothing -> rl
-      Just s -> s P.++ "≡" P.++ rl
-    where rl = "Rl" P.++ show xys
 
 ----- "all" values -----
 numZ :: Z
@@ -794,7 +779,7 @@ allFuns' :: Set(Val)
 allFuns' = mkSet [ F f | (f, _) ← knownFuns' ]
 
 allRels :: Set(Val)
-allRels = mkSet [ R f | (f, _) ← knownRels ]
+allRels = mkSet [ F f | (f, _) ← knownRels ]
 
 -- 0, 1, 2-tuples of numbers
 allTuples :: Set(Val)
