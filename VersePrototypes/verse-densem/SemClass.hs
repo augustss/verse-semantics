@@ -116,7 +116,8 @@ import qualified Epic.List as L
 ɩℰ (Fun(tₐ)(q)(ω)(tb)) h f | ω == succeeds =
 --  trace("enns=" P.++ show envs) $
 --  trace("allfuns=" P.++ show (P.map funs (Set.toList' envs))) $
---  trace ("Fun " P.++ show (sa, favs, bavs, envs)) $
+--  trace ("Fun " P.++ show (sa, sb)) $
+--  trace (show ([favs, bavs, fbvs, bbvs] :: [Set(F.Ident)])) $
   unionS [ mapFilter(keep(ρ),funs(ρ)) | ρ <- envs ]
   where
 
@@ -125,7 +126,7 @@ import qualified Epic.List as L
     sb :: M(Env)
     sb = ɩℰ (tb) j z   -- ru=j, rv=z
 
-    funs :: Env -> M(M(Val,(Val,Val,Val)))   -- (x,(w,j,z))
+    funs :: Env -> M(M(Val,Env))   -- (x,(w,j,z))
     funs(ρ) =
       piM(domvs, rngvs)
       where
@@ -133,18 +134,18 @@ import qualified Epic.List as L
         dom = ([ρ] \\\ bavs \\\ [x,w]) ⎧*⎫ sa
         domvs :: M(Val)
         domvs = allValuesOf x dom
-        rngvs :: M(Val,(Val,Val,Val))
+        rngvs :: M(Val,Env)
         rngvs = unionSM(xSetToSet(collapse(domvs))) $ \ xv ->
                 intersectSM[aρ | aρ <- xSetToSet(collapse(dom)), aρ·x == xv] $ \ aρ ->
---                trace("rng xv=" P.++ show xv P.++ " aρ=" P.++ show aρ P.++ " * " P.++ show (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb)) $
-                [ (xv, (bρ·w, bρ·j, bρ·z)) | bρ <- ([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb ]
+--                trace("rng xv=" P.++ show xv P.++ " aρ=" P.++ show aρ P.++ " * " P.++ show (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) P.++ " = " P.++ (show $ (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) \\\ unneededVars)) $
+                [ (xv, bρ) | bρ <- (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) \\\ unneededVars ]
 
-    keep :: Env -> M(Val,(Val,Val,Val)) -> Set(Env)
+    keep :: Env -> M(Val,Env) -> Set(Env)
     keep(ρ)(fun) --x | ρ·f == F fm && ρ·h == F hm = [ρ]
                  | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm'), (h, F hm')] | (fm', hm') <- openClose(q, fm, hm) ]
                  | otherwise                  = []
-      where fm = Fn $ prune $ mapM'(\(x,(_,_,z))->(x,z), fun)
-            hm = Fn $ prune $ mapM'(\(_,(w,j,_))->(w,j), fun)
+      where fm = Fn $ prune $ mapM'(\(x,bρ)->(x,   bρ·z), fun)
+            hm = Fn $ prune $ mapM'(\(_,bρ)->(bρ·w,bρ·j), fun)
 
     -----
     envs :: Set(AEnv)
@@ -153,6 +154,8 @@ import qualified Epic.List as L
     bavs = bvs(tₐ)
     fbvs = fvs(tb)
     bbvs = bvs(tb)
+    neededVars = [z,w,j]
+    unneededVars = (favs ∪ fbvs ∪ bavs ∪ bbvs) `Set.difference` neededVars
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
 
 ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
@@ -1273,6 +1276,9 @@ fF = ɩℱ
 
 cint :: Term
 cint = Rng (Prim F.IsInt)
+
+cbin :: Term
+cbin = Rng (Var (F.Ident F.noLoc "bin"))
 
 plus :: Term -> Term -> Term
 plus x y = (Prim F.Add) :@ Array[x,y]
