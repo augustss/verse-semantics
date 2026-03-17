@@ -113,7 +113,7 @@ import qualified Epic.List as L
     bbvs = bvs(tb)
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
 
-ɩℰ (Fun(tₐ)(q)(ω)(tb)) h f | ω == succeeds =
+ɩℰ (Fun(tₐ)(q)(ω)(tb)) h f =
 --  trace("enns=" P.++ show envs) $
 --  trace("allfuns=" P.++ show (P.map funs (Set.toList' envs))) $
 --  trace ("Fun " P.++ show (sa, sb)) $
@@ -126,6 +126,9 @@ import qualified Epic.List as L
     sb :: M(Env)
     sb = ɩℰ (tb) j z   -- ru=j, rv=z
 
+    fxExt ρs | ω == decides, prune ρs == empty = inj (fx_fail .= I 1)
+    fxExt ρs = ρs
+
     funs :: Env -> M(M(Val,Env))   -- (x,(w,j,z))
     funs(ρ) =
       piM(domvs, rngvs)
@@ -137,15 +140,24 @@ import qualified Epic.List as L
         rngvs :: M(Val,Env)
         rngvs = unionSM(xSetToSet(collapse(domvs))) $ \ xv ->
                 intersectSM[aρ | aρ <- xSetToSet(collapse(dom)), aρ·x == xv] $ \ aρ ->
---                trace("rng xv=" P.++ show xv P.++ " aρ=" P.++ show aρ P.++ " * " P.++ show (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) P.++ " = " P.++ (show $ (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) \\\ unneededVars)) $
-                [ (xv, bρ) | bρ <- (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) \\\ unneededVars ]
+                let bρs = fxExt (([aρ] \\\ bbvs \\\ [j,z]) ⎧*⎫ sb) in
+--                trace("rng xv=" P.++ show xv P.++ " aρ=" P.++ show aρ P.++ ", bρs = " P.++ show bρs
+--                      P.++ " = " P.++ (show $ bρs \\\ unneededVars)) $
+                [ (xv, bρ) | bρ <- bρs \\\ unneededVars ]
 
     keep :: Env -> M(Val,Env) -> Set(Env)
     keep(ρ)(fun) --x | ρ·f == F fm && ρ·h == F hm = [ρ]
+--                 | trace ("keep=" P.++ show (fun, dropFails fun)) False = undefined
                  | isFunction fm && isFunction hm = [ρ `extend` [(f, F fm'), (h, F hm')] | (fm', hm') <- openClose(q, fm, hm) ]
                  | otherwise                  = []
-      where fm = Fn $ prune $ mapM'(\(x,bρ)->(x,   bρ·z), fun)
-            hm = Fn $ prune $ mapM'(\(_,bρ)->(bρ·w,bρ·j), fun)
+      where fm = Fn $ prune $ mapM'(\(x,bρ)->(x,   bρ·z), fun')
+            hm = Fn $ prune $ mapM'(\(_,bρ)->(bρ·w,bρ·j), fun')
+            fun' = dropFails fun
+
+    dropFails :: M(Val,Env) -> M(Val,Env)
+    dropFails m = mapFilter(f, m)
+      where f x@(_,r) | has r fx_fail = Set.empty
+                      | otherwise     = Set.sing x
 
     -----
     envs :: Set(AEnv)
@@ -154,9 +166,10 @@ import qualified Epic.List as L
     bavs = bvs(tₐ)
     fbvs = fvs(tb)
     bbvs = bvs(tb)
-    neededVars = [z,w,j]
+    neededVars = [z,w,j, fx_fail]
     unneededVars = (favs ∪ fbvs ∪ bavs ∪ bbvs) `Set.difference` neededVars
     [x,w,j,z] = fresh ["x","w","j","z"] [tₐ,tb,Var f,Var h]
+    fx_fail = F.Ident F.noLoc "fx_fail"
 
 ɩℰ t _ _ = error $ "ɩℰ: unimplemented " P.++ show t
 
@@ -415,6 +428,8 @@ pattern C = F.Closed
 type Eff = F.Eff
 succeeds :: Eff
 succeeds = F.effSucceeds
+decides :: Eff
+decides = F.effDecides
 
 ----- primops -----
 
@@ -957,6 +972,9 @@ newtype AEnv = Env [(Iden, Val)]   -- only used for functions
 
 (·) :: HasCallStack => AEnv → Iden → Val
 Env kvs · x = P.fromMaybe (error $ "getSing " P.++ show x) $ P.lookup x kvs
+
+has :: AEnv -> Iden -> Bool
+has (Env kvs) x = P.isJust (P.lookup x kvs)
 
 extend :: AEnv → [(Iden, Val)] → AEnv
 extend (Env kvs) kvs' = Env (kvs P.++ kvs')
