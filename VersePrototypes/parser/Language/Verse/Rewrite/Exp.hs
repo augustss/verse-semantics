@@ -86,6 +86,7 @@ data Exp f a
   -- ANF style ':=' form, unsure if needed
   | InfixColonEqual !Access !Quantifier (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
+  | PrefixColonFx (f (Exp f a)) !Split.Effect   -- :t<fx>
     -- Prefix and infix operator application
   | PrefixOp a (f (Exp f a))                -- op e
   | PostfixOp (f (Exp f a)) a               -- e op

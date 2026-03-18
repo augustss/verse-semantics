@@ -434,6 +434,14 @@ rewritePat = \ case
   InfixColon (extract -> Parse.Var _e1 i@(extract -> Parse.IdentName x) e2) e -> do
     access <- getDefSpecs e2
     Alloc2 access (Ident.Name x <$ i) <$> rewriteExp e
+
+  Parse.PrefixColon (extract -> ExpSpecs e1 bs) ->
+    PrefixColonFx <$> rewriteExp e1 <*> pure (head $ map get_eff bs)
+    where get_eff x | isPredefined "succeeds" x = Effect.Succeeds
+                    | isPredefined "fails"    x = Effect.Fails
+                    | isPredefined "decides"  x = Effect.Decides
+                    | otherwise = error $ "expSpecs with unknown effect: " ++ show x
+
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
   Parse.PatTuple xs  -> do
     xs' <- traverse (\(L l x) -> L l <$> rewritePat x) xs
