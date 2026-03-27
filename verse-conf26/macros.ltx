@@ -4,6 +4,10 @@
 %include forall.fmt
 %include ../LaTex/calculus.fmt
 
+% --------------- Distinguished variables -------
+\newcommand{\vin}{{\mathbf u}}
+\newcommand{\vout}{{\mathbf v}}
+
 % --------------- Sequences, S ------------
 \newcommand{\VmSeqKw}{{\mathcal S}}
 \newcommand{\VmSeq}[1]{\VmSeqKw(#1)}
@@ -36,7 +40,7 @@
 \newcommand{\vmmap}{\mathbf{map}_m}
 \newcommand{\vmmaptwo}{\mathbf{map2}_m}
 \newcommand{\vmmapset}{\mathbf{mapS}}
-\newcommand{\vmmapfilter}{\mathbf{mapFilter}}
+\newcommand{\vmmapfilter}{\mathbf{flatMap}}
 \newcommand{\vmfold}{\mathbf{fold}_m}
 \newcommand{\vmnot}{\mathbf{not}}
 \newcommand{\vmone}{\mathbf{one}}
