@@ -10,15 +10,27 @@ choicefree = choiceFreeLH
 
 --------------------------------------------------------------------------------
 
-data Result
-  = FAIL
-  | VAL Val
-  | BLKD Expr      -- BLKD e: blkd e == True
-  | Expr :||: Expr
+data Result  -- The result of evaluating an expression `e`
+  = FAIL           -- Evaluation fails
+
+  | VAL Val        -- Evaluation yields a single value
+
+  | Expr :||: Expr -- Evaluation yields a choice
+
+  | BLKD Bool Expr      -- Evaluation may make some progress, but gets stuck
+                   --     BLKD e: blkd e == True
+
   | SUBST [Ident] (Ident,Val) Expr
+       -- SUBST zs (x,v) e'
+       -- Evaluation of `e` wants to do a substitution in the
+       -- enclosing context. If
+       --     eval env e = SUBST zs (x,v) e'
+       -- then `x` must be in (flexi env), and
+       --     e == (Exi zs. x=v; e')
+
  deriving ( Eq, Ord, Show )
 
--- a Result can be interpreted as an expression
+-- A Result can be interpreted as an expression
 toExpr :: Result -> Expr
 toExpr FAIL               = Fail
 toExpr (VAL v)            = v
@@ -34,9 +46,9 @@ exis (z:zs) e = Exi (bind z (exis zs e))
 
 data Env
   = Env
-  { inChoiceFreeC :: Bool    -- are we in a choiceFree context?
-  , flexis        :: [Ident] -- what flexible variables are in scope
-  , rigids        :: [Ident] -- what rigid variables are in scope (only used for alphaRename)
+  { inChoiceFreeC :: Bool    -- Are we in a choiceFree context?  No choice to the left of the hole
+  , flexis        :: [Ident] -- What flexible variables are in scope
+  , rigids        :: [Ident] -- What rigid variables are in scope (only used for alphaRename)
   }
 
 -- starting Env
@@ -49,13 +61,15 @@ vars env = flexis env ++ rigids env
 
 -- start a new scope; reset choicefree-ness and make all flexis rigid
 newScope :: Env -> Env
-newScope env = env{ inChoiceFreeC = True, rigids = vars env, flexis = [] }
+newScope env = env{ inChoiceFreeC = True
+                  , rigids        = vars env
+                  , flexis        = [] }
 
 -- add a flexible variable
 flexi :: Ident -> Env -> Env
 flexi x env = env{ flexis = x : flexis env }
 
--- update choicefree-ness
+-- Update choicefree-ness
 (/\) :: Bool -> Env -> Env
 chf /\ env = env{ inChoiceFreeC = chf && inChoiceFreeC env }
 
@@ -64,7 +78,7 @@ chf /\ env = env{ inChoiceFreeC = chf && inChoiceFreeC env }
 -- eval env e = r:
 -- 1. e === toExpr r
 -- 2. if r = SUBST zs (x,v) e', then:
---    - x is in flexis env
+--    - x is in (flexis env)
 --    - zs are exi-bound somewhere in the original e
 -- 3. inChoiceFreeC env says if we are operating inside a choicefree context
 --    (important for if we can apply the CHOICE rule or not)
@@ -98,9 +112,11 @@ eval env (Exi bnd) =
       | y==x             -> eval env (exis zs (subst [(x,w)] e'))
       -- exi x . Exi zs . y=w; e' --> Exi x,zs . y=w; e'
       | otherwise        -> SUBST (x:zs) (y,w) e'
-    
+
     -- exi x.(e1|e2) --> (exi x.e1)|(exi x.e2)
     eL :||: eR           -> Exi (bind x eL) :||: Exi (bind x eR)
+
+    -- ToDo: what about FAIL and VAL?
 
     -- do EXI-ELIM?
     r | x `elem` free e' -> BLKD (Exi (bind x e'))
@@ -114,7 +130,7 @@ eval env (All e) = evalAll [e]
  where
   evalAll [] =
     VAL (Tup [])
-  
+
   evalAll (e:es) =
     case eval (newScope env) e of
       FAIL ->
@@ -144,7 +160,7 @@ eval env (Iter e cons nil) =
           (Var f :=: (cons :@: v)) :>: (Var f :@: nil)
      where
       f = identNotIn (free e ++ free cons ++ free nil)
-    
+
     -- iter(cons,nil){e1|e2} --> iter(cons,\_.iter(cons,nil){e2}){e1}
     e1 :||: e2 ->
       eval env $
@@ -163,7 +179,7 @@ eval env ((v :=: e1) :>: e2) =
 
     -- v=(Exi zs. y=w;e1'); e2 --> Exi zs. y=w; v=e1'; e2
     (v, SUBST zs (y,w) e1') ->
-      SUBST zs (y,w) ((v :=: e1') :>: e2)
+      SUBST zs (y,w) ((v :=: e1') :>: e2)     -- ToDo: what if zs is free in e2?
 
     -- x=v1; e2 == x=v1; e2
     (Var x, VAL v1) | x `elem` flexis env ->
@@ -178,15 +194,15 @@ eval env ((v :=: e1) :>: e2) =
       case unify hnf1 hnf2 e2 of
         Nothing -> FAIL
         Just e  -> eval env e
-    
+
     (v, eL :||: eR)
       | inChoiceFreeC env ->
         -- v=(eL|eR);e2 --> (v=eL;e2)|(v=eR;e2)
         eval env (((v :=: eL) :>: e2) :|: ((v :=: eR) :>: e2))
-      
+
       | otherwise ->
         -- e|fail -> e  OR  fail|e -> e
-        evalChoiceTry eL eR env (\e1' -> ((v:=:e1'):>:e2))
+        evalChoiceTry env eL eR (\e1' -> ((v:=:e1'):>:e2))
           (\e1' -> evalSeqBlkd env (v,e1') e2)
 
     (v, r1) -> evalSeqBlkd env (v, toExpr r1) e2
@@ -194,7 +210,7 @@ eval env ((v :=: e1) :>: e2) =
 eval _ e =
   error ("eval unimplemented for " ++ show e)
 
--- eval for (v:=:e1'):>:e2, where we know that e1 is blkd
+-- eval for (v:=:e1'):>:e2, where we know that e1' is blkd
 evalSeqBlkd :: Env -> (Val,Expr) -> Expr -> Result
 evalSeqBlkd env (v, e1') e2 =
   case eval env' e2 of
@@ -209,7 +225,7 @@ evalSeqBlkd env (v, e1') e2 =
       | choicefree_e1' -> ((v:=:e1'):>:eL) :||: ((v:=:e1'):>:eR)
 
       | otherwise ->
-        evalChoiceTry eL eR env' (\e2' -> (v:=:e1'):>:e2')
+        evalChoiceTry env' eL eR (\e2' -> (v:=:e1'):>:e2')
           (\e2' -> BLKD ((v:=:e1'):>:e2'))
 
     -- v=e1';e2' == v=e1';e2'
@@ -218,10 +234,16 @@ evalSeqBlkd env (v, e1') e2 =
   choicefree_e1' = choicefree e1'
   env'           = choicefree_e1' /\ env
 
--- try to find places where to use e|fail->e and fail|e->e
+-- Try to find places where to use e|fail->e and fail|e->e
 -- PRE: inChoiceFreeC env == False
-evalChoiceTry :: Expr -> Expr -> Env -> (Expr -> Expr) -> (Expr -> Result) -> Result
-evalChoiceTry eL eR env k choicy =
+evalChoiceTry :: Env
+              -> Expr -> Expr      -- Left and right components of the choice
+              -> (Expr -> Expr)    -- What to do if the one side or the other is FAIL
+                                   --   Argument is the non-failing expression
+              -> (Expr -> Result)  -- What do to if neither is FAIL
+                                   --   Argument is (e1' | e2')
+              -> Result
+evalChoiceTry env eL eR k choicy =
   case eval (False /\ newScope env) eL of
     FAIL -> eval env (k eR)
     rL   -> case eval (False /\ newScope env) eR of
@@ -229,17 +251,19 @@ evalChoiceTry eL eR env k choicy =
               rR   -> choicy (toExpr rL :|: toExpr rR)
 
 -- SUBST, REC, U-OCCURS in one step
+--    x=val; e  -->  Result
 substOccursCheck :: Ident -> Val -> Expr -> Result
 substOccursCheck x v e =
   case check x v of
     Nothing -> FAIL
-    Just v' -> SUBST [] (x,v') e
+    Just v' -> SUBST [] (x,v') e    -- ToDo: why do v and v' differ?
+     -- Answer: SUBST_REC
  where
   check x (Var y) | x==y = Nothing
   check x (Tup vs)       = Tup `fmap` sequence [ check x v | v <- vs ]
   check x (Tru v)        = Tru `fmap` check x v
   check x (Lam bnd)
-    | x `elem` free bnd  = 
+    | x `elem` free bnd  =
       let (y,e) = alphaRename (x : free v) bnd in
         Just $ Lam $ bind y $ Exi (bind x ((Var x :=: v) :>: e))
   check _ v              = Just v
@@ -253,5 +277,3 @@ unify (Tup vs) (Tup ws) e | length vs == length ws =
 unify _        _        _          = Nothing
 
 --------------------------------------------------------------------------------
-
-
