@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_GHC -Wno-missing-methods -Wno-incomplete-uni-patterns -Wno-unused-matches -Wno-missing-pattern-synonym-signatures #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -423,7 +423,9 @@ fvs = mkSet . filter (\ (F.Ident _ s) -> s `notElem` globals) . F.getFree
   where globals = "_" : "operator'|||'" : P.map P.fst knownFunsF P.++ P.map P.fst knownRelsF
 
 type Aperture = F.Aperture
+pattern O :: Aperture
 pattern O = F.Open
+pattern C :: Aperture
 pattern C = F.Closed
 type Eff = F.Eff
 succeeds :: Eff
@@ -725,17 +727,24 @@ getTuple _ = Nothing
 
 instance P.Num Val where
   I x + I y = I ((x+y) `mod` numZ)
+  _ + _ = error "+"
   I x - I y = I ((x-y) `mod` numZ)
+  _ - _ = error "+"
   I x * I y = I ((x*y) `mod` numZ)
+  _ * _ = error "+"
   fromInteger = I
 
 instance P.Real Val where
   toRational (I i) = toRational i
+  toRational _ = error "toRational"
 
 instance P.Integral Val where
   mod (I x) (I y) = I (mod x y)
+  mod _ _ = error "mod"
   div (I x) (I y) = I (div x y)
+  div _ _ = error "div"
   toInteger (I i) = i
+  toInteger _ = error "toInteger"
   quotRem x y = (div x y, mod x y)
 
 instance P.Bounded Val where
@@ -745,6 +754,7 @@ instance P.Bounded Val where
 instance P.Enum Val where
   enumFrom n = enumFromTo n maxBound
   enumFromTo (I l) (I h) = P.map I [l .. h]
+  enumFromTo _ _ = error "enumFromTo"
 
 newtype Fn = Fn (M (Val :⇒ Val))
   deriving (Eq, Ord)
@@ -766,6 +776,7 @@ dom = fmap fst
 
 infix 1 :⇒
 type a :⇒ b = (a, b)       -- pairs used to form functions
+pattern (:⇒) :: a -> b -> (a :⇒ b)
 pattern a :⇒ b = (a, b)
 
 ----- "all" values -----
@@ -1194,6 +1205,7 @@ instance MyMonad M where
 instance ASet a => IsList (M a) where
   type Item (M a) = a
   fromList [x] = M [asing x]
+  fromList _ = undefined
   toList = undefined
 
 ---------------------------
@@ -1212,6 +1224,7 @@ instance Pi Set where
     , x == x'
     , xys <- pi (mkSet xs) ys
     ]
+  pi _ _ = undefined
 
 instance Pi [] where
   pi [] _ =
@@ -1263,6 +1276,7 @@ xSetToList = Set.toList' . xSetToSet
 listToXSet :: (ASet a) => [a] -> XSet a
 listToXSet = setToXSet . mkSet
 
+#if 0
 -----------------------------------------
 
 
@@ -1317,4 +1331,44 @@ where OpenClosedExtensions(open  ,fm,hm) :=
   , hm=<(pv,j):hm1 | hm(pv)<>{}>
   , ∀(pu:any, fm(pu)={}). fm1(pu)=hm1(pu)
   }
+-}
+#endif
+
+{-
+
+E[ t1 ; t2 ]uv = ( E[t1]pq \ {allow_fx, abstracting_fx, p, q} ) ∩ E[t2]uv    ←  Colons in t1 somehow don't get the inherited effects
+
+
+ε⟦:t<fx>⟧ix         := ε⟦t ⟧hf *
+                       <ρ | n:ℕm, ρ:env, ρ.f∈function, fs:f[n], (ρ.i,ρ.x)∈fs,  # application
+                        ρ.abstract_fx *<=* (ρ.allow_fx ∩ fx ∩ resolves)>-{h,f}
+
+
+ɩℰ (Colon t fx) i x = ɩℰ (t) h f ⎧*⎫ ɩℱ f i x
+                      \\\ [h, f]
+
+
+  where [h,f] = fresh ["h","f"] [t,Var i, Var x]
+
+Sequential composition, written *<=*:
+It's the least lattice satisfying a*b *<=* a and a*b *<=* b, where '*' is effects sequencing.
+The potential effects of "a; b" are (the potential effects of a) * (the potential effects of b).
+So fails *<=* decides, decides *<=* succeeds.
+We need this lattice so we can recognize f()<decides> := (:t<fails>, :t<succeeds>) definitely fails, and (:t<decides>,:t<succeeds>) is <decides>.
+
+Effect sequencing *
+fails * x = fails
+succeeds * x = x
+decides * x = decides
+
+               decides={fails,succeeds}
+              /       \
+    fails={fails}   succeeds={succeeds}
+              \       /
+              contradicts={}
+
+
+E[:int<succeeds>]
+
+
 -}
