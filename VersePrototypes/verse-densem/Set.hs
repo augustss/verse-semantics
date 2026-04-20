@@ -37,10 +37,12 @@ module Set(
   unzip3Set,
   lookupSet,
   partitions,
+  subsetsOf,
+  allFunctions,
   ) where
 import Control.Applicative
 import Control.Monad
-import Data.List(intercalate, sort, groupBy, sortBy, partition)
+import Data.List(intercalate, sort, groupBy, sortBy, partition, subsequences)
 import qualified Data.Maybe as M
 import qualified Data.Set as S
 import GHC.Stack
@@ -227,3 +229,13 @@ partitionM f (x:xs) = do
     res <- f x
     (as,bs) <- partitionM f xs
     pure ([x | res]++as, [x | not res]++bs)
+
+subsetsOf :: Ord a => Set a -> Set (Set a)
+subsetsOf s = S (map S (subsequences (toList' s)))
+
+allFunctions :: (Ord a, Ord b) => Set a -> Set b -> Set (Set (a, b))
+allFunctions as bs = S (map S (allFs (toList' as) (toList' bs)))
+
+allFs :: [a] -> [b] -> [[(a, b)]]
+allFs [] _ = [[]]
+allFs (a:as) bs = [(a, b) : f | b <- bs, f <- allFs as bs]
