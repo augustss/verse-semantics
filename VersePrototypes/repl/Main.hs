@@ -33,6 +33,7 @@ import qualified SLS (den)
 import qualified Pom (den)
 import qualified PomPom (denS, ForUnionMode(..), ForUnitMode(..), IfUnionMode(..), Config(..), defaultConfig)
 import qualified SemClass (den)
+import qualified Red as Simon (run)
 import ENVDesugar (envDesugar)
 
 -- Epic libraries
@@ -228,6 +229,7 @@ theCommandSet = CommandSet
       , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cSemClassDensem
       , Cmd "ppom [EXPR]"          "Evaluate [last] expression"            cPomPomDensem
+      , Cmd "simon [EXPR]"         "Reduce [last] expression"              cSimon
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -590,6 +592,26 @@ cSemClassDensem
        ; e_ds <- eSlsDesugar flags e_ess
        ; let res = SemClass.den e_ds
        ; let den_sem = addHeader "M Den-sem" $ text $ show res
+       ; if fQuiet flags then
+           displayDoc $ text $ show res
+         else
+           displayDoc den_sem
+{-
+       ; let resU = Pom.denU e_ds
+       ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
+       ; displayDoc den_semU
+-}
+       ; return () }
+
+cSimon :: CmdRunner CState
+cSimon
+  = getInputExpr $ \e s ->
+    tryIt (\_ -> pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- eSlsDesugar flags e_ess
+       ; let res = Simon.run e_ds
+       ; let den_sem = addHeader "Simon reduction" $ text $ show res
        ; if fQuiet flags then
            displayDoc $ text $ show res
          else

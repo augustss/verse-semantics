@@ -185,7 +185,7 @@ executable refimpltester
 
 library verse-densem
     import:           general-libs
-    hs-source-dirs:   verse-densem
+    hs-source-dirs:   verse-densem Simon
     default-extensions:  TypeOperators
     exposed-modules:
                       SExp
@@ -208,6 +208,7 @@ library verse-densem
                       ValueP
                       ENVP
                       EQD
+                      Red
     build-depends:    verse-libs,
                       base,
                       containers,
