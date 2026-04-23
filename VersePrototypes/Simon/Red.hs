@@ -10,6 +10,13 @@ import qualified FrontEnd.Expr as F
 import Epic.Print
 import Debug.Trace
 
+{-
+  Potential problems:
+  :sim f:=fun(x:int){x+1}; ((f[y]; y:= -2) | 5)
+
+-}
+
+
 type Iden = F.Ident
 type Op = F.PrimOp
 
@@ -55,6 +62,8 @@ data Exp
 
 type Eqn = (Iden, Val)
 
+type Set a = [a]
+
 -- The equation RHSs have no variables from the LHSs
 data Blk = Blk (Set Iden) (Set Eqn) Exp
   deriving (Eq, Show)
@@ -89,6 +98,7 @@ instance Pretty Blk where
   pPrintPrec l p (Blk vs eqns e) = maybeParens (p > 0) $ text "∃" <> hsep (map (pPrintPrec l 10) vs) <> text "." <+>
                                    vcat (punctuate (text "") (map (\ (i, d) -> pPrintPrec l 0 i <> text "<-" <> pPrintPrec l 0 d) eqns ++ [pPrintPrec l 0 e]))
 
+-- A HNF, i.e., a value, but not a variable
 pattern HNF :: Exp -> Val
 pattern HNF e <- (getHNF -> Just e)
 
@@ -96,9 +106,18 @@ getHNF :: Exp -> Maybe Exp
 getHNF Var{} = Nothing
 getHNF e = getVal e
 
+-- Either an Arr with all HNF, or a non-arr HNF
+pattern AHNF :: Exp -> Val
+pattern AHNF e <- (getAHNF -> Just e)
+
+getAHNF :: Exp -> Maybe Exp
+getAHNF (Arr es) | Nothing <- mapM getHNF es = Nothing
+getAHNF e = getHNF e
+
 pattern Val :: Exp -> Val
 pattern Val e <- (getVal -> Just e)
 
+-- Values
 getVal :: Exp -> Maybe Exp
 getVal e@Var{} = Just e
 getVal e@Int{} = Just e
@@ -117,8 +136,6 @@ getCon e@Int{} = Just e
 getCon e@(Arr es) | Just _ <- mapM getCon es = Just e
 getCon _ = Nothing
 
-type Set a = [a]
-
 srcToExp :: F.SrcEssential -> Exp
 srcToExp (F.Variable i) | F.isSrcUnderscore i = Und
                         | otherwise = Var i
@@ -136,6 +153,7 @@ srcToExp (F.Block e) = Crl (srcToBlk e)
 srcToExp (F.Array es) = Arr (map srcToExp es)
 srcToExp (F.Fail) = Fail
 srcToExp (F.Function _ e1 _ e2) = Fun (srcToExp e1) (srcToExp e2)
+srcToExp (F.DefineV x) = x := Rng (Prm F.IsAny)
 srcToExp e = error $ "srcToBlk: unimplemented " ++ show e
 
 srcToBlk :: F.SrcEssential -> Blk
@@ -146,24 +164,25 @@ instance Show PExp where
   show (P e) = prettyShow e
 
 run :: F.SrcEssential -> PExp
-run e = P $ evalBlk (Blk [u] [] (u :~> e'))
+run e = P $ evalBlk 100 (Blk [u] [] (u :~> e'))
   where u = freshVars e' !! 0
         e' = srcToExp e
 
-evalBlk :: Blk -> Exp
-evalBlk b | trace (prettyShow b ++ "\n") False = undefined
-evalBlk b@(Blk is eqs expr) =
-    case findRedex (freshVarsBlk b) is eqs expr of
+evalBlk :: Int -> Blk -> Exp
+evalBlk _ b | trace (prettyShow b ++ "\n") False = undefined
+evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
+evalBlk fuel b@(Blk is eqs expr) =
+    case findTopRedex (freshVarsBlk b) b of
       -- XXX iterate substVal?
-      Block _ xs eqns e -> evalBlk (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
+      Block _ xs eqns e -> evalBlk (fuel-1) (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
                                                          map (second $ substVal eqns) eqs) e)
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
-      Delete xs         -> evalBlk (Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) expr)
+      Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
 
 data Reduction
-  = Delete [Iden]                          -- delete the identifiers from the block existential and equations
+  = Delete (Set Iden)                      -- delete the identifiers from the block existential and equations
   | Block String [Iden] [Eqn] Exp          -- the named rule fired.  Add new existential, add new equations, replace expression
   | None                                   -- no redex found
   | Failure String                         -- evaluation failed
@@ -190,13 +209,30 @@ needVar (_ :> _) = True
 needVar (_ :=: _) = True
 needVar _ = False
 
-findRedex :: [Iden] -> Set Iden -> Set Eqn -> Exp -> Reduction
-findRedex fresh locals eqns ex =
+dom :: Set Eqn -> Set Iden
+dom = map fst
+
+fv :: Exp -> Set Iden
+fv = allFreeVars'
+
+noIntersect :: Eq a => Set a -> Set a -> Bool
+noIntersect xs ys = null $ xs `intersect` ys
+
+findTopRedex :: [Iden] -> Blk -> Reduction
+findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] blk
+  where
+    singleOcc :: Set Iden
+    singleOcc = [ x | [x] <- group (sort (allVars ex)), x `elem` locals, isNothing (lookup x eqns) ]
+
+findRedex :: [Iden] -> Set Iden -> Set Eqn -> Blk -> Reduction
+findRedex fresh singleOcc geqns (Blk locals leqns ex) =
   trace (render (text "findRedex" <+> (pPrintL prettyNormal ex $$ pPrintL prettyNormal res)) ++ "\n") res
   where
-    res | xs@(_ : _) <- locals \\ (allVars' ex ++ concatMap (allVars' . snd) eqns) = Delete xs  -- GC rules
-        | otherwise = find ex
-    singleOcc = [ x | [x] <- group (sort (allVars ex)), x `elem` locals, isNothing (lookup x eqns) ]
+    res | xs@(_ : _) <- locals \\ (allVars' ex ++ concatMap (allVars' . snd) leqns) = Delete xs  -- GC rules
+      | otherwise = find ex
+    eqns = leqns ++ geqns
+    findB :: Set Eqn -> Blk -> Reduction
+    findB = findRedex fresh singleOcc
     find :: Exp -> Reduction
     find expr =
       case expr of
@@ -206,28 +242,41 @@ findRedex fresh locals eqns ex =
         Und                -> error "Found Und"
         Fun _ _            -> error "Found Fun"
 
-        -- Scope and ubstitution
-        Var i  :=: Val v  | i `elem` locals                                -- must be a local variable
-                          , null (allFreeVars' v `intersect` map fst eqns) -- v must not have variables from eqns
-                          , isNothing (lookup i eqns)                      -- i must not already have an eqn
-                          -> Block "PROMOTE" [] [(i, v)] v
+        -- Scope and substitution
+        Var x  :=: Val v  | x `elem` locals                                -- must be a local variable
+                          , x `notElem` dom leqns                          -- x must not have an eqn
+                          , fv v `noIntersect` dom eqns                    -- v must not have variables from eqns
+                          , x `notElem` fv v
+                          -> Block "PROMOTE1" [] [(x, v)] v
+        Val v  :=: Var x  | x `elem` locals                                -- must be a local variable
+                          , x `notElem` dom leqns                          -- x must not have an eqn
+                          , fv v `noIntersect` dom eqns                    -- v must not have variables from eqns
+                          , x `notElem` fv v
+                          -> Block "PROMOTE2" [] [(x, v)] v
+
         Var i             | Just v <- lookup i eqns -> Done ("SUBST " ++ show i) v
         Crl b@Blk{}        -> Block "FLOAT" is' eqs' e' where Blk is' eqs' e' = freshen fresh b
         -- GC rules handled above
 
         -- Primops
-        Prm F.Add :@ Arr [Int i, Int j] -> Done "Prim+" $ Int (i + j)
-        Prm F.Sub :@ Arr [Int i, Int j] -> Done "Prim-" $ Int (i - j)
-        Prm F.Mul :@ Arr [Int i, Int j] -> Done "Prim*" $ Int (i * j)
-        Prm F.Div :@ Arr [Int i, Int j] | j == 0 -> Failure "Prim/"
-                                      | otherwise-> Done "Prim/" $ Int (i `div` j)
-        Prm F.Neg :@ Int i -> Done "Prim-neg" $ Int (- i)
-        Prm F.IsInt :@ Con v | Int _ <- v -> Done "Prim-isInt" v
-                             | otherwise -> Failure "Prim-isInt"
-        Prm F.Lt :@ Arr [Int i, Int j] | i < j -> Done "Prim-Lt" $ Int i
-                                       | otherwise -> Failure "Prim-Lt"
-        Prm F.Gt :@ Arr [Int i, Int j] | i > j -> Done "Prim-Gt" $ Int i
-                                       | otherwise -> Failure "Prim-Gt"
+        Prm F.Add :@ v   | Arr [Int i, Int j] <- v         -> Done    "Prim+"    $ Int (i + j)
+                         | AHNF{}             <- v         -> Failure "Prim+"
+        Prm F.Sub :@ v   | Arr [Int i, Int j] <- v         -> Done    "Prim-"    $ Int (i - j)
+                         | AHNF{}             <- v         -> Failure "Prim-"
+        Prm F.Mul :@ v   | Arr [Int i, Int j] <- v         -> Done    "Prim*"    $ Int (i * j)
+                         | AHNF{}             <- v         -> Failure "Prim*"
+        Prm F.Div :@ v   | Arr [Int i, Int j] <- v, j /= 0 -> Done    "Prim/"    $ Int (i `div` j)
+                         | AHNF{}             <- v         -> Failure "Prim/"
+
+        Prm F.Neg :@ v   | Int i <- v                      -> Done    "Prim-neg" $ Int (- i)
+                         | HNF{} <- v                      -> Failure "Prim-neg"
+        Prm F.IsInt :@ v | Int _ <- v                      -> Done    "Prim-isInt" v
+                         | HNF{} <- v                      -> Failure "Prim-isInt"
+
+        Prm F.Lt :@ v    | Arr [Int i, Int j] <- v, i < j  -> Done    "Prim-Lt"  $ Int i
+                         | AHNF{}             <- v         -> Failure "Prim-Lt"
+        Prm F.Gt :@ v    | Arr [Int i, Int j] <- v, i > j  -> Done    "Prim-Gt"  $ Int i
+                         | AHNF{}             <- v         -> Failure "Prim-Gt"
 
         -- Unification
         Val v1 :=: Val v2 | v1 == v2 -> Done "EQ" v1
@@ -242,6 +291,7 @@ findRedex fresh locals eqns ex =
         Val v  :=: (e1 :>  e2) -> Done "= ;" $ e1 :> (v :=: e2)
         Val v  :=: (e1 :=: e2) -> Done "= =" $ (v :=: e1) :> (v :=: e2)
         (e1 :> e2) :=: e3      -> Done "; =" $ e1 :> (e2 :=: e3)
+        (Val v :=: e2) :=: e3  -> Done "v==" $ v :=: (e2 :=: e3)
         e1     :=: e2 | needVar e1 -> Block "name-=-rhs" [u] [] $ (Var u :=: e1) :> (Var u :=: e2) where u = fresh!!0
         e1     :=: e2    -> find2 (:=:) e1 e2
 
@@ -255,7 +305,7 @@ findRedex fresh locals eqns ex =
         Arr es  :@ Val v -> Done "ITUP" $ foldr alt Fail (zipWith (\ i e -> (v :=: Int i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
 
-        Var f   :@ Var _ | f `elem` singleOcc -> Block "EXI-APP" [u] [] (Var u) where u = fresh!!0
+        Var f   :@ Val _ | f `elem` singleOcc -> Block "EXI-APP" [u] [] (Var u) where u = fresh!!0
         e1      :@  e2   -> find2 (:@) e1 e2
 
         e1     :|: e2    -> find2B (:|:) e1 e2
@@ -269,8 +319,10 @@ findRedex fresh locals eqns ex =
         -- Lam v e          -> find1 (Lam v) e
 
         -- :~> reduction
-        -- Hackily turn IsInt back to a lambda:
-        x :~> Prm F.IsInt          -> Done "int-hack" $ Var x :=: Lam u (Blk [] [] $ (Prm F.IsInt :@ Var u)) :> Var u
+        -- Hackily turn IsInt, IsAny back to a lambda:
+        x :~> Prm F.IsInt          -> Done "int-hack" $ Var x :=: (Lam u $ Blk [] [] $ (Prm F.IsInt :@ Var u) :> Var u)
+                                      where u = fresh!!0
+        x :~> Prm F.IsAny          -> Done "any-hack" $ Var x :=: (Lam u $ Blk [] [] $ Var u)
                                       where u = fresh!!0
         -- Matching
         x :~> Und                  -> Done "MWild"    $ Var x
@@ -279,7 +331,8 @@ findRedex fresh locals eqns ex =
         x :~> (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
         x :~> (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
         x :~> (e1 :=: e2)          -> Done "MUnif"    $ (x :~> e1) :=: (x :~> e2)
-        x :~> (b1 :|: b2)          -> Done "MChoice"  $ (x :~> Crl b1) :=: (x :~> Crl b2)
+        x :~> (Blk is1 eqs1 e1 :|: Blk is2 eqs2 e2)
+                                   -> Done "MChoice"  $ (Blk is1 eqs1 $ x :~> e1) :|: (Blk is2 eqs2 $ x :~> e2)
         _ :~> Fail                 -> Done "Mfail"    $ Fail
         x :~> (e1 :> e2)           -> Block "MSemi"  [u]   [] $ (u :~> e1) :> (x :~> e2)         where u = fresh!!0
         x :~> (e1 `Where` e2)      -> Block "MWhere" [u,v] [] $ (Var v :=: (x :~> e1)) :> (u :~> e2) :> Var v  where u:v:_ = fresh
@@ -315,16 +368,6 @@ findRedex fresh locals eqns ex =
       case find e of
         Block s is eqs e'  -> Block s is eqs (c e')
         r                  -> r
-    find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
-    find2B c b1@(Blk is1 eqs1 e1) b2 =
-      case find e1 of
-        Block s is eqs e1' -> Block s is eqs (Blk is1 eqs1 e1' `c` b2)
-        None               -> find1B (c b1) b2
-        r                  -> r
-    find1B c (Blk is eqs e) =
-      case find e of
-        Block s is' eqs' e' -> Block s is' eqs' (c (Blk is eqs e'))
-        r                   -> r
     findArr :: [Exp] -> Reduction
     findArr [] = None
     findArr (e:es) =
@@ -335,6 +378,16 @@ findRedex fresh locals eqns ex =
             Block s is eqs (Arr es') -> Block s is eqs (Arr (e:es'))
             r                        -> r
         r                 -> r
+    find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
+    find2B c b1@(Blk is eqs _) b2 =
+      case findB eqns b1 of
+        Block s is' eqs' e' -> Block s [] [] (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
+        None                -> find1B (c b1) b2
+        r                   -> r
+    find1B c b@(Blk is eqs _) =
+      case findB eqns b of
+        Block s is' eqs' e' -> Block s [] [] (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
+        r                   -> r
 
 {-
 -- Variables in a substitutable position, i.e., not in abstraction context
@@ -566,3 +619,28 @@ substVal sub (Arr vs) = Arr (map (substVal sub) vs)
 substVal sub e@Lam{} | null $ map fst sub `intersect` allVars' e = e
                      | otherwise = error "substVal: Lam unimplemented"
 substVal _ e = error $ "substVal: not a Val: " ++ show e
+
+-- XXX This is ugly.  Should GC locally instead
+gcVars :: Set Iden -> Exp -> Exp
+gcVars  _ e@Var{}   = e
+gcVars  _ e@Int{}   = e
+gcVars  _ e@Prm{}   = e
+gcVars  _ e@Lam{}   = e   -- XXX maybe recurse inside?
+gcVars  _ e@(:~>){} = e
+gcVars  _ e@(:=){}  = e
+gcVars  _ e@Und     = e
+gcVars  _ e@Where{} = e
+gcVars xs (e1 :@ e2) = gcVars xs e1 :@ gcVars xs e2
+gcVars  _ e@Rng{}   = e
+gcVars  _ e@Fun{}   = e
+gcVars xs (e1 :> e2) = gcVars xs e1 :> gcVars xs e2
+gcVars xs (e1 :=: e2) = gcVars xs e1 :=: gcVars xs e2
+gcVars xs (Arr es) = Arr (map (gcVars xs) es)
+gcVars xs (Crl b) = Crl (gcVarsBlk xs b)
+gcVars  _ e@Dly{} = e
+gcVars xs (b1 :|: b2) = gcVarsBlk xs b1 :|: gcVarsBlk xs b2
+gcVars xs (e1 :.. e2) = gcVars xs e1 :.. gcVars xs e2
+gcVars  _ e@Fail   = e
+
+gcVarsBlk :: Set Iden -> Blk -> Blk
+gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) $ gcVars xs expr
