@@ -57,7 +57,7 @@ data Exp
   | Blk :|: Blk      -- e1 | e2
   | Exp :.. Exp      -- e1 .. e2
   | Fail             -- fail
- -- Iter             -- if/for
+  | Iter IterCtx Blk Blk  -- if/for
   deriving (Eq, Show)
 
 type Eqn = (Iden, Val)
@@ -69,6 +69,9 @@ data Blk = Blk (Set Iden) (Set Eqn) Exp
   deriving (Eq, Show)
 
 type Val = Exp
+
+data IterCtx = IF | FOR
+  deriving (Eq, Show)
 
 instance Pretty Exp where
   pPrintPrec l p (Var i) = pPrintPrec l p i
@@ -85,18 +88,20 @@ instance Pretty Exp where
   pPrintPrec l p (e1 `Where` e2) = maybeParens (p > 0) $ pPrintPrec l 1 e1 <+> text "where" <+> pPrintPrec l 0 e2
   pPrintPrec l p (e1 :=: e2) = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
   pPrintPrec l _ (Arr es) | l == prettyNormal = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
-  pPrintPrec l _ (Arr [e]) = text "array" <> braces (pPrintPrec l 0 e)
+  pPrintPrec l _ (Arr [e]) = text "array" <> braces (pPrintL l e)
   pPrintPrec l _ (Arr es) = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
   pPrintPrec l _ (Crl b) = braces $ pPrintPrec l 0 b
-  pPrintPrec l _ (Dly b) = text "delay" <> braces (pPrintPrec l 0 b)
+  pPrintPrec l _ (Dly b) = text "delay" <> braces (pPrintL l b)
   pPrintPrec l p (b1 :|: b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec l p (e1 :.. e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
   pPrintPrec _ _ Fail = text "fail"
+  pPrintPrec l _ (Iter ic b1 b2) = text "iter" <> parens (text (show ic)) <> braces (pPrintL l b1) <> braces (pPrintL l b2)
 
 instance Pretty Blk where
   pPrintPrec l p (Blk [] [] e) = pPrintPrec l p e
   pPrintPrec l p (Blk vs eqns e) = maybeParens (p > 0) $ text "∃" <> hsep (map (pPrintPrec l 10) vs) <> text "." <+>
                                    vcat (punctuate (text "") (map (\ (i, d) -> pPrintPrec l 0 i <> text "<-" <> pPrintPrec l 0 d) eqns ++ [pPrintPrec l 0 e]))
+
 
 -- A HNF, i.e., a value, but not a variable
 pattern HNF :: Exp -> Val
@@ -279,13 +284,13 @@ findRedex fresh singleOcc geqns (Blk locals leqns ex) =
                          | AHNF{}             <- v         -> Failure "Prim-Gt"
 
         -- Unification
-        Val v1 :=: Val v2 | v1 == v2 -> Done "EQ" v1
+        Val v1 :=: Val v2 | v1 == v2 -> Done "EqVal" v1
         Con v1 :=: Con v2 | v1 /= v2 -> Failure "/="
         HNF v  :=: Var i             -> Done "SWAP" $ Var i :=: v
-        Var i  :=: HNF v  | i `elem` allFreeVars' v -> Failure "OCCUR"  -- occurs check
+-- Let this be stuck instead        Var i  :=: HNF v  | i `elem` allFreeVars' v -> Failure "OCCUR"  -- occurs check
         Val (Arr vs) :=: Arr es | length vs /= length es -> Failure "arr /="
                                 | otherwise ->
-                                  Done "EQARR" $ foldr (:>) (Arr vs) (zipWith (:=:) vs es)
+                                  Done "EqTup" $ foldr (:>) (Arr vs) (zipWith (:=:) vs es)
 
         -- Unification, structural
         Val v  :=: (e1 :>  e2) -> Done "= ;" $ e1 :> (v :=: e2)
@@ -443,6 +448,7 @@ allVars (b1 :|: b2) = allVarsBlk b1 ++ allVarsBlk b2
 allVars (e1 :.. e2) = allVars e1 ++ allVars e2
 allVars Fail = []
 allVars (Dly b) = allVarsBlk b
+allVars (Iter _ b1 b2) = allVarsBlk b1 ++ allVarsBlk b2
 
 allVarsBlk :: Blk -> [Iden]
 allVarsBlk (Blk is eqs e) = is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -558,6 +564,7 @@ rename sub = ren
     ren (e1 :.. e2) = ren e1 :.. ren e2
     ren e@Fail = e
     ren (Dly b) = Dly (renB b)
+    ren (Iter ic b1 b2) = Iter ic (renB b1) (renB b2)
     renB :: Blk -> Blk
     renB (Blk is eqs e) | any (isJust . (`lookup` sub)) is = error "rename clash 2"
                         | otherwise = Blk is (map (second ren) eqs) (ren e)
@@ -641,6 +648,7 @@ gcVars  _ e@Dly{} = e
 gcVars xs (b1 :|: b2) = gcVarsBlk xs b1 :|: gcVarsBlk xs b2
 gcVars xs (e1 :.. e2) = gcVars xs e1 :.. gcVars xs e2
 gcVars  _ e@Fail   = e
+gcVars xs (Iter ic b1 b2) = Iter ic (gcVarsBlk xs b1) (gcVarsBlk xs b2)
 
 gcVarsBlk :: Set Iden -> Blk -> Blk
 gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) $ gcVars xs expr
