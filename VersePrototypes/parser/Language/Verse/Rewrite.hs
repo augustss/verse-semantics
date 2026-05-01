@@ -40,7 +40,7 @@ import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Loc (L (..), Loc (..), liftL1, loc)
+import Language.Verse.Loc (L (..), Loc (..), liftL1, loc, mkL)
 import Language.Verse.Path (Path)
 import Language.Verse.Path qualified as Path
 import Language.Verse.SimpleName
@@ -560,6 +560,10 @@ rewriteDef pat rhs = case extract pat of
     rewriteDef' Val p
       (prefixColon e')
       (rhs `ofType` e')
+  InfixArrow p1@(extract -> Parse.Name (Parse.IdentName n1)) p2@(extract -> Parse.Name (Parse.IdentName n2)) -> do
+    let x1 = mkL (loc p1) $ Ident.Name n1
+    let x2 = mkL (loc p2) $ Ident.Name n2
+    pure $ List [mixfixArrowColonEqual x1 x2 rhs]
   InfixArrow p1 p2 -> do
     x1 <- freshIdent $ loc p1
     x2 <- freshIdent $ loc p2

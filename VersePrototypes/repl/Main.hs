@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 module Main(main) where
-
+import Debug.Trace
 import Prelude
 
 import Core.Expr     as Core
@@ -376,6 +376,7 @@ cParseLine line' s
   = tryIt (\_exc -> pure s) (updateLastExpr s) $ do
     let !line = substitute (cs_variables s) line'
         !prog = LP.parseToSrcExpr "<interactive>" (B.pack line)
+    traceM $ "cParseLine " ++ show prog
     pure prog
 
 variableSigil :: Char
