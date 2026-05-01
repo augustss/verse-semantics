@@ -1,7 +1,11 @@
-{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-} {- -Wno-missing-methods -Wno-incomplete-uni-patterns -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-}
+     {- -Wno-missing-methods -Wno-incomplete-uni-patterns -Wno-unused-matches
+        -Wno-missing-pattern-synonym-signatures -}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+
 module Red(run) where
+
 import Prelude hiding ((<>))
 import Control.Arrow(second)
 import Data.List(intersect, nub, (\\), union, group, sort)
@@ -17,17 +21,23 @@ import Debug.Trace
 -}
 
 
-type Iden = F.Ident
-type Op = F.PrimOp
+--------------------------------------------------------------------------------
+--
+--             Data types Term and Exp
+--
+--------------------------------------------------------------------------------
 
 infixr 0 :>
 infix  2 :=
 infixr 4 :|:
 infixr 5 :=:
 
+-- Synonyms to line up with the rewrite rules doca
+type Iden = F.Ident
+type Op   = F.PrimOp
+
 data Term
-  -- variables
-  = Und               -- _  
+  = Und               -- _
   | TVar Iden         -- x
   | TInt Integer      -- k
   | TPrm Op           -- op
@@ -49,31 +59,35 @@ data Term
 
 data Exp
   -- Values
-  = Var Iden         -- x
+  = Var Iden              -- x
   -- HNF
-  | Int Integer      -- k
-  | Prm Op           -- op
+  | Int Integer           -- k
+  | Prm Op                -- op
   -- Arr below
-  | Lam Iden Blk     -- \ x . e
-  | Dly Blk          -- delay{b}
-  -- non-HNF
-  | Exp :>  Exp      -- e1; e2
-  | Blk :|: Blk      -- e1 | e2
-  | Fail             -- fail
-  | Exp :=: Exp      -- e1 = e2
-  | Iden :~> Term    -- e ~> t
-  | Exp :@  Exp      -- e1[e2]
-  | Exp :.. Exp      -- e1 .. e2
-  | Arr [Exp]        -- array{e1,...,e2}
-  | Iter IterCtx Blk Blk  -- if/for
-  | Crl Blk          -- {...}
+  | Lam Iden Blk          -- \ x . e
+  | Dly Blk               -- delay{b}
+  -- Non-HNF
+  | Exp :>  Exp           -- e1; e2
+  | Blk :|: Blk           -- e1 | e2
+  | Fail                  -- fail
+  | Exp :=: Exp           -- e1 = e2
+  | Iden :~> Term         -- e ~> t
+  | Exp :@  Exp           -- e1[e2]
+  | Exp :.. Exp           -- e1 .. e2
+  | Arr [Exp]             -- array{e1,...,e2}
+  | Iter IterCtx Blk Exp  -- if/for
+  | Crl Blk               -- {...}
     deriving (Eq, Show)
 
 type Eqn = (Iden, Val)
 
-type Set a = [a]
+type Set a = [a]   -- Represented as a list, but order is immaterial
 
 -- The equation RHSs have no variables from the LHSs
+-- A block (Blk xs eqs e) satisfies these invariants:
+--    (A)  dom(eqs)    `subset`   X
+--    (B)  occfvs(eqs) `disjoint` X
+
 data Blk = Blk (Set Iden) (Set Eqn) Exp
   deriving (Eq, Show)
 
@@ -82,54 +96,80 @@ type Val = Exp
 data IterCtx = IF | FOR
   deriving (Eq, Show)
 
+--------------------------------------------------------------------------------
+--
+--             Pretty-printing
+--
+--------------------------------------------------------------------------------
+
+newtype PExp = P Exp
+instance Show PExp where
+  show (P e) = prettyShow e
+
 instance Pretty Term where
   pPrintPrec l p (TVar i) = pPrintPrec l p i
   pPrintPrec l p (TInt i) = pPrintPrec l p i
   pPrintPrec l p (TPrm o) = pPrintPrec l p o
-  pPrintPrec _ _ Und = text "_"
-  pPrintPrec l p (Rng e) = maybeParens (p > 10) $ text ":" <> pPrintPrec l 11 e
-  pPrintPrec l _ (Fun e1 e2) = text "fun" <> parens (pPrintPrec l 0 e1) <> braces (pPrintPrec l 0 e2)
-  pPrintPrec l p (x := e) = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":=" <+> pPrintPrec l 2 e
-  pPrintPrec l p (e1 :@% e2) = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
-  pPrintPrec l p (e1 :>% e2) = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
+  pPrintPrec _ _ Und      = text "_"
+
+  pPrintPrec l p (Rng e)         = maybeParens (p > 10) $ text ":" <> pPrintPrec l 11 e
+  pPrintPrec l _ (Fun e1 e2)     = text "fun" <> parens (pPrintPrec l 0 e1) <> braces (pPrintPrec l 0 e2)
+  pPrintPrec l p (x := e)        = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":=" <+> pPrintPrec l 2 e
+  pPrintPrec l p (e1 :@% e2)     = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
+  pPrintPrec l p (e1 :>% e2)     = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
   pPrintPrec l p (e1 `Where` e2) = maybeParens (p > 0) $ pPrintPrec l 1 e1 <+> text "where" <+> pPrintPrec l 0 e2
-  pPrintPrec l p (e1 :=:% e2) = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
-  pPrintPrec l _ (TArr es) | l == prettyNormal = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+  pPrintPrec l p (e1 :=:% e2)    = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
+
+  pPrintPrec l _ (TArr es)
+    | l == prettyNormal     = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l _ (TArr [e]) = text "array" <> braces (pPrintL l e)
-  pPrintPrec l _ (TArr es) = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+  pPrintPrec l _ (TArr es)  = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+
   pPrintPrec l p (b1 :|:% b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec l p (e1 :..% e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
-  pPrintPrec _ _ TFail = text "fail"
+  pPrintPrec _ _ TFail        = text "fail"
+
   pPrintPrec l _ (If t1 t2 t3) = text "if" <> parens (pPrintL l t1) <> braces (pPrintL l t2) <> text "else" <> braces (pPrintL l t3)
-  pPrintPrec l _ (For t1 t2) = text "if" <> parens (pPrintL l t1) <> braces (pPrintL l t2)
-  pPrintPrec l p (x :-> e) = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":->" <+> pPrintPrec l 2 e
+  pPrintPrec l _ (For t1 t2)   = text "if" <> parens (pPrintL l t1) <> braces (pPrintL l t2)
+  pPrintPrec l p (x :-> e)     = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":->" <+> pPrintPrec l 2 e
 
 instance Pretty Exp where
-  pPrintPrec l p (Var i) = pPrintPrec l p i
-  pPrintPrec l p (Int i) = pPrintPrec l p i
-  pPrintPrec l p (Prm o) = pPrintPrec l p o
-  pPrintPrec l p (Lam i b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 0 b
-  pPrintPrec l p (x :~> e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
-  pPrintPrec l p (e1 :@ e2) = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
-  pPrintPrec l p (e1 :> e2) = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
+  pPrintPrec l p (Var i)     = pPrintPrec l p i
+  pPrintPrec l p (Int i)     = pPrintPrec l p i
+  pPrintPrec l p (Prm o)     = pPrintPrec l p o
+  pPrintPrec l p (Lam i b)   = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 0 b
+  pPrintPrec l p (x :~> e)   = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
+  pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
+  pPrintPrec l p (e1 :> e2)  = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
   pPrintPrec l p (e1 :=: e2) = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
-  pPrintPrec l _ (Arr es) | l == prettyNormal = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+
+  pPrintPrec l _ (Arr es)
+    | l == prettyNormal    = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l _ (Arr [e]) = text "array" <> braces (pPrintL l e)
-  pPrintPrec l _ (Arr es) = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
-  pPrintPrec l _ (Crl b) = braces $ pPrintPrec l 0 b
-  pPrintPrec l _ (Dly b) = text "delay" <> braces (pPrintL l b)
+  pPrintPrec l _ (Arr es)  = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+
+  pPrintPrec l _ (Crl b)     = braces $ pPrintPrec l 0 b
+  pPrintPrec l _ (Dly b)     = text "delay" <> braces (pPrintL l b)
   pPrintPrec l p (b1 :|: b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec l p (e1 :.. e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
-  pPrintPrec _ _ Fail = text "fail"
-  pPrintPrec l _ (Iter ic b1 b2) = text "iter" <> parens (text (show ic)) <> braces (pPrintL l b1) <> braces (pPrintL l b2)
+  pPrintPrec _ _ Fail        = text "fail"
+
+  pPrintPrec l _ (Iter ic b1 b2)
+    = text "iter" <> parens (text (show ic)) <> braces (pPrintL l b1) <> braces (pPrintL l b2)
 
 instance Pretty Blk where
   pPrintPrec l p (Blk [] [] e) = pPrintPrec l p e
-  pPrintPrec l p (Blk vs eqns e) = maybeParens (p > 0) $ text "∃" <+> 
-                                   vcat ((hsep (map (pPrintPrec l 10) vs) <> text ".") :
-                                         (punctuate (text "") (map (\ (i, d) -> pPrintPrec l 0 i <+> text "<-" <+> pPrintPrec l 0 d) eqns)) ++
-                                         [pPrintPrec l 0 e])
+  pPrintPrec l p (Blk vs eqns e)
+    = maybeParens (p > 0) $ text "∃" <+>
+      vcat ([hsep (map (pPrintPrec l 10) vs) <> text "."]
+            ++ (punctuate (text "") (map (\ (i, d) -> pPrintPrec l 0 i <+> text "<-" <+> pPrintPrec l 0 d) eqns))
+            ++ [pPrintPrec l 0 e])
 
+--------------------------------------------------------------------------------
+--
+--             Pattern synonyms that carve out Exp subsets
+--
+--------------------------------------------------------------------------------
 
 -- A HNF, i.e., a value, but not a variable
 pattern HNF :: Exp -> Val
@@ -169,6 +209,12 @@ getCon e@Int{} = Just e
 getCon e@(Arr es) | Just _ <- mapM getCon es = Just e
 getCon _ = Nothing
 
+--------------------------------------------------------------------------------
+--
+--             Convert SrcEssential to Term
+--
+--------------------------------------------------------------------------------
+
 srcToTerm :: F.SrcEssential -> Term
 srcToTerm (F.Variable i) | F.isSrcUnderscore i = Und
                          | otherwise = TVar i
@@ -191,9 +237,37 @@ srcToTerm (F.If3 e1 e2 e3) = If (srcToTerm e1) (srcToTerm e2) (srcToTerm e3)
 srcToTerm (F.For2 e1 e2) = For (srcToTerm e1) (srcToTerm e2)
 srcToTerm e = error $ "srcToTerm: unimplemented " ++ show e
 
-newtype PExp = P Exp
-instance Show PExp where
-  show (P e) = prettyShow e
+--------------------------------------------------------------------------------
+--
+--             Reductions
+--
+--------------------------------------------------------------------------------
+
+type RuleName = String
+
+data Reduction
+  = None               -- No redex found
+  | Failure String     -- Evaluation failed
+  | Delete (Set Iden)  -- Delete the identifiers from the block existential and equations
+  | Step RuleName [Iden] [Eqn] Exp  -- The named rule fired, returning this Blk
+  deriving (Eq, Show)
+
+pattern Done :: String -> Exp -> Reduction
+pattern Done s e = Step s [] [] e
+
+instance Pretty Reduction where
+  pPrintPrec l p (Delete is) = text "GC" <+> pPrintPrec l p is
+  pPrintPrec _ _ None               = text "None"
+  pPrintPrec _ _ (Failure s)        = text "Failure" <+> text (show s)
+  pPrintPrec l _ (Done s e)         = text "Done" <+> text (show s) <+> pPrintPrec l 0 e
+  pPrintPrec l _ (Step s xs eqns e) = text "Step" <+> text (show s)
+                                      <+> pPrintPrec l 0 (Blk xs eqns e)
+
+--------------------------------------------------------------------------------
+--
+--             The evaluator
+--
+--------------------------------------------------------------------------------
 
 run :: F.SrcEssential -> PExp
 run src = P $ evalBlk 1000000 (Blk (u:tbs t) [] (u :~> t))
@@ -206,42 +280,15 @@ evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
 evalBlk fuel b@(Blk is eqs expr) =
     case findTopRedex (freshVarsBlk b) b of
       -- XXX iterate substVal?
-      Block _ xs eqns e -> evalBlk (fuel-1) (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
-                                                                  map (second $ substVal eqns) eqs) e)
+      Step _ xs eqns e -> evalBlk (fuel-1) $
+                          (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
+                                                map (second $ substVal eqns) eqs) e)
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
 
-data Reduction
-  = Delete (Set Iden)                      -- delete the identifiers from the block existential and equations
-  | Block String [Iden] [Eqn] Exp          -- the named rule fired.  Add new existential, add new equations, replace expression
-  | None                                   -- no redex found
-  | Failure String                         -- evaluation failed
-  deriving (Eq, Show)
 
-instance Pretty Reduction where
-  pPrintPrec l p (Delete is) = text "GC" <+> pPrintPrec l p is
-  pPrintPrec _ _ None = text "None"
-  pPrintPrec _ _ (Failure s) = text "Failure" <+> text (show s)
-  pPrintPrec l _ (Done s e) = text "Done" <+> text (show s) <+> pPrintPrec l 0 e
-  pPrintPrec l _ (Block s xs eqns e) = text "Block" <+> text (show s) <+> pPrintPrec l 0 (Blk xs eqns e)
-
-pattern Done :: String -> Exp -> Reduction
-pattern Done s e = Block s [] [] e
-
-{-
-notVar :: Exp -> Bool
-notVar Var{} = False
-notVar _ = True
--}
-
-{-
-needVar :: Exp -> Bool
-needVar (_ :> _) = True
-needVar (_ :=: _) = True
-needVar _ = False
--}
 
 dom :: Set Eqn -> Set Iden
 dom = map fst
@@ -255,34 +302,41 @@ noIntersect xs ys = null $ xs `intersect` ys
 findTopRedex :: [Iden] -> Blk -> Reduction
 findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] blk
   where
+    -- Subset of `locals` that occur exactly once, and have no Eqn
+    -- To support EXI-APP
+    -- ToDo: what about occurrences in `eqns` under a lambda?
     singleOcc :: Set Iden
-    singleOcc = [ x | [x] <- group (sort (allVars ex)), x `elem` locals, isNothing (lookup x eqns) ]
+    singleOcc = [ x | [x] <- group (sort (allVars ex))
+                    , x `elem` locals
+                    , isNothing (lookup x eqns) ]
 
 findRedex :: [Iden] -> Set Iden -> Set Eqn -> Blk -> Reduction
-findRedex fresh singleOcc geqns (Blk locals leqns ex) =
+findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
   trace (render (text "findRedex" <+> (pPrintL prettyNormal ex $$ pPrintL prettyNormal res)) ++ "\n")
           res
   where
-    res | xs@(_ : _) <- locals \\ (allVars' ex ++ concatMap (allVars' . snd) leqns) = Delete xs  -- GC rules
-      | otherwise = find ex
+    res | not (null dead_vars) = Delete dead_vars  -- GC rules
+        | otherwise            = find ex
+
+    dead_vars :: [Iden]  -- Subset of locals that are unused
+    dead_vars = locals \\ (allVars' ex ++ concatMap (allVars' . snd) leqns)
+
     eqns = leqns ++ geqns
+
     findB :: Set Eqn -> Blk -> Reduction
     findB = findRedex fresh singleOcc
+
     find :: Exp -> Reduction
     find expr =
       case expr of
         -- Scope and substitution
-        Var x  :=: Val v  | x `elem` locals                                -- must be a local variable
-                          , x `notElem` dom leqns                          -- x must not have an eqn
-                          , occfvs v `noIntersect` (x:dom eqns)            -- v must not have variables from eqns
-                          -> Block "Promote1" [] [(x, v)] v
-        Val v  :=: Var x  | x `elem` locals                                -- must be a local variable
-                          , x `notElem` dom leqns                          -- x must not have an eqn
-                          , occfvs v `noIntersect` (x:dom eqns)            -- v must not have variables from eqns
-                          -> Block "Promote2" [] [(x, v)] v
+        Var x  :=: Val v  | promotionOK parent x v
+                          -> Step "Promote1" [] [(x, v)] v
+        Val v  :=: Var x  | promotionOK parent x v
+                          -> Step "Promote2" [] [(x, v)] v
 
         Var i             | Just v <- lookup i eqns -> Done ("Subst " ++ show i) v
-        Crl b@Blk{}       -> Block "FloatB" is' eqs' e' where Blk is' eqs' e' = freshen fresh b
+        Crl b@Blk{}       -> Step "FloatB" is' eqs' e' where Blk is' eqs' e' = freshen fresh b
         -- GC rules handled above
 
         -- Primops
@@ -314,47 +368,52 @@ findRedex fresh singleOcc geqns (Blk locals leqns ex) =
                                 | otherwise ->
 --                                  Done "EqTup" $ foldr (:>) (Arr vs) (zipWith (:=:) vs es)
                                   Done "EqTup" $ Arr (zipWith (:=:) vs es)
-        
+
         -- Sequencing
         Val{}  :>  e2    -> Done "Seq1" e2
-        e1     :>  e2    -> find2 (:>)  e1 e2
 
 
         -- Unification, structural
-        (e1 :> e2) :=: e3      -> Done "Norm1" $ e1 :> (e2 :=: e3)
-        Val v  :=: (e1 :>  e2) -> Done "Norm2" $ e1 :> (v :=: e2)
-        Val v  :=: (e1 :=: e2) -> Done "Norm3" $ (v :=: e1) :> (v :=: e2)
-{-
-        (Val v :=: e2) :=: e3  -> Done "v==" $ v :=: (e2 :=: e3)
-        e1     :=: e2 | needVar e1 -> Block "name-=-rhs" [u] [] $ (Var u :=: e1) :> (Var u :=: e2) where u = fresh!!0
--}
-        e1     :=: e2    -> find2 (:=:) e1 e2
+        Val v  :=: (e1 :>  e2) -> Done "Norm1" $ e1 :> (v :=: e2)
+        Val v  :=: (e1 :=: e2) -> Done "Norm2" $ (v :=: e1) :> (v :=: e2)
+        (e1 :> e2) :=: e3      -> Done "Norm3" $ e1 :> (e2 :=: e3)
+        (Val v :=: e1) :=: e2  -> Done "Norm4" $ (v :=: e1) :> (v :=: e2)
 
         -- Beta
-        Lam x (Blk vs eqs e)
-                :@ Val v -> Block "Beta" is' eqs' e' where Blk is' eqs' e' = freshen fresh (Blk (x:vs) ((x, v):eqs) e)
-        Arr es  :@ Val v -> Done "ITUP" $ foldr alt Fail (zipWith (\ i e -> (v :=: Int i) :> e) [0..] es)
+        Lam x (Blk vs eqs e) :@ Val v
+          -> Step "Beta" is' eqs' e'
+          where Blk is' eqs' e' = freshen fresh (Blk (x:vs) ((x, v):eqs) e)
+
+        Arr es :@ Val v -> Done "ITUP" $
+                           foldr alt Fail (zipWith (\ i e -> (v :=: Int i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
-        Var f   :@ Val _ | f `elem` singleOcc -> Block "ExiApp" [u] [] (Var u) where u = fresh!!0
-        e1      :@  e2   -> find2 (:@) e1 e2
 
-        b1     :|: b2    -> find2B (:|:) b1 b2
+        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" [u] [] (Var u) where u = fresh!!0
 
---        Lam x b          -> find1B (Lam x) b
-
---        Fail             -> Failure "FAIL"
+        Fail             -> Failure "FAIL"
 
         Arr es           -> findArr es
 
-        Iter ic b1 b2    ->
-          case findRedex fresh singleOcc eqns b1 of
-            Failure _s -> Done ("IFail-" ++ _s) $ Crl b2
-            None       -> None
-            Delete xs  -> Done "GC" $ Iter ic (gcVarsBlk xs b1) b2
+        -- Catch-all cases for context C; just walk downwards
+        e1 :>  e2  -> find2  (:>)  e1 e2
+        e1 :=: e2  -> find2  (:=:) e1 e2
+        e1  :@  e2 -> find2  (:@)  e1 e2
+        b1 :|: b2  -> find2B (:|:) b1 b2
+        Lam x b    -> find1B (Lam x) b
 
-            Block _s is eqs (c1 :|: c2) -> Done ("IChoice-" ++ _s) $ Iter ic (Blk is eqs $ Crl c1) (Blk [] [] $ Iter ic (Blk is eqs $ Crl c2) b2)
-            Block _s [] _ (Dly b) | ic == IF -> Done ("IIf-"++ _s) $ Crl b
-            Block s is eqs e -> Done s $ Iter ic (Blk is eqs e) b2
+
+
+        Iter ic b1 e2    ->
+          case findRedex fresh singleOcc eqns b1 of
+            Failure _s -> Done ("IFail-" ++ _s) e2
+            None       -> None
+            Delete xs  -> Done "GC" $ Iter ic (gcVarsBlk xs b1) e2
+
+            Step _s is eqs (c1 :|: c2) -> Done ("IChoice-" ++ _s) $
+                                          Iter ic (Blk is eqs $ Crl c1)
+                                                  (Iter ic (Blk is eqs $ Crl c2) e2)
+            Step _s [] _ (Dly b) | ic == IF -> Done ("IIf-"++ _s) $ Crl b
+            Step s  is eqs e -> Done s $ Iter ic (Blk is eqs e) e2
 
         -- Reduction under lambda
         -- XXX WRONG, needs a Blk boundary inside the Lam
@@ -362,6 +421,7 @@ findRedex fresh singleOcc geqns (Blk locals leqns ex) =
 
         -- :~> reduction
         -- Hackily turn IsInt, IsAny back to a lambda:
+        -- We can't do this earlier because we don't have lambda in Trm.
         x :~> TPrm F.IsInt         -> Done "int-hack" $ Var x :=: (Lam u $ Blk [] [] $ (Prm F.IsInt :@ Var u) :> Var u)
                                       where u = fresh!!0
         x :~> TPrm F.IsAny         -> Done "any-hack" $ Var x :=: (Lam u $ Blk [] [] $ Var u)
@@ -376,17 +436,19 @@ findRedex fresh singleOcc geqns (Blk locals leqns ex) =
         x :~> (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
         x :~> (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
 -}
-        x :~> (t1 :@% t2)          -> Block "MApp" [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
+        x :~> (t1 :@% t2)          -> Step "MApp" [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
         x :~> (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
         x :~> (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
+        -- SLPJ what if x is one of the binders in t1/t2?
+
         _ :~> TFail                -> Done "Mfail"    $ Fail
-        x :~> (t1 :>% t2)          -> Block "MSemi"  [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
-        x :~> (t1 `Where` t2)      -> Block "MWhere" [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
-        x :~> TArr ts              -> Block "MTup"   xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
+        x :~> (t1 :>% t2)          -> Step "MSemi"  [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
+        x :~> (t1 `Where` t2)      -> Step "MWhere" [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
+        x :~> TArr ts              -> Step "MTup"   xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
                                       where xs = take (length ts) fresh
-        x :~> Rng t                -> Block "MColon" [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
-        x :~> (i := t)             -> Block "MDef"   [i]   [] $ Var i :=: (x :~> t)
-        x :~> (i :-> t)            -> Block "MArr"   [i]   [] $ (Var i :=: Var x) :> (x :~> t)
+        x :~> Rng t                -> Step "MColon" [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
+        x :~> (i := t)             -> Step "MDef"   [i]   [] $ Var i :=: (x :~> t)
+        x :~> (i :-> t)            -> Step "MArr"   [i]   [] $ (Var i :=: Var x) :> (x :~> t)
 {-
         x :~> ea@(Val{} :.. Val{}) -> Done "MEnum-v-v" $ Var x :=: ea
         x :~> (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
@@ -398,39 +460,54 @@ findRedex fresh singleOcc geqns (Blk locals leqns ex) =
                                                                                       (y :~> bt)
                                         where u:x:y:_ = fresh
         x :~> If t0 t1 t2          -> Done "MIf"      $ Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
-                                                                (Blk (tbs t2) [] (x :~> t2))
+                                                                (Crl (Blk (tbs t2) [] (x :~> t2)))
                                         where u = fresh!!0
         _ -> None
 
-    find2 c e1 e2 =
-      case find e1 of
-        Block s is eqs e1' -> Block s is eqs (e1' `c` e2)
-        None               -> find1 (c e1) e2
-        r                  -> r
+    find1 :: (Exp -> Exp) -> Exp -> Reduction
     find1 c e =
       case find e of
-        Block s is eqs e'  -> Block s is eqs (c e')
-        r                  -> r
+        Step s is eqs e'  -> Step s is eqs (c e')
+        r                 -> r
+
+    find2 :: (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction
+    find2 c e1 e2 =
+      case find e1 of
+        Step s is eqs e1' -> Step s is eqs (e1' `c` e2)
+        None              -> find1 (c e1) e2
+        r                 -> r
+
     findArr :: [Exp] -> Reduction
     findArr [] = None
     findArr (e:es) =
       case find e of
-        Block s is eqs e' -> Block s is eqs (Arr (e':es))
+        Step s is eqs e' -> Step s is eqs (Arr (e':es))
         None              ->
           case findArr es of
-            Block s is eqs (Arr es') -> Block s is eqs (Arr (e:es'))
-            r                        -> r
+            Step s is eqs (Arr es') -> Step s is eqs (Arr (e:es'))
+            r                       -> r
         r                 -> r
+
+    find1B :: (Blk -> Exp) -> Blk -> Reduction
+    find1B c b@(Blk is eqs _) =
+      case findB eqns b of
+        Step s is' eqs' e' -> Done s (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
+        r                  -> r
+
     find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
     find2B c b1@(Blk is eqs _) b2 =
       case findB eqns b1 of
-        Block s is' eqs' e' -> Block s [] [] (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
-        None                -> find1B (c b1) b2
-        r                   -> r
-    find1B c b@(Blk is eqs _) =
-      case findB eqns b of
-        Block s is' eqs' e' -> Block s [] [] (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
-        r                   -> r
+        Step s is' eqs' e' -> Done s (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
+        None               -> find1B (c b1) b2
+        r                  -> r
+
+
+promotionOK :: Blk -> Iden -> Val -> Bool
+-- True if we can promote (var=val) into the heap for the parent block
+promotionOK (Blk locals leqns _) x v
+  =  x `elem` locals                        -- must be a local variable
+  && x `notElem` dom leqns                  -- x must not have an eqn
+  && occfvs v `noIntersect` (x : dom leqns) -- v must not have variables from eqns
 
 -- Top level binders
 tbs :: Term -> Set Iden
@@ -468,48 +545,11 @@ occfvs (i :~> _) = [i]  -- XXX what should we do here
 occfvs (e1 :@ e2) = occfvs e1 `union` occfvs e2
 occfvs (e1 :.. e2) = occfvs e1 `union` occfvs e2
 occfvs (Arr es) = foldr union [] (map occfvs es)
-occfvs (Iter _ b1 b2) = occfvsB b1 `union` occfvsB b2
+occfvs (Iter _ b1 e2) = occfvsB b1 `union` occfvs e2
 occfvs (Crl b) = occfvsB b
 
 occfvsB :: Blk -> Set Iden
 occfvsB (Blk is eqs e) = foldr union (occfvs e) (map (occfvs . snd) eqs) \\ is
-
-
-{-
--- Variables in a substitutable position, i.e., not in abstraction context
-substVars :: Exp -> [Iden]
-substVars (Var i) = [i]
-substVars Und = []
-substVars (Int _) = []
-substVars (Prm _) = []
-substVars (_ := e) = substVars e
-substVars (e1 :>  e2) = substVars e1 ++ substVars e2
-substVars (e1 `Where`  e2) = substVars e1 ++ substVars e2
-substVars (e1 :=: e2) = substVars e1 ++ substVars e2
-substVars (e1 :~> _) = substVars e1 -- e2 is a "pattern"
-substVars (e1 :@  e2) = substVars e1 ++ substVars e2
-substVars (Fun _ e2) = substVarsBlk e2 -- e1 is a "pattern"
-substVars (Rng e) = substVars e
-substVars (Arr es) = concatMap substVars es
-substVars (Crl b) = substVarsBlk b
-substVars (b1 :|: b2) = substVarsBlk b1 ++ substVarsBlk b2
-substVars (e1 :.. e2) = substVars e1 ++ substVars e2
-substVars Fail = []
-
-substVars' :: Exp -> Set Iden
-substVars' = nub . substVars
-
-substVarsBlk :: Blk -> [Iden]
-substVarsBlk (Blk is e) = filter (`notElem` is) (substVars e)
--}
-
-{-
-allFreeVars :: Exp -> [Iden]
-allFreeVars = allVars -- XXX
-
-allFreeVars' :: Exp -> Set Iden
-allFreeVars' = nub . allFreeVars
--}
 
 allVars :: Exp -> [Iden]
 allVars (Var i) = [i]
@@ -526,7 +566,7 @@ allVars (e1 :.. e2) = allVars e1 ++ allVars e2
 allVars Fail = []
 allVars (Dly b) = allVarsBlk b
 allVars (Crl b) = allVarsBlk b
-allVars (Iter _ b1 b2) = allVarsBlk b1 ++ allVarsBlk b2
+allVars (Iter _ b1 e2) = allVarsBlk b1 ++ allVars e2
 
 allVarsBlk :: Blk -> [Iden]
 allVarsBlk (Blk is eqs e) = is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -655,7 +695,7 @@ rename sub = ren
     ren (e1 :.. e2) = ren e1 :.. ren e2
     ren e@Fail = e
     ren (Dly b) = Dly (renB b)
-    ren (Iter ic b1 b2) = Iter ic (renB b1) (renB b2)
+    ren (Iter ic b1 e2) = Iter ic (renB b1) (ren e2)
     ren (Crl b) = Crl (renB b)
     renB :: Blk -> Blk
     renB (Blk is eqs e) | any (isJust . (`lookup` sub)) is = error "rename clash 2"
@@ -759,7 +799,7 @@ gcVars  _ e@Dly{} = e
 gcVars xs (b1 :|: b2) = gcVarsBlk xs b1 :|: gcVarsBlk xs b2
 gcVars xs (e1 :.. e2) = gcVars xs e1 :.. gcVars xs e2
 gcVars  _ e@Fail   = e
-gcVars xs (Iter ic b1 b2) = Iter ic (gcVarsBlk xs b1) (gcVarsBlk xs b2)
+gcVars xs (Iter ic b1 e2) = Iter ic (gcVarsBlk xs b1) (gcVars xs e2)
 
 gcVarsBlk :: Set Iden -> Blk -> Blk
 gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) $ gcVars xs expr

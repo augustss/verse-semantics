@@ -11,11 +11,36 @@ module Core.Traced(
 import Prelude hiding( (<>) )
 import Epic.Print
 
+--------------------------------------------------------------------------------
+--
+--             Data types
+--
+--------------------------------------------------------------------------------
+
+data Traced a = a :<-- [TraceStep a]
+  --    (e, [(sn,en), ..., (s1,e1)])
+  -- represents the sequence of steps
+  --    e1 --s1--> e2 --s2--> ... en --sn--> e
+  -- That is, the most recent step is at the head of the list
+  deriving (Show)
+
 data TraceStep a
-  = TS { ts_str     :: String     -- Describes the sep
+  = TS { ts_payload :: a          -- Payload just /before/ the step
+       , ts_str     :: String     -- Describes the step
        , ts_verb    :: Verbosity  -- Show this rule at verbosity rw_verb and above
-       , ts_payload :: a }        -- Payload just /before/ the step
-  deriving( Functor, Show )
+    }  deriving( Functor, Show )
+
+type Verbosity = Int
+  -- At verbosity level V, when displaying a trace,
+  -- show only rewrites that have verbosity <= V.
+  -- Typical levels are 1,2,3
+
+
+--------------------------------------------------------------------------------
+--
+--             Functions
+--
+--------------------------------------------------------------------------------
 
 tsPayload :: TraceStep a -> a
 tsPayload = ts_payload
@@ -26,20 +51,8 @@ setTsPayload ts x = ts { ts_payload = x }
 updTsPayload :: (a -> a) -> TraceStep a -> TraceStep a
 updTsPayload = fmap
 
-type Verbosity = Int
-  -- At verbosity level V, when displaying a trace,
-  -- show only rewrites that have verbosity <= V.
-  -- Typical levels are 1,2,3
-
 verbosityAll :: Verbosity
 verbosityAll = 100
-
-data Traced a = a :<-- [TraceStep a]
-  --    (e, [(sn,en), ..., (s1,e1)])
-  -- represents the sequence of steps
-  --    e1 --s1--> e2 --s2--> ... en --sn--> e
-  -- That is, the most recent step is at the head of the list
-  deriving (Show)
 
 term :: Traced a -> a
 term (x :<-- _) = x

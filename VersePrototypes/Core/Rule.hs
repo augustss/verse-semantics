@@ -240,6 +240,7 @@ normalize fuel rule orig_e = go fuel [] orig_e
         | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
                             go (fuel_left-1) tr' e'
         where
-          tr' = TS lab v e' `setTsPayload` e : tr
+          tr' = TS { ts_str = lab, ts_verb = v, ts_payload = e' }
+                `setTsPayload` e : tr
 
 -----------------------------------------------------------------------------

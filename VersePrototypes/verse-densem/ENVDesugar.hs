@@ -6,11 +6,16 @@ envDesugar :: SrcEssential -> SrcEssential
 envDesugar = desugar
 
 desugar :: SrcEssential -> SrcEssential
+
 -- x := :any        --->  exists x
 desugar (DefineE i (Range (Variable (Ident _ "any")))) = DefineV i
--- prim := e1; e2   --->  e2
+
+-- "prim"  -->   primop-for-prim
 desugar (Variable (Ident _ s)) | Just p <- lookup s primOps = EPrim p
+
+-- prim := e1; e2   --->  e2
 desugar (Seq (DefineE (Ident _ s) _) e) | Just _ <- lookup s primOps' = desugar e
+
 desugar e = composOp desugar e
 
 primOps :: [(String, PrimOp)]
