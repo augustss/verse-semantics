@@ -470,7 +470,7 @@ cEval
        ; prepd_core <- runD flags Core.Fail (getCore flags e)
        ; let rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules
-       ; let (res, tr) = Core.normalize (fRewriteSteps flags) rules prepd_core
+       ; let (res, tr) = Core.normalize rules rules (fRewriteSteps flags) prepd_core
 
        ; let eval_doc = addHeader "Evaluate" $
                         case res of

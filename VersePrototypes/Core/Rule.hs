@@ -15,7 +15,7 @@ module Core.Rule
   , only
   , permute
   , choices
-  , normalize
+  , normalizeExpr
   , NormResult(..)
   , showNormResult
   , lotsOfSteps
@@ -204,43 +204,12 @@ everywhere r = r <|> dive (everywhere r)
 -----------------------------------------------------------------------------
 -- normalizing
 
-type Fuel = Int
-
-lotsOfSteps :: Fuel
-lotsOfSteps = 1000
-
-data NormResult
-  = NormOK        -- No rewrites apply
-  | NormExpired   -- We ran out of fuel
-  | NormInvalid   -- A rewrite produced an invalid output
-                  -- according to the `valid` predicate
-  deriving( Eq )
-
-instance Show NormResult where
-   show = showNormResult
-
-showNormResult :: NormResult -> String
-showNormResult NormOK      = "reached a normal form"
-showNormResult NormExpired = "ran out of fuel (Unexpected)"
-showNormResult NormInvalid = "reached an invalid expression -- yikes!"
-
-normalize :: Fuel    -- Maximum number of steps
-          -> Rule Expr -> Expr
-          -> (NormResult, Traced Expr)
--- Repeatedly apply the first in the
--- list of possiblities returned by the rule
-normalize fuel rule orig_e = go fuel [] orig_e
- where
-  go fuel_left tr e =
-    case run rule (S.fromList (occurs e)) [] [] e of
-      []                        -> (NormOK,      e  :<-- tr)
-      (e',lab,v) : _   -- Pick the first offered rewrite
-        | fuel_left==0   -> (NormExpired, e  :<-- tr)
-        | not (valid e') -> (NormInvalid, e' :<-- tr')
-        | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
-                            go (fuel_left-1) tr' e'
-        where
-          tr' = TS { ts_str = lab, ts_verb = v, ts_payload = e' }
-                `setTsPayload` e : tr
-
------------------------------------------------------------------------------
+normalizeExpr :: Rule Expr -> Fuel -> Expr
+              -> (NormResult, Traced Expr)
+normalizeExpr rules = normalize step valid
+  where
+    step e = case run rules  (S.fromList (occurs e)) [] [] e of
+               [] -> Nothing
+               (e', lab, v) : _ -> Just (TS { ts_payload = e'
+                                            , ts_str = lab
+                                            , ts_verb = v})

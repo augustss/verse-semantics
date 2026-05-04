@@ -3,7 +3,9 @@
 module Core.Traced(
   Traced(..), TraceStep(..), tsPayload, setTsPayload, updTsPayload,
   Verbosity, verbosityAll,
-  term, trace, start, (++>), loop,
+  term, trace, start, (++>), loop, normalize,
+  Fuel, lotsOfSteps,
+  NormResult(..), showNormResult,
   filterTrace,
   displayTrace, displayTraceV, pPrintTrace,
   PrettyBrief(..)
@@ -35,6 +37,48 @@ type Verbosity = Int
   -- show only rewrites that have verbosity <= V.
   -- Typical levels are 1,2,3
 
+
+--------------------------------------------------------------------------------
+--
+--             Running a sequence of rules
+--
+--------------------------------------------------------------------------------
+
+type Fuel = Int
+
+lotsOfSteps :: Fuel
+lotsOfSteps = 1000
+
+data NormResult
+  = NormOK        -- No rewrites apply
+  | NormExpired   -- We ran out of fuel
+  | NormInvalid   -- A rewrite produced an invalid output
+                  -- according to the `valid` predicate
+  deriving( Eq )
+
+instance Show NormResult where
+   show = showNormResult
+
+showNormResult :: NormResult -> String
+showNormResult NormOK      = "reached a normal form"
+showNormResult NormExpired = "ran out of fuel (Unexpected)"
+showNormResult NormInvalid = "reached an invalid expression -- yikes!"
+
+-- Repeatedly apply the first in the
+-- list of possiblities returned by the rule
+normalize :: (a -> Maybe (TraceStep a))   -- How to take a step
+          -> (a -> Bool)                  -- Validity predicate
+          -> Fuel -> a -> (NormResult, Traced a)
+normalize step valid fuel orig_e
+  = go fuel [] orig_e
+  where
+    go fuel_left tr e
+      = case step e of
+          Nothing -> (NormOK, e :<-- tr)
+          Just ts@(TS { ts_payload = e' })
+            | fuel_left==0   -> (NormExpired, e  :<-- tr)
+            | not (valid e') -> (NormInvalid, e' :<-- (ts : tr))
+            | otherwise      -> go (fuel_left-1) (ts : tr) e'
 
 --------------------------------------------------------------------------------
 --
