@@ -34,7 +34,7 @@ import qualified Pom (den)
 import qualified PomPom (denS, ForUnionMode(..), ForUnitMode(..), IfUnionMode(..), Config(..), defaultConfig)
 import qualified SemClass (den)
 import qualified Red as Simon (run)
-import ENVDesugar (envDesugar)
+import FrontEnf.ENVDesugar (envDesugar)
 
 -- Epic libraries
 import Epic.Repl
@@ -470,7 +470,7 @@ cEval
        ; prepd_core <- runD flags Core.Fail (getCore flags e)
        ; let rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules
-       ; let (res, tr) = Core.normalize rules rules (fRewriteSteps flags) prepd_core
+       ; let (res, tr) = Core.normalizeExpr rules (fRewriteSteps flags) prepd_core
 
        ; let eval_doc = addHeader "Evaluate" $
                         case res of

@@ -5,7 +5,7 @@
 module FrontEnd.Desugar(
     desugar
     , DsM, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr, doIO_D
-    , addPrelude, sDesugarExpr, essToMini
+    , addPrelude, sDesugarExpr, essToMini, srcToEssential
     , miniToCore
   ) where
 
@@ -14,6 +14,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
+import FrontEnd.ENVDesugar( envDesugar )
 import Core.Expr  ( allPrimOps, primOpString )
 
 -- Epic libraries
@@ -71,6 +72,26 @@ desugar flgs add_verification e_parsed
 
        ; return e_ds
        }
+
+srcToEssential :: Flags -> SrcExpr -> IO SrcEssential
+srcToEssential flags e_parsed
+  = runD flags Fail $
+    do { _ <- traceDS "parsed" e_parsed
+
+       -- Prepend prelude from
+       --    verifyprelude.verse, mediumprelude.verse
+       ; e_prel <- addPrelude e_parsed
+       ; _ <- traceDS "Add prelude" e_prel
+
+       -- Desugar into Essential Verse by doing superficial desugaring
+       ; e_essential <- sDesugarExpr e_prel
+
+       -- Do the silly envDesugar thing
+       ; let e_essential' = envDesugar e_essential
+
+       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential'
+
+       ; return e_essential' }
 
 --------------------------------------------------------
 --

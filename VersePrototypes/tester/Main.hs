@@ -19,11 +19,11 @@ import FrontEnd.ToCore  as FrontEnd ( convertToPrepdCore )
 import FrontEnd.Flags   as FrontEnd
 import FrontEnd.Expr    as Src
 import FrontEnd.Prelude( findPrelude )
+import FrontEnd.ENVDesugar
 
 import qualified Parser.Verse               as V
 import qualified Parser.Compat              as PC
 
-import ENVDesugar
 
 import Core.Expr as Core
 import Core.Traced
@@ -46,7 +46,6 @@ import qualified Pom    (den)
 import qualified PomPom (denS, defaultConfig)
 import qualified SemClass (den)
 
-import ENVDesugar (envDesugar)
 import Control.Monad( (>=>))
 -}
 
@@ -552,10 +551,10 @@ doEvalCoreTest tflg test
        ; mb_v2 <- case src2 of
                      Variable (Ident _ "wrong") -> pure Nothing
                      _ -> do { core2 <- srcToCore flags False src2
-                             ; let (_,tr2) = evalExpr tflg test core2
+                             ; let (_,tr2) = evalCoreExpr tflg test core2
                              ; return (Just (Core.Traced.term tr2)) }
 
-       ; let (res1,tr1) = evalExpr tflg test core1
+       ; let (res1,tr1) = evalCoreExpr tflg test core1
              v1          = Core.Traced.term tr1
              n_steps     = length (trace tr1)
              test_passed = equivValue v1 mb_v2
@@ -602,13 +601,13 @@ desugarForVerification TestEvalEq{}   = False
 desugarForVerification TestDenSem{}   = False
 desugarForVerification TestVerify{}   = True
 
-evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
-evalExpr flags test e = normalizeExpr rules (maxSteps flags) e
+evalCoreExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
+evalCoreExpr flags test e = normalizeExpr rules (maxSteps flags) e
   where
     rules = case test of
         TestEvalEq {} -> everywhere runtimeRules
         TestVerify {} -> everywhere verificationRules
-        TestDenSem {} -> error "evalExpr: found a densem test...impossibly"
+        TestDenSem {} -> error "evalCoreExpr: found a densem test...impossibly"
 
 
 
@@ -627,7 +626,7 @@ doEvalEssentialTest tflg test
              flags        = mkFEFlags tflg add_verif
              add_verif    = desugarForVerification test
 
-             src_to_ess src = do { ess <- sDesugarExpr src
+             src_to_ess src = do { ess <- srcToEssential src
                                  ; return (envDesugar ess) }
 
        ; ess1 <- src_to_ess src1

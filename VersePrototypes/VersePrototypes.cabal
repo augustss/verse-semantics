@@ -201,7 +201,6 @@ library verse-densem
                       MultiSet
                       ValueS
                       Map
-                      ENVDesugar
                       PomSet
                       PomPom
                       SemClass
@@ -262,6 +261,7 @@ library verse-libs
                       FrontEnd.Prelude
                       FrontEnd.Desugar
                       FrontEnd.ToCore
+                      FrontEnd.ENVDesugar
                       Core.Bind
                       Core.Expr
                       Core.Solver
