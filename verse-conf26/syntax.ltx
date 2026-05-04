@@ -21,28 +21,29 @@ $
 \text{Constants} & |k| & ::= & \textit{integer constants} \\
                  &     & \vb & \textit{string constants} \\
 \\
-\text{Terms} &  |t| & ::= & |_|                        & \text{Underscore} \\
+\text{Blocks} & |b| & ::= & e  & \text{Block} \\
+\text{Terms} &  |e| & ::= & |_|                        & \text{Underscore} \\
 &      & \vb & |x|                        & \text{Variable} \\
 &      & \vb & |k|                        & \text{Constant} \\
 &      & \vb & |o|                        & \text{Primops} \\
-&      & \vb & |x := t|                    & \text{Definition; binds |x|} \\
-&      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
-&      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
-&      & \vb & |t_1 where t_2|             & \text{Reverse sequencing} \\
-&      & \vb & |t_1 = t_2|                 & \text{Unification} \\
-&      & \vb & |matches t_1 t_2|           & \text{Matching} \\
+&      & \vb & |x := e|                    & \text{Definition; binds |x|} \\
+&      & \vb & |e_1^[e_2]|                 & \text{Function application} \\
+&      & \vb & |e_1 ; e_2|                 & \text{Sequencing} \\
+&      & \vb & |e_1 where e_2|             & \text{Reverse sequencing} \\
+&      & \vb & |b_1 = b_2|                 & \text{Unification} \\
+&      & \vb & |matches e_1 e_2|           & \text{Matching} \\
 &      & \vb & |fail|                     & \text{Failure (empty choice)} \\
-&      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
-&      & \vb & |t_1 .. t_2|                 & \text{Multiple choice} \\
-&      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+&      & \vb & |b_1 `choice` b_2|          & \text{Choice} \\
+&      & \vb & |e_1 .. e_2|                 & \text{Multiple choice} \\
+&      & \vb & |if(b_1) then b_2 else b_3| & \text{Conditional expression} \\
 &      & \vb & |choiceindex |             & \text{Choice indexing} \\
-&      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
-% &      & \vb & |truth t|                  & \text{Truth value} \\
-&      & \vb & |functionOCX q t_1 fx t_2|  & \text{Function} \\
-&      & \vb & |relation t_1 t_2|  & \text{Relation} \\
-&      & \vb & |: t|                      & \text{Range} \\
-% &      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
-% &      & \vb & |check fx t|                & \text{Effects check} \\
+&      & \vb & |array (e_1, xdots, e_n)|   & \text{Array}, n \geq 0 \\
+% &      & \vb & |truth e|                  & \text{Truth value} \\
+&      & \vb & |functionOCX q b_1 fx b_2|  & \text{Function} \\
+&      & \vb & |relation b_1 b_2|  & \text{Relation} \\
+&      & \vb & |: b|                      & \text{Range} \\
+% &      & \vb & |oftypefx e_1 fx e_2|       & \text{Opacity}\\
+% &      & \vb & |check fx e|                & \text{Effects check} \\
 \\
 \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
 \text{Aperture} &  |q| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
@@ -52,13 +53,13 @@ $
 \\
 \textbf{Abbreviations} \\
 \begin{array}{rcll}
-|x : t| & \rightarrow  & |x := :t| \\
-|t_1 : t_2 := t_3| & \rightarrow  & |t_1 := apply1N t_2 t_3| \\
-|squig x t_1 := t_2| & \rightarrow  & |x:any; t_1 := matches x t_2| \\
-|apply1 t_1 t_2 := t_3| & \rightarrow  & |t_1 := functionOCX open t_2 succeeds t_3| \\
-|apply1 t_1 t_2 (eff oc) (eff fx) := t_3| & \rightarrow  & |t_1 := functionOCX oc t_2 fx t_3| \\
-|type^{t}| & \rightarrow & |relation (x:=t) x| & \text{fresh |x|}\\
-|fordo t_1 t_2| & \rightarrow & |functionOCX closed (choiceindex(t_1)) succeeds t_2| \\
+|x : e| & \rightarrow  & |x := :e| \\
+|e_1 : e_2 := e_3| & \rightarrow  & |e_1 := apply1N e_2 e_3| \\
+|squig x e_1 := e_2| & \rightarrow  & |x:any; e_1 := matches x e_2| \\
+|apply1 e_1 e_2 := e_3| & \rightarrow  & |e_1 := functionOCX open e_2 succeeds e_3| \\
+|apply1 e_1 e_2 (eff oc) (eff fx) := e_3| & \rightarrow  & |e_1 := functionOCX oc e_2 fx e_3| \\
+|type^{e}| & \rightarrow & |relation (x:=e) x| & \text{fresh |x|}\\
+|fordo e_1 e_2| & \rightarrow & |functionOCX closed (choiceindex(e_1)) succeeds e_2| \\
 \end{array}
 
 \end{array}
