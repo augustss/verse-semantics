@@ -141,7 +141,7 @@ instance Pretty Exp where
   pPrintPrec l p (x :~> e)   = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
   pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
   pPrintPrec l p (e1 :> e2)  = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
-  pPrintPrec l p (e1 :=: e2) = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
+  pPrintPrec l p (e1 :=: e2) = maybeParens (p > 0) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
   pPrintPrec l _ (Arr es)
     | l == prettyNormal    = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
@@ -280,14 +280,16 @@ evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
 evalBlk fuel b@(Blk is eqs expr) =
     case findTopRedex (freshVarsBlk b) b of
       -- XXX iterate substVal?
-      Step _ xs eqns e -> evalBlk (fuel-1) $
-                          (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
-                                                map (second $ substVal eqns) eqs) e)
+      Step _ xs eqns e  -> evalBlk (fuel-1) $ mergeStep b (Blk xs eqns e)
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
 
+mergeStep :: Blk -> Blk -> Blk
+mergeStep (Blk is eqs _) (Blk xs eqns e) =
+  (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
+                        map (second $ substVal eqns) eqs) e)
 
 
 dom :: Set Eqn -> Set Iden
@@ -312,8 +314,11 @@ findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] blk
 
 findRedex :: [Iden] -> Set Iden -> Set Eqn -> Blk -> Reduction
 findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
-  trace (render (text "findRedex" <+> (pPrintL prettyNormal ex $$ pPrintL prettyNormal res)) ++ "\n")
-          res
+  trace (render (text "findRedex enter parent =" <+> pPrintL prettyNormal parent) ++ "\n") $
+  trace (render (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
+                                              (text "res    =" <+> pPrintL prettyNormal res)))
+         ++ "\n")
+        res
   where
     res | not (null dead_vars) = Delete dead_vars  -- GC rules
         | otherwise            = find ex
@@ -402,18 +407,24 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
         Lam x b    -> find1B (Lam x) b
 
 
-
         Iter ic b1 e2    ->
           case findRedex fresh singleOcc eqns b1 of
-            Failure _s -> Done ("IFail-" ++ _s) e2
+            Failure s  -> Done ("IFail-" ++ s) e2
             None       -> None
-            Delete xs  -> Done "GC" $ Iter ic (gcVarsBlk xs b1) e2
+{-
+              trace ("*** None " ++ prettyShow b1) $
+              case b1 of
+                Blk is eqs (c1 :|: c2) ->
+                  Done "IChoice" $ Iter ic (Blk is eqs (Crl c1)) (Iter ic (Blk is eqs (Crl c2)) e2)
+                _ -> None
+-}
+            Delete xs  -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
 
-            Step _s is eqs (c1 :|: c2) -> Done ("IChoice-" ++ _s) $
-                                          Iter ic (Blk is eqs $ Crl c1)
-                                                  (Iter ic (Blk is eqs $ Crl c2) e2)
-            Step _s [] _ (Dly b) | ic == IF -> Done ("IIf-"++ _s) $ Crl b
-            Step s  is eqs e -> Done s $ Iter ic (Blk is eqs e) e2
+            Step s is eqs (c1 :|: c2) -> Done ("IChoice-" ++ s) $
+                                          Iter ic (mergeStep b1 (Blk is eqs $ Crl c1))
+                                                  (Iter ic (mergeStep b1 (Blk is eqs $ Crl c2)) e2)
+            Step s [] [] (Dly b) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
+            Step s is eqs e -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 (Blk is eqs e)) e2
 
         -- Reduction under lambda
         -- XXX WRONG, needs a Blk boundary inside the Lam
