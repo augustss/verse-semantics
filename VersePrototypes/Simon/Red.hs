@@ -397,15 +397,15 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
 
         Fail             -> Failure "FAIL"
 
-        Arr es           -> findArr es
+        x :~> tm  -> reduceMatch fresh x tm
 
         -- Catch-all cases for context C; just walk downwards
         e1 :>  e2  -> find2  (:>)  e1 e2
         e1 :=: e2  -> find2  (:=:) e1 e2
         e1  :@  e2 -> find2  (:@)  e1 e2
         b1 :|: b2  -> find2B (:|:) b1 b2
+        Arr es     -> findArr es
         Lam x b    -> find1B (Lam x) b
-
 
         Iter ic b1 e2    ->
           case findRedex fresh singleOcc eqns b1 of
@@ -430,49 +430,6 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
         -- XXX WRONG, needs a Blk boundary inside the Lam
         -- Lam v e          -> find1 (Lam v) e
 
-        -- :~> reduction
-        -- Hackily turn IsInt, IsAny back to a lambda:
-        -- We can't do this earlier because we don't have lambda in Trm.
-        x :~> TPrm F.IsInt         -> Done "int-hack" $ Var x :=: (Lam u $ Blk [] [] $ (Prm F.IsInt :@ Var u) :> Var u)
-                                      where u = fresh!!0
-        x :~> TPrm F.IsAny         -> Done "any-hack" $ Var x :=: (Lam u $ Blk [] [] $ Var u)
-                                      where u = fresh!!0
-        -- Matching
-        x :~> Und                  -> Done "MWild"    $ Var x
-        x :~> TVar i               -> Done "MVar"     $ Var x :=: Var i
-        x :~> TInt k               -> Done "MInt"     $ Var x :=: Int k
-        x :~> TPrm o               -> Done "MPrim"    $ Var x :=: Prm o
-{-
-        x :~> ea@(Val _ :@ Val _)  -> Done "MApp-v-v" $ Var x :=: ea
-        x :~> (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
-        x :~> (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
--}
-        x :~> (t1 :@% t2)          -> Step "MApp"     $ Blk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
-        x :~> (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
-        x :~> (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
-        -- SLPJ what if x is one of the binders in t1/t2?
-
-        _ :~> TFail                -> Done "Mfail"    $ Fail
-        x :~> (t1 :>% t2)          -> Step "MSemi"    $ Blk [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
-        x :~> (t1 `Where` t2)      -> Step "MWhere"   $ Blk [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
-        x :~> TArr ts              -> Step "MTup"     $ Blk xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
-                                      where xs = take (length ts) fresh
-        x :~> Rng t                -> Step "MColon"   $ Blk [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
-        x :~> (i := t)             -> Step "MDef"     $ Blk [i]   [] $ Var i :=: (x :~> t)
-        x :~> (i :-> t)            -> Step "MArr"     $ Blk [i]   [] $ (Var i :=: Var x) :> (x :~> t)
-{-
-        x :~> ea@(Val{} :.. Val{}) -> Done "MEnum-v-v" $ Var x :=: ea
-        x :~> (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
-        x :~> (e1 :.. Val e2)      -> Done "MEnum-e-v" $ x :~> ((u := e2) :> (e1 :.. Var u))    where u = fresh!!0
--}
-        x :~> (t1 :..% t2)         -> Done "MEnum"    $ Var x :=: ((u1 :~> t1) :.. (u2 :~> t2)) where u1:u2:_ = fresh
-        f :~> Fun at bt            -> Done "MFun"     $ Lam u $ Blk (x:y:tbs at) [] $ (Var x :=: (u :~> at)) :>
-                                                                                      (Var y :=: (Var f :@ Var x)) :>
-                                                                                      (y :~> bt)
-                                        where u:x:y:_ = fresh
-        x :~> If t0 t1 t2          -> Done "MIf"      $ Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
-                                                                (Crl (Blk (tbs t2) [] (x :~> t2)))
-                                        where u = fresh!!0
         _ -> None
 
     find1 :: (Exp -> Exp) -> Exp -> Reduction
@@ -512,6 +469,55 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
         None                     -> find1B (c b1) b2
         r                        -> r
 
+
+reduceMatch ::  [Iden] -> Iden -> Term -> Reduction
+-- :~> reduction
+reduceMatch fresh x tm
+  = case tm of
+        -- Hackily turn IsInt, IsAny back to a lambda:
+        -- We can't do this earlier because we don't have lambda in Trm.
+        TPrm F.IsInt         -> Done "int-hack" $ Var x :=: (Lam u $ Blk [] [] $ (Prm F.IsInt :@ Var u) :> Var u)
+                                where u = fresh!!0
+        TPrm F.IsAny         -> Done "any-hack" $ Var x :=: (Lam u $ Blk [] [] $ Var u)
+                                      where u = fresh!!0
+        -- Matching
+        Und                  -> Done "MWild"    $ Var x
+        TVar i               -> Done "MVar"     $ Var x :=: Var i
+        TInt k               -> Done "MInt"     $ Var x :=: Int k
+        TPrm o               -> Done "MPrim"    $ Var x :=: Prm o
+{-
+        ea@(Val _ :@ Val _)  -> Done "MApp-v-v" $ Var x :=: ea
+        (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
+        (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
+-}
+        (t1 :@% t2)          -> Step "MApp"     $ Blk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
+        (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
+        (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
+        -- SLPJ what if x is one of the binders in t1/t2?
+
+        TFail                -> Done "Mfail"    $ Fail
+        (t1 :>% t2)          -> Step "MSemi"    $ Blk [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
+        (t1 `Where` t2)      -> Step "MWhere"   $ Blk [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
+        TArr ts              -> Step "MTup"     $ Blk xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
+                                where xs = take (length ts) fresh
+        Rng t                -> Step "MColon"   $ Blk [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
+        (i := t)             -> Step "MDef"     $ Blk [i]   [] $ Var i :=: (x :~> t)
+        (i :-> t)            -> Step "MArr"     $ Blk [i]   [] $ (Var i :=: Var x) :> (x :~> t)
+{-
+        ea@(Val{} :.. Val{}) -> Done "MEnum-v-v" $ Var x :=: ea
+        (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
+        (e1 :.. Val e2)      -> Done "MEnum-e-v" $ x :~> ((u := e2) :> (e1 :.. Var u))    where u = fresh!!0
+-}
+        (t1 :..% t2)         -> Done "MEnum"    $ Var x :=: ((u1 :~> t1) :.. (u2 :~> t2)) where u1:u2:_ = fresh
+        Fun at bt            -> Done "MFun"     $ Lam u $ Blk (p:q:tbs at) [] $ (Var p :=: (u :~> at)) :>
+                                                                                (Var q :=: (Var x :@ Var p)) :>
+                                                                                (q :~> bt)
+                                  where u:p:q:_ = fresh
+        If t0 t1 t2          -> Done "MIf"      $ Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
+                                                                (Crl (Blk (tbs t2) [] (x :~> t2)))
+                                        where u = fresh!!0
+
+        For {}               -> error "reduceMatch: FOR not done yet"
 
 promotionOK :: Blk -> Iden -> Val -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
