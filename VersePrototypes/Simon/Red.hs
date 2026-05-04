@@ -249,19 +249,19 @@ data Reduction
   = None               -- No redex found
   | Failure String     -- Evaluation failed
   | Delete (Set Iden)  -- Delete the identifiers from the block existential and equations
-  | Step RuleName [Iden] [Eqn] Exp  -- The named rule fired, returning this Blk
+  | Step RuleName Blk  -- The named rule fired, returning this Blk
   deriving (Eq, Show)
 
 pattern Done :: String -> Exp -> Reduction
-pattern Done s e = Step s [] [] e
+pattern Done s e = Step s (Blk [] [] e)
 
 instance Pretty Reduction where
   pPrintPrec l p (Delete is) = text "GC" <+> pPrintPrec l p is
   pPrintPrec _ _ None               = text "None"
   pPrintPrec _ _ (Failure s)        = text "Failure" <+> text (show s)
   pPrintPrec l _ (Done s e)         = text "Done" <+> text (show s) <+> pPrintPrec l 0 e
-  pPrintPrec l _ (Step s xs eqns e) = text "Step" <+> text (show s)
-                                      <+> pPrintPrec l 0 (Blk xs eqns e)
+  pPrintPrec l _ (Step s b)         = text "Step" <+> text (show s)
+                                      <+> pPrintPrec l 0 b
 
 --------------------------------------------------------------------------------
 --
@@ -280,7 +280,7 @@ evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
 evalBlk fuel b@(Blk is eqs expr) =
     case findTopRedex (freshVarsBlk b) b of
       -- XXX iterate substVal?
-      Step _ xs eqns e  -> evalBlk (fuel-1) $ mergeStep b (Blk xs eqns e)
+      Step _ b'         -> evalBlk (fuel-1) $ mergeStep b b'
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
@@ -336,12 +336,12 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
       case expr of
         -- Scope and substitution
         Var x  :=: Val v  | promotionOK parent x v
-                          -> Step "Promote1" [] [(x, v)] v
+                          -> Step "Promote1" $ Blk [] [(x, v)] v
         Val v  :=: Var x  | promotionOK parent x v
-                          -> Step "Promote2" [] [(x, v)] v
+                          -> Step "Promote2" $ Blk  [] [(x, v)] v
 
         Var i             | Just v <- lookup i eqns -> Done ("Subst " ++ show i) v
-        Crl b@Blk{}       -> Step "FloatB" is' eqs' e' where Blk is' eqs' e' = freshen fresh b
+        Crl b@Blk{}       -> Step "FloatB" $ freshen fresh b
         -- GC rules handled above
 
         -- Primops
@@ -386,14 +386,14 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
 
         -- Beta
         Lam x (Blk vs eqs e) :@ Val v
-          -> Step "Beta" is' eqs' e'
+          -> Step "Beta" $ Blk is' eqs' e'
           where Blk is' eqs' e' = freshen fresh (Blk (x:vs) ((x, v):eqs) e)
 
         Arr es :@ Val v -> Done "ITUP" $
                            foldr alt Fail (zipWith (\ i e -> (v :=: Int i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
 
-        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" [u] [] (Var u) where u = fresh!!0
+        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ Blk [u] [] (Var u) where u = fresh!!0
 
         Fail             -> Failure "FAIL"
 
@@ -420,11 +420,11 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
 -}
             Delete xs  -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
 
-            Step s is eqs (c1 :|: c2) -> Done ("IChoice-" ++ s) $
+            Step s (Blk is eqs (c1 :|: c2)) -> Done ("IChoice-" ++ s) $
                                           Iter ic (mergeStep b1 (Blk is eqs $ Crl c1))
                                                   (Iter ic (mergeStep b1 (Blk is eqs $ Crl c2)) e2)
-            Step s [] [] (Dly b) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
-            Step s is eqs e -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 (Blk is eqs e)) e2
+            Step s (Blk [] [] (Dly b)) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
+            Step s b -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
 
         -- Reduction under lambda
         -- XXX WRONG, needs a Blk boundary inside the Lam
@@ -447,19 +447,19 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
         x :~> (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
         x :~> (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
 -}
-        x :~> (t1 :@% t2)          -> Step "MApp" [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
+        x :~> (t1 :@% t2)          -> Step "MApp"     $ Blk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
         x :~> (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
         x :~> (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
         -- SLPJ what if x is one of the binders in t1/t2?
 
         _ :~> TFail                -> Done "Mfail"    $ Fail
-        x :~> (t1 :>% t2)          -> Step "MSemi"  [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
-        x :~> (t1 `Where` t2)      -> Step "MWhere" [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
-        x :~> TArr ts              -> Step "MTup"   xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
+        x :~> (t1 :>% t2)          -> Step "MSemi"    $ Blk [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
+        x :~> (t1 `Where` t2)      -> Step "MWhere"   $ Blk [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
+        x :~> TArr ts              -> Step "MTup"     $ Blk xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
                                       where xs = take (length ts) fresh
-        x :~> Rng t                -> Step "MColon" [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
-        x :~> (i := t)             -> Step "MDef"   [i]   [] $ Var i :=: (x :~> t)
-        x :~> (i :-> t)            -> Step "MArr"   [i]   [] $ (Var i :=: Var x) :> (x :~> t)
+        x :~> Rng t                -> Step "MColon"   $ Blk [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
+        x :~> (i := t)             -> Step "MDef"     $ Blk [i]   [] $ Var i :=: (x :~> t)
+        x :~> (i :-> t)            -> Step "MArr"     $ Blk [i]   [] $ (Var i :=: Var x) :> (x :~> t)
 {-
         x :~> ea@(Val{} :.. Val{}) -> Done "MEnum-v-v" $ Var x :=: ea
         x :~> (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
@@ -478,39 +478,39 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
     find1 :: (Exp -> Exp) -> Exp -> Reduction
     find1 c e =
       case find e of
-        Step s is eqs e'  -> Step s is eqs (c e')
-        r                 -> r
+        Step s (Blk is eqs e') -> Step s $ Blk is eqs (c e')
+        r                      -> r
 
     find2 :: (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction
     find2 c e1 e2 =
       case find e1 of
-        Step s is eqs e1' -> Step s is eqs (e1' `c` e2)
-        None              -> find1 (c e1) e2
-        r                 -> r
+        Step s (Blk is eqs e1') -> Step s $ Blk is eqs (e1' `c` e2)
+        None                    -> find1 (c e1) e2
+        r                       -> r
 
     findArr :: [Exp] -> Reduction
     findArr [] = None
     findArr (e:es) =
       case find e of
-        Step s is eqs e' -> Step s is eqs (Arr (e':es))
-        None              ->
+        Step s (Blk is eqs e') -> Step s $ Blk is eqs (Arr (e':es))
+        None                   ->
           case findArr es of
-            Step s is eqs (Arr es') -> Step s is eqs (Arr (e:es'))
-            r                       -> r
-        r                 -> r
+            Step s (Blk is eqs (Arr es')) -> Step s $ Blk is eqs (Arr (e:es'))
+            r                             -> r
+        r                      -> r
 
     find1B :: (Blk -> Exp) -> Blk -> Reduction
     find1B c b@(Blk is eqs _) =
       case findB eqns b of
-        Step s is' eqs' e' -> Done s (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
-        r                  -> r
+        Step s (Blk is' eqs' e') -> Done s (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
+        r                        -> r
 
     find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
     find2B c b1@(Blk is eqs _) b2 =
       case findB eqns b1 of
-        Step s is' eqs' e' -> Done s (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
-        None               -> find1B (c b1) b2
-        r                  -> r
+        Step s (Blk is' eqs' e') -> Done s (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
+        None                     -> find1B (c b1) b2
+        r                        -> r
 
 
 promotionOK :: Blk -> Iden -> Val -> Bool
