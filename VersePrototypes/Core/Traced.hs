@@ -3,7 +3,7 @@
 module Core.Traced(
   Traced(..), TraceStep(..), tsPayload, setTsPayload, updTsPayload,
   Verbosity, verbosityAll,
-  term, trace, start, (++>), loop, normalize,
+  getTerm, getTrace, start, (++>), loop, normalize,
   Fuel, lotsOfSteps,
   NormResult(..), showNormResult,
   filterTrace,
@@ -27,7 +27,7 @@ data Traced a = a :<-- [TraceStep a]
   deriving (Show)
 
 data TraceStep a
-  = TS { ts_payload :: a          -- Payload just /before/ the step
+  = TS { ts_payload :: a          -- Payload just after the step
        , ts_str     :: String     -- Describes the step
        , ts_verb    :: Verbosity  -- Show this rule at verbosity rw_verb and above
     }  deriving( Functor, Show )
@@ -70,7 +70,7 @@ normalize :: (a -> Maybe (TraceStep a))   -- How to take a step
           -> (a -> Bool)                  -- Validity predicate
           -> Fuel -> a -> (NormResult, Traced a)
 normalize step valid fuel orig_e
-  = go fuel [] orig_e
+  = go fuel [TS{ ts_str = "Initial", ts_verb = 0, ts_payload = orig_e }] orig_e
   where
     go fuel_left tr e
       = case step e of
@@ -98,11 +98,11 @@ updTsPayload = fmap
 verbosityAll :: Verbosity
 verbosityAll = 100
 
-term :: Traced a -> a
-term (x :<-- _) = x
+getTerm :: Traced a -> a
+getTerm (x :<-- _) = x
 
-trace :: Traced a -> [TraceStep a]
-trace (_ :<-- tr) = tr
+getTrace :: Traced a -> [TraceStep a]
+getTrace (_ :<-- tr) = tr
 
 start :: a -> Traced a
 start x = x :<-- []
@@ -143,29 +143,24 @@ class Pretty a => PrettyBrief a where
    pPrintBrief :: a -> Doc
 
 pPrintTrace :: forall a. PrettyBrief a => Verbosity -> Traced a -> [Doc]
-pPrintTrace verb (res_expr :<-- tr)
-  =  go 1 False empty (reverse tr) -- Print forwards
+pPrintTrace show_verb (_ :<-- tr)
+  =  go 1 (reverse tr) -- Print forwards
   where
-    go :: Int -> Bool   -- True <=> print the payload regardless of
-                        --          the verbosity of the next step
-              -> Doc
-              -> [TraceStep a] -> [Doc]
-    go _ _ herald []
-      = [pp_item herald res_expr]
-    go n show_anyway herald (step : steps)
-      | show_step || show_anyway
-      = pp_item herald (tsPayload step)
-        : go (n+1) show_step (mkarrow n step) steps
+    go :: Int -> [TraceStep a] -> [Doc]
+    go _  [] = []
 
-      | otherwise = go (n+1) False (herald $$ mkarrow n step) steps
-      where
-        show_step = verb >= 2 - ts_verb step
+    go n (step : steps) = pp_item n step : go (n+1) steps
 
-    pp_item herald expr = vcat [text "", herald, indent (pPrint expr)]
-                          -- NB: (text "") adds a blank line
+    pp_item n step@(TS { ts_payload = payload, ts_verb = step_verb })
+      | show_verb >= 2 - step_verb
+      = vcat [ text ""   -- NB: (text "") adds a blank line
+             , mkarrow n step
+             , indent (pPrint payload) ]
+      | otherwise
+      = mkarrow n step
 
-    mkarrow n step = text (show n ++ ":--" ++ ts_str step ++ "-->")
-                     <> braces (pPrintBrief (ts_payload step))
+    mkarrow n (TS { ts_payload = payload, ts_str = rulename })
+      = text (show n ++ ":--" ++ rulename ++ "-->") <> braces (pPrintBrief payload)
 
 filterTrace :: (String -> Bool) -> Traced t -> Traced t
 filterTrace p (x :<-- nys) = x :<-- go nys

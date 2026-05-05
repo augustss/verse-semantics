@@ -14,12 +14,14 @@
 module Main(main) where
 
 import FrontEnd.CopyHook
-import FrontEnd.Desugar as FrontEnd ( desugar, runD, addPrelude, sDesugarExpr )
+import FrontEnd.Desugar as FrontEnd
 import FrontEnd.ToCore  as FrontEnd ( convertToPrepdCore )
 import FrontEnd.Flags   as FrontEnd
 import FrontEnd.Expr    as Src
 import FrontEnd.Prelude( findPrelude )
 import FrontEnd.ENVDesugar
+
+import qualified Red as Simon
 
 import qualified Parser.Verse               as V
 import qualified Parser.Compat              as PC
@@ -552,11 +554,11 @@ doEvalCoreTest tflg test
                      Variable (Ident _ "wrong") -> pure Nothing
                      _ -> do { core2 <- srcToCore flags False src2
                              ; let (_,tr2) = evalCoreExpr tflg test core2
-                             ; return (Just (Core.Traced.term tr2)) }
+                             ; return (Just (Core.Traced.getTerm tr2)) }
 
        ; let (res1,tr1) = evalCoreExpr tflg test core1
-             v1          = Core.Traced.term tr1
-             n_steps     = length (trace tr1)
+             v1          = Core.Traced.getTerm tr1
+             n_steps     = length (getTrace tr1)
              test_passed = equivValue v1 mb_v2
 
              outcome :: TestOutcome
@@ -573,6 +575,10 @@ doEvalCoreTest tflg test
                           , text "evaluates to" <+>  pPrint v1
                           , text "while" <+> pPrint src2
                           , text "evaluates to" <+> pPrint mb_v2  ])
+
+       -- Display the trace if asked for, regardless of success/failure
+       ; when (showTrace tflg) $
+         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflg) tr1 }
 
        ; return (TestRes { tr_info = testInfo test
                          , tr_outcome = outcome
@@ -618,15 +624,14 @@ evalCoreExpr flags test e = normalizeExpr rules (maxSteps flags) e
 ----------------------------------------------------------------
 
 doEvalEssentialTest :: TestFlags -> Test -> IO TestRes
-doEvalEssentialTest = error "doEvalEssentialTest"
+-- doEvalEssentialTest = error "doEvalEssentialTest"
 
-{-
 doEvalEssentialTest tflg test
   = do { let (src1, src2) = testExprs test
              flags        = mkFEFlags tflg add_verif
              add_verif    = desugarForVerification test
 
-             src_to_ess src = do { ess <- srcToEssential src
+             src_to_ess src = do { ess <- srcToEssential flags src
                                  ; return (envDesugar ess) }
 
        ; ess1 <- src_to_ess src1
@@ -635,13 +640,14 @@ doEvalEssentialTest tflg test
        -- tells us that we expect e1 to get stuck
        ; mb_v2 <- case src2 of
                      Variable (Ident _ "wrong") -> pure Nothing
-                     _ -> do { ess <- src_to_ess src2
-                             ; let (_,_,tr2) = evalExpr tflg test core2
-                             ; return (Just (Core.Traced.term tr2)) }
+                     _ -> do { ess2 <- src_to_ess src2
+                             ; let (_,tr2) = evalEssentialExpr tflg ess2
+                             ; return (Just (Core.Traced.getTerm tr2)) }
 
-       ; let (res1,n_steps,tr1) = evalExpr tflg test core1
-             v1          = Core.Traced.term tr1
-             test_passed = equivValue v1 mb_v2
+       ; let (res1,tr1)  = evalEssentialExpr tflg ess1
+             v1          = Core.Traced.getTerm tr1
+             test_passed = equivBlk v1 mb_v2
+             n_steps     = length (Core.Traced.getTrace tr1)
 
              outcome :: TestOutcome
              outcome = case res1 of
@@ -658,10 +664,23 @@ doEvalEssentialTest tflg test
                           , text "while" <+> pPrint src2
                           , text "evaluates to" <+> pPrint mb_v2  ])
 
+       -- Display the trace if asked for, regardless of success/failure
+       ; when (showTrace tflg) $
+         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflg) tr1 }
+
        ; return (TestRes { tr_info = testInfo test
                          , tr_outcome = outcome
                          , tr_details = details }) }
--}
+
+evalEssentialExpr :: TestFlags -> SrcEssential
+                  -> (NormResult, Traced Simon.Blk)
+evalEssentialExpr flags e = Simon.runTraced (maxSteps flags) e
+
+-- | Equivalence on values (or stuck expressions)
+-- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
+equivBlk :: Simon.Blk -> Maybe Simon.Blk -> Bool
+equivBlk b1                (Just b2) = b1 == b2  -- Not right: need alpha renaming
+equivBlk (Simon.Blk _ _ e) Nothing   = not (Simon.isVal e)
 
 ----------------------------------------------------------------
 --

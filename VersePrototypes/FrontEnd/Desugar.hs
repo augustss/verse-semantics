@@ -80,11 +80,11 @@ srcToEssential flags e_parsed
 
        -- Prepend prelude from
        --    verifyprelude.verse, mediumprelude.verse
-       ; e_prel <- addPrelude e_parsed
-       ; _ <- traceDS "Add prelude" e_prel
+--       ; e_prel <- addPrelude e_parsed
+--       ; _ <- traceDS "Add prelude" e_prel
 
        -- Desugar into Essential Verse by doing superficial desugaring
-       ; e_essential <- sDesugarExpr e_prel
+       ; e_essential <- sDesugarExpr e_parsed
 
        -- Do the silly envDesugar thing
        ; let e_essential' = envDesugar e_essential

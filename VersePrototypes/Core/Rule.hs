@@ -211,5 +211,5 @@ normalizeExpr rules = normalize step valid
     step e = case run rules  (S.fromList (occurs e)) [] [] e of
                [] -> Nothing
                (e', lab, v) : _ -> Just (TS { ts_payload = e'
-                                            , ts_str = lab
-                                            , ts_verb = v})
+                                            , ts_str     = lab
+                                            , ts_verb    = v})
