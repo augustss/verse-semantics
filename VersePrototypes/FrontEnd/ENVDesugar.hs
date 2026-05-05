@@ -26,7 +26,10 @@ primOps =
   , ("operator'*'",  Mul)
   , ("operator'/'",  Div)
   , ("operator'>'",  Gt)
+  , ("operator'>='",  GEq)
   , ("operator'<'",  Lt)
+  , ("operator'<='",  LEq)
+  , ("operator'<>'",  NEq)
   ]
 
 primOps' :: [(String, PrimOp)]

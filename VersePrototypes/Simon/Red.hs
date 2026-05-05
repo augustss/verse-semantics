@@ -460,26 +460,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         -- GC rules handled above
 
         -- Primops
-        Prm F.Add :@ v   | Arr [LInt i, LInt j] <- v         -> Done    "Prim+"    $ LInt (i + j)
-                         | AHNF{}             <- v           -> Failure "Prim+"
-        Prm F.Sub :@ v   | Arr [LInt i, LInt j] <- v         -> Done    "Prim-"    $ LInt (i - j)
-                         | AHNF{}             <- v           -> Failure "Prim-"
-        Prm F.Mul :@ v   | Arr [LInt i, LInt j] <- v         -> Done    "Prim*"    $ LInt (i * j)
-                         | AHNF{}             <- v           -> Failure "Prim*"
-        Prm F.Div :@ v   | Arr [LInt i, LInt j] <- v, j /= 0 -> Done    "Prim/"    $ LInt (i `div` j)
-                         | AHNF{}             <- v           -> Failure "Prim/"
-
-        Prm F.Neg :@ v   | LInt i <- v                       -> Done    "Prim-neg" $ LInt (- i)
-                         | HNF{} <- v                        -> Failure "Prim-neg"
-        Prm F.IsInt :@ v | LInt _ <- v                       -> Done    "Prim-isInt" v
-                         | HNF{} <- v                        -> Failure "Prim-isInt"
-
-        Prm F.Lt :@ v    | Arr [LInt i, LInt j] <- v, i < j  -> Done    "Prim-Lt"  $ LInt i
-                         | AHNF{}             <- v           -> Failure "Prim-Lt"
-        Prm F.Gt :@ v    | Arr [LInt i, LInt j] <- v, i > j  -> Done    "Prim-Gt"  $ LInt i
-                         | AHNF{}             <- v           -> Failure "Prim-Gt"
-
-        Prm F.ArrCons :@ v | Arr [x, Arr xs]  <- v         -> Done    "Prim-cons" $ Arr (x:xs)
+        Prm op :@ v | Just redn <- reducePrimOp op v -> redn
 
         -- Unification
         Val v1 :=: Val v2 | v1 == v2 -> Done "EqVal" v1
@@ -504,7 +485,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
 
         -- Beta
         -- NOTE: it should be enough to match with eqs=[]
-        Lam x (Blk vs eqs e) :@ Val v                     -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
+        Lam x (Blk vs eqs e) :@ Val v -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
 
         -- This rule isn't strictly necessary, but it allows indexing by
         -- a constant to proceed outside a failure context.
@@ -603,6 +584,43 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         r                        -> r
 -}
 
+------------------------------------
+reducePrimOp :: Core.PrimOp -> Exp -> Maybe Reduction
+reducePrimOp F.Add (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i + j)
+reducePrimOp F.Sub (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i - j)
+reducePrimOp F.Mul (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i * j)
+reducePrimOp F.Div (Arr [LInt i, LInt j])
+  | j /= 0                                = Just $ Done "Prim+" $ LInt (i `div` j)
+
+reducePrimOp F.Add AHNF{} = Just $ Failure "Prim+"
+reducePrimOp F.Sub AHNF{} = Just $ Failure "Prim-"
+reducePrimOp F.Mul AHNF{} = Just $ Failure "Prim*"
+reducePrimOp F.Div AHNF{} = Just $ Failure "Prim/"
+
+reducePrimOp F.Neg (LInt i) = Just $ Done   "Prim-neg" $ LInt (- i)
+reducePrimOp F.Neg HNF{}    = Just $ Failure "Prim-neg"
+
+reducePrimOp F.IsInt v@(LInt {}) = Just $ Done "Prim-isInt" v
+reducePrimOp F.IsInt HNF{}       = Just $ Failure "Prim-isInt"
+
+reducePrimOp F.Lt  (Arr [LInt i, LInt j]) | i<j  = Just $ Done "Prim-Lt"  $ LInt i
+reducePrimOp F.LEq (Arr [LInt i, LInt j]) | i<=j = Just $ Done "Prim-LEq" $ LInt i
+reducePrimOp F.GEq (Arr [LInt i, LInt j]) | i>=j = Just $ Done "Prim-GEq" $ LInt i
+reducePrimOp F.Gt  (Arr [LInt i, LInt j]) | i>j  = Just $ Done "Prim-Gt"  $ LInt i
+reducePrimOp F.NEq (Arr [LInt i, LInt j]) | i/=j = Just $ Done "Prim-NEq"  $ LInt i
+
+reducePrimOp F.Lt  AHNF{} = Just $ Failure "Prim-Lt"
+reducePrimOp F.LEq AHNF{} = Just $ Failure "Prim-LEq"
+reducePrimOp F.GEq AHNF{} = Just $ Failure "Prim-GEq"
+reducePrimOp F.Gt  AHNF{} = Just $ Failure "Prim-Gt"
+reducePrimOp F.NEq AHNF{} = Just $ Failure "Prim-NEq"
+
+reducePrimOp F.ArrCons (Arr [x, Arr xs]) = Just $ Done    "Prim-cons" $ Arr (x:xs)
+reducePrimOp F.ArrCons AHNF{}            = Just $ Failure "Prim-cons"
+
+reducePrimOp _ _ = Nothing
+
+------------------------------------
 reduceMatch ::  [Iden] -> Iden -> Term -> Reduction
 -- :~> reduction
 reduceMatch _fresh x tm | x `elem` allVarsTerm tm = error "unimplemented: reduceMatch, possible name clash"
