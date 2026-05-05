@@ -5,7 +5,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Red( Blk(..), Exp(..), Term(..)
+module Red( Blk(Blk, BlkX), Exp(..), Term(..)
           , run, runTraced, isVal
   ) where
 
@@ -37,7 +37,7 @@ addVerify = True
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = True
+traceReductions = False
 
 --------------------------------------------------------------------------------
 --
@@ -123,6 +123,7 @@ type Set a = [a]   -- Represented as a list, but order is immaterial
 newtype Blk = BlkX SBlk
   deriving (Eq, Show, Pretty)
 
+{-# COMPLETE Blk #-}
 pattern Blk :: (Set Iden) -> (Set Eqn) -> Exp -> Blk
 --pattern Blk is eqs e = BlkX (SBlk is eqs e)  -- do not check invariant
 pattern Blk is eqs e <- BlkX (SBlk is eqs e)   -- check invariant
@@ -216,11 +217,10 @@ instance Pretty Exp where
 
 instance Pretty SBlk where
   pPrintPrec l p (SBlk vs eqns e) = ppBlk l p vs eqns e
-instance Pretty Blk where
-  pPrintPrec l p (Blk vs eqns e) = ppBlk l p vs eqns e
 
-
-ppBlk l p [] [] = pPrintPrec l p e
+ppBlk :: PrettyLevel -> Rational -> [Iden] -> [Eqn] -> Exp -> Doc
+ppBlk l p [] [] e
+  = pPrintPrec l p e
 ppBlk l p vs eqns e
   = maybeParens (p > 0) $ sep [pp_bndrs, pp_body]
   where
@@ -499,8 +499,8 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         (e1 :> e2) :=: e3      -> Done "Norm3" $ e1 :> (e2 :=: e3)
         (Val v :=: e1) :=: e2  -> Done "Norm4" $ (v :=: e1) :> (v :=: e2)
 
-        Int l :.. Int h        -> Done "Enum"  $ if h < l then Fail else foldr alt Fail [l .. h]
-          where alt i e = Blk [] [] (Int i) :|: Blk [] [] e
+        LInt l :.. LInt h     -> Done "Enum"  $ if h < l then Fail else foldr alt Fail [l .. h]
+          where alt i e = Blk [] [] (LInt i) :|: Blk [] [] e
 
         -- Beta
         -- NOTE: it should be enough to match with eqs=[]
@@ -508,13 +508,15 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
 
         -- This rule isn't strictly necessary, but it allows indexing by
         -- a constant to proceed outside a failure context.
-        Arr es :@ Int i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i') where i' = fromInteger i
+        Arr es :@ LInt i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i')
+                                                     where i' = fromInteger i
 
         Arr es :@ Val v -> Done "ITup" $
                            foldr alt Fail (zipWith (\ i e -> (v :=: LInt i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
 
-        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ SBlk [u] [] (Var u) where u = fresh!!0
+        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ SBlk [u] [] (Var u)
+                                              where u = fresh!!0
 
         Fail             -> Failure "Fail"
 
@@ -615,7 +617,7 @@ reduceMatch fresh x tm
                                       where u = fresh!!0
 
         -- Blocks
-        TBlock t             -> Step  "MBlock" $ Blk (tbs t) [] (x :~> t)
+        TBlock t             -> Step  "MBlock" $ SBlk (tbs t) [] (x :~> t)
 
         -- Matching
         Und                  -> Done "MWild"    $ Var x
@@ -669,8 +671,8 @@ promotionOK (Blk locals leqns _) x v
 
 cons2 :: Exp -> Exp -> Exp -> Exp
 cons2 x y xsys = Arr [cons x xs, cons y ys]
-  where xs = xsys :@ Int 0
-        ys = xsys :@ Int 1
+  where xs = xsys :@ LInt 0
+        ys = xsys :@ LInt 1
         cons a as = Prm F.ArrCons :@ Arr [a, as]
 
 -- Top level binders
