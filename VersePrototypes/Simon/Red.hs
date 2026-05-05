@@ -279,6 +279,7 @@ data Reduction
   | Failure String     -- Evaluation failed
   | Delete (Set Iden)  -- Delete the identifiers from the block existential and equations
   | Step RuleName SBlk -- The named rule fired, returning this Blk
+  | StepC RuleName SBlk SBlk  -- The named rule fired, returning a choice.  Used for the B context
   deriving (Eq, Show)
 
 pattern Done :: String -> Exp -> Reduction
@@ -291,6 +292,8 @@ instance Pretty Reduction where
   pPrintPrec l _ (Done s e)         = text "Done" <+> text (show s) <+> pPrintPrec l 0 e
   pPrintPrec l _ (Step s b)         = text "Step" <+> text (show s)
                                       <+> pPrintPrec l 0 b
+  pPrintPrec l _ (StepC s b1 b2)    = text "Step" <+> text (show s)
+                                      <+> pPrintPrec l 11 b1 <+> pPrintPrec l 11 b2
 
 --------------------------------------------------------------------------------
 --
@@ -314,6 +317,7 @@ evalBlk fuel b@(Blk is eqs expr) =
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
+      StepC _ _ _       -> error "impossible: findTopRedex StepC"
 
 mergeStep :: Blk -> SBlk -> Blk
 mergeStep (Blk is eqs _) (SBlk xs eqns e) =
@@ -331,7 +335,7 @@ disjoint :: Eq a => Set a -> Set a -> Bool
 disjoint xs ys = null $ xs `intersect` ys
 
 findTopRedex :: [Iden] -> Blk -> Reduction
-findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] blk
+findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] False blk
   where
     -- Subset of `locals` that occur exactly once, and have no Eqn
     -- To support EXI-APP
@@ -341,8 +345,8 @@ findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] blk
                     , x `elem` locals
                     , isNothing (lookup x eqns) ]
 
-findRedex :: [Iden] -> Set Iden -> Set Eqn -> Blk -> Reduction
-findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
+findRedex :: [Iden] -> Set Iden -> Set Eqn -> Bool -> Blk -> Reduction
+findRedex fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
   trace (render (text "findRedex enter parent =" <+> pPrintL prettyNormal parent) ++ "\n") $
   trace (render (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
                                               (text "res    =" <+> pPrintL prettyNormal res)))
@@ -430,21 +434,15 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
         e1 :@  e2  -> find2  (:@)  e1 e2
         Arr es     -> findArr es
 {-
+-- no reductions under choice and lambda
         b1 :|: b2  -> find2B (:|:) b1 b2
         Lam x b    -> find1B (Lam x) b
 -}
 
         Iter ic b1 e2    ->
-          case findRedex fresh singleOcc eqns b1 of
+          case findRedex fresh singleOcc eqns True b1 of
             Failure s  -> Done ("IFail-" ++ s) e2
             None       -> None
-{-
-              trace ("*** None " ++ prettyShow b1) $
-              case b1 of
-                Blk is eqs (c1 :|: c2) ->
-                  Done "IChoice" $ Iter ic (Blk is eqs (Crl c1)) (Iter ic (Blk is eqs (Crl c2)) e2)
-                _ -> None
--}
             Delete xs  -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
 
             Step s (SBlk is eqs (c1 :|: c2)) -> Done ("IChoice-" ++ s) $
@@ -452,6 +450,8 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
                                                   (Iter ic (mergeStep b1 (SBlk is eqs $ Crl c2)) e2)
             Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
             Step s b -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
+            StepC s bl br -> Done ("IChoice-" ++ s) $
+              Iter ic (mergeStep b1 bl) $ Iter ic (mergeStep b1 br) e2
 
         -- Reduction under lambda
         -- XXX WRONG, needs a Blk boundary inside the Lam
@@ -463,42 +463,48 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
     find1 c e =
       case find e of
         Step s (SBlk is eqs e') -> Step s $ SBlk is eqs (c e')
-        r                       -> r
+        StepC s (SBlk is1 eqs1 e1') (SBlk is2 eqs2 e2') -> StepC s (SBlk is1 eqs1 (c e1')) (SBlk is2 eqs2 (c e2'))
+        r                      -> r
 
     find2 :: (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction
     find2 c e1 e2 =
       case find e1 of
         Step s (SBlk is eqs e1') -> Step s $ SBlk is eqs (e1' `c` e2)
-        None                     -> find1 (c e1) e2
-        r                        -> r
+        StepC s (SBlk is1 eqs1 e1') (SBlk is2 eqs2 e2') -> StepC s (SBlk is1 eqs1 (e1' `c` e1)) (SBlk is2 eqs2 (e2' `c` e1))
+        None                    -> find1 (c e1) e2
+        r                       -> r
 
     findArr :: [Exp] -> Reduction
     findArr [] = None
     findArr (e:es) =
       case find e of
         Step s (SBlk is eqs e') -> Step s $ SBlk is eqs (Arr (e':es))
-        None                    ->
+        StepC s (SBlk is1 eqs1 e1') (SBlk is2 eqs2 e2') -> StepC s (SBlk is1 eqs1 (Arr (e1':es))) (SBlk is2 eqs2 (Arr (e2':es)))
+        None                   ->
           case findArr es of
             Step s (SBlk is eqs (Arr es')) -> Step s $ SBlk is eqs (Arr (e:es'))
-            r                              -> r
-        r                       -> r
+            StepC s (SBlk is1 eqs1 (Arr es1')) (SBlk is2 eqs2 (Arr es2')) -> StepC s  (SBlk is1 eqs1 (Arr (e:es1')))  (SBlk is2 eqs2 (Arr (e:es2')))
+            r                             -> r
+        r                      -> r
 
 {-
     findB :: Set Eqn -> Blk -> Reduction
-    findB = findRedex fresh singleOcc
+    findB = findRedex fresh singleOcc 
 
     find1B :: (Blk -> Exp) -> Blk -> Reduction
     find1B c b@(Blk is eqs _) =
       case findB eqns b of
-        Step s (SBlk is' eqs' e') -> Done s (c (SBlk (is' ++ is) (eqs' ++ eqs) e'))
-        r                         -> r
+        Step s (Blk is' eqs' e') -> Done s (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
+        StepC ...
+        r                        -> r
 
     find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
     find2B c b1@(Blk is eqs _) b2 =
       case findB eqns b1 of
-        Step s (SBlk is' eqs' e') -> Done s (SBlk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
-        None                      -> find1B (c b1) b2
-        r                         -> r
+        Step s (Blk is' eqs' e') -> Done s (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
+        StepC ...
+        None                     -> find1B (c b1) b2
+        r                        -> r
 -}
 
 reduceMatch ::  [Iden] -> Iden -> Term -> Reduction

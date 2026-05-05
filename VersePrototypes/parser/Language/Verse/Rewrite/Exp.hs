@@ -63,6 +63,7 @@ data Exp f a
   | Inst (f (Exp f a)) (f (Exp f a))
   | Let  (f (Exp f a)) (f (Exp f a))   -- let(e){body} Note: not in VerseSpec 0.15
   | Enum [SimpleName]
+  | IfElse (f (Exp f a)) (f (Exp f a))
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))

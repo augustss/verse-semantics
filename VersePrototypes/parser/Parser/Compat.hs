@@ -89,6 +89,7 @@ expToSrcExpr' _ (R.Inst (L _ (R.ParenInvoke (L _ (R.Name "relation")) e1)) e2) =
 expToSrcExpr' _ (R.Inst (L _ (R.ParenInvoke (L _ (R.Name "rel")) e1)) e2) = Src.Relation (lexp e1) Src.effSucceeds (lexp e2)
 expToSrcExpr' l (R.InfixOp lhs op rhs)  = Src.InfixOp (lexp lhs) (inOp l op) (lexp rhs)
 expToSrcExpr' l (R.PostfixOp e op)      = Src.PostfixOp (lexp e) (postOp l op)
+expToSrcExpr' _ (R.IfElse e1 e2)        = Src.If2E (lexp e1) (lexp e2)
 expToSrcExpr' _ (R.IfThenElse e1 e2 e3) = Src.If3 (lexp e1) (lexp e2) (lexp e3)
 expToSrcExpr' _ (R.ForDo e1 e2)         = Src.For2 (lexp e1) (lexp e2)
 expToSrcExpr' _ (R.Block e)             = Src.Block (lexp e)

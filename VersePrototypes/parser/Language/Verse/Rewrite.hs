@@ -77,7 +77,7 @@ import Language.Verse.Exp
   , expToPat
   )
 import Language.Verse.Exp qualified as Parse
-import Language.Verse.Rewrite.Exp
+import Language.Verse.Rewrite.Exp as Exp
 
 import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error, (-))
 
@@ -296,15 +296,15 @@ rewriteExp expr = for expr $ \case
     pure $ Enum (map (extract . snd) xs) -- Ignore attributes
   If e -> do
     e' <- rewriteExp e
-    pure $ IfThenElse e' (Tuple [] <$ expr) (Tuple [] <$ expr)
+    pure $ Exp.IfElse e' (Tuple [] <$ expr)
   IfThen e1 e2 -> do
     e1' <- rewriteExp e1
     e2' <- rewriteExp e2
     pure $ IfThenElse e1' e2' (Tuple [] <$ expr)
-  IfElse e1 e2 -> do
+  Parse.IfElse e1 e2 -> do
     e1' <- rewriteExp e1
     e2' <- rewriteExp e2
-    pure $ IfThenElse e1' (Tuple [] <$ expr) e2'
+    pure $ Exp.IfElse e1' e2'
   Parse.IfThenElse e1 e2 e3 ->
     IfThenElse <$> rewriteExp e1 <*> rewriteExp e2 <*> rewriteExp e3
   For e ->
