@@ -14,6 +14,7 @@ import Data.Maybe
 import qualified FrontEnd.Expr as F
 import Epic.Print
 import Debug.Trace
+import GHC.IO.Exception(assertError)
 
 
 {-
@@ -22,6 +23,18 @@ import Debug.Trace
 
 -}
 
+
+--------------------------------------------------------------------------------
+--
+-- Utils
+--
+--------------------------------------------------------------------------------
+
+subset :: Eq a => [a] -> [a] -> Bool
+subset small big = null (small \\ big)
+
+unions :: Eq a => [[a]] -> [a]
+unions = foldr union []
 
 --------------------------------------------------------------------------------
 --
@@ -88,13 +101,19 @@ type Set a = [a]   -- Represented as a list, but order is immaterial
 -- The equation RHSs have no variables from the LHSs
 -- A block (Blk xs eqs e) satisfies these invariants:
 --    (A)  dom(eqs)    `subset`   X
---    (B)  occfvs(eqs) `disjoint` X
+--    (B)  occfvs(eqs) `disjoint` dom(eqs)
 
 newtype Blk = BlkX SBlk
   deriving (Eq, Show, Pretty)
 
 pattern Blk :: (Set Iden) -> (Set Eqn) -> Exp -> Blk
-pattern Blk is eqs e = BlkX (SBlk is eqs e)
+--pattern Blk is eqs e = BlkX (SBlk is eqs e)  -- do not check invariant
+pattern Blk is eqs e <- BlkX (SBlk is eqs e)   -- check invariant
+  where Blk is eqs e =
+--          trace ("Blk " ++ show (is, eqs, e)) $
+          assertError (dom eqs `subset` is) $
+          assertError (unions (map (occfvs . snd) eqs) `disjoint` dom eqs) $
+          BlkX (SBlk is eqs e)
 
 -- A block with no invariants.
 -- This is what Step returns.
@@ -308,8 +327,8 @@ dom = map fst
 --fv :: Exp -> Set Iden
 --fv = allFreeVars'
 
-noIntersect :: Eq a => Set a -> Set a -> Bool
-noIntersect xs ys = null $ xs `intersect` ys
+disjoint :: Eq a => Set a -> Set a -> Bool
+disjoint xs ys = null $ xs `intersect` ys
 
 findTopRedex :: [Iden] -> Blk -> Reduction
 findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] blk
@@ -502,19 +521,19 @@ reduceMatch fresh x tm
         (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
         (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
 -}
-        (t1 :@% t2)          -> Step "MApp"     $ Blk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
+        (t1 :@% t2)          -> Step "MApp"     $ SBlk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
         (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
         (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
         -- SLPJ what if x is one of the binders in t1/t2?
 
         TFail                -> Done "Mfail"    $ Fail
-        (t1 :>% t2)          -> Step "MSemi"    $ Blk [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
-        (t1 `Where` t2)      -> Step "MWhere"   $ Blk [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
-        TArr ts              -> Step "MTup"     $ Blk xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
+        (t1 :>% t2)          -> Step "MSemi"    $ SBlk [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
+        (t1 `Where` t2)      -> Step "MWhere"   $ SBlk [u,w] [] $ (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w  where u:w:_ = fresh
+        TArr ts              -> Step "MTup"     $ SBlk xs    [] $ (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
                                 where xs = take (length ts) fresh
-        Rng t                -> Step "MColon"   $ Blk [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
-        (i := t)             -> Step "MDef"     $ Blk [i]   [] $ Var i :=: (x :~> t)
-        (i :-> t)            -> Step "MArr"     $ Blk [i]   [] $ (Var i :=: Var x) :> (x :~> t)
+        Rng t                -> Step "MColon"   $ SBlk [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
+        (i := t)             -> Step "MDef"     $ SBlk [i]   [] $ Var i :=: (x :~> t)
+        (i :-> t)            -> Step "MArr"     $ SBlk [i]   [] $ (Var i :=: Var x) :> (x :~> t)
 {-
         ea@(Val{} :.. Val{}) -> Done "MEnum-v-v" $ Var x :=: ea
         (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
@@ -536,7 +555,7 @@ promotionOK :: Blk -> Iden -> Val -> Bool
 promotionOK (Blk locals leqns _) x v
   =  x `elem` locals                        -- must be a local variable
   && x `notElem` dom leqns                  -- x must not have an eqn
-  && occfvs v `noIntersect` (x : dom leqns) -- v must not have variables from eqns
+  && occfvs v `disjoint` (x : dom leqns)    -- v must not have variables from eqns
 
 -- Top level binders
 tbs :: Term -> Set Iden
@@ -551,7 +570,7 @@ tbs (t1 :@% t2) = tbs t1 `union` tbs t2
 tbs (t1 :..% t2) = tbs t1 `union` tbs t2
 tbs TFail{} = []
 tbs (_ :|:% _) = []
-tbs (TArr ts) = foldr union [] $ map tbs ts
+tbs (TArr ts) = unions $ map tbs ts
 tbs Fun{} = []
 tbs If{} = []
 tbs For{} = []
@@ -573,7 +592,7 @@ occfvs (e1 :=: e2) = occfvs e1 `union` occfvs e2
 occfvs (i :~> _) = [i]  -- XXX what should we do here
 occfvs (e1 :@ e2) = occfvs e1 `union` occfvs e2
 occfvs (e1 :.. e2) = occfvs e1 `union` occfvs e2
-occfvs (Arr es) = foldr union [] (map occfvs es)
+occfvs (Arr es) = unions (map occfvs es)
 occfvs (Iter _ b1 e2) = occfvsB b1 `union` occfvs e2
 occfvs (Crl b) = occfvsB b
 
