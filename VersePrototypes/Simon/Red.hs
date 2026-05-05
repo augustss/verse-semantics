@@ -167,7 +167,7 @@ instance Pretty Term where
   pPrintPrec _ _ TFail        = text "fail"
 
   pPrintPrec l _ (If t1 t2 t3) = text "if" <> parens (pPrintL l t1) <> braces (pPrintL l t2) <> text "else" <> braces (pPrintL l t3)
-  pPrintPrec l _ (For t1 t2)   = text "if" <> parens (pPrintL l t1) <> braces (pPrintL l t2)
+  pPrintPrec l _ (For t1 t2)   = text "for" <> parens (pPrintL l t1) <> braces (pPrintL l t2)
   pPrintPrec l p (x :-> e)     = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":->" <+> pPrintPrec l 2 e
 
 instance Pretty Exp where
@@ -365,6 +365,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
     res | not (null dead_vars) = Delete dead_vars  -- GC rules
         | otherwise            = find ex
 
+    -- XXX This needs to construct SCCs from uses inside lambda
     dead_vars :: [Iden]  -- Subset of locals that are unused
     dead_vars = locals \\ (allVars' ex ++ concatMap (allVars' . snd) leqns)
 
@@ -377,7 +378,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         Var x  :=: Val v  | promotionOK parent x v
                           -> Step "Promote1" $ SBlk [] [(x, v)] v
         Val v  :=: Var x  | promotionOK parent x v
-                          -> Step "Promote2" $ SBlk  [] [(x, v)] v
+                          -> Step "Promote2" $ SBlk [] [(x, v)] v
 
         Var i             | Just v <- lookup i eqns -> Done ("Subst " ++ show i) v
         Crl b@Blk{}       -> Step "FloatB" $ freshen fresh b
@@ -407,15 +408,13 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         -- Unification
         Val v1 :=: Val v2 | v1 == v2 -> Done "EqVal" v1
         Con v1 :=: Con v2 | v1 /= v2 -> Failure "EqFail"
---        HNF v  :=: Var i             -> Done "SWAP" $ Var i :=: v
+
 -- Let this be stuck instead        Var i  :=: HNF v  | i `elem` allFreeVars' v -> Failure "OCCUR"  -- occurs check
-        Val (Arr vs) :=: Arr es | length vs /= length es -> Failure "arr /="
-                                | otherwise ->
---                                  Done "EqTup" $ foldr (:>) (Arr vs) (zipWith (:=:) vs es)
-                                  Done "EqTup" $ Arr (zipWith (:=:) vs es)
+        Val (Arr vs) :=: Arr es | length vs /= length es   -> Failure "arr /="
+                                | otherwise                -> Done "EqTup" $ Arr (zipWith (:=:) vs es)
 
         -- Sequencing
-        Val{}  :>  e2    -> Done "Seq1" e2
+        Val{}  :>  e2                                      -> Done "Seq1" e2
 
 
         -- Unification, structural
@@ -424,11 +423,15 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         (e1 :> e2) :=: e3      -> Done "Norm3" $ e1 :> (e2 :=: e3)
         (Val v :=: e1) :=: e2  -> Done "Norm4" $ (v :=: e1) :> (v :=: e2)
 
-        -- Beta
-        Lam x (Blk vs eqs e) :@ Val v
-          -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
+        Int l :.. Int h        -> Done "Enum"  $ if h < l then Fail else foldr alt Fail [l .. h]
+          where alt i e = Blk [] [] (Int i) :|: Blk [] [] e
 
-        -- This rule isn't strictly necessary, but it allows indexing by a constant to proceed outside a failure context.
+        -- Beta
+        -- NOTE: it should be enough to match with eqs=[]
+        Lam x (Blk vs eqs e) :@ Val v                     -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
+
+        -- This rule isn't strictly necessary, but it allows indexing by
+        -- a constant to proceed outside a failure context.
         Arr es :@ Int i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i') where i' = fromInteger i
 
         Arr es :@ Val v -> Done "ITup" $
@@ -437,7 +440,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
 
         Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ SBlk [u] [] (Var u) where u = fresh!!0
 
-        Fail             -> Failure "FAIL"
+        Fail             -> Failure "Fail"
 
         x :~> tm  -> reduceMatch fresh x tm
 
@@ -445,37 +448,30 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         e1 :>  e2  -> find2  (:>)  e1 e2
         e1 :=: e2  -> find2  (:=:) e1 e2
         e1 :@  e2  -> find2  (:@)  e1 e2
+        e1 :.. e2  -> find2  (:..) e1 e2
         Arr es     -> findArr es
 {-
 -- no reductions under choice and lambda
         b1 :|: b2  -> find2B (:|:) b1 b2
         Lam x b    -> find1B (Lam x) b
 -}
+
         BlkX b1 :|: BlkX b2 | inB -> StepC "B" b1 b2     -- Found a choice, return it if in a B context
 
         Iter ic b1 e2    ->
-          case findRedex (depth+1) fresh singleOcc eqns True b1 of
-            Failure s  -> Done ("IFail-" ++ s) e2
-            None       -> None
-            Delete xs  -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
+          case findRedex (depth+1) fresh singleOcc eqns True b1 of  -- find a redex in B context
+            Failure s     -> Done ("IFail-" ++ s) e2
+            None          -> None
+            Delete xs     -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
 
-
-{-
-            Step s (SBlk is eqs (c1 :|: c2)) -> Done ("IChoice-" ++ s) $
-                                          Iter ic (mergeStep b1 (SBlk is eqs $ Crl c1))
-                                                  (Iter ic (mergeStep b1 (SBlk is eqs $ Crl c2)) e2)
--}
-            Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
-            Step s (SBlk [] [] v@Val{}) | ic == FOR -> Done ("IFor-" ++ s) $ Crl $ mergeStep b1 $ SBlk [x] [] $ cons2 (Var x) (v :@ Var x) e2
+            Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF ->
+                             Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
+            Step s (SBlk [] [] v@Val{}) | ic == FOR ->
+                             Done ("IFor-" ++ s) $ Crl $ mergeStep b1 $ SBlk [x] [] $ cons2 (Var x) (v :@ Var x) e2
                                   where x = fresh!!0
 
-            Step s b -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
-            StepC s bl br -> Done ("IChoice-" ++ s) $
-              Iter ic (mergeStep b1 bl) $ Iter ic (mergeStep b1 br) e2
-
-        -- Reduction under lambda
-        -- XXX WRONG, needs a Blk boundary inside the Lam
-        -- Lam v e          -> find1 (Lam v) e
+            Step s b      -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
+            StepC s bl br -> Done ("IChoice-" ++ s) $ Iter ic (mergeStep b1 bl) $ Iter ic (mergeStep b1 br) e2
 
         Verify s -> trace ("*** discard verify " ++ show s) $ Done "Verify" (Arr [])
 
@@ -531,6 +527,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
 
 reduceMatch ::  [Iden] -> Iden -> Term -> Reduction
 -- :~> reduction
+reduceMatch _fresh x tm | x `elem` allVarsTerm tm = error "unimplemented: reduceMatch, possible name clash"
 reduceMatch fresh x tm
   = case tm of
         -- Hackily turn IsInt, IsAny back to a lambda:
@@ -552,7 +549,6 @@ reduceMatch fresh x tm
         (t1 :@% t2)          -> Step "MApp"     $ SBlk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
         (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
         (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
-        -- SLPJ what if x is one of the binders in t1/t2?
 
         TFail                -> Done "Mfail"    $ Fail
         (t1 :>% t2)          -> Step "MSemi"    $ SBlk [u]   [] $ (u :~> t1) :> (x :~> t2)         where u = fresh!!0
@@ -567,7 +563,7 @@ reduceMatch fresh x tm
         (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
         (e1 :.. Val e2)      -> Done "MEnum-e-v" $ x :~> ((u := e2) :> (e1 :.. Var u))    where u = fresh!!0
 -}
-        (t1 :..% t2)         -> Done "MEnum"    $ Var x :=: ((u1 :~> t1) :.. (u2 :~> t2)) where u1:u2:_ = fresh
+        (t1 :..% t2)         -> Step "MEnum"    $ SBlk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :.. (u2 :~> t2)) where u1:u2:_ = fresh
         Fun at bt            -> Done "MFun"     $ (if addVerify then (Verify (prettyShow (Fun at bt)) :>) else id) $
                                                   Lam u $ Blk (p:q:tbs at) [] $ (Var p :=: (u :~> at)) :>
                                                                                  (Var q :=: (Var x :@ Var p)) :>
@@ -772,8 +768,8 @@ rename sub = ren
                   | otherwise = e
     ren e@(Int _) = e
     ren e@(Prm _) = e
-    ren (Lam i e) | isJust (lookup i sub) = error "rename: clash 3"
-                  | otherwise = Lam i (renB e)
+    ren (Lam i b) | isJust (lookup i sub) = let Crl b' = rename (filter ((/= i) . fst) sub) (Crl b) in Lam i b'
+                  | otherwise = Lam i (renB b)
     ren (Var i :=: Var j) | Just j' <- lookup i sub, j == j' = Var j
     ren (e1 :> e2) = ren e1 :> ren e2
     ren (e1 :=: e2) = ren e1 :=: ren e2
@@ -788,8 +784,8 @@ rename sub = ren
     ren (Crl b) = Crl (renB b)
     ren e@Verify{} = e
     renB :: Blk -> Blk
-    renB (Blk is eqs e) | any (isJust . (`lookup` sub)) is = error "rename clash 2"
-                        | otherwise = Blk is (map (second ren) eqs) (ren e)
+    renB b@(Blk is eqs e) | any (isJust . (`lookup` sub)) is = let Crl b' = rename (filter ((`notElem` is) . fst) sub) (Crl b) in b'
+                          | otherwise = Blk is (map (second ren) eqs) (ren e)
 
     renT e@(TVar i) | Just j <- lookup i sub = TVar j
                     | otherwise = e
