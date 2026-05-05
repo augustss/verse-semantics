@@ -23,6 +23,13 @@ import GHC.IO.Exception(assertError)
 
 -}
 
+-- Add a verify block
+addVerify :: Bool
+addVerify = True
+
+-- Show every reduction step
+traceReductions :: Bool
+traceReductions = True
 
 --------------------------------------------------------------------------------
 --
@@ -92,6 +99,7 @@ data Exp
   | Arr [Exp]             -- array{e1,...,e2}
   | Iter IterCtx Blk Exp  -- if/for
   | Crl Blk               -- {...}
+  | Verify String         -- the string should be replaced by something sensible
     deriving (Eq, Show)
 
 type Eqn = (Iden, Val)
@@ -185,6 +193,7 @@ instance Pretty Exp where
 
   pPrintPrec l _ (Iter ic b1 b2)
     = text "iter" <> parens (text (show ic)) <> braces (pPrintL l b1) <> braces (pPrintL l b2)
+  pPrintPrec _ _ (Verify s) = text "verify" <> parens (text (show s))
 
 instance Pretty SBlk where
   pPrintPrec l p (SBlk [] [] e) = pPrintPrec l p e
@@ -307,17 +316,16 @@ run src = P $ evalBlk 1000000 (Blk (u:tbs t) [] (u :~> t))
         t = srcToTerm src
 
 evalBlk :: Int -> Blk -> Exp
-evalBlk _ b | trace (prettyShow b ++ "\n") False = undefined
+evalBlk _ b | traceReductions && trace (prettyShow b ++ "\n") False = undefined
 evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
 evalBlk fuel b@(Blk is eqs expr) =
     case findTopRedex (freshVarsBlk b) b of
-      -- XXX iterate substVal?
       Step _ b'         -> evalBlk (fuel-1) $ mergeStep b b'
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
-      StepC _ _ _       -> error "impossible: findTopRedex StepC"
+      StepC _ _ _       -> error "impossible: findTopRedex StepC"  -- can only happen with inB=True
 
 mergeStep :: Blk -> SBlk -> Blk
 mergeStep (Blk is eqs _) (SBlk xs eqns e) =
@@ -328,9 +336,6 @@ mergeStep (Blk is eqs _) (SBlk xs eqns e) =
 dom :: Set Eqn -> Set Iden
 dom = map fst
 
---fv :: Exp -> Set Iden
---fv = allFreeVars'
-
 disjoint :: Eq a => Set a -> Set a -> Bool
 disjoint xs ys = null $ xs `intersect` ys
 
@@ -339,6 +344,7 @@ findTopRedex fresh blk@(Blk locals eqns ex) = findRedex 0 fresh singleOcc [] Fal
   where
     -- Subset of `locals` that occur exactly once, and have no Eqn
     -- To support EXI-APP
+    -- XXX This is wrong.  Can't handle multiple uses of a function
     -- ToDo: what about occurrences in `eqns` under a lambda?
     singleOcc :: Set Iden
     singleOcc = [ x | [x] <- group (sort (allVars ex))
@@ -347,11 +353,14 @@ findTopRedex fresh blk@(Blk locals eqns ex) = findRedex 0 fresh singleOcc [] Fal
 
 findRedex :: Int -> [Iden] -> Set Iden -> Set Eqn -> Bool -> Blk -> Reduction
 findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
-  trace (render (nest (4*depth) (text "findRedex enter parent =" <+> pPrintL prettyNormal parent))) $
-  trace (render (nest (4*depth) (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
-                                                              (text "res    =" <+> pPrintL prettyNormal res))))
-         ++ "\n")
-        res
+  if traceReductions then
+    trace (render (nest (4*depth) (text "findRedex enter parent =" <+> pPrintL prettyNormal parent))) $
+    trace (render (nest (4*depth) (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
+                                                                (text "res    =" <+> pPrintL prettyNormal res))))
+           ++ "\n")
+    res
+  else
+    res
   where
     res | not (null dead_vars) = Delete dead_vars  -- GC rules
         | otherwise            = find ex
@@ -462,6 +471,8 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         -- XXX WRONG, needs a Blk boundary inside the Lam
         -- Lam v e          -> find1 (Lam v) e
 
+        Verify s -> trace ("*** discard verify " ++ show s) $ Done "Verify" (Arr [])
+
         _ -> None
 
     find1 :: (Exp -> Exp) -> Exp -> Reduction
@@ -551,9 +562,10 @@ reduceMatch fresh x tm
         (e1 :.. Val e2)      -> Done "MEnum-e-v" $ x :~> ((u := e2) :> (e1 :.. Var u))    where u = fresh!!0
 -}
         (t1 :..% t2)         -> Done "MEnum"    $ Var x :=: ((u1 :~> t1) :.. (u2 :~> t2)) where u1:u2:_ = fresh
-        Fun at bt            -> Done "MFun"     $ Lam u $ Blk (p:q:tbs at) [] $ (Var p :=: (u :~> at)) :>
-                                                                                (Var q :=: (Var x :@ Var p)) :>
-                                                                                (q :~> bt)
+        Fun at bt            -> Done "MFun"     $ (if addVerify then (Verify (prettyShow (Fun at bt)) :>) else id) $
+                                                  Lam u $ Blk (p:q:tbs at) [] $ (Var p :=: (u :~> at)) :>
+                                                                                 (Var q :=: (Var x :@ Var p)) :>
+                                                                                 (q :~> bt)
                                   where u:p:q:_ = fresh
         If t0 t1 t2          -> Done "MIf"      $ Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
                                                                 (Crl (Blk (tbs t2) [] (x :~> t2)))
@@ -606,6 +618,7 @@ occfvs (e1 :.. e2) = occfvs e1 `union` occfvs e2
 occfvs (Arr es) = unions (map occfvs es)
 occfvs (Iter _ b1 e2) = occfvsB b1 `union` occfvs e2
 occfvs (Crl b) = occfvsB b
+occfvs Verify{} = []
 
 occfvsB :: Blk -> Set Iden
 occfvsB (Blk is eqs e) = foldr union (occfvs e) (map (occfvs . snd) eqs) \\ is
@@ -626,6 +639,7 @@ allVars Fail = []
 allVars (Dly b) = allVarsBlk b
 allVars (Crl b) = allVarsBlk b
 allVars (Iter _ b1 e2) = allVarsBlk b1 ++ allVars e2
+allVars Verify{} = []
 
 allVarsBlk :: Blk -> [Iden]
 allVarsBlk (Blk is eqs e) = is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -756,6 +770,7 @@ rename sub = ren
     ren (Dly b) = Dly (renB b)
     ren (Iter ic b1 e2) = Iter ic (renB b1) (ren e2)
     ren (Crl b) = Crl (renB b)
+    ren e@Verify{} = e
     renB :: Blk -> Blk
     renB (Blk is eqs e) | any (isJust . (`lookup` sub)) is = error "rename clash 2"
                         | otherwise = Blk is (map (second ren) eqs) (ren e)
@@ -859,6 +874,7 @@ gcVars xs (b1 :|: b2) = gcVarsBlk xs b1 :|: gcVarsBlk xs b2
 gcVars xs (e1 :.. e2) = gcVars xs e1 :.. gcVars xs e2
 gcVars  _ e@Fail   = e
 gcVars xs (Iter ic b1 e2) = Iter ic (gcVarsBlk xs b1) (gcVars xs e2)
+gcVars _ e@Verify{} = e
 
 gcVarsBlk :: Set Iden -> Blk -> Blk
 gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) $ gcVars xs expr
