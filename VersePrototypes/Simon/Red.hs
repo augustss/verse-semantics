@@ -402,6 +402,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
                          | AHNF{}             <- v         -> Failure "Prim-Lt"
         Prm F.Gt :@ v    | Arr [Int i, Int j] <- v, i > j  -> Done    "Prim-Gt"  $ Int i
                          | AHNF{}             <- v         -> Failure "Prim-Gt"
+        Prm F.ArrCons :@ v | Arr [x, Arr xs]  <- v         -> Done    "Prim-cons" $ Arr (x:xs)
 
         -- Unification
         Val v1 :=: Val v2 | v1 == v2 -> Done "EqVal" v1
@@ -427,7 +428,10 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         Lam x (Blk vs eqs e) :@ Val v
           -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
 
-        Arr es :@ Val v -> Done "ITUP" $
+        -- This rule isn't strictly necessary, but it allows indexing by a constant to proceed outside a failure context.
+        Arr es :@ Int i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i') where i' = fromInteger i
+
+        Arr es :@ Val v -> Done "ITup" $
                            foldr alt Fail (zipWith (\ i e -> (v :=: Int i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
 
@@ -462,6 +466,8 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
                                                   (Iter ic (mergeStep b1 (SBlk is eqs $ Crl c2)) e2)
 -}
             Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
+            Step s (SBlk [] [] v@Val{}) | ic == FOR -> Done ("IFor-" ++ s) $ Crl $ mergeStep b1 $ SBlk [x] [] $ cons2 (Var x) (v :@ Var x) e2
+                                  where x = fresh!!0
 
             Step s b -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
             StepC s bl br -> Done ("IChoice-" ++ s) $
@@ -571,7 +577,11 @@ reduceMatch fresh x tm
                                                                 (Crl (Blk (tbs t2) [] (x :~> t2)))
                                         where u = fresh!!0
 
-        For {}               -> error "reduceMatch: FOR not done yet"
+        For t0 t1            -> Step "MFor"     $ SBlk [y] [] $ (Arr [Var x, Var y] :=:
+                                                                  Iter FOR (Blk (u:tbs t0) [] ((u :~> t0) :> Lam w (Blk [] [] $ w :~> t1)))
+                                                                            (Arr [Arr [], Arr []])
+                                                                ) :> Var y
+                                        where y:u:w:_ = fresh
 
 promotionOK :: Blk -> Iden -> Val -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
@@ -579,6 +589,12 @@ promotionOK (Blk locals leqns _) x v
   =  x `elem` locals                        -- must be a local variable
   && x `notElem` dom leqns                  -- x must not have an eqn
   && occfvs v `disjoint` (x : dom leqns)    -- v must not have variables from eqns
+
+cons2 :: Exp -> Exp -> Exp -> Exp
+cons2 x y xsys = Arr [cons x xs, cons y ys]
+  where xs = xsys :@ Int 0
+        ys = xsys :@ Int 1
+        cons a as = Prm F.ArrCons :@ Arr [a, as]
 
 -- Top level binders
 tbs :: Term -> Set Iden

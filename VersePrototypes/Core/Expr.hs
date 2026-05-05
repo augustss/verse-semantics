@@ -464,6 +464,7 @@ data PrimOp
  | DotDot     -- dotDot$[v,n] = (v = (0 | 1 | .. | n)); ()
  | ArrApp     -- arrApp$[ Tup as, Tup bs, r ] =  r=(as++bs); r
  | ArrMap     -- arrMap$[t,a]
+ | ArrCons    -- arrCons$[x,xs] = <x,..xs>
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
@@ -489,6 +490,7 @@ primOpString ArrLen   = "arrLen$"
 primOpString DotDot   = "dotDot$"
 primOpString ArrApp   = "arrApp$"
 primOpString ArrMap   = "arrMap$"
+primOpString ArrCons  = "arrCons$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -525,6 +527,7 @@ primOpCanFail IsTru  = True
 primOpCanFail IsType = True
 primOpCanFail ArrApp = True
 primOpCanFail DotDot = True  -- Can fail when unification fails
+primOpCanFail ArrCons = True  -- if run backwards
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
