@@ -34,7 +34,7 @@ import qualified Pom (den)
 import qualified PomPom (denS, ForUnionMode(..), ForUnitMode(..), IfUnionMode(..), Config(..), defaultConfig)
 import qualified SemClass (den)
 import qualified Red as Simon (run)
-import FrontEnf.ENVDesugar (envDesugar)
+import FrontEnd.ENVDesugar (envDesugar)
 
 -- Epic libraries
 import Epic.Repl
