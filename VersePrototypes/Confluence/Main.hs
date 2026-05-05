@@ -76,7 +76,7 @@ prop_Confluent =
     ]
 
   stepRule rule e =
-    [ TS lab v e'
+    [ TS { ts_str = lab, ts_verb = v, ts_payload = e' }
     | (e',lab,v) <- run rule (S.fromList (occurs e)) [] [] e
     ]
 
