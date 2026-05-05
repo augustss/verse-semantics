@@ -335,7 +335,7 @@ disjoint :: Eq a => Set a -> Set a -> Bool
 disjoint xs ys = null $ xs `intersect` ys
 
 findTopRedex :: [Iden] -> Blk -> Reduction
-findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] False blk
+findTopRedex fresh blk@(Blk locals eqns ex) = findRedex 0 fresh singleOcc [] False blk
   where
     -- Subset of `locals` that occur exactly once, and have no Eqn
     -- To support EXI-APP
@@ -345,11 +345,11 @@ findTopRedex fresh blk@(Blk locals eqns ex) = findRedex fresh singleOcc [] False
                     , x `elem` locals
                     , isNothing (lookup x eqns) ]
 
-findRedex :: [Iden] -> Set Iden -> Set Eqn -> Bool -> Blk -> Reduction
-findRedex fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
-  trace (render (text "findRedex enter parent =" <+> pPrintL prettyNormal parent) ++ "\n") $
-  trace (render (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
-                                              (text "res    =" <+> pPrintL prettyNormal res)))
+findRedex :: Int -> [Iden] -> Set Iden -> Set Eqn -> Bool -> Blk -> Reduction
+findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
+  trace (render (nest (4*depth) (text "findRedex enter parent =" <+> pPrintL prettyNormal parent))) $
+  trace (render (nest (4*depth) (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
+                                                              (text "res    =" <+> pPrintL prettyNormal res))))
          ++ "\n")
         res
   where
@@ -438,17 +438,22 @@ findRedex fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         b1 :|: b2  -> find2B (:|:) b1 b2
         Lam x b    -> find1B (Lam x) b
 -}
+        BlkX b1 :|: BlkX b2 | inB -> StepC "B" b1 b2     -- Found a choice, return it if in a B context
 
         Iter ic b1 e2    ->
-          case findRedex fresh singleOcc eqns True b1 of
+          case findRedex (depth+1) fresh singleOcc eqns True b1 of
             Failure s  -> Done ("IFail-" ++ s) e2
             None       -> None
             Delete xs  -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
 
+
+{-
             Step s (SBlk is eqs (c1 :|: c2)) -> Done ("IChoice-" ++ s) $
                                           Iter ic (mergeStep b1 (SBlk is eqs $ Crl c1))
                                                   (Iter ic (mergeStep b1 (SBlk is eqs $ Crl c2)) e2)
+-}
             Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
+
             Step s b -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
             StepC s bl br -> Done ("IChoice-" ++ s) $
               Iter ic (mergeStep b1 bl) $ Iter ic (mergeStep b1 br) e2
@@ -470,7 +475,7 @@ findRedex fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
     find2 c e1 e2 =
       case find e1 of
         Step s (SBlk is eqs e1') -> Step s $ SBlk is eqs (e1' `c` e2)
-        StepC s (SBlk is1 eqs1 e1') (SBlk is2 eqs2 e2') -> StepC s (SBlk is1 eqs1 (e1' `c` e1)) (SBlk is2 eqs2 (e2' `c` e1))
+        StepC s (SBlk is1 eqs1 e1') (SBlk is2 eqs2 e2') -> StepC s (SBlk is1 eqs1 (e1' `c` e2)) (SBlk is2 eqs2 (e2' `c` e2))
         None                    -> find1 (c e1) e2
         r                       -> r
 
