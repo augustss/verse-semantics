@@ -1,6 +1,7 @@
-{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns -Wno-incomplete-patterns #-}
      {- -Wno-missing-methods -Wno-incomplete-uni-patterns -Wno-unused-matches
         -Wno-missing-pattern-synonym-signatures -}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -13,6 +14,7 @@ import Data.Maybe
 import qualified FrontEnd.Expr as F
 import Epic.Print
 import Debug.Trace
+
 
 {-
   Potential problems:
@@ -88,7 +90,15 @@ type Set a = [a]   -- Represented as a list, but order is immaterial
 --    (A)  dom(eqs)    `subset`   X
 --    (B)  occfvs(eqs) `disjoint` X
 
-data Blk = Blk (Set Iden) (Set Eqn) Exp
+newtype Blk = BlkX SBlk
+  deriving (Eq, Show, Pretty)
+
+pattern Blk :: (Set Iden) -> (Set Eqn) -> Exp -> Blk
+pattern Blk is eqs e = BlkX (SBlk is eqs e)
+
+-- A block with no invariants.
+-- This is what Step returns.
+data SBlk = SBlk (Set Iden) (Set Eqn) Exp
   deriving (Eq, Show)
 
 type Val = Exp
@@ -157,9 +167,9 @@ instance Pretty Exp where
   pPrintPrec l _ (Iter ic b1 b2)
     = text "iter" <> parens (text (show ic)) <> braces (pPrintL l b1) <> braces (pPrintL l b2)
 
-instance Pretty Blk where
-  pPrintPrec l p (Blk [] [] e) = pPrintPrec l p e
-  pPrintPrec l p (Blk vs eqns e)
+instance Pretty SBlk where
+  pPrintPrec l p (SBlk [] [] e) = pPrintPrec l p e
+  pPrintPrec l p (SBlk vs eqns e)
     = maybeParens (p > 0) $ text "∃" <+>
       vcat ([hsep (map (pPrintPrec l 10) vs) <> text "."]
             ++ (punctuate (text "") (map (\ (i, d) -> pPrintPrec l 0 i <+> text "<-" <+> pPrintPrec l 0 d) eqns))
@@ -249,11 +259,11 @@ data Reduction
   = None               -- No redex found
   | Failure String     -- Evaluation failed
   | Delete (Set Iden)  -- Delete the identifiers from the block existential and equations
-  | Step RuleName Blk  -- The named rule fired, returning this Blk
+  | Step RuleName SBlk -- The named rule fired, returning this Blk
   deriving (Eq, Show)
 
 pattern Done :: String -> Exp -> Reduction
-pattern Done s e = Step s (Blk [] [] e)
+pattern Done s e = Step s (SBlk [] [] e)
 
 instance Pretty Reduction where
   pPrintPrec l p (Delete is) = text "GC" <+> pPrintPrec l p is
@@ -286,8 +296,8 @@ evalBlk fuel b@(Blk is eqs expr) =
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
 
-mergeStep :: Blk -> Blk -> Blk
-mergeStep (Blk is eqs _) (Blk xs eqns e) =
+mergeStep :: Blk -> SBlk -> Blk
+mergeStep (Blk is eqs _) (SBlk xs eqns e) =
   (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
                         map (second $ substVal eqns) eqs) e)
 
@@ -328,17 +338,14 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
 
     eqns = leqns ++ geqns
 
-    findB :: Set Eqn -> Blk -> Reduction
-    findB = findRedex fresh singleOcc
-
     find :: Exp -> Reduction
     find expr =
       case expr of
         -- Scope and substitution
         Var x  :=: Val v  | promotionOK parent x v
-                          -> Step "Promote1" $ Blk [] [(x, v)] v
+                          -> Step "Promote1" $ SBlk [] [(x, v)] v
         Val v  :=: Var x  | promotionOK parent x v
-                          -> Step "Promote2" $ Blk  [] [(x, v)] v
+                          -> Step "Promote2" $ SBlk  [] [(x, v)] v
 
         Var i             | Just v <- lookup i eqns -> Done ("Subst " ++ show i) v
         Crl b@Blk{}       -> Step "FloatB" $ freshen fresh b
@@ -386,14 +393,13 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
 
         -- Beta
         Lam x (Blk vs eqs e) :@ Val v
-          -> Step "Beta" $ Blk is' eqs' e'
-          where Blk is' eqs' e' = freshen fresh (Blk (x:vs) ((x, v):eqs) e)
+          -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
 
         Arr es :@ Val v -> Done "ITUP" $
                            foldr alt Fail (zipWith (\ i e -> (v :=: Int i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
 
-        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ Blk [u] [] (Var u) where u = fresh!!0
+        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ SBlk [u] [] (Var u) where u = fresh!!0
 
         Fail             -> Failure "FAIL"
 
@@ -402,10 +408,12 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
         -- Catch-all cases for context C; just walk downwards
         e1 :>  e2  -> find2  (:>)  e1 e2
         e1 :=: e2  -> find2  (:=:) e1 e2
-        e1  :@  e2 -> find2  (:@)  e1 e2
-        b1 :|: b2  -> find2B (:|:) b1 b2
+        e1 :@  e2  -> find2  (:@)  e1 e2
         Arr es     -> findArr es
+{-
+        b1 :|: b2  -> find2B (:|:) b1 b2
         Lam x b    -> find1B (Lam x) b
+-}
 
         Iter ic b1 e2    ->
           case findRedex fresh singleOcc eqns b1 of
@@ -420,10 +428,10 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
 -}
             Delete xs  -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
 
-            Step s (Blk is eqs (c1 :|: c2)) -> Done ("IChoice-" ++ s) $
-                                          Iter ic (mergeStep b1 (Blk is eqs $ Crl c1))
-                                                  (Iter ic (mergeStep b1 (Blk is eqs $ Crl c2)) e2)
-            Step s (Blk [] [] (Dly b)) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
+            Step s (SBlk is eqs (c1 :|: c2)) -> Done ("IChoice-" ++ s) $
+                                          Iter ic (mergeStep b1 (SBlk is eqs $ Crl c1))
+                                                  (Iter ic (mergeStep b1 (SBlk is eqs $ Crl c2)) e2)
+            Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF -> Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
             Step s b -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
 
         -- Reduction under lambda
@@ -435,40 +443,44 @@ findRedex fresh singleOcc geqns parent@(Blk locals leqns ex) =
     find1 :: (Exp -> Exp) -> Exp -> Reduction
     find1 c e =
       case find e of
-        Step s (Blk is eqs e') -> Step s $ Blk is eqs (c e')
-        r                      -> r
+        Step s (SBlk is eqs e') -> Step s $ SBlk is eqs (c e')
+        r                       -> r
 
     find2 :: (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction
     find2 c e1 e2 =
       case find e1 of
-        Step s (Blk is eqs e1') -> Step s $ Blk is eqs (e1' `c` e2)
-        None                    -> find1 (c e1) e2
-        r                       -> r
+        Step s (SBlk is eqs e1') -> Step s $ SBlk is eqs (e1' `c` e2)
+        None                     -> find1 (c e1) e2
+        r                        -> r
 
     findArr :: [Exp] -> Reduction
     findArr [] = None
     findArr (e:es) =
       case find e of
-        Step s (Blk is eqs e') -> Step s $ Blk is eqs (Arr (e':es))
-        None                   ->
+        Step s (SBlk is eqs e') -> Step s $ SBlk is eqs (Arr (e':es))
+        None                    ->
           case findArr es of
-            Step s (Blk is eqs (Arr es')) -> Step s $ Blk is eqs (Arr (e:es'))
-            r                             -> r
-        r                      -> r
+            Step s (SBlk is eqs (Arr es')) -> Step s $ SBlk is eqs (Arr (e:es'))
+            r                              -> r
+        r                       -> r
+
+{-
+    findB :: Set Eqn -> Blk -> Reduction
+    findB = findRedex fresh singleOcc
 
     find1B :: (Blk -> Exp) -> Blk -> Reduction
     find1B c b@(Blk is eqs _) =
       case findB eqns b of
-        Step s (Blk is' eqs' e') -> Done s (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
-        r                        -> r
+        Step s (SBlk is' eqs' e') -> Done s (c (SBlk (is' ++ is) (eqs' ++ eqs) e'))
+        r                         -> r
 
     find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
     find2B c b1@(Blk is eqs _) b2 =
       case findB eqns b1 of
-        Step s (Blk is' eqs' e') -> Done s (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
-        None                     -> find1B (c b1) b2
-        r                        -> r
-
+        Step s (SBlk is' eqs' e') -> Done s (SBlk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
+        None                      -> find1B (c b1) b2
+        r                         -> r
+-}
 
 reduceMatch ::  [Iden] -> Iden -> Term -> Reduction
 -- :~> reduction
@@ -782,11 +794,11 @@ freshVarsTerm t = freshVars (F.Ident F.noLoc "" :~> t)
 --freshVar :: Exp -> Iden
 --freshVar = (!!0) . freshVars
 
-freshen :: [Iden] -> Blk -> Blk
+freshen :: [Iden] -> Blk -> SBlk
 freshen fresh _b@(Blk is eqs expr) =
 --  trace ("freshen " ++ show sub ++ "\n" ++ show _b ++ "\n" ++ show res)
   res
-  where res = Blk vs (map renEqn eqs) (rename sub expr)
+  where res = SBlk vs (map renEqn eqs) (rename sub expr)
         sub = zip is fresh
         vs = map snd sub
         renEqn (i, e) = (fromMaybe i (lookup i sub), rename sub e)
