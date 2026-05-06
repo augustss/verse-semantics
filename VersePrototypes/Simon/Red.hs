@@ -610,8 +610,10 @@ reducePrimOp F.Sub AHNF{} = Just $ Failure "Prim-"
 reducePrimOp F.Mul AHNF{} = Just $ Failure "Prim*"
 reducePrimOp F.Div AHNF{} = Just $ Failure "Prim/"
 
-reducePrimOp F.Neg (LInt i) = Just $ Done   "Prim-neg" $ LInt (- i)
+reducePrimOp F.Neg (LInt i) = Just $ Done    "Prim-neg" $ LInt (- i)
 reducePrimOp F.Neg HNF{}    = Just $ Failure "Prim-neg"
+reducePrimOp F.Pls (LInt i) = Just $ Done    "Prim-pls" $ LInt i
+reducePrimOp F.Pls HNF{}    = Just $ Failure "Prim-pls"
 
 reducePrimOp F.IsInt v@(LInt {}) = Just $ Done "Prim-isInt" v
 reducePrimOp F.IsInt HNF{}       = Just $ Failure "Prim-isInt"

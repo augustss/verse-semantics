@@ -458,6 +458,7 @@ inRangeType n
 data PrimOp
  = -- Operations on integers
    Add | Sub | Mul | Div | Neg
+ | Pls                               -- prefix +
 
    -- Operations on arrays
  | ArrLen
@@ -485,6 +486,7 @@ primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
 primOpString Neg = "intNeg$"
+primOpString Pls = "intPls$"
 
 primOpString ArrLen   = "arrLen$"
 primOpString DotDot   = "dotDot$"
@@ -535,6 +537,7 @@ primOpCanFail Sub      = False
 primOpCanFail Mul      = False
 primOpCanFail Div      = False
 primOpCanFail Neg      = False
+primOpCanFail Pls      = False
 primOpCanFail ArrLen   = False
 primOpCanFail ArrMap   = False
 
