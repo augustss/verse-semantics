@@ -37,7 +37,7 @@ addVerify = True
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = False
+traceReductions = True
 
 --------------------------------------------------------------------------------
 --
@@ -202,7 +202,9 @@ instance Pretty Exp where
   pPrintPrec l p (Lam i b)   = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 0 b
   pPrintPrec l p (x :~> e)   = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
   pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
-  pPrintPrec l p (e1 :> e2)  = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
+  pPrintPrec l p ee@(_ :> _) = maybeParens (p > 0) $ sep $ punctuate (text ";") (map (pPrintL l) $ flat ee)
+                               where flat (e1 :> e2) = flat e1 ++ flat e2
+                                     flat e = [e]
   pPrintPrec l p (e1 :=: e2) = maybeParens (p > 0) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
   pPrintPrec l _ (Arr es)
