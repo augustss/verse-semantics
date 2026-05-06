@@ -143,6 +143,10 @@ type Val = Exp
 data IterCtx = IF | FOR
   deriving (Eq, Show)
 
+mkCrl :: Blk -> Exp
+mkCrl (Blk [] [] e) = e
+mkCrl b             = Crl b
+
 --------------------------------------------------------------------------------
 --
 --             Pretty-printing
@@ -485,7 +489,10 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
 
         -- Beta
         -- NOTE: it should be enough to match with eqs=[]
-        Lam x (Blk vs eqs e) :@ Val v -> Step "Beta" $ freshen fresh (Blk (x:vs) ((x, v):eqs) e)
+        Lam x b :@ e -> Step "Beta" $ SBlk [x'] [] ((Var x' :=: e) :> mkCrl b')
+            where
+              x' = fresh!!0
+              b' = renameBlk [(x,x')] b
 
         -- This rule isn't strictly necessary, but it allows indexing by
         -- a constant to proceed outside a failure context.
@@ -851,9 +858,8 @@ rename sub = ren
     ren (Iter ic b1 e2) = Iter ic (renB b1) (ren e2)
     ren (Crl b) = Crl (renB b)
     ren e@Verify{} = e
-    renB :: Blk -> Blk
-    renB b@(Blk is eqs e) | any (isJust . (`lookup` sub)) is = let Crl b' = rename (filter ((`notElem` is) . fst) sub) (Crl b) in b'
-                          | otherwise = Blk is (map (second ren) eqs) (ren e)
+
+    renB = renameBlk sub
 
     renT e@(TVar i) | Just j <- lookup i sub = TVar j
                     | otherwise = e
@@ -876,6 +882,14 @@ rename sub = ren
     renT (i := t) = fromMaybe i (lookup i sub) := renT t
     renT (i :-> t) = fromMaybe i (lookup i sub) :-> renT t
     renT (TBlock t) = TBlock (renT t)
+
+renameBlk :: [(Iden,Iden)] -> Blk -> Blk
+renameBlk sub b@(Blk is eqs e)
+  | any (isJust . (`lookup` sub)) is
+  = let Crl b' = rename (filter ((`notElem` is) . fst) sub) (Crl b)
+    in b'
+  | otherwise = Blk is (map (second (rename sub)) eqs)
+                       (rename sub e)
 
 freshVars :: Exp -> [Iden]
 freshVars e = idenSupply \\ allVars e
