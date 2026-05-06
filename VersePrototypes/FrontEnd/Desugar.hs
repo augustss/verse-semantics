@@ -127,10 +127,13 @@ sDesugarExpr = ds
 
     -- Application
     ds (ApplyD  e1 e2) = ApplyD <$> ds e1 <*> ds e2
-    ds (ApplyS  e1 e2) = applyS <$> ds e1 <*> ds e2
+    ds (ApplyS  e1 e2) = do e1' <- ds e1; e2' <- ds e2; applyS e1' e2'
       where
-        -- This replaces f(e) with check<succeeds>{f[e]}
-        applyS x y = eCheck effSucceeds (ApplyD x y)
+        -- This replaces f(a) with check<succeeds>{f[a]},
+        -- but pulls out expressions, so e1(e2) turns into f:=e1; a:=e2; check<succeed>{f[a])
+        applyS f a | not (isValue f) = do fi <- newIdent (getLoc f) "f"; fa <- applyS (Variable fi) a; return $ DefineE fi f `Seq` fa
+        applyS f a | not (isValue a) = do ai <- newIdent (getLoc a) "a"; fa <- applyS f (Variable ai); return $ DefineE ai a `Seq` fa
+        applyS f a = return $ eCheck effSucceeds (ApplyD f a)
 
     -- (e1 = e2)  --->  Unify
     ds (InfixOp e1 (Op "=")  e2)
