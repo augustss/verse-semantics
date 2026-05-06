@@ -86,6 +86,7 @@ data Term
   | Iden := Term      -- x := t
   | Iden :-> Term     -- x ??? t
   | TBlock Term       -- block{ t }
+  | Succ Term         -- check<succeeds>{t}
   deriving (Eq, Show)
 
 data Exp
@@ -140,7 +141,7 @@ data SBlk = SBlk (Set Iden) (Set Eqn) Exp
 
 type Val = Exp
 
-data IterCtx = IF | FOR
+data IterCtx = IF | FOR | SUCC
   deriving (Eq, Show)
 
 mkCrl :: Blk -> Exp
@@ -191,7 +192,8 @@ instance Pretty Term where
   pPrintPrec l _ (For t1 t2)   = text "for" <> parens (pPrintL l t1) <> braces (pPrintL l t2)
   pPrintPrec l p (x :-> e)     = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":->" <+> pPrintPrec l 2 e
 
-  pPrintPrec l _ (TBlock t) = braces $ (pPrintL l t)
+  pPrintPrec l _ (TBlock t)    = braces $ (pPrintL l t)
+  pPrintPrec l _ (Succ t)      = text "check<succeeds>" <> braces (pPrintL l t)
 
 instance Pretty Exp where
   pPrintPrec l p (Var i)     = pPrintPrec l p i
@@ -319,6 +321,7 @@ srcToTerm (F.Exists is e)        = TBlock (foldr bind_one (srcToTerm e) is)
                                  where
                                    bind_one x t = (srcToCoreIdent x := Und) :>% t
 
+srcToTerm (F.Check suc e) | suc == F.effSucceeds = Succ (srcToTerm e)
 srcToTerm e = error $ "srcToTerm: unimplemented " ++ show e
 
 srcToCoreIdent :: F.Ident -> Core.Ident
@@ -529,6 +532,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         Iter IF  (Blk [] [] (Dly b)) _  -> Done "IIf" $ Crl b
         Iter FOR (Blk xs eqs v@Val{}) e2 -> Step "IFor" $ freshen (drop 1 fresh) $ Blk (x:xs) eqs $ cons2 (Var x) (v :@ Var x) e2
                                   where x = fresh!!0
+        Iter SUCC (Blk xs eqs v@Val{}) _ -> Step "ISucc" $ SBlk xs eqs v
         Iter ic b1 e2    ->
           case findRedex (depth+1) fresh singleOcc eqns True b1 of  -- find a redex in B context
             Failure s     -> Done ("IFail-" ++ s) e2
@@ -657,6 +661,8 @@ reduceMatch fresh x tm
                                                                             (Arr [Arr [], Arr []])
                                                                 ) :> Var y
                                         where y:u:w:_ = fresh
+        Succ t               -> Done "MSucc"   $ Var x :=: Iter SUCC (Blk (u:tbs t) [] $ u :~> t) (Var (Core.Name "STUCK-application-failed"))
+                                        where u = fresh!!0
 
 promotionOK :: Blk -> Iden -> Val -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
@@ -692,6 +698,7 @@ tbs (Rng t) = tbs t
 tbs (x := t) = [x] `union` tbs t
 tbs (x :-> t) = [x] `union` tbs t
 tbs (TBlock {}) = []
+tbs (Succ _) = []
 
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Iden
@@ -760,6 +767,7 @@ allVarsTerm (If t1 t2 t3) = allVarsTerm t1 ++ allVarsTerm t2 ++ allVarsTerm t3
 allVarsTerm (For t1 t2) = allVarsTerm t1 ++ allVarsTerm t2
 allVarsTerm (i :-> e) = i : allVarsTerm e
 allVarsTerm (TBlock t) = allVarsTerm t
+allVarsTerm (Succ t) = allVarsTerm t
 
 expSize :: Exp -> Int
 expSize (Var {})    = 1
@@ -805,6 +813,7 @@ termSize (If t1 t2 t3)    = 1 + termSize t1 + termSize t2 + termSize t3
 termSize (For t1 t2)      = 1 + termSize t1 + termSize t2
 termSize (_ :-> e)        = 1 + termSize e
 termSize (TBlock t)       = 1 + termSize t
+termSize (Succ t)         = 1 + termSize t
 
 rename :: [(Iden, Iden)] -> Exp -> Exp
 rename sub = ren
@@ -853,6 +862,7 @@ rename sub = ren
     renT (i := t) = fromMaybe i (lookup i sub) := renT t
     renT (i :-> t) = fromMaybe i (lookup i sub) :-> renT t
     renT (TBlock t) = TBlock (renT t)
+    renT (Succ t) = Succ (renT t)
 
 renameBlk :: [(Iden,Iden)] -> Blk -> Blk
 renameBlk sub b@(Blk is eqs e)
