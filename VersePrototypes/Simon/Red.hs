@@ -241,11 +241,13 @@ ppBlk l p vs eqns e
 --
 --------------------------------------------------------------------------------
 
+type HNF = Exp
+
 -- A HNF, i.e., a value, but not a variable
-pattern HNF :: Exp -> Val
+pattern HNF :: Exp -> HNF
 pattern HNF e <- (getHNF -> Just e)
 
-getHNF :: Exp -> Maybe Exp
+getHNF :: Exp -> Maybe HNF
 -- A value with a constructor at the top, not a variable
 --   E.g.  7, (\x.e),  <x,3>
 getHNF Var{} = Nothing
@@ -267,14 +269,14 @@ getVal _ = Nothing
 isVal :: Exp -> Bool
 isVal e = isJust (getVal e)
 
-pattern Con :: Exp -> Val
-pattern Con e <- (getCon -> Just e)
-
--- Constants
-getCon :: Exp -> Maybe Exp
-getCon e@Lit{} = Just e
-getCon e@(Arr es) | Just _ <- mapM getCon es = Just e
-getCon _ = Nothing
+-- Turn every kind of HNF into a trivial one
+root :: HNF -> HNF
+root Lit{} = LInt 0
+root Prm{} = Prm F.Add
+root Lam{} = Lam (Core.Name "") (Blk [] [] $ LInt 0)
+root Arr{} = Arr []
+root Dly{} = Dly (Blk [] [] $ LInt 0)
+root _ = error "root: not an HNF"
 
 pattern LInt :: Integer -> Exp
 pattern LInt i = Lit (Core.LInt i)
@@ -488,12 +490,12 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
         Prm op :@ v | Just redn <- reducePrimOp op v -> redn
 
         -- Unification
-        Val v1 :=: Val v2 | v1 == v2 -> Done "EqVal" v1
-        Con v1 :=: Con v2 | v1 /= v2 -> Failure "EqFail"
+        Val v1       :=: Val v2 | v1 == v2                 -> Done    "EqVal" v1
+        Lit k1       :=: Lit k2 | k1 /= k2                 -> Failure "EqValFail"
 
--- Let this be stuck instead        Var i  :=: HNF v  | i `elem` allFreeVars' v -> Failure "OCCUR"  -- occurs check
-        Val (Arr vs) :=: Arr es | length vs /= length es   -> Failure "arr /="
-                                | otherwise                -> Done "EqTup" $ Arr (zipWith (:=:) vs es)
+        Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
+        Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
+        HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
 
         -- Sequencing
         Val{}  :>  e2                                      -> Done "Seq1" e2
