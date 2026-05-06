@@ -600,10 +600,10 @@ promotionOK (Blk locals leqns _) x v
 reducePrimOp :: Core.PrimOp -> Exp -> Maybe Reduction
 
 reducePrimOp F.Add (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i + j)
-reducePrimOp F.Sub (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i - j)
-reducePrimOp F.Mul (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i * j)
+reducePrimOp F.Sub (Arr [LInt i, LInt j]) = Just $ Done "Prim-" $ LInt (i - j)
+reducePrimOp F.Mul (Arr [LInt i, LInt j]) = Just $ Done "Prim*" $ LInt (i * j)
 reducePrimOp F.Div (Arr [LInt i, LInt j])
-  | j /= 0                                = Just $ Done "Prim+" $ LInt (i `div` j)
+  | j /= 0                                = Just $ Done "Prim/" $ LInt (i `div` j)
 
 reducePrimOp F.Add AHNF{} = Just $ Failure "Prim+"
 reducePrimOp F.Sub AHNF{} = Just $ Failure "Prim-"
