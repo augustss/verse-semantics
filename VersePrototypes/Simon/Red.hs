@@ -376,7 +376,7 @@ runTraced fuel src
       | otherwise
       = case findTopRedex (freshVarsBlk blk) blk of
           Step rule_nm flts -> Just $ TS { ts_str = rule_nm
-                                         , ts_payload = mergeStep blk flts
+                                         , ts_payload = mergeStep' blk flts
                                          , ts_verb = 1 }
           Delete xs         -> Just $ TS { ts_str = "Delete " ++ show xs
                                          , ts_payload = gcVarsBlk xs blk
