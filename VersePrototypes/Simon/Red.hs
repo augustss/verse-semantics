@@ -23,7 +23,7 @@ import Data.Maybe
 
 import Debug.Trace
 import GHC.IO.Exception(assertError)
-
+import GHC.Stack
 
 {-
   Potential problems:
@@ -204,9 +204,9 @@ instance Pretty Exp where
   pPrintPrec l p (e1 :=: e2) = maybeParens (p > 0) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
   pPrintPrec l _ (Arr es)
-    | l == prettyNormal    = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+    | l == prettyNormal    = text "<" <> sep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l _ (Arr [e]) = text "array" <> braces (pPrintL l e)
-  pPrintPrec l _ (Arr es)  = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+  pPrintPrec l _ (Arr es)  = parens $ sep $ punctuate (text ",") $ map (pPrintPrec l 0) es
 
   pPrintPrec l _ (Crl b)     = braces $ pPrintPrec l 0 b
   pPrintPrec l _ (Dly b)     = text "delay" <> braces (pPrintL l b)
@@ -350,7 +350,7 @@ instance Pretty Reduction where
   pPrintPrec l _ (Done s e)         = text "Done" <+> text (show s) <+> pPrintPrec l 0 e
   pPrintPrec l _ (Step s b)         = text "Step" <+> text (show s)
                                       <+> pPrintPrec l 0 b
-  pPrintPrec l _ (StepC s b1 b2)    = text "Step" <+> text (show s)
+  pPrintPrec l _ (StepC s b1 b2)    = text "StepC" <+> text (show s)
                                       <+> pPrintPrec l 11 b1 <+> pPrintPrec l 11 b2
 
 --------------------------------------------------------------------------------
@@ -398,18 +398,24 @@ evalBlk _ b | traceReductions && trace (prettyShow b ++ "\n") False = undefined
 evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
 evalBlk fuel b@(Blk is eqs expr) =
     case findTopRedex (freshVarsBlk b) b of
-      Step _ b'         -> evalBlk (fuel-1) $ mergeStep b b'
+      Step _ b'         -> evalBlk (fuel-1) $ mergeStep' b b'
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
       StepC _ _ _       -> error "impossible: findTopRedex StepC"  -- can only happen with inB=True
 
-mergeStep :: Blk -> SBlk -> Blk
+mergeStep :: HasCallStack => Blk -> SBlk -> Blk
+mergeStep (Blk is _ _) (SBlk xs _ _) | not (is `disjoint` xs) = error $ "mergeStep\n" ++ prettyCallStack callStack
 mergeStep (Blk is eqs _) (SBlk xs eqns e) =
   (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
                         map (second $ substVal eqns) eqs) e)
 
+mergeStep' :: HasCallStack => Blk -> SBlk -> Blk
+mergeStep' b1@(Blk is1 _ _) b2@(SBlk is2 _ _) | not (is1 `disjoint` is2) =
+  -- must freshen b2 to avoid clash
+  mergeStep b1 (freshen (freshVarsBlk b1) (BlkX b2))
+mergeStep' b1 b2 = mergeStep b1 b2
 
 dom :: Set Eqn -> Set Iden
 dom = map fst
@@ -448,7 +454,8 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
     dead_vars :: [Iden]  -- Subset of locals that are unused
     dead_vars = locals \\ (allVars' ex ++ concatMap (allVars' . snd) leqns)
 
-    eqns = leqns ++ geqns
+    -- The filter implements the side condition for subst
+    eqns = leqns ++ filter ((`notElem` locals) . fst) geqns
 
     find :: Exp -> Reduction
     find expr =
@@ -516,28 +523,19 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         e1 :@  e2  -> find2  (:@)  e1 e2
         e1 :.. e2  -> find2  (:..) e1 e2
         Arr es     -> findArr es
-{-
--- no reductions under choice and lambda
-        b1 :|: b2  -> find2B (:|:) b1 b2
-        Lam x b    -> find1B (Lam x) b
--}
 
         BlkX b1 :|: BlkX b2 | inB -> StepC "B" b1 b2     -- Found a choice, return it if in a B context
 
+        Iter IF  (Blk [] [] (Dly b)) _  -> Done "IIf" $ Crl b
+        Iter FOR (Blk xs eqs v@Val{}) e2 -> Step "IFor" $ freshen (drop 1 fresh) $ Blk (x:xs) eqs $ cons2 (Var x) (v :@ Var x) e2
+                                  where x = fresh!!0
         Iter ic b1 e2    ->
           case findRedex (depth+1) fresh singleOcc eqns True b1 of  -- find a redex in B context
             Failure s     -> Done ("IFail-" ++ s) e2
             None          -> None
             Delete xs     -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
-
-            Step s (SBlk [] [] (Dly (BlkX b))) | ic == IF ->
-                             Done ("IIf-"++ s) $ Crl (mergeStep b1 b)
-            Step s (SBlk [] [] v@Val{}) | ic == FOR ->
-                             Done ("IFor-" ++ s) $ Crl $ mergeStep b1 $ SBlk [x] [] $ cons2 (Var x) (v :@ Var x) e2
-                                  where x = fresh!!0
-
-            Step s b      -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
-            StepC s bl br -> Done ("IChoice-" ++ s) $ Iter ic (mergeStep b1 bl) $ Iter ic (mergeStep b1 br) e2
+            Step s b      -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep' b1 b) e2
+            StepC s bl br -> Done ("IChoice-" ++ s) $ Iter ic (mergeStep' b1 bl) $ Iter ic (mergeStep' b1 br) e2
 
         Verify s -> trace ("*** discard verify " ++ show s) $ Done "Verify" (Arr [])
 
@@ -571,27 +569,8 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
             r                             -> r
         r                      -> r
 
-{-
-    findB :: Set Eqn -> Blk -> Reduction
-    findB = findRedex fresh singleOcc 
-
-    find1B :: (Blk -> Exp) -> Blk -> Reduction
-    find1B c b@(Blk is eqs _) =
-      case findB eqns b of
-        Step s (Blk is' eqs' e') -> Done s (c (Blk (is' ++ is) (eqs' ++ eqs) e'))
-        StepC ...
-        r                        -> r
-
-    find2B :: (Blk -> Blk -> Exp) -> Blk -> Blk -> Reduction
-    find2B c b1@(Blk is eqs _) b2 =
-      case findB eqns b1 of
-        Step s (Blk is' eqs' e') -> Done s (Blk (is' ++ is) (eqs' ++ eqs) e' `c` b2)
-        StepC ...
-        None                     -> find1B (c b1) b2
-        r                        -> r
--}
-
 ------------------------------------
+
 reducePrimOp :: Core.PrimOp -> Exp -> Maybe Reduction
 reducePrimOp F.Add (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i + j)
 reducePrimOp F.Sub (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i - j)
@@ -628,6 +607,7 @@ reducePrimOp F.ArrCons AHNF{}            = Just $ Failure "Prim-cons"
 reducePrimOp _ _ = Nothing
 
 ------------------------------------
+
 reduceMatch ::  [Iden] -> Iden -> Term -> Reduction
 -- :~> reduction
 reduceMatch _fresh x tm | x `elem` allVarsTerm tm = error "unimplemented: reduceMatch, possible name clash"
@@ -649,11 +629,7 @@ reduceMatch fresh x tm
         TVar i               -> Done "MVar"     $ Var x :=: Var i
         TLit k               -> Done "MLit"     $ Var x :=: Lit k
         TPrm o               -> Done "MPrim"    $ Var x :=: Prm o
-{-
-        ea@(Val _ :@ Val _)  -> Done "MApp-v-v" $ Var x :=: ea
-        (Val e1 :@ e2)       -> Done "MApp-v-e" $ x :~> ((u := e2) :> (e1 :@ Var u))    where u = fresh!!0
-        (e1 :@ Val e2)       -> Done "MApp-e-v" $ x :~> ((u := e1) :> (Var u :@ e2))    where u = fresh!!0
--}
+
         (t1 :@% t2)          -> Step "MApp"     $ SBlk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :@ (u2 :~> t2)) where u1:u2:_ = fresh
         (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
         (t1 :|:% t2)         -> Done "MChoice"  $ (Blk (tbs t1) [] $ x :~> t1) :|: (Blk (tbs t2) [] $ x :~> t2)
@@ -666,11 +642,6 @@ reduceMatch fresh x tm
         Rng t                -> Step "MColon"   $ SBlk [u]   [] $ (u :~> t) :@ Var x            where u = fresh!!0
         (i := t)             -> Step "MDef"     $ SBlk [i]   [] $ Var i :=: (x :~> t)
         (i :-> t)            -> Step "MArr"     $ SBlk [i]   [] $ (Var i :=: Var x) :> (x :~> t)
-{-
-        ea@(Val{} :.. Val{}) -> Done "MEnum-v-v" $ Var x :=: ea
-        (Val e1 :.. e2)      -> Done "MEnum-v-e" $ x :~> ((u := e1) :> (Var u :.. e2))    where u = fresh!!0
-        (e1 :.. Val e2)      -> Done "MEnum-e-v" $ x :~> ((u := e2) :> (e1 :.. Var u))    where u = fresh!!0
--}
         (t1 :..% t2)         -> Step "MEnum"    $ SBlk [u1,u2] [] $ Var x :=: ((u1 :~> t1) :.. (u2 :~> t2)) where u1:u2:_ = fresh
         Fun at bt            -> Done "MFun"     $ (if addVerify then (Verify (prettyShow (Fun at bt)) :>) else id) $
                                                   Lam u $ Blk (p:q:tbs at) [] $ (Var p :=: (u :~> at)) :>
@@ -695,9 +666,9 @@ promotionOK (Blk locals leqns _) x v
   && occfvs v `disjoint` (x : dom leqns)    -- v must not have variables from eqns
 
 cons2 :: Exp -> Exp -> Exp -> Exp
-cons2 x y xsys = Arr [cons x xs, cons y ys]
-  where xs = xsys :@ LInt 0
-        ys = xsys :@ LInt 1
+cons2 x y xsys = Crl $ Blk [xs,ys] [] $ (Arr [Var xs, Var ys] :=: xsys) :> Arr [cons x (Var xs), cons y (Var ys)]
+  where xs = Core.Name "_xs"
+        ys = Core.Name "_ys"
         cons a as = Prm F.ArrCons :@ Arr [a, as]
 
 -- Top level binders
