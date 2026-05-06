@@ -617,7 +617,9 @@ reducePrimOp F.NEq (Arr [LInt i, LInt j]) | i/=j      = Just $ Done    "Prim-NEq
                                           | otherwise = Just $ Failure "Prim-NEq"
 
 reducePrimOp F.ArrCons (Arr [x, Arr xs])              = Just $ Done    "Prim-cons" $ Arr (x:xs)
--- 
+reducePrimOp F.ArrLen (Arr xs)                        = Just $ Done    "prim-length" $ LInt (toInteger (length xs))
+-- Could have some inverse of ArrLen by reducing
+--  (ArrLen :@ e) :=: LInt k  -->  e :=: Arr [_,_,...,_] k new existentials
 
 reducePrimOp _ _ = Nothing
 

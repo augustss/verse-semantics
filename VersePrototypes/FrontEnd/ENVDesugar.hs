@@ -19,6 +19,7 @@ primOps =
   [ ("any",           IsAny)
   , ("int",           IsInt)
   , ("nat",           IsInt)   -- No negative ints
+  , ("length",        ArrLen)
   , ("operator'..'",  DotDot)
   , ("prefix'-'",     Neg)
   , ("prefix'+'",     Pls)
