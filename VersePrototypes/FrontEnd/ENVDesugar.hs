@@ -16,18 +16,19 @@ desugar e = composOp desugar e
 
 primOps :: [(String, PrimOp)]
 primOps =
-  [ ("any",          IsAny)
-  , ("int",          IsInt)
-  , ("nat",          IsInt)   -- No negative ints
-  , ("operator'..'", DotDot)
-  , ("prefix'-'",    Neg)
-  , ("operator'+'",  Add)
-  , ("operator'-'",  Sub)
-  , ("operator'*'",  Mul)
-  , ("operator'/'",  Div)
-  , ("operator'>'",  Gt)
+  [ ("any",           IsAny)
+  , ("int",           IsInt)
+  , ("nat",           IsInt)   -- No negative ints
+  , ("operator'..'",  DotDot)
+  , ("prefix'-'",     Neg)
+  , ("prefix'+'",     Pls)
+  , ("operator'+'",   Add)
+  , ("operator'-'",   Sub)
+  , ("operator'*'",   Mul)
+  , ("operator'/'",   Div)
+  , ("operator'>'",   Gt)
   , ("operator'>='",  GEq)
-  , ("operator'<'",  Lt)
+  , ("operator'<'",   Lt)
   , ("operator'<='",  LEq)
   , ("operator'<>'",  NEq)
   ]

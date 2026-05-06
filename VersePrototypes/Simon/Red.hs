@@ -251,15 +251,6 @@ getHNF :: Exp -> Maybe Exp
 getHNF Var{} = Nothing
 getHNF e = getVal e
 
--- Either an Arr with all HNF, or a non-arr HNF
--- Simon: why?
-pattern AHNF :: Exp -> Val
-pattern AHNF e <- (getAHNF -> Just e)
-
-getAHNF :: Exp -> Maybe Exp
-getAHNF (Arr es) | Nothing <- mapM getHNF es = Nothing
-getAHNF e = getHNF e
-
 pattern Val :: Exp -> Val
 pattern Val e <- (getVal -> Just e)
 
@@ -599,39 +590,34 @@ promotionOK (Blk locals leqns _) x v
 ------------------------------------
 reducePrimOp :: Core.PrimOp -> Exp -> Maybe Reduction
 
-reducePrimOp F.Add (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i + j)
-reducePrimOp F.Sub (Arr [LInt i, LInt j]) = Just $ Done "Prim-" $ LInt (i - j)
-reducePrimOp F.Mul (Arr [LInt i, LInt j]) = Just $ Done "Prim*" $ LInt (i * j)
+-- Primops get stuck on values outside the domain
+reducePrimOp :: Core.PrimOp -> Exp -> Maybe Reduction
+reducePrimOp F.Add (Arr [LInt i, LInt j])             = Just $ Done    "Prim+" $ LInt (i + j)
+reducePrimOp F.Sub (Arr [LInt i, LInt j])             = Just $ Done    "Prim-" $ LInt (i - j)
+reducePrimOp F.Mul (Arr [LInt i, LInt j])             = Just $ Done    "Prim*" $ LInt (i * j)
 reducePrimOp F.Div (Arr [LInt i, LInt j])
-  | j /= 0                                = Just $ Done "Prim/" $ LInt (i `div` j)
+  | j /= 0                                            = Just $ Done    "Prim/" $ LInt (i `div` j)
+  | otherwise                                         = Just $ Failure "Prim/"
 
-reducePrimOp F.Add AHNF{} = Just $ Failure "Prim+"
-reducePrimOp F.Sub AHNF{} = Just $ Failure "Prim-"
-reducePrimOp F.Mul AHNF{} = Just $ Failure "Prim*"
-reducePrimOp F.Div AHNF{} = Just $ Failure "Prim/"
+reducePrimOp F.Neg (LInt i)                           = Just $ Done    "Prim-neg" $ LInt (- i)
+reducePrimOp F.Pls (LInt i)                           = Just $ Done    "Prim-pls" $ LInt i
 
-reducePrimOp F.Neg (LInt i) = Just $ Done    "Prim-neg" $ LInt (- i)
-reducePrimOp F.Neg HNF{}    = Just $ Failure "Prim-neg"
-reducePrimOp F.Pls (LInt i) = Just $ Done    "Prim-pls" $ LInt i
-reducePrimOp F.Pls HNF{}    = Just $ Failure "Prim-pls"
+reducePrimOp F.IsInt v@(LInt {})                      = Just $ Done    "Prim-isInt" v
+reducePrimOp F.IsInt HNF{}                            = Just $ Failure "Prim-isInt"
 
-reducePrimOp F.IsInt v@(LInt {}) = Just $ Done "Prim-isInt" v
-reducePrimOp F.IsInt HNF{}       = Just $ Failure "Prim-isInt"
+reducePrimOp F.Lt  (Arr [LInt i, LInt j]) | i<j       = Just $ Done    "Prim-Lt"  $ LInt i
+                                          | otherwise = Just $ Failure "Prim-Lt"
+reducePrimOp F.LEq (Arr [LInt i, LInt j]) | i<=j      = Just $ Done    "Prim-LEq" $ LInt i
+                                          | otherwise = Just $ Failure "Prim-LEt"
+reducePrimOp F.GEq (Arr [LInt i, LInt j]) | i>=j      = Just $ Done    "Prim-GEq" $ LInt i
+                                          | otherwise = Just $ Failure "Prim-GEq"
+reducePrimOp F.Gt  (Arr [LInt i, LInt j]) | i>j       = Just $ Done    "Prim-Gt"  $ LInt i
+                                          | otherwise = Just $ Failure "Prim-Gt"
+reducePrimOp F.NEq (Arr [LInt i, LInt j]) | i/=j      = Just $ Done    "Prim-NEq" $ LInt i
+                                          | otherwise = Just $ Failure "Prim-NEq"
 
-reducePrimOp F.Lt  (Arr [LInt i, LInt j]) | i<j  = Just $ Done "Prim-Lt"  $ LInt i
-reducePrimOp F.LEq (Arr [LInt i, LInt j]) | i<=j = Just $ Done "Prim-LEq" $ LInt i
-reducePrimOp F.GEq (Arr [LInt i, LInt j]) | i>=j = Just $ Done "Prim-GEq" $ LInt i
-reducePrimOp F.Gt  (Arr [LInt i, LInt j]) | i>j  = Just $ Done "Prim-Gt"  $ LInt i
-reducePrimOp F.NEq (Arr [LInt i, LInt j]) | i/=j = Just $ Done "Prim-NEq"  $ LInt i
-
-reducePrimOp F.Lt  AHNF{} = Just $ Failure "Prim-Lt"
-reducePrimOp F.LEq AHNF{} = Just $ Failure "Prim-LEq"
-reducePrimOp F.GEq AHNF{} = Just $ Failure "Prim-GEq"
-reducePrimOp F.Gt  AHNF{} = Just $ Failure "Prim-Gt"
-reducePrimOp F.NEq AHNF{} = Just $ Failure "Prim-NEq"
-
-reducePrimOp F.ArrCons (Arr [x, Arr xs]) = Just $ Done    "Prim-cons" $ Arr (x:xs)
-reducePrimOp F.ArrCons AHNF{}            = Just $ Failure "Prim-cons"
+reducePrimOp F.ArrCons (Arr [x, Arr xs])              = Just $ Done    "Prim-cons" $ Arr (x:xs)
+-- 
 
 reducePrimOp _ _ = Nothing
 
