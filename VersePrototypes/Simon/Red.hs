@@ -141,6 +141,8 @@ pattern Blk is eqs e <- BlkX (SBlk is eqs e)   -- check invariant
              invariant1 = dom eqs `subset` is
              invariant2 = unions (map (occfvs . snd) eqs) `disjoint` dom eqs
 
+-- exists x y{ x <-3; y<-x }  -- no to inv2
+
 -- A block with no invariants.
 -- This is what Step returns.
 data SBlk = SBlk (Set Iden) (Set Eqn) Exp
@@ -444,10 +446,10 @@ mergeStep b1@(Blk is1 _ _) b2@(SBlk is2 _ _)
   | otherwise
   = merge b1 b2
   where
-    merge (Blk is eqs _) (SBlk xs eqns e)
+    merge (Blk is outer_eqs _) (SBlk xs inner_eqs e)
       = Blk (is `union` xs)
-            (map (second $ substVal eqs) eqns ++
-             map (second $ substVal eqns) eqs)
+            (   map (second $ substVal inner_eqs) outer_eqs
+             ++ map (second $ substVal outer_eqs) inner_eqs)
             e
 
 dom :: Set Eqn -> Set Iden
@@ -675,11 +677,11 @@ reducePrimOp _ _ = Nothing
 reduceMatch ::  NameSupply -> Iden -> Term -> Reduction
 -- :~> reduction
 
+reduceMatch _fresh x tm
 -- We always push down a variable that is not mentioned or bound in t
 -- Thus    x ~> (x := 7)  is not allowed
 -- Reason: when pushing (x~>) inside, we don't want to capture.
 -- Alternative: alpha-rename when pushing inside
-reduceMatch _fresh x tm
   | x `elem` allVarsTerm tm
   = error "unimplemented: reduceMatch, possible name clash"
 
@@ -726,15 +728,15 @@ reduceMatch fresh x tm
                                    (q :~> TBlock bt)
                       where u:p:q:_ = fresh
 
-        If t0 t1 t2          -> Done "MIf"      $ Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
-                                                                (mkCrl (Blk (tbs t2) [] (x :~> t2)))
-                                        where u = fresh!!0
+        If t0 t1 t2 -> Done "MIf"      $ Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
+                                                      (mkCrl (Blk (tbs t2) [] (x :~> t2)))
+                       where u = fresh!!0
 
-        For t0 t1            -> Step "MFor"     $ SBlk [y] [] $ (Arr [Var x, Var y] :=:
-                                                                  Iter FOR (Blk (u:tbs t0) [] ((u :~> t0) :> Lam w (Blk [] [] $ w :~> t1)))
-                                                                            (Arr [Arr [], Arr []])
-                                                                ) :> Var y
-                                        where y:u:w:_ = fresh
+        For t0 t1    -> Step "MFor"     $ SBlk [y] [] $ (Arr [Var x, Var y] :=:
+                                                         Iter FOR (Blk (u:tbs t0) [] ((u :~> t0) :> Lam w (Blk [] [] $ w :~> t1)))
+                                                                   (Arr [Arr [], Arr []])
+                                                     ) :> Var y
+                        where y:u:w:_ = fresh
         Check fx t
           | C.Iterates <- fx -> Done "MCheckI" $ x :~> t   -- check<iterates> is a no-op
           | otherwise        -> Done "MCheck"  $ (Prm chk_op :@) $
@@ -1038,27 +1040,6 @@ substVal sub (Arr vs) = Arr (map (substVal sub) vs)
 substVal sub e@Lam{} | null $ map fst sub `intersect` allVars' e = e
                      | otherwise = e -- error "substVal: Lam unimplemented"
 substVal _ e = error $ "substVal: not a Val: " ++ show e
-
-{-
--- XXX This is ugly.  Should GC locally instead
-gcVars :: Set Iden -> Exp -> Exp
-gcVars  _ e@Var{}   = e
-gcVars  _ e@Lit{}   = e
-gcVars  _ e@Prm{}   = e
-gcVars xs (Lam i b) = Lam i (gcVarsBlk xs b)
-gcVars  _ e@(:~>){} = e
-gcVars xs (e1 :@ e2) = gcVars xs e1 :@ gcVars xs e2
-gcVars xs (e1 :> e2) = gcVars xs e1 :> gcVars xs e2
-gcVars xs (e1 :=: e2) = gcVars xs e1 :=: gcVars xs e2
-gcVars xs (Arr es) = Arr (map (gcVars xs) es)
-gcVars xs (Crl b) = Crl (gcVarsBlk xs b)
-gcVars  _ e@Dly{} = e
-gcVars xs (b1 :|: b2) = gcVarsBlk xs b1 :|: gcVarsBlk xs b2
-gcVars xs (e1 :.. e2) = gcVars xs e1 :.. gcVars xs e2
-gcVars  _ e@Fail   = e
-gcVars xs (Iter ic b1 e2) = Iter ic (gcVarsBlk xs b1) (gcVars xs e2)
-gcVars _ e@Verify{} = e
--}
 
 gcVarsBlk :: Set Iden -> Blk -> Blk
 gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) expr
