@@ -8,9 +8,10 @@ module Epic.List(
     revTakeWhile, revDropWhile,
     pick, pickLR,
     pattern Snoc,
-    nub, nubKey, (\\),
+    nub, nubKey, (\\), noDups,
     takeUntil, dropUntil, groupKey,
-    firstJust
+    firstJust,
+    mapFst, mapSnd
   ) where
 
 import qualified Data.Set as S
@@ -22,6 +23,11 @@ import Data.Maybe (listToMaybe, catMaybes)
 --         General utilities on lists
 --
 --------------------------------------------------------
+
+mapFst :: (a1->a2) -> [(a1,b)] -> [(a2,b)]
+mapFst f xs = [(f x, y) | (x,y) <- xs]
+mapSnd :: (b1->b2) -> [(a,b1)] -> [(a,b2)]
+mapSnd f xs = [(x, f y) | (x,y) <- xs]
 
 anySame :: (Eq a) => [a] -> Bool
 anySame [] = False
@@ -62,6 +68,8 @@ unSnoc [] = Nothing
 unSnoc xs = Just (init xs, last xs)
 
 ---------
+noDups :: Ord a => [a] -> Bool
+noDups xs = length xs == length (nub xs)
 
 nub :: Ord a => [a] -> [a]
 nub = go S.empty

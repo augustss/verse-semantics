@@ -3,8 +3,10 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
 
-module FrontEnd.ToCore(
-    convertToCore, convertToPrepdCore, convert
+module FrontEnd.ToCore
+  ( convertToCore, convertToPrepdCore
+  , convert
+  , toCoreEff
   ) where
 
 import Prelude hiding (pi)

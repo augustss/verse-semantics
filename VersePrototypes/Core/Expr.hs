@@ -474,6 +474,8 @@ data PrimOp
  | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
  | IsComp | IsAny | IsType
 
+   -- Checking
+ | ChkFails | ChkSucceeds | ChkDecides
  deriving
    ( Eq, Ord, Bounded, Enum, Show, Data )
 
@@ -510,6 +512,9 @@ primOpString IsFun    = "isFun$"
 primOpString IsGround = "isGround$"
 primOpString IsAny    = "isAny$"
 primOpString IsType   = "isType$"
+primOpString ChkFails    = "check<fails>"
+primOpString ChkSucceeds = "check<succeeds>"
+primOpString ChkDecides  = "check<decides>"
 
 primOpCanFail :: PrimOp -> Bool
 
@@ -530,6 +535,11 @@ primOpCanFail IsType = True
 primOpCanFail ArrApp = True
 primOpCanFail DotDot = True  -- Can fail when unification fails
 primOpCanFail ArrCons = True  -- if run backwards
+
+-- chk<succeeds>[ <> ] is simply stuck; can't fail
+primOpCanFail ChkSucceeds = False
+primOpCanFail ChkFails    = True
+primOpCanFail ChkDecides  = True
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
@@ -678,7 +688,7 @@ data Effect
   | Succeeds
   | Decides
   | Iterates
- deriving ( Eq, Ord )
+ deriving ( Eq, Ord, Data )
 
 instance Show Effect where
   show Fails    = "fails"
