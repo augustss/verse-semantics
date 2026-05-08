@@ -40,7 +40,7 @@ addVerify = True
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = True
+traceReductions = False
 
 --------------------------------------------------------------------------------
 --
@@ -281,8 +281,8 @@ isVal e = isJust (getVal e)
 -- Turn every kind of HNF into a trivial one
 root :: HNF -> HNF
 root Lit{} = LInt 0
-root Prm{} = Prm F.Add
-root Lam{} = Lam (Core.Name "") (Blk [] [] $ LInt 0)
+root Prm{} = Prm C.Add
+root Lam{} = Lam (C.Name "") (Blk [] [] $ LInt 0)
 root Arr{} = Arr []
 root Dly{} = Dly (Blk [] [] $ LInt 0)
 root _ = error "root: not an HNF"
