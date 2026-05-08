@@ -67,18 +67,19 @@ type Iden = Core.Ident
 type Op   = Core.PrimOp
 
 data Term
-  = Und               -- _
-  | TVar Iden         -- x
+  = TVar Iden         -- x
   | TLit Core.Lit     -- k
   | TPrm Op           -- op
   | Term :>%  Term    -- t1; t2
-  | Term `Where` Term -- t1 where t2
+  | Term :|:% Term    -- t1 | t2
+  | TFail             -- fail
   | Term :=:% Term    -- t1 = t2
   | Term :@%  Term    -- t1[t2]
   | Term :..% Term    -- t1 .. t2
-  | TFail             -- fail
-  | Term :|:% Term    -- t1 | t2
   | TArr [Term]       -- array{t1,...,t2}
+
+  | Und               -- _
+  | Term `Where` Term -- t1 where t2
   | Fun Term Term     -- fun(t1){t2}
   | If Term Term Term -- if (t1){t2}{t3}
   | For Term Term     -- for (t1){t2}
@@ -92,25 +93,24 @@ data Term
 data Exp
   -- Values
   = Var Iden              -- x
-  -- HNF
   | Lit Core.Lit          -- k
   | Prm Op                -- op
-  -- Arr below
-  | Lam Iden Blk          -- \ x . e
-  | Dly Blk               -- delay{b}
-  -- Non-HNF
   | Exp :>  Exp           -- e1; e2
   | Blk :|: Blk           -- e1 | e2
   | Fail                  -- fail
   | Exp :=: Exp           -- e1 = e2
-  | Iden :~> Term         -- e ~> t
   | Exp :@  Exp           -- e1[e2]
   | Exp :.. Exp           -- e1 .. e2
   | Arr [Exp]             -- array{e1,...,e2}
+
+  | Lam Iden Blk          -- \ x . e
   | Iter IterCtx Blk Exp  -- if/for
+  | Dly Blk               -- delay{b}
   | Crl Blk               -- {...}
+  | Iden :~> Term         -- e ~> t
+
   | Verify String         -- the string should be replaced by something sensible
-    deriving (Eq, Show)
+  deriving (Eq, Show)
 
 type Eqn = (Iden, Val)
 
@@ -376,7 +376,7 @@ runTraced fuel src
       | otherwise
       = case findTopRedex (freshVarsBlk blk) blk of
           Step rule_nm flts -> Just $ TS { ts_str = rule_nm
-                                         , ts_payload = mergeStep' blk flts
+                                         , ts_payload = mergeStep blk flts
                                          , ts_verb = 1 }
           Delete xs         -> Just $ TS { ts_str = "Delete " ++ show xs
                                          , ts_payload = gcVarsBlk xs blk
@@ -401,24 +401,26 @@ evalBlk _ b | traceReductions && trace (prettyShow b ++ "\n") False = undefined
 evalBlk 0 b = error $ "No fuel: " ++ prettyShow b
 evalBlk fuel b@(Blk is eqs expr) =
     case findTopRedex (freshVarsBlk b) b of
-      Step _ b'         -> evalBlk (fuel-1) $ mergeStep' b b'
+      Step _ b'         -> evalBlk (fuel-1) $ mergeStep b b'
       None | null is    -> expr
            | otherwise  -> Crl (Blk is eqs expr)
       Failure _         -> Fail
       Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
-      StepC _ _ _       -> error "impossible: findTopRedex StepC"  -- can only happen with inB=True
+      StepC _ _ _       -> error "impossible: findTopRedex StepC"  -- can only happen with depth>0
 
 mergeStep :: HasCallStack => Blk -> SBlk -> Blk
-mergeStep (Blk is _ _) (SBlk xs _ _) | not (is `disjoint` xs) = error $ "mergeStep\n" ++ prettyCallStack callStack
-mergeStep (Blk is eqs _) (SBlk xs eqns e) =
-  (Blk (is `union` xs) (map (second $ substVal eqs) eqns ++
-                        map (second $ substVal eqns) eqs) e)
-
-mergeStep' :: HasCallStack => Blk -> SBlk -> Blk
-mergeStep' b1@(Blk is1 _ _) b2@(SBlk is2 _ _) | not (is1 `disjoint` is2) =
-  -- must freshen b2 to avoid clash
-  mergeStep b1 (freshen (freshVarsBlk b1) (BlkX b2))
-mergeStep' b1 b2 = mergeStep b1 b2
+mergeStep b1@(Blk is1 _ _) b2@(SBlk is2 _ _)
+  | not (is1 `disjoint` is2)
+  =  -- must freshen b2 to avoid clash
+    merge b1 (freshen (freshVarsBlk b1) (BlkX b2))
+  | otherwise
+  = merge b1 b2
+  where
+    merge (Blk is eqs _) (SBlk xs eqns e)
+      = Blk (is `union` xs)
+            (map (second $ substVal eqs) eqns ++
+             map (second $ substVal eqns) eqs)
+            e
 
 dom :: Set Eqn -> Set Iden
 dom = map fst
@@ -428,8 +430,13 @@ disjoint xs ys = null $ xs `intersect` ys
 
 findTopRedex :: [Iden] -> Blk -> Reduction
 findTopRedex fresh blk@(Blk locals eqns ex)
-  = findRedex 0 fresh singleOcc [] False blk
+  = reduceBlock top_cxt blk
   where
+    top_cxt = RC { rc_depth  = 0
+                 , rc_fresh  = fresh
+                 , rc_single = singleOcc
+                 , rc_eqns   = [] }
+
     -- Subset of `locals` that occur exactly once, and have no Eqn
     -- To support EXI-APP
     -- XXX This is wrong.  Can't handle multiple uses of a function
@@ -439,12 +446,22 @@ findTopRedex fresh blk@(Blk locals eqns ex)
                     , x `elem` locals
                     , isNothing (lookup x eqns) ]
 
-findRedex :: Int -> [Iden] -> Set Iden -> Set Eqn -> Bool -> Blk -> Reduction
-findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
+data ReductionContext
+  = RC { rc_depth  :: Int         -- Number of enclosing Blks
+       , rc_fresh  :: NameSupply  -- Supply of fresh names
+       , rc_single :: Set Iden    -- Supports ExiApp
+       , rc_eqns   :: Set Eqn     -- In-scope equations
+    }
+
+lookupEqn :: ReductionContext -> Iden -> Maybe Val
+lookupEqn (RC { rc_eqns = eqns }) x = lookup x eqns
+
+reduceBlock :: ReductionContext -> Blk -> Reduction
+reduceBlock cxt parent@(Blk locals leqns ex) =
   if traceReductions then
-    trace (render (nest (4*depth) (text "findRedex enter parent =" <+> pPrintL prettyNormal parent))) $
-    trace (render (nest (4*depth) (text "findRedex exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
-                                                                (text "res    =" <+> pPrintL prettyNormal res))))
+    trace (render (nest (4*rc_depth cxt) (text "reduceBlock enter parent =" <+> pPrintL prettyNormal parent))) $
+    trace (render (nest (4*rc_depth cxt) (text "reduceBlock exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
+                                                                     (text "res    =" <+> pPrintL prettyNormal res))))
            ++ "\n")
     res
   else
@@ -457,8 +474,11 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
     dead_vars :: [Iden]  -- Subset of locals that are unused
     dead_vars = locals \\ (allVars' ex ++ concatMap (allVars' . snd) leqns)
 
-    -- The filter implements the side condition for subst
-    eqns = leqns ++ filter ((`notElem` locals) . fst) geqns
+    -- inner_cxt: update the ReductionContext for when we walk inside the block
+    inner_cxt = cxt { rc_depth = rc_depth cxt + 1
+                    , rc_eqns = filter ((`notElem` locals) . fst) (rc_eqns cxt)
+                                -- The filter implements the side condition for subst
+                                ++ leqns }
 
     find :: Exp -> Reduction
     find expr =
@@ -469,8 +489,8 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         Val v  :=: Var x  | promotionOK parent x v
                           -> Step "Promote2" $ SBlk [] [(x, v)] v
 
-        Var i             | Just v <- lookup i eqns -> Done ("Subst " ++ show i) v
-        Crl b@Blk{}       -> Step "FloatB" $ freshen fresh b
+        Var i             | Just v <- lookupEqn inner_cxt i -> Done ("Subst " ++ show i) v
+        Crl b@Blk{}       -> Step "FloatB" $ freshen (rc_fresh cxt) b
         -- GC rules handled above
 
         -- Primops
@@ -501,7 +521,7 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         -- NOTE: it should be enough to match with eqs=[]
         Lam x b :@ e -> Step "Beta" $ SBlk [x'] [] ((Var x' :=: e) :> mkCrl b')
             where
-              x' = fresh!!0
+              x' = rc_fresh cxt !! 0
               b' = renameBlk [(x,x')] b
 
         -- This rule isn't strictly necessary, but it allows indexing by
@@ -513,12 +533,14 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
                            foldr alt Fail (zipWith (\ i e -> (v :=: LInt i) :> e) [0..] es)
           where alt e1 e2 = Blk [] [] e1 :|: Blk [] [] e2
 
-        Var f   :@ Val _ | f `elem` singleOcc -> Step "ExiApp" $ SBlk [u] [] (Var u)
-                                              where u = fresh!!0
+        -- (ExiApp)
+        Var f   :@ Val _ | f `elem` rc_single cxt
+                         -> Step "ExiApp" $ SBlk [u] [] (Var u)
+                         where u = rc_fresh cxt !! 0
 
         Fail             -> Failure "Fail"
 
-        x :~> tm  -> reduceMatch fresh x tm
+        x :~> tm  -> reduceMatch (rc_fresh cxt) x tm
 
         -- Catch-all cases for context C; just walk downwards
         e1 :>  e2  -> find2  (:>)  e1 e2
@@ -527,19 +549,10 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
         e1 :.. e2  -> find2  (:..) e1 e2
         Arr es     -> findArr es
 
-        BlkX b1 :|: BlkX b2 | inB -> StepC "B" b1 b2     -- Found a choice, return it if in a B context
+        BlkX b1 :|: BlkX b2 | rc_depth cxt > 0
+             -> StepC "B" b1 b2     -- Found a choice, return it if inside a block
 
-        Iter IF  (Blk [] [] (Dly b)) _  -> Done "IIf" $ Crl b
-        Iter FOR (Blk xs eqs v@Val{}) e2 -> Step "IFor" $ freshen (drop 1 fresh) $ Blk (x:xs) eqs $ cons2 (Var x) (v :@ Var x) e2
-                                  where x = fresh!!0
-        Iter SUCC (Blk xs eqs v@Val{}) _ -> Step "ISucc" $ SBlk xs eqs v
-        Iter ic b1 e2    ->
-          case findRedex (depth+1) fresh singleOcc eqns True b1 of  -- find a redex in B context
-            Failure s     -> Done ("IFail-" ++ s) e2
-            None          -> None
-            Delete xs     -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
-            Step s b      -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep' b1 b) e2
-            StepC s bl br -> Done ("IChoice-" ++ s) $ Iter ic (mergeStep' b1 bl) $ Iter ic (mergeStep' b1 br) e2
+        Iter ic b e -> reduceIter inner_cxt ic b e
 
         Verify s -> trace ("*** discard verify " ++ show s) $ Done "Verify" (Arr [])
 
@@ -573,9 +586,19 @@ findRedex depth fresh singleOcc geqns inB parent@(Blk locals leqns ex) =
             r                             -> r
         r                      -> r
 
-------------------------------------
 
+promotionOK :: Blk -> Iden -> Val -> Bool
+-- True if we can promote (var=val) into the heap for the parent block
+promotionOK (Blk locals leqns _) x v
+  =  x `elem` locals                        -- Must be bound by the /immediately enclosing/ block
+                                            --   i.e. is "flexible"
+  && x `notElem` dom leqns                  -- x must not have an eqn
+  && occfvs v `disjoint` (x : dom leqns)    -- v must not have variables from eqns
+
+
+------------------------------------
 reducePrimOp :: Core.PrimOp -> Exp -> Maybe Reduction
+
 reducePrimOp F.Add (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i + j)
 reducePrimOp F.Sub (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i - j)
 reducePrimOp F.Mul (Arr [LInt i, LInt j]) = Just $ Done "Prim+" $ LInt (i * j)
@@ -611,17 +634,19 @@ reducePrimOp F.ArrCons AHNF{}            = Just $ Failure "Prim-cons"
 reducePrimOp _ _ = Nothing
 
 ------------------------------------
-
-reduceMatch ::  [Iden] -> Iden -> Term -> Reduction
+reduceMatch ::  NameSupply -> Iden -> Term -> Reduction
 -- :~> reduction
-reduceMatch _fresh x tm | x `elem` allVarsTerm tm = error "unimplemented: reduceMatch, possible name clash"
+reduceMatch _fresh x tm
+  | x `elem` allVarsTerm tm
+  = error "unimplemented: reduceMatch, possible name clash"
+
 reduceMatch fresh x tm
   = case tm of
         -- Hackily turn IsInt, IsAny back to a lambda:
         -- We can't do this earlier because we don't have lambda in Trm.
         TPrm F.IsInt         -> Done "int-hack" $ Var x :=: (Lam u $ Blk [] [] $
                                                              (Prm F.IsInt :@ Var u) :> Var u)
-                                where u = fresh!!0
+                                where u = fresh !! 0
         TPrm F.IsAny         -> Done "any-hack" $ Var x :=: (Lam u $ Blk [] [] $ Var u)
                                       where u = fresh!!0
 
@@ -664,18 +689,41 @@ reduceMatch fresh x tm
         Succ t               -> Done "MSucc"   $ Var x :=: Iter SUCC (Blk (u:tbs t) [] $ u :~> t) (Var (Core.Name "STUCK-application-failed"))
                                         where u = fresh!!0
 
-promotionOK :: Blk -> Iden -> Val -> Bool
--- True if we can promote (var=val) into the heap for the parent block
-promotionOK (Blk locals leqns _) x v
-  =  x `elem` locals                        -- must be a local variable
-  && x `notElem` dom leqns                  -- x must not have an eqn
-  && occfvs v `disjoint` (x : dom leqns)    -- v must not have variables from eqns
+---------------------------------------
+reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction
+reduceIter _ IF (Blk [] [] (Dly b)) _
+  = Done "IIf" $ Crl b
+
+reduceIter cxt FOR (Blk xs eqs v@Val{}) e2
+  = Step "IFor" $ freshen (drop 1 fresh) $ Blk (x:xs) eqs $ cons2 (Var x) (v :@ Var x) e2
+  where
+    fresh = rc_fresh cxt
+    x = fresh !! 0
+
+reduceIter _ SUCC (Blk xs eqs v@Val{}) _
+  = Step "ISucc" $ SBlk xs eqs v
+
+reduceIter cxt ic b1 e2
+  = case reduceBlock cxt b1 of  -- find a redex in B context
+      Failure s     -> Done ("IFail-" ++ s) e2
+      None          -> None
+      Delete xs     -> Done (show ic ++ "-GC") $ Iter ic (gcVarsBlk xs b1) e2
+      Step s b      -> Done (show ic ++ "-" ++ s) $ Iter ic (mergeStep b1 b) e2
+      StepC s bl br -> Done ("IChoice-" ++ s) $ Iter ic (mergeStep b1 bl) $
+                                                Iter ic (mergeStep b1 br) e2
 
 cons2 :: Exp -> Exp -> Exp -> Exp
 cons2 x y xsys = Crl $ Blk [xs,ys] [] $ (Arr [Var xs, Var ys] :=: xsys) :> Arr [cons x (Var xs), cons y (Var ys)]
   where xs = Core.Name "_xs"
         ys = Core.Name "_ys"
         cons a as = Prm F.ArrCons :@ Arr [a, as]
+
+
+--------------------------------------------------------------------------------
+--
+--             Free and bound variables
+--
+--------------------------------------------------------------------------------
 
 -- Top level binders
 tbs :: Term -> Set Iden
@@ -872,30 +920,6 @@ renameBlk sub b@(Blk is eqs e)
   | otherwise = Blk is (map (second (rename sub)) eqs)
                        (rename sub e)
 
-freshVars :: Exp -> [Iden]
-freshVars e = idenSupply \\ allVars e
-
-idenSupply :: [Iden]
-idenSupply = [Core.Name $ "u" ++ show i | i <- [1::Int ..]]
-
-freshVarsBlk :: Blk -> [Iden]
-freshVarsBlk b = idenSupply \\ allVarsBlk b
-
-freshVarsTerm :: Term -> [Iden]
-freshVarsTerm t = freshVars (Core.Name "" :~> t)
-
---freshVar :: Exp -> Iden
---freshVar = (!!0) . freshVars
-
-freshen :: [Iden] -> Blk -> SBlk
-freshen fresh _b@(Blk is eqs expr) =
---  trace ("freshen " ++ show sub ++ "\n" ++ show _b ++ "\n" ++ show res)
-  res
-  where res = SBlk vs (map renEqn eqs) (rename sub expr)
-        sub = zip is fresh
-        vs = map snd sub
-        renEqn (i, e) = (fromMaybe i (lookup i sub), rename sub e)
-
 substVal :: [(Iden, Val)] -> Val -> Val
 substVal sub e@(Var i) = fromMaybe e $ lookup i sub
 substVal _ e@Lit{} = e
@@ -926,3 +950,37 @@ gcVars _ e@Verify{} = e
 
 gcVarsBlk :: Set Iden -> Blk -> Blk
 gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) $ gcVars xs expr
+
+
+--------------------------------------------------------------------------------
+--
+--             Fresh names
+--
+--------------------------------------------------------------------------------
+
+type NameSupply = [Iden]  -- An infinite list of fresh names
+
+freshVars :: Exp -> [Iden]
+freshVars e = idenSupply \\ allVars e
+
+idenSupply :: [Iden]
+idenSupply = [Core.Name $ "u" ++ show i | i <- [1::Int ..]]
+
+freshVarsBlk :: Blk -> [Iden]
+freshVarsBlk b = idenSupply \\ allVarsBlk b
+
+freshVarsTerm :: Term -> [Iden]
+freshVarsTerm t = freshVars (Core.Name "" :~> t)
+
+--freshVar :: Exp -> Iden
+--freshVar = (!!0) . freshVars
+
+freshen :: [Iden] -> Blk -> SBlk
+freshen fresh _b@(Blk is eqs expr) =
+--  trace ("freshen " ++ show sub ++ "\n" ++ show _b ++ "\n" ++ show res)
+  res
+  where res = SBlk vs (map renEqn eqs) (rename sub expr)
+        sub = zip is fresh
+        vs = map snd sub
+        renEqn (i, e) = (fromMaybe i (lookup i sub), rename sub e)
+
