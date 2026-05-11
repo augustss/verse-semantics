@@ -410,6 +410,8 @@ mkCons2 :: Exp -> Exp -> Exp -> Exp
 -- cons2 x y <xs,ys> = <cons x xs, cons y ys>
 mkCons2 x y xys
   = Crl $ Blk (mkSetUnsafe [xs,ys,ar]) Empty $
+    -- We need have the two Arr in this order, otherwise choices
+    -- in the body of a 'for' will come in the wrong order.
     (Var ar :=: Arr [ mkCons x (Var xs)
                     , mkCons y (Var ys)]) :>
     (Arr [Var xs, Var ys] :=: xys) :>
