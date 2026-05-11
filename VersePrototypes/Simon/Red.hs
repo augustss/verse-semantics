@@ -409,13 +409,15 @@ mkCons a as = Prm ArrCons :@ Arr [a, as]
 mkCons2 :: Exp -> Exp -> Exp -> Exp
 -- cons2 x y <xs,ys> = <cons x xs, cons y ys>
 mkCons2 x y xys
-  = Crl $ Blk (mkSetUnsafe [xs,ys]) Empty $
+  = Crl $ Blk (mkSetUnsafe [xs,ys,ar]) Empty $
+    (Var ar :=: Arr [ mkCons x (Var xs)
+                    , mkCons y (Var ys)]) :>
     (Arr [Var xs, Var ys] :=: xys) :>
-    (Arr [ mkCons x (Var xs)
-         , mkCons y (Var ys)])
+    (Var ar)
   where
     xs  = mkName "xs"
     ys  = mkName "ys"
+    ar  = mkName "ar"
 
 --------------------------------------------------------------------------------
 --
