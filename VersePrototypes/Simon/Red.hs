@@ -171,11 +171,6 @@ pattern Blk is eqs e <- BlkX is eqs e   -- check invariant
 
 -- exists x y{ x <-3; y<-x }  -- no to inv2
 
--- A block with no invariants.
--- This is what Step returns.
-data SBlk = FloatB Blk | Promote (Ident, Exp) Exp
-  deriving (Eq, Show)
-
 type Val = Exp
 
 data IterCtx = IF | FOR | ALL
@@ -394,6 +389,12 @@ data Reduction
   | Step RuleName SBlk -- The named rule fired, returning this Blk
   | StepC RuleName Blk Blk  -- The named rule fired, returning a choice.  Used for the B context
   deriving (Eq, Show)
+
+-- A Step returns a SBlk
+data SBlk = FloatB Blk                   -- From (FloatB)
+          | Promote (Ident, Exp) Exp     -- From (Promote1) or (Promote2)
+  deriving (Eq, Show)
+
 
 pattern Done :: String -> Exp -> Reduction
 pattern Done s e = Step s (FloatB (BlkE e))
@@ -646,10 +647,10 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
         Arr es :@ IntE i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i')
                                                      where i' = fromInteger i
 
-        Arr es :@ e -> Step "ITup" $
-                       FloatB $ Blk (sing x) Empty $
-                       Var x :=: e :>
-                       foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
+        Val (Arr es) :@ e -> Step "ITup" $
+                             FloatB $ Blk (sing x) Empty $
+                             Var x :=: e :>
+                            foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
           where
             x = rc_fresh cxt !! 0
             alt e1 e2 = BlkE e1 :|: BlkE e2
