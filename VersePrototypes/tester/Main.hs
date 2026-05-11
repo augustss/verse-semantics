@@ -30,7 +30,7 @@ import Core.Expr as Core
 import Core.Traced
 import Core.Verifier( verificationRules )
 import Core.Rules ( runtimeRules )
-import Core.Rule( everywhere, normalizeExpr, NormResult(..) )
+import Core.Rule( everywhere, normalizeExpr )
 
 {- Imports for denotational semantics
 
