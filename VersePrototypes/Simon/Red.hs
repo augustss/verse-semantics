@@ -647,7 +647,7 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
                                                      where i' = fromInteger i
 
         Arr es :@ e -> Step "ITup" $
-                       SBlk (sing x) Empty $
+                       FloatB $ Blk (sing x) Empty $
                        Var x :=: e :>
                        foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
           where
