@@ -71,6 +71,8 @@ unions :: Eq a => [Set a] -> Set a
 unions = foldr union Empty
 toList :: Set a -> [a]
 toList (Set s) = s
+fromList :: Ord a => [a] -> Set a
+fromList xs = Set (nub xs)
 mapSetUnsafe :: (a -> b) -> Set a -> Set b        -- Only use this when the result list has unique elements
 mapSetUnsafe f (Set xs) = Set (map f xs)
 member :: Eq a => a -> Set a -> Bool
@@ -471,7 +473,7 @@ runTraced fuel src
           Step rule_nm flts -> Just $ TS { ts_str = rule_nm
                                          , ts_payload = mergeStep blk flts
                                          , ts_verb = 1 }
-          Delete xs         -> Just $ TS { ts_str = "Delete " ++ show xs
+          Delete xs         -> Just $ TS { ts_str = "GC " ++ show xs
                                          , ts_payload = gcVarsBlk xs blk
                                          , ts_verb = 1 }
           Failure rule_nm   -> Just $ TS { ts_str = rule_nm
@@ -497,8 +499,8 @@ run src = P $ evalBlk 1000000 (initialBlk src)
 
 initialBlk :: F.SrcEssential -> Blk
 initialBlk src
-  = Blk (sing u `union` tbs term `union` map fst thePrelude)
-        thePrelude
+  = Blk (sing u `union` tbs term `union` fromList (map fst thePrelude))
+        (mkSetUnsafe thePrelude)
         (u :~> term)
   where
     term = srcToTerm src
@@ -631,9 +633,13 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
         Arr es :@ IntE i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i')
                                                      where i' = fromInteger i
 
-        Arr es :@ Val v -> Done "ITup" $
-                           foldr alt Fail (zipWith (\ i e -> (v :=: IntE i) :> e) [0..] es)
-          where alt e1 e2 = BlkE e1 :|: BlkE e2
+        Arr es :@ e -> Step "ITup" $
+                       SBlk (sing x) Empty $
+                       Var x :=: e :>
+                       foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
+          where
+            x = rc_fresh cxt !! 0
+            alt e1 e2 = BlkE e1 :|: BlkE e2
 
         -- (ExiApp)
         Var f   :@ Val _ | f `member` rc_single cxt
