@@ -69,8 +69,8 @@ infixr 4 :|:
 infixr 5 :=:
 
 data Term
-  = TVar Ident               -- x
-  | TLit Lit              -- k
+  = TVar Ident              -- x
+  | TLit Lit                -- k
   | TPrm PrimOp             -- op
   | Term :>%  Term          -- t1; t2
   | Term :|:% Term          -- t1 | t2
@@ -82,14 +82,14 @@ data Term
 
   | Und                     -- _
   | Term `Where` Term       -- t1 where t2
-  | Fun Term Effect Term  -- fun(t1)<fx>{t2}
+  | Fun Term Effect Term    -- fun(t1)<fx>{t2}
   | If Term Term Term       -- if (t1){t2}{t3}
   | For Term Term           -- for (t1){t2}
   | Rng Term                -- :t
-  | Ident := Term            -- x := t
-  | Ident :-> Term           -- x ??? t
+  | Ident := Term           -- x := t
+  | Ident :-> Term          -- x ??? t
   | TBlock Term             -- block{ t }
-  | Check Effect Term     -- check<fx>{t}
+  | Check Effect Term       -- check<fx>{t}
   deriving (Eq, Show)
 
 data Exp
@@ -181,11 +181,9 @@ instance Pretty Term where
   pPrintPrec _ _ Und      = text "_"
 
   pPrintPrec l p (Rng e)         = maybeParens (p > 10) $ text ":" <> pPrintPrec l 11 e
-  pPrintPrec l _ (Fun e1 fx e2)  = text "fun" <> hsep [ parens (pPrintPrec l 0 e1)
-                                                      , angleBrackets (pPrint fx) <>
-                                                        braces (pPrintPrec l 0 e2) ]
+  pPrintPrec l _ (Fun e1 fx e2)  = text "fun" <> cat [parens (pPrintPrec l 0 e1), angleBrackets (pPrint fx), braces (pPrintPrec l 0 e2)]
   pPrintPrec l p (x := e)        = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":=" <+> pPrintPrec l 2 e
-  pPrintPrec l p (e1 :@% e2)     = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
+  pPrintPrec l p (e1 :@% e2)     = maybeParens (p > 10) $ cat [pPrintPrec l 10 e1, nest 2 (text "[" <> pPrintPrec l 0 e2 <> text "]")]
   pPrintPrec l p (e1 :>% e2)     = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
   pPrintPrec l p (e1 `Where` e2) = maybeParens (p > 0) $ pPrintPrec l 1 e1 <+> text "where" <+> pPrintPrec l 0 e2
   pPrintPrec l p (e1 :=:% e2)    = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
@@ -199,8 +197,8 @@ instance Pretty Term where
   pPrintPrec l p (e1 :..% e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
   pPrintPrec _ _ TFail        = text "fail"
 
-  pPrintPrec l _ (If t1 t2 t3) = text "if" <> parens (pPrintL l t1) <> braces (pPrintL l t2) <> text "else" <> braces (pPrintL l t3)
-  pPrintPrec l _ (For t1 t2)   = text "for" <> parens (pPrintL l t1) <> braces (pPrintL l t2)
+  pPrintPrec l _ (If t1 t2 t3) = sep [text "if" <> parens (pPrintL l t1), nest 2 (braces (pPrintL l t2)), text "else", nest 2 (braces (pPrintL l t3)) ]
+  pPrintPrec l _ (For t1 t2)   = sep [text "for" <> parens (pPrintL l t1), nest 2 (braces (pPrintL l t2))]
   pPrintPrec l p (x :-> e)     = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":->" <+> pPrintPrec l 2 e
 
   pPrintPrec l _ (TBlock t)    = braces $ (pPrintL l t)
@@ -212,16 +210,16 @@ instance Pretty Exp where
   pPrintPrec l p (Prm o)     = pPrintPrec l p o
   pPrintPrec l p (Lam i b)   = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 0 b
   pPrintPrec l p (x :~> e)   = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
-  pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ pPrintPrec l 10 e1 <> text "[" <> pPrintPrec l 0 e2 <> text "]"
+  pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ cat [pPrintPrec l 10 e1, nest 2 (text "[" <> pPrintPrec l 0 e2 <> text "]")]
   pPrintPrec l p ee@(_ :> _) = maybeParens (p > 0) $ sep $ punctuate (text ";") (map (pPrintL l) $ flat ee)
                                where flat (e1 :> e2) = flat e1 ++ flat e2
                                      flat e = [e]
   pPrintPrec l p (e1 :=: e2) = maybeParens (p > 0) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
   pPrintPrec l _ (Arr es)
-    | l == prettyNormal    = text "<" <> sep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
-  pPrintPrec l _ (Arr [e]) = text "array" <> braces (pPrintL l e)
-  pPrintPrec l _ (Arr es)  = parens $ sep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+    | l == prettyNormal      = text "<" <> sep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+  pPrintPrec l _ (Arr [e])   = text "array" <> braces (pPrintL l e)
+  pPrintPrec l _ (Arr es)    = parens $ sep $ punctuate (text ",") $ map (pPrintPrec l 0) es
 
   pPrintPrec l _ (Crl b)     = braces $ pPrintPrec l 0 b
   pPrintPrec l _ (Dly b)     = text "delay" <> braces (pPrintL l b)
@@ -231,8 +229,7 @@ instance Pretty Exp where
 
 
   pPrintPrec l _ (Iter ic b1 b2)
-    = text "iter" <> parens (text (show ic)) <> braces (pPrintL l b1) <> braces (pPrintL l b2)
-
+    = text "iter" <> cat [parens (text (show ic)), braces (pPrintL l b1), braces (pPrintL l b2)]
   pPrintPrec l _ (Verify rs as e)
     = sep [ text "verify" <> parens (sep [ fsep (map pPrint rs) <> text ";"
                                          , fsep (map pPrint as) ])
@@ -245,10 +242,10 @@ ppBlk :: PrettyLevel -> Rational -> [Ident] -> [Eqn] -> Exp -> Doc
 ppBlk l p [] [] e
   = pPrintPrec l p e
 ppBlk l p vs eqns e
-  = maybeParens (p > 0) $ sep [pp_bndrs, pp_body]
+  = maybeParens (p > 0) $ text "∃" <+> sep [pp_bndrs, pp_eqns, pp_body]
   where
-    pp_bndrs = text "∃" <> hsep (map (pPrintPrec l 10) vs) <> braces (fsep pp_eqns) <> text "."
-    pp_eqns = punctuate (text ";") $ map ppr_eqn eqns
+    pp_bndrs = hsep (map (pPrintPrec l 10) vs)
+    pp_eqns = braces (fsep $ punctuate (text ";") $ map ppr_eqn eqns) <> text "."
     pp_body = pPrintPrec l 0 e
     ppr_eqn (i, d) = pPrintPrec l 0 i <+> text "<-" <+> pPrintPrec l 0 d
 
@@ -645,7 +642,6 @@ promotionOK (Blk locals leqns _) x v
 ------------------------------------
 reducePrimOp :: PrimOp -> Exp -> Maybe Reduction
 -- Primops get stuck on values outside the domain
-
 reducePrimOp Add (Arr [IntE i, IntE j])             = Just $ Done    "Prim+" $ IntE (i + j)
 reducePrimOp Sub (Arr [IntE i, IntE j])             = Just $ Done    "Prim-" $ IntE (i - j)
 reducePrimOp Mul (Arr [IntE i, IntE j])             = Just $ Done    "Prim*" $ IntE (i * j)
