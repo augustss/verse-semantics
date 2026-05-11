@@ -86,12 +86,9 @@ srcToEssential flags e_parsed
        -- Desugar into Essential Verse by doing superficial desugaring
        ; e_essential <- sDesugarExpr e_parsed
 
-       -- Do the silly envDesugar thing
-       ; let e_essential' = envDesugar e_essential
+       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
 
-       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential'
-
-       ; return e_essential' }
+       ; return e_essential }
 
 --------------------------------------------------------
 --

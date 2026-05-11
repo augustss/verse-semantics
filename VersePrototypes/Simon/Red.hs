@@ -345,14 +345,19 @@ srcToTerm (F.Array es)           = TArr (map srcToTerm es)
 srcToTerm (F.Fail)               = TFail
 srcToTerm (F.Function _ e1 fx e2)
   | Just eff <- toCoreEff fx     = Fun (srcToTerm e1) eff (srcToTerm e2)
-srcToTerm (F.DefineV x)          = srcToCoreIdent x := Rng (TPrm F.IsAny)
+srcToTerm (F.DefineV x)          = srcToCoreIdent x := Rng (TVar (Name "any"))
 srcToTerm (F.DefineIE i e)       = srcToCoreIdent i :-> srcToTerm e
 srcToTerm (F.If3 e1 e2 e3)       = If (srcToTerm e1) (srcToTerm e2) (srcToTerm e3)
 srcToTerm (F.For2 e1 e2)         = For (srcToTerm e1) (srcToTerm e2)
+
+-- Special case for operator'..'[ t1, t2 ]
+-- We want to turn that into the syntactic form (t1 @.. t2),
+-- because ".." plays a special role in pattern matching
 srcToTerm (F.ApplyD e1 e2)
-  | F.EPrim F.DotDot <- e1
+  | F.Variable (F.Ident _ "operator'..'") <- e1
   , F.Array [e2a, e2b] <- e2     = srcToTerm e2a :..% srcToTerm e2b
-  | otherwise                    = srcToTerm e1 :@% srcToTerm e2
+
+srcToTerm (F.ApplyD e1 e2)       = srcToTerm e1 :@% srcToTerm e2
 srcToTerm (F.Exists is e)        = TBlock (foldr bind_one (srcToTerm e) is)
                                  where
                                    bind_one x t = (srcToCoreIdent x := Und) :>% t
@@ -421,6 +426,29 @@ mkCons2 x y xys
     ys  = mkName "ys"
     ar  = mkName "ar"
 
+thePrelude :: [Eqn]
+thePrelude
+  = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
+    , (mkName "any",          Lam vp  $ BlkE $ Var vp)
+    , (mkName "length",       Lam vp  $ BlkE $ Prm ArrLen :@ (Var vp))
+    , (mkName "prefix'+'",    Lam vp  $ BlkE $ Var vp)
+    , (mkName "prefix'-'",    Lam vp  $ BlkE $ Prm Neg    :@ (Var vp))
+    , (mkName "operator'+'",  Lam vpq $ BlkE $ Prm Add    :@ (Var vpq))
+    , (mkName "operator'-'",  Lam vpq $ BlkE $ Prm Sub    :@ (Var vpq))
+    , (mkName "operator'*'",  Lam vpq $ BlkE $ Prm Mul    :@ (Var vpq))
+    , (mkName "operator'/'",  Lam vpq $ BlkE $ Prm Div    :@ (Var vpq))
+    , (mkName "operator'<'",  Lam vpq $ BlkE $ Prm Lt     :@ (Var vpq))
+    , (mkName "operator'<='", Lam vpq $ BlkE $ Prm LEq    :@ (Var vpq))
+    , (mkName "operator'>='", Lam vpq $ BlkE $ Prm GEq    :@ (Var vpq))
+    , (mkName "operator'>'",  Lam vpq $ BlkE $ Prm Gt     :@ (Var vpq))
+    , (mkName "operator'<>'", Lam vpq $ BlkE $ Prm NEq    :@ (Var vpq))
+    , (mkName "operator'..'", Lam vpq $ BlkE $ Prm DotDot :@ (Var vpq))
+    ]
+
+vp,vpq :: Ident
+vpq = mkName "pq"
+vp  = mkName "p"
+
 --------------------------------------------------------------------------------
 --
 --             The evaluator: driver
@@ -469,7 +497,9 @@ run src = P $ evalBlk 1000000 (initialBlk src)
 
 initialBlk :: F.SrcEssential -> Blk
 initialBlk src
-  = Blk (sing u `union` tbs term) Empty (u :~> term)
+  = Blk (sing u `union` tbs term `union` map fst thePrelude)
+        thePrelude
+        (u :~> term)
   where
     term = srcToTerm src
     u    = freshVarsTerm term !! 0
@@ -721,14 +751,6 @@ reduceMatch _fresh x tm
 
 reduceMatch fresh x tm
   = case tm of
-        -- Hackily turn IsInt, IsAny back to a lambda:
-        -- We can't do this earlier because we don't have lambda in Trm.
-        TPrm IsInt         -> Done "int-hack" $ Var x :=: (Lam u $ BlkE $
-                                                             (Prm IsInt :@ Var u) :> Var u)
-                                where u = fresh !! 0
-        TPrm IsAny         -> Done "any-hack" $ Var x :=: (Lam u $ BlkE $ Var u)
-                                      where u = fresh!!0
-
         -- Blocks
         TBlock t             -> Step  "MBlock" $ SBlk (tbs t) Empty (x :~> t)
 

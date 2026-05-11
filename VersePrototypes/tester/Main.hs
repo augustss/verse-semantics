@@ -19,7 +19,6 @@ import FrontEnd.ToCore  as FrontEnd ( convertToPrepdCore )
 import FrontEnd.Flags   as FrontEnd
 import FrontEnd.Expr    as Src
 import FrontEnd.Prelude( findPrelude )
-import FrontEnd.ENVDesugar
 
 import qualified Red as Simon
 
@@ -631,8 +630,7 @@ doEvalEssentialTest tflg test
              flags        = mkFEFlags tflg add_verif
              add_verif    = desugarForVerification test
 
-             src_to_ess src = do { ess <- srcToEssential flags src
-                                 ; return (envDesugar ess) }
+             src_to_ess src = srcToEssential flags src
 
        ; ess1 <- src_to_ess src1
 
