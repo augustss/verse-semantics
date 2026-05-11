@@ -20,10 +20,11 @@ import Core.Solver( unsat )
 import Core.Expr as C ( Ident(..), Assump, Effect(..), Lit(..), PrimOp(..) )
 
 import Epic.Print
-import Epic.List
+import Epic.List hiding ((\\))
 
 import Control.Arrow(second)
-import Data.List(intersect, union, group, sort)
+import Data.List(group, sort)
+import qualified Data.List as L
 import Data.Maybe
 
 import Debug.Trace
@@ -35,27 +36,56 @@ import GHC.Stack
 
 -}
 
--- Add a verify block
-addVerify :: Bool
-addVerify = True
-
 -- Show every reduction step
 traceReductions :: Bool
 traceReductions = False
 
 --------------------------------------------------------------------------------
 --
--- Utils
---
---------------------------------------------------------------------------------
+-- Sets
+---------------------------------------------------------------------------------
 
-subset :: (Pretty a, Ord a) => [a] -> [a] -> Bool
-subset small big = assertP "subset1" (noDups small) (pPrint small) $
-                   assertP "subset2" (noDups big)   (pPrint big) $
-                   null (small \\ big)
+newtype Set a = Set [a]
+  deriving (Show)
+instance Eq a => Eq (Set a) where
+  a == b  =  subset a b && subset b a
+mkSet :: Ord a => [a] -> Set a
+mkSet = Set . nub
+mkSetUnsafe :: [a] -> Set a        -- Only use this when the list has unique elements
+mkSetUnsafe = Set
+sing :: a -> Set a
+sing x = Set [x]
+pattern Empty :: Set a
+pattern Empty = Set []
+isEmptySet (Set []) = True
+isEmptySet _ = False
+union :: Eq a => Set a -> Set a -> Set a
+union (Set a) (Set b) = Set (a `L.union` b)
+intersect :: Eq a => Set a -> Set a -> Set a
+intersect (Set a) (Set b) = Set (a `L.intersect` b)
+(\\) :: Eq a => Set a -> Set a -> Set a
+(\\) (Set a) (Set b) = Set (a L.\\ b)
+subset :: Eq a => Set a -> Set a -> Bool
+subset small big = isEmptySet (small \\ big)
+unions :: Eq a => [Set a] -> Set a
+unions = foldr union Empty
+toList :: Set a -> [a]
+toList (Set s) = s
+mapSetUnsafe :: (a -> b) -> Set a -> Set b        -- Only use this when the result list has unique elements
+mapSetUnsafe f (Set xs) = Set (map f xs)
+member :: Eq a => a -> Set a -> Bool
+member x (Set xs) = x `elem` xs
+notMember :: Eq a => a -> Set a -> Bool
+notMember x (Set xs) = x `notElem` xs
+filterSet :: (a -> Bool) -> Set a -> Set a
+filterSet p (Set xs) = Set (filter p xs)
+size :: Set a -> Int
+size (Set xs) = length xs
+disjoint :: Eq a => Set a -> Set a -> Bool
+disjoint xs ys = isEmptySet $ xs `intersect` ys
 
-unions :: Eq a => [[a]] -> [a]
-unions = foldr union []
+instance Pretty a => Pretty (Set a) where
+  pPrintPrec l _ (Set xs) = braces $ fsep $ punctuate (text ",") $ map (pPrintL l) xs
 
 --------------------------------------------------------------------------------
 --
@@ -116,8 +146,6 @@ data Exp
 
 type Eqn = (Ident, Val)
 
-type Set a = [a]   -- Represented as a list, but order is immaterial
-
 -- The equation RHSs have no variables from the LHSs
 -- A block (Blk xs eqs e) satisfies these invariants:
 --    (A)  dom(eqs)    `subset`   X
@@ -136,7 +164,7 @@ pattern Blk is eqs e <- BlkX (SBlk is eqs e)   -- check invariant
            where
              blk = BlkX (SBlk is eqs e)
              invariant1 = dom eqs `subset` is
-             invariant2 = unions (map (occfvs . snd) eqs) `disjoint` dom eqs
+             invariant2 = unions (map (occfvs . snd) $ toList eqs) `disjoint` dom eqs
 
 -- exists x y{ x <-3; y<-x }  -- no to inv2
 
@@ -151,7 +179,7 @@ data IterCtx = IF | FOR | ALL
   deriving (Eq, Show)
 
 pattern BlkE :: Exp -> Blk
-pattern BlkE e = Blk [] [] e
+pattern BlkE e = Blk Empty Empty e
 
 mkCrl :: Blk -> Exp
 mkCrl (BlkE e) = e
@@ -238,14 +266,14 @@ instance Pretty Exp where
 instance Pretty SBlk where
   pPrintPrec l p (SBlk vs eqns e) = ppBlk l p vs eqns e
 
-ppBlk :: PrettyLevel -> Rational -> [Ident] -> [Eqn] -> Exp -> Doc
-ppBlk l p [] [] e
+ppBlk :: PrettyLevel -> Rational -> Set Ident -> Set Eqn -> Exp -> Doc
+ppBlk l p Empty Empty e
   = pPrintPrec l p e
 ppBlk l p vs eqns e
   = maybeParens (p > 0) $ text "∃" <+> sep [pp_bndrs, pp_eqns, pp_body]
   where
-    pp_bndrs = hsep (map (pPrintPrec l 10) vs)
-    pp_eqns = braces (fsep $ punctuate (text ";") $ map ppr_eqn eqns) <> text "."
+    pp_bndrs = hsep (map (pPrintPrec l 10) $ toList vs)
+    pp_eqns = braces (fsep $ punctuate (text ";") $ map ppr_eqn $ toList eqns) <> text "."
     pp_body = pPrintPrec l 0 e
     ppr_eqn (i, d) = pPrintPrec l 0 i <+> text "<-" <+> pPrintPrec l 0 d
 
@@ -354,7 +382,7 @@ data Reduction
   deriving (Eq, Show)
 
 pattern Done :: String -> Exp -> Reduction
-pattern Done s e = Step s (SBlk [] [] e)
+pattern Done s e = Step s (SBlk Empty Empty e)
 
 instance Pretty Reduction where
   pPrintPrec l p (Delete is) = text "GC" <+> pPrintPrec l p is
@@ -381,7 +409,7 @@ mkCons a as = Prm ArrCons :@ Arr [a, as]
 mkCons2 :: Exp -> Exp -> Exp -> Exp
 -- cons2 x y <xs,ys> = <cons x xs, cons y ys>
 mkCons2 x y xys
-  = Crl $ Blk [xs,ys] [] $
+  = Crl $ Blk (mkSetUnsafe [xs,ys]) Empty $
     (Arr [Var xs, Var ys] :=: xys) :>
     (Arr [ mkCons x (Var xs)
          , mkCons y (Var ys)])
@@ -429,7 +457,7 @@ run src = P $ evalBlk 1000000 (initialBlk src)
     evalBlk fuel b@(Blk is eqs expr) =
         case findTopRedex (freshVarsBlk b) b of
           Step _ b'         -> evalBlk (fuel-1) $ mergeStep b b'
-          None | null is    -> expr
+          None | isEmptySet is -> expr
                | otherwise  -> mkCrl (Blk is eqs expr)
           Failure _         -> Fail
           Delete xs         -> evalBlk (fuel-1) (gcVarsBlk xs b)
@@ -437,7 +465,7 @@ run src = P $ evalBlk 1000000 (initialBlk src)
 
 initialBlk :: F.SrcEssential -> Blk
 initialBlk src
-  = Blk (u : tbs term) [] (u :~> term)
+  = Blk (sing u `union` tbs term) Empty (u :~> term)
   where
     term = srcToTerm src
     u    = freshVarsTerm term !! 0
@@ -452,15 +480,12 @@ mergeStep b1@(Blk is1 _ _) b2@(SBlk is2 _ _)
   where
     merge (Blk is outer_eqs _) (SBlk xs inner_eqs e)
       = Blk (is `union` xs)
-            (   map (second $ substVal inner_eqs) outer_eqs
-             ++ map (second $ substVal outer_eqs) inner_eqs)
+            (        mapSetUnsafe (second $ substVal $ toList inner_eqs) outer_eqs
+             `union` mapSetUnsafe (second $ substVal $ toList outer_eqs) inner_eqs)
             e
 
 dom :: Set Eqn -> Set Ident
-dom = map fst
-
-disjoint :: Eq a => Set a -> Set a -> Bool
-disjoint xs ys = null $ xs `intersect` ys
+dom = mapSetUnsafe fst
 
 findTopRedex :: [Ident] -> Blk -> Reduction
 findTopRedex fresh blk@(Blk locals eqns ex)
@@ -469,7 +494,7 @@ findTopRedex fresh blk@(Blk locals eqns ex)
     top_cxt = RC { rc_depth  = 0
                  , rc_fresh  = fresh
                  , rc_single = singleOcc
-                 , rc_eqns   = []
+                 , rc_eqns   = Empty
                  , rc_skols  = [] }
 
     -- Subset of `locals` that occur exactly once, and have no Eqn
@@ -477,9 +502,9 @@ findTopRedex fresh blk@(Blk locals eqns ex)
     -- XXX This is wrong.  Can't handle multiple uses of a function
     -- ToDo: what about occurrences in `eqns` under a lambda?
     singleOcc :: Set Ident
-    singleOcc = [ x | [x] <- group (sort (allVars ex))
-                    , x `elem` locals
-                    , isNothing (lookup x eqns) ]
+    singleOcc = mkSet [ x | [x] <- group (sort (allVars ex))
+                      , x `member` locals
+                      , isNothing (lookup x $ toList eqns) ]
 
 data ReductionContext
   = RC { rc_depth  :: Int         -- Number of enclosing Blks
@@ -490,7 +515,7 @@ data ReductionContext
     }
 
 lookupEqn :: ReductionContext -> Ident -> Maybe Val
-lookupEqn (RC { rc_eqns = eqns }) x = lookup x eqns
+lookupEqn (RC { rc_eqns = eqns }) x = lookup x $ toList eqns
 
 --------------------------------------------------------------------------------
 --
@@ -509,27 +534,27 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
   else
     res
   where
-    res | not (null dead_vars) = Delete dead_vars  -- GC rules
-        | otherwise            = find ex
+    res | not (isEmptySet dead_vars) = Delete dead_vars  -- GC rules
+        | otherwise                  = find ex
 
     -- XXX This needs to construct SCCs from uses inside lambda
-    dead_vars :: [Ident]  -- Subset of locals that are unused
-    dead_vars = locals \\ (nub $ freeVars ex ++ concatMap (freeVars . snd) leqns)
+    dead_vars :: Set Ident  -- Subset of locals that are unused
+    dead_vars = locals \\ (freeVars ex `union` (unions (map (freeVars . snd) $ toList leqns)))
 
     -- inner_cxt: update the ReductionContext for when we walk inside the block
     inner_cxt = cxt { rc_depth = rc_depth cxt + 1
-                    , rc_eqns = filter ((`notElem` locals) . fst) (rc_eqns cxt)
+                    , rc_eqns = filterSet ((`notMember` locals) . fst) (rc_eqns cxt)
                                 -- The filter implements the side condition for subst
-                                ++ leqns }
+                                `union` leqns }
 
     find :: Exp -> Reduction
     find expr =
       case expr of
         -- Scope and substitution
         Var x  :=: Val v  | promotionOK parent x v
-                          -> Step "Promote1" $ SBlk [] [(x, v)] v
+                          -> Step "Promote1" $ SBlk Empty (sing (x, v)) v
         Val v  :=: Var x  | promotionOK parent x v
-                          -> Step "Promote2" $ SBlk [] [(x, v)] v
+                          -> Step "Promote2" $ SBlk Empty (sing (x, v)) v
 
         Var i             | Just v <- lookupEqn inner_cxt i -> Done ("Subst " ++ show i) v
         Crl b@Blk{}       -> Step "FloatB" $ freshen (rc_fresh cxt) b
@@ -562,7 +587,7 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
         -- Beta (\x.blk)[a] -->  exists x. x = a; blk
         -- NOTE: it should be enough to match with eqs=[]
         Lam x blk :@ arg
-            -> Step ("Beta " ++ show x) $ SBlk (x':is') eqs' ((Var x' :=: arg) :> body')
+            -> Step ("Beta " ++ show x) $ SBlk (sing x' `union` is') eqs' ((Var x' :=: arg) :> body')
             where
               x' = rc_fresh cxt !! 0
               Blk is' eqs' body' = renameBlk [(x,x')] blk
@@ -577,8 +602,8 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
           where alt e1 e2 = BlkE e1 :|: BlkE e2
 
         -- (ExiApp)
-        Var f   :@ Val _ | f `elem` rc_single cxt
-                         -> Step "ExiApp" $ SBlk [u] [] (Var u)
+        Var f   :@ Val _ | f `member` rc_single cxt
+                         -> Step "ExiApp" $ SBlk (sing u) Empty (Var u)
                          where u = rc_fresh cxt !! 0
 
         x :~> tm  -> reduceMatch (rc_fresh cxt) x tm
@@ -633,10 +658,10 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
 promotionOK :: Blk -> Ident -> Val -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
 promotionOK (Blk locals leqns _) x v
-  =  x `elem` locals                        -- Must be bound by the /immediately enclosing/ block
+  =  x `member` locals                        -- Must be bound by the /immediately enclosing/ block
                                             --   i.e. is "flexible"
-  && x `notElem` dom leqns                  -- x must not have an eqn
-  && occfvs v `disjoint` (x : dom leqns)    -- v must not have variables from eqns
+  && x `notMember` dom leqns                  -- x must not have an eqn
+  && occfvs v `disjoint` (sing x `union` dom leqns)    -- v must not have variables from eqns
 
 
 ------------------------------------
@@ -701,7 +726,7 @@ reduceMatch fresh x tm
                                       where u = fresh!!0
 
         -- Blocks
-        TBlock t             -> Step  "MBlock" $ SBlk (tbs t) [] (x :~> t)
+        TBlock t             -> Step  "MBlock" $ SBlk (tbs t) Empty (x :~> t)
 
         -- Matching
         Und                  -> Done "MWild" $ Var x
@@ -710,30 +735,30 @@ reduceMatch fresh x tm
         TPrm o               -> Done "MPrim" $ Var x :=: Prm o
         TFail                -> Done "Mfail"    $ Fail
 
-        (t1 :@% t2)          -> Step "MApp" $ SBlk [u1,u2] [] $
+        (t1 :@% t2)          -> Step "MApp" $ SBlk (mkSet [u1,u2]) Empty $
                                      Var x :=: ((u1 :~> t1) :@ (u2 :~> t2))
                              where u1:u2:_ = fresh
         (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
         (t1 :|:% t2)         -> Done "MChoice"  $
-                                (Blk (tbs t1) [] $ x :~> t1) :|:
-                                (Blk (tbs t2) [] $ x :~> t2)
-        (t1 :>% t2)          -> Step "MSemi"    $ SBlk [u]   [] $ (u :~> t1) :> (x :~> t2)
+                                (Blk (tbs t1) Empty $ x :~> t1) :|:
+                                (Blk (tbs t2) Empty $ x :~> t2)
+        (t1 :>% t2)          -> Step "MSemi"    $ SBlk (sing u)   Empty $ (u :~> t1) :> (x :~> t2)
                               where u = fresh!!0
-        (t1 `Where` t2)      -> Step "MWhere"   $ SBlk [u,w] [] $
+        (t1 `Where` t2)      -> Step "MWhere"   $ SBlk (mkSet [u,w]) Empty $
                                 (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w
                              where u:w:_ = fresh
 
-        TArr ts              -> Step "MTup"     $ SBlk xs    [] $
+        TArr ts              -> Step "MTup"     $ SBlk (mkSet xs)    Empty $
                                 (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
                               where xs = take (length ts) fresh
 
-        Rng t      -> Step "MColon" $ SBlk [u]   [] $ (u :~> t) :@ Var x
+        Rng t      -> Step "MColon" $ SBlk (sing u)   Empty $ (u :~> t) :@ Var x
                    where u = fresh!!0
 
         (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: (x :~> t)
         (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> (x :~> t)
 
-        (t1 :..% t2) -> Step "MEnum" $ SBlk [u1,u2] [] $
+        (t1 :..% t2) -> Step "MEnum" $ SBlk (mkSet [u1,u2]) Empty $
                         Var x :=: ((u1 :~> t1) :.. (u2 :~> t2))
                       where u1:u2:_ = fresh
 
@@ -741,13 +766,13 @@ reduceMatch fresh x tm
         Fun at fx bt -> matchFun fresh x at fx bt
 
         If t0 t1 t2 -> Done "MIf" $
-                       Iter IF (Blk (u:tbs t0) [] ((u :~> t0) :> Dly (Blk (tbs t1) [] (x :~> t1))))
-                               (mkCrl (Blk (tbs t2) [] (x :~> t2)))
+                       Iter IF (Blk (sing u `union` tbs t0) Empty ((u :~> t0) :> Dly (Blk (tbs t1) Empty (x :~> t1))))
+                               (mkCrl (Blk (tbs t2) Empty (x :~> t2)))
                      where u = fresh!!0
 
-        For t0 t1    -> Step "MFor" $ SBlk [y] [] $
+        For t0 t1    -> Step "MFor" $ SBlk (sing y) Empty $
                         (Arr [Var x, Var y] :=:
-                         Iter FOR (Blk (u:tbs t0) [] ((u :~> t0) :> Lam w (BlkE $ w :~> t1)))
+                         Iter FOR (Blk (sing u `union` tbs t0) Empty ((u :~> t0) :> Lam w (BlkE $ w :~> t1)))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                       where y:u:w:_ = fresh
@@ -762,13 +787,13 @@ matchFun fresh f at fx bt
     the_lambda
   where
     u:p:q:fresh2 = fresh
-    the_lambda = Lam u $ Blk (p:q:tbs at) [] $
+    the_lambda = Lam u $ Blk (mkSet [p,q] `union` tbs at) Empty $
                  (Var p :=: (u :~> at))       :>
                  (Var q :=: (Var f :@ Var p)) :>
                  (q :~> TBlock bt)
 
-    fun_verify = Verify [u] []     $
-                 Blk (q:tbs at) [] $
+    fun_verify = Verify [u] [] $
+                 Blk (sing q `union` tbs at) Empty $
                  (u :~> at) :>
                  matchCheck fresh2 q fx bt
 
@@ -776,7 +801,7 @@ matchCheck :: NameSupply -> Ident -> Effect -> Term -> Exp
 matchCheck fresh x fx t
   | Iterates <- fx = x :~> t   -- check<iterates> is a no-op
   | otherwise        = (Prm chk_op :@) $
-                       Var x :=: Iter ALL (Blk (u:tbs t) [] $ u :~> t) (Arr [])
+                       Var x :=: Iter ALL (Blk (sing u `union` tbs t) Empty $ u :~> t) (Arr [])
   where
     u  = fresh !! 0
     chk_op = case fx of
@@ -792,7 +817,7 @@ reduceIter _ IF (BlkE (Dly b)) _
 
 reduceIter cxt FOR (Blk xs eqs v@Val{}) e2
   = Step "IFor" $ freshen (drop 1 fresh) $
-                  Blk (x:xs) eqs $
+                  Blk (sing x `union` xs) eqs $
                   mkCons2 (Var x) (v :@ Var x) e2
   where
     fresh = rc_fresh cxt
@@ -844,102 +869,100 @@ reduceVerify cxt skols as blk
 
 -- Top level binders
 tbs :: Term -> Set Ident
-tbs Und{}           = []
-tbs TLit{}          = []
-tbs TVar{}          = []
-tbs TPrm{}          = []
+tbs Und{}           = Empty
+tbs TLit{}          = Empty
+tbs TVar{}          = Empty
+tbs TPrm{}          = Empty
 tbs (t1 :>% t2)     = tbs t1 `union` tbs t2
 tbs (t1 `Where` t2) = tbs t1 `union` tbs t2
 tbs (t1 :=:% t2)    = tbs t1 `union` tbs t2
 tbs (t1 :@% t2)     = tbs t1 `union` tbs t2
 tbs (t1 :..% t2)    = tbs t1 `union` tbs t2
-tbs TFail{}         = []
-tbs (_ :|:% _)      = []
+tbs TFail{}         = Empty
+tbs (_ :|:% _)      = Empty
 tbs (TArr ts)       = unions $ map tbs ts
-tbs Fun{}           = []
-tbs If{}            = []
-tbs For{}           = []
+tbs Fun{}           = Empty
+tbs If{}            = Empty
+tbs For{}           = Empty
 tbs (Rng t)         = tbs t
-tbs (x := t)        = [x] `union` tbs t   -- (:=) binds
-tbs (_ :-> t)       = tbs t              -- (:->) does not bind
-tbs (TBlock {})     = []
+tbs (x := t)        = sing x `union` tbs t   -- (:=) binds
+tbs (_ :-> t)       = tbs t                  -- (:->) does not bind
+tbs (TBlock {})     = Empty
 tbs (Check _ t)     = tbs t
 
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Ident
-occfvs (Var x) = [x]
-occfvs Lit{} = []
-occfvs Prm{} = []
-occfvs Lam{} = []
-occfvs Dly{} = []
+occfvs (Var x) = sing x
+occfvs Lit{} = Empty
+occfvs Prm{} = Empty
+occfvs Lam{} = Empty
+occfvs Dly{} = Empty
 occfvs (e1 :> e2) = occfvs e1 `union` occfvs e2
 occfvs (b1 :|: b2) = occfvsB b1 `union` occfvsB b2
-occfvs Fail = []
+occfvs Fail = Empty
 occfvs (e1 :=: e2) = occfvs e1 `union` occfvs e2
-occfvs (i :~> _) = [i]  -- XXX what should we do here
+occfvs (i :~> _) = sing i  -- XXX what should we do here
 occfvs (e1 :@ e2) = occfvs e1 `union` occfvs e2
 occfvs (e1 :.. e2) = occfvs e1 `union` occfvs e2
 occfvs (Arr es) = unions (map occfvs es)
 occfvs (Iter _ b1 e2) = occfvsB b1 `union` occfvs e2
 occfvs (Crl b) = occfvsB b
-occfvs Verify{} = []
+occfvs Verify{} = Empty
 
 occfvsB :: Blk -> Set Ident
-occfvsB (Blk is eqs e) = nub (foldr union (occfvs e) (map (occfvs . snd) eqs)) \\ is
+occfvsB (Blk is eqs e) = (unions (occfvs e : map (occfvs . snd) (toList eqs))) \\ is
 
-freeVars :: Exp -> [Ident]
 -- All /free/ variables
-freeVars (Var i)     = [i]
-freeVars (Lit {})    = []
-freeVars (Prm {})    = []
-freeVars (Lam i e)   = nub (freeVarsBlk e) \\ [i]
-freeVars (e1 :>  e2) = freeVars e1 ++ freeVars e2
-freeVars (e1 :=: e2) = freeVars e1 ++ freeVars e2
-freeVars (i  :~> t ) = i : freeVarsTerm t
-freeVars (e1 :@  e2) = freeVars e1 ++ freeVars e2
-freeVars (Arr es)    = concatMap freeVars es
-freeVars (b1 :|: b2) = freeVarsBlk b1 ++ freeVarsBlk b2
-freeVars (e1 :.. e2) = freeVars e1 ++ freeVars e2
-freeVars Fail        = []
+freeVars :: Exp -> Set Ident
+freeVars (Var i)     = sing i
+freeVars (Lit {})    = Empty
+freeVars (Prm {})    = Empty
+freeVars (Lam i e)   = freeVarsBlk e \\ sing i
+freeVars (e1 :>  e2) = freeVars e1 `union` freeVars e2
+freeVars (e1 :=: e2) = freeVars e1 `union` freeVars e2
+freeVars (i  :~> t ) = sing i `union` freeVarsTerm t
+freeVars (e1 :@  e2) = freeVars e1 `union` freeVars e2
+freeVars (Arr es)    = unions $ map freeVars es
+freeVars (b1 :|: b2) = freeVarsBlk b1 `union` freeVarsBlk b2
+freeVars (e1 :.. e2) = freeVars e1 `union` freeVars e2
+freeVars Fail        = Empty
 freeVars (Dly b)     = freeVarsBlk b
 freeVars (Crl b)     = freeVarsBlk b
-freeVars (Iter _ b1 e2) = freeVarsBlk b1 ++ freeVars e2
-freeVars Verify{} = []
+freeVars (Iter _ b1 e2) = freeVarsBlk b1 `union` freeVars e2
+freeVars Verify{}    = Empty
 
-freeVarsBlk :: Blk -> [Ident]
-freeVarsBlk (Blk is eqs e) = nub (concatMap (freeVars . snd) eqs ++ freeVars e) \\ is
+freeVarsBlk :: Blk -> Set Ident
+freeVarsBlk (Blk is eqs e) = (unions (map (freeVars . snd) (toList eqs)) `union` freeVars e) \\ is
 
-freeVars' :: Exp -> Set Ident
-freeVars' = nub . freeVars
-
-freeVarsTerm :: Term -> [Ident]
--- All variables mentioned, either as occurrences or binders
-freeVarsTerm (TVar i) = [i]
-freeVarsTerm Und = []
-freeVarsTerm (TLit _) = []
-freeVarsTerm (TPrm _) = []
-freeVarsTerm (i := t) = i : freeVarsTerm t
-freeVarsTerm (e1 :>%  e2) = freeVarsTerm e1 ++ freeVarsTerm e2
-freeVarsTerm (e1 `Where`  e2) = freeVarsTerm e1 ++ freeVarsTerm e2
-freeVarsTerm (e1 :=:% e2) = freeVarsTerm e1 ++ freeVarsTerm e2
-freeVarsTerm (e1 :@%  e2) = freeVarsTerm e1 ++ freeVarsTerm e2
-freeVarsTerm (Fun t1 _ t2) = (freeVarsTerm t1 ++ freeVarsTermBlock t2) \\ tbs t1
+freeVarsTerm :: Term -> Set Ident
+-- All variables mentioned, either as occurrences or binders,
+-- freeVarsTermBlock handles the block scope
+freeVarsTerm (TVar i) = sing i
+freeVarsTerm Und      = Empty
+freeVarsTerm (TLit _) = Empty
+freeVarsTerm (TPrm _) = Empty
+freeVarsTerm (i := t) = sing i `union` freeVarsTerm t
+freeVarsTerm (e1 :>%  e2) = freeVarsTerm e1 `union` freeVarsTerm e2
+freeVarsTerm (e1 `Where`  e2) = freeVarsTerm e1 `union` freeVarsTerm e2
+freeVarsTerm (e1 :=:% e2) = freeVarsTerm e1 `union` freeVarsTerm e2
+freeVarsTerm (e1 :@%  e2) = freeVarsTerm e1 `union` freeVarsTerm e2
+freeVarsTerm (Fun t1 _ t2) = (freeVarsTerm t1 `union` freeVarsTermBlock t2) \\ tbs t1
 freeVarsTerm (Rng e) = freeVarsTerm e
-freeVarsTerm (TArr es) = concatMap freeVarsTerm es
-freeVarsTerm (b1 :|:% b2) = freeVarsTermBlock b1 ++ freeVarsTermBlock b2
-freeVarsTerm (e1 :..% e2) = freeVarsTerm e1 ++ freeVarsTerm e2
-freeVarsTerm TFail = []
-freeVarsTerm (If t1 t2 t3) = (nub (freeVarsTerm t1 ++ freeVarsTermBlock t2) \\ tbs t1)
-                             ++ freeVarsTermBlock t3
-freeVarsTerm (For t1 t2) = nub (freeVarsTerm t1 ++ freeVarsTermBlock t2) \\ tbs t1
-freeVarsTerm (i :-> e) = i : freeVarsTerm e
+freeVarsTerm (TArr es) = unions $ map freeVarsTerm es
+freeVarsTerm (b1 :|:% b2) = freeVarsTermBlock b1 `union` freeVarsTermBlock b2
+freeVarsTerm (e1 :..% e2) = freeVarsTerm e1 `union` freeVarsTerm e2
+freeVarsTerm TFail = Empty
+freeVarsTerm (If t1 t2 t3) = ((freeVarsTerm t1 `union` freeVarsTermBlock t2) \\ tbs t1)
+                             `union` freeVarsTermBlock t3
+freeVarsTerm (For t1 t2) = (freeVarsTerm t1 `union` freeVarsTermBlock t2) \\ tbs t1
+freeVarsTerm (i :-> e) = sing i `union` freeVarsTerm e
 freeVarsTerm (TBlock t) = freeVarsTermBlock t
 freeVarsTerm (Check _ t) = freeVarsTerm t
 
-freeVarsTermBlock :: Term -> [Ident]
-freeVarsTermBlock t = nub (freeVarsTerm t) \\ tbs t
+freeVarsTermBlock :: Term -> Set Ident
+freeVarsTermBlock t = freeVarsTerm t \\ tbs t
 
-
+-- Do NOT use a Set, we use this to count occurrences.
 allVars :: Exp -> [Ident]
 -- All variables, including binders
 allVars (Var i)     = [i]
@@ -957,18 +980,15 @@ allVars Fail        = []
 allVars (Dly b)     = allVarsBlk b
 allVars (Crl b)     = allVarsBlk b
 allVars (Iter _ b1 e2) = allVarsBlk b1 ++ allVars e2
-allVars Verify{} = []
+allVars Verify{}    = []
 
 allVarsBlk :: Blk -> [Ident]
-allVarsBlk (Blk is eqs e) = is ++ concatMap (allVars . snd) eqs ++ allVars e
-
-allVars' :: Exp -> Set Ident
-allVars' = nub . allVars
+allVarsBlk (Blk is eqs e) = toList is ++ concatMap (allVars . snd) (toList eqs) ++ allVars e
 
 allVarsTerm :: Term -> [Ident]
 -- All variables mentioned, either as occurrences or binders
 allVarsTerm (TVar i) = [i]
-allVarsTerm Und = []
+allVarsTerm Und      = []
 allVarsTerm (TLit _) = []
 allVarsTerm (TPrm _) = []
 allVarsTerm (i := e) = i : allVarsTerm e
@@ -1007,7 +1027,7 @@ expSize (Iter _ b1 e2) = 1 + blkSize b1 + expSize e2
 expSize (Verify {})    = 1  -- For now
 
 blkSize :: Blk -> Int
-blkSize (Blk is eqs e) = length is + sum (map eqnSize eqs) + expSize e
+blkSize (Blk is eqs e) = size is + sum (map eqnSize $ toList eqs) + expSize e
 
 eqnSize :: Eqn -> Int
 eqnSize (_,e) = 1 + expSize e
@@ -1086,10 +1106,10 @@ rename sub = ren
 
 renameBlk :: [(Ident,Ident)] -> Blk -> Blk
 renameBlk sub b@(Blk is eqs e)
-  | any (isJust . (`lookup` sub)) is
-  = let Crl b' = rename (filter ((`notElem` is) . fst) sub) (Crl b)
+  | any (isJust . (`lookup` sub)) (toList is)
+  = let Crl b' = rename (filter ((`notMember` is) . fst) sub) (Crl b)
     in b'
-  | otherwise = Blk is (map (second (rename sub)) eqs)
+  | otherwise = Blk is (mapSetUnsafe (second (rename sub)) eqs)
                        (rename sub e)
 
 substVal :: [(Ident, Val)] -> Val -> Val
@@ -1097,12 +1117,12 @@ substVal sub e@(Var i) = fromMaybe e $ lookup i sub
 substVal _ e@Lit{} = e
 substVal _ e@Prm{} = e
 substVal sub (Arr vs) = Arr (map (substVal sub) vs)
-substVal sub e@Lam{} | null $ map fst sub `intersect` allVars' e = e
+substVal sub e@Lam{} | isEmptySet $ mkSetUnsafe (map fst sub) `intersect` mkSet (allVars e) = e
                      | otherwise = e -- error "substVal: Lam unimplemented"
 substVal _ e = error $ "substVal: not a Val: " ++ show e
 
 gcVarsBlk :: Set Ident -> Blk -> Blk
-gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) eqs) expr
+gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filterSet ((`notMember` xs) . fst) eqs) expr
 
 
 --------------------------------------------------------------------------------
@@ -1114,13 +1134,13 @@ gcVarsBlk xs (Blk is eqs expr) = Blk (is \\ xs) (filter ((`notElem` xs) . fst) e
 type NameSupply = [Ident]  -- An infinite list of fresh names
 
 freshVars :: Exp -> [Ident]
-freshVars e = idenSupply \\ allVars e
+freshVars e = idenSupply L.\\ allVars e
 
 idenSupply :: [Ident]
 idenSupply = [Name $ "u" ++ show i | i <- [1::Int ..]]
 
 freshVarsBlk :: Blk -> [Ident]
-freshVarsBlk b = idenSupply \\ allVarsBlk b
+freshVarsBlk b = idenSupply L.\\ allVarsBlk b
 
 freshVarsTerm :: Term -> [Ident]
 freshVarsTerm t = freshVars (Name "" :~> t)
@@ -1132,8 +1152,8 @@ freshen :: [Ident] -> Blk -> SBlk
 freshen fresh _b@(Blk is eqs expr) =
 --  trace ("freshen " ++ show sub ++ "\n" ++ show _b ++ "\n" ++ show res)
   res
-  where res = SBlk vs (map renEqn eqs) (rename sub expr)
-        sub = zip is fresh
+  where res = SBlk (mkSetUnsafe vs) (mapSetUnsafe renEqn eqs) (rename sub expr)
+        sub = zip (toList is) fresh
         vs = map snd sub
         renEqn (i, e) = (fromMaybe i (lookup i sub), rename sub e)
 
