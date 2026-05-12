@@ -477,12 +477,12 @@ testeq("Ampersand2", pass){ f ( x&y : int, q:int )<closed> := { (q, x + y) }; f[
 testeq("Ampersand3", pass){ (x&y) := 4; x+y } { 8 }
 testeq("Ampersand4", pass){ f ( x&y&z : int )<closed> := { x + y + z }; f[2,3,4] } { 9 }
 
-testeq("fundom1", pass) { f:=fun(x:=1|2,y:=3|4)<closed>:=x+y; all{ i->x:f; i } }
+testeq("fundom1", pass) { f(x:=1|2,y:=3|4)<closed>:=x+y; all{ i->x:f; i } }
                         { ((1,3), (1,4), (2, 3), (2, 4)) }
-testeq("fundom1a", pass) { f:=fun(x:=1|2,y:=3|4)<closed>:=x+y; all{ :f } }
+testeq("fundom1a", pass) { f(x:=1|2,y:=3|4)<closed>:=x+y; all{ :f } }
                         { (4,5,5,6) }
 # fundom2 should fail.  The domain is not allowed to have extra iterates.
-testeq("fundom2", pass, broken) { f:=fun(x:=1|2 where y:=3|4)<closed>:=x+y; all{ :f } } { wrong }
+testeq("fundom2", pass, broken) { f(x:=1|2 where y:=3|4)<closed>:=x+y; all{ :f } } { wrong }
 
 # tests for check
 testeq("check1", pass){ check<fails>{ 3=4 } } {3=4}
