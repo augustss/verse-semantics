@@ -354,6 +354,9 @@ srcToTerm (F.DefineV x)          = srcToCoreIdent x := Rng (TVar (Name "any"))
 srcToTerm (F.DefineIE i e)       = srcToCoreIdent i :-> srcToTerm e
 srcToTerm (F.If3 e1 e2 e3)       = If (srcToTerm e1) (srcToTerm e2) (srcToTerm e3)
 srcToTerm (F.For2 e1 e2)         = For (srcToTerm e1) (srcToTerm e2)
+srcToTerm (F.One e)              = If (x := srcToTerm e) (TVar x) TFail
+  where
+    x = mkName "oneBinder"  -- Hack; hope this is not free in 'e'!
 
 -- Special case for operator'..'[ t1, t2 ]
 -- We want to turn that into the syntactic form (t1 @.. t2),
