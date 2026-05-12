@@ -456,7 +456,7 @@ thePrelude :: [Eqn]
 thePrelude
   = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ BlkE $ Var vp)
-    , (mkName "length",       Lam vp  $ BlkE $ Prm ArrLen :@ (Var vp))
+    , (mkName "Length",       Lam vp  $ BlkE $ Prm ArrLen :@ (Var vp))
     , (mkName "prefix'+'",    Lam vp  $ BlkE $ Var vp)
     , (mkName "prefix'-'",    Lam vp  $ BlkE $ Prm Neg    :@ (Var vp))
     , (mkName "operator'+'",  Lam vpq $ BlkE $ Prm Add    :@ (Var vpq))
