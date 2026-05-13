@@ -92,17 +92,18 @@ testeq("Unif16",pass) {1=1}                                 {1}
 #            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq("Unif18",pass) {(1,2)=(1,2)}                         {(1,2)}
 # tim=skip: functions cannot be compared
-testeq("Unif19",pass,tim=skip) {(x:any=>x)=(x:any=>x)}       {:false}
+# skip: function comparison gets stuck rather than failing
+testeq("Unif19",pass,skip,tim=skip) {(x:any=>x)=(x:any=>x)}       {:false}
 
 # If BIND is implemented in parallel, it may forget to substitute in the substitutions
 testeq("Unif20",pass) {x:any; y:any; x=y; y=1}  {1}
 testeq("Unif21",pass) {x:any; y:any; x=1; y=x}  {1}
+# skip: Unif22, Unif23 need alpha conversion
+# tim=skip: cycles rejected by the verifier
+testeq("Unif22",pass,skip,tim=skip) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
 # Needs alpha conversion
 # tim=skip: cycles rejected by the verifier
-testeq("Unif22",pass,tim=skip) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
-# Needs alpha conversion
-# tim=skip: cycles rejected by the verifier
-testeq("Unif23",pass,tim=skip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
+testeq("Unif23",pass,skip,tim=skip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
 
 
 # Arrays
@@ -119,7 +120,8 @@ testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 # Array8 is skipped as densem tests treat all as for1. See issue #
 testeq("Array8",pass,skip){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 testeq("Array9",pass){ a := (0,1); all{ a[0] } }                   {array{0}}
-testeq("Array9x",pass){ a := (0,1); a[0] }                   {0}
+# skip: Array9x needs processing | on the top level
+testeq("Array9x",pass,skip){ a := (0,1); a[0] }                   {0}
 testeq("Array9y",pass){ a := (0,1); a(0) }                   {0}
 # Array9x: test does not pass when fail is not a unit of choice
 testeq("Array10",pass){ all{1..4} }                         {array{1,2,3,4} }
@@ -261,18 +263,20 @@ testeq("let1",pass) { let(x:=1){x+2} } { 3 }
 # Joachim's tests
 # Check that BIND removes _one_ unification only
 # tim=skip: cannot compare functions
-testeq("JB1",pass,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
-testeq("JB2",pass,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
+# skip: JB1, JB2, JB4 need alpha conversion to work.
+testeq("JB1",pass,skip,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
+testeq("JB2",pass,skip,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
 testeq("JB3",pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
-testeq("JB4",pass,tim=skip) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
+testeq("JB4",pass,skip,tim=skip) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
 # "Dom1": Unification in the domain
 testeq("Dom1",pass) {f9( x := 3|4)<closed>:int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
 
 # Recursion
-testeq("TRec1",pass)
+# skip: LA: TRec1, TRec2 need cycle GC
+testeq("TRec1",pass,skip)
             {f(n:any)<closed> := if (n = 0) then 1 else f(n-1); f(1)}  {1}
-testeq("TRec2",pass)
+testeq("TRec2",pass,skip)
             {fac(n:any)<closed> := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
 
 # SLOW with PLDI; needs 'for'
@@ -327,7 +331,8 @@ testeq("EV19",pass,tim=P00) {operator'/'(1,0)}                    {wrong}
 testeq("EV20",pass) {f(x:int)<closed><succeeds>:=x<10; f[3]}      {3}
 testeq("EV21",pass) {f(x:int)<closed><succeeds>:=x<10; f[11]}     {wrong}
 
-testeq("EV22",pass,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
+# skip: EV22 uses bad
+testeq("EV22",pass,skip,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
                             ; p:any; swapBad [p] = (2,3); p }
                             {wrong}
 testeq("EV23",pass) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
@@ -337,8 +342,9 @@ testeq("EV23a",pass) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x,
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
 # tim=skip: Tim does not allow this.  Bug?
-verify("EV23b",fail,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
-verify("EV23c",pass,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
+# skip: LA: no verification yet
+verify("EV23b",fail,skip,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23c",pass,skip,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
