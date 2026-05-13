@@ -5,6 +5,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
+
 module Red( Blk(Blk, BlkX), Exp(..), Term(..)
           , run, runTraced, isVal
   ) where
@@ -20,10 +21,9 @@ import Core.Solver( unsat )
 import Core.Expr as C ( Ident(..), Assump, Effect(..), Lit(..), PrimOp(..) )
 
 import Epic.Print
-import Epic.List hiding ((\\))
+--import Epic.List hiding ((\\))
 
 import Control.Arrow(second)
-import Data.List(group, sort)
 import qualified Data.List as L
 import Data.Maybe
 import qualified Data.Set as S
@@ -88,7 +88,7 @@ data Term
 data Exp
   -- Values
   = Var Ident             -- x
-  | Lit Lit             -- k
+  | Lit Lit               -- k
   | Prm PrimOp            -- op
   | Exp :>  Exp           -- e1; e2
   | Blk :|: Blk           -- e1 | e2
@@ -102,12 +102,15 @@ data Exp
   | Iter IterCtx Blk Exp   -- if/for
   | Dly Blk                -- delay{b}
   | Crl Blk                -- {...}
-  | Ident :~> Term         -- e ~> t
+  | SArr Blob Ident Term   -- e ~> t
 
   | Verify [Ident] [Assump] Blk
   deriving (Eq, Show)
 
 data Blk = BlkX (Set Ident) Heap Exp
+  deriving (Eq, Show)
+
+data Blob = Blob | NoBlob
   deriving (Eq, Show)
 
 type Eqn = (Ident, Val)
@@ -121,6 +124,8 @@ emptyHeap = []
 --    (A)  dom(eqs)    `subset`   X
 --    (B)  occfvs(eqs) `disjoint` dom(eqs)
 
+(~~>) :: Ident -> Term -> Exp
+i ~~> t = SArr Blob i t
 
 {-# COMPLETE Blk #-}
 pattern Blk :: (Set Ident) -> Heap -> Exp -> Blk
@@ -202,7 +207,8 @@ instance Pretty Exp where
   pPrintPrec l p (Lit i)     = pPrintPrec l p i
   pPrintPrec l p (Prm o)     = pPrintPrec l p o
   pPrintPrec l p (Lam i b)   = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 0 b
-  pPrintPrec l p (x :~> e)   = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
+  pPrintPrec l p (SArr NoBlob x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
+  pPrintPrec l p (SArr Blob   x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~~>" <+> pPrintPrec l 1 e
   pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ cat [pPrintPrec l 10 e1, nest 2 (text "[" <> pPrintPrec l 0 e2 <> text "]")]
   pPrintPrec l p ee@(_ :> _) = maybeParens (p > 0) $ sep $ punctuate (text ";") (map (pPrintL l) $ flat ee)
                                where flat (e1 :> e2) = flat e1 ++ flat e2
@@ -409,9 +415,10 @@ mkCons2 x y xys
   = Crl $ Blk (S.fromList [xs,ys,ar]) emptyHeap $
     -- We need have the two Arr in this order, otherwise choices
     -- in the body of a 'for' will come in the wrong order.
-    (Arr [Var xs, Var ys] :=: xys) :>
     (Var ar :=: Arr [ mkCons x (Var xs)
-                    , mkCons y (Var ys)])
+                    , mkCons y (Var ys)]) :>
+    (Arr [Var xs, Var ys] :=: xys) :>
+    Var ar
   where
     xs  = mkName "xs"
     ys  = mkName "ys"
@@ -422,7 +429,7 @@ thePrelude
   = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ BlkE $ Var vp)
     , (mkName "Length",       Lam vp  $ BlkE $ Prm ArrLen :@ (Var vp))
-    , (mkName "prefix'+'",    Lam vp  $ BlkE $ Var vp)
+    , (mkName "prefix'+'",    Lam vp  $ BlkE $ Prm Pls    :@ (Var vp))
     , (mkName "prefix'-'",    Lam vp  $ BlkE $ Prm Neg    :@ (Var vp))
     , (mkName "operator'+'",  Lam vpq $ BlkE $ Prm Add    :@ (Var vpq))
     , (mkName "operator'-'",  Lam vpq $ BlkE $ Prm Sub    :@ (Var vpq))
@@ -489,7 +496,7 @@ initialBlk :: F.SrcEssential -> Blk
 initialBlk src
   = Blk (sing u `S.union` tbs term `S.union` S.fromList (map fst thePrelude))
         thePrelude
-        (u :~> term)
+        (u ~~> term)
   where
     term = srcToTerm src
     u    = freshVarsTerm term !! 0
@@ -519,28 +526,17 @@ dom :: Heap -> Set Ident
 dom eqs = S.fromList (map fst eqs)
 
 findTopRedex :: [Ident] -> Blk -> Reduction
-findTopRedex fresh blk@(Blk locals eqns ex)
+findTopRedex fresh blk
   = reduceBlock top_cxt blk
   where
     top_cxt = RC { rc_depth  = 0
                  , rc_fresh  = fresh
-                 , rc_single = singleOcc
                  , rc_eqns   = emptyHeap
                  , rc_skols  = [] }
-
-    -- Subset of `locals` that occur exactly once, and have no Eqn
-    -- To support EXI-APP
-    -- XXX This is wrong.  Can't handle multiple uses of a function
-    -- ToDo: what about occurrences in `eqns` under a lambda?
-    singleOcc :: Set Ident
-    singleOcc = S.fromList [ x | [x] <- group (sort (allVars ex))
-                           , x `S.member` locals
-                           , isNothing (lookup x eqns) ]
 
 data ReductionContext
   = RC { rc_depth  :: Int         -- Number of enclosing Blks
        , rc_fresh  :: NameSupply  -- Supply of fresh names
-       , rc_single :: Set Ident   -- Supports ExiApp
        , rc_eqns   :: Heap        -- In-scope equations
        , rc_skols  :: [Ident]
     }
@@ -566,7 +562,7 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
     res
   where
     res | not (S.null dead_vars) = Delete dead_vars  -- GC rules
-        | otherwise              = find ex
+        | otherwise              = find True ex
 
     -- XXX This needs to construct SCCs from uses inside lambda
     dead_vars :: Set Ident  -- Subset of locals that are unused
@@ -579,8 +575,8 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
                                 -- The filter implements the side condition for subst
                                 ++ leqns }
 
-    find :: Exp -> Reduction
-    find expr =
+    find :: Bool -> Exp -> Reduction
+    find leftCF expr =    -- leftCF means that the context to the left of the find is choice free
       case expr of
         -- Scope and substitution
         Var x  :=: Val v  | promotionOK parent x v
@@ -638,16 +634,11 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
             x = rc_fresh cxt !! 0
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
-        -- (ExiApp)
-        Var f   :@ Val _ | f `S.member` rc_single cxt
-                         -> Step "ExiApp" (mkExiFloat1 u) (Var u)
-                         where u = rc_fresh cxt !! 0
-
-        x :~> tm  -> reduceMatch (rc_fresh cxt) x tm
+        SArr b x tm  -> reduceMatch (rc_fresh cxt) x tm b
 
         -- Choice and failure
         Fail -> Failure "Fail"
-        b1 :|: b2 | rc_depth cxt > 0
+        b1 :|: b2 | rc_depth cxt > 0 && leftCF
              -> StepC "B" (mkCrl b1) (mkCrl b2)     -- Found a choice, return it if inside a block
 
         Iter ic b e -> reduceIter inner_cxt ic b e
@@ -655,31 +646,31 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
         Verify skols as e -> reduceVerify cxt skols as e
 
         -- Catch-all cases for context C; just walk downwards
-        e1 :>  e2  -> find2  (:>)  e1 e2
-        e1 :=: e2  -> find2  (:=:) e1 e2
-        e1 :@  e2  -> find2  (:@)  e1 e2
-        e1 :.. e2  -> find2  (:..) e1 e2
-        Arr es     -> findArr es
+        e1 :>  e2  -> find2 leftCF (:>)  e1 e2
+        e1 :=: e2  -> find2 leftCF (:=:) e1 e2
+        e1 :@  e2  -> find2 leftCF (:@)  e1 e2
+        e1 :.. e2  -> find2 leftCF (:..) e1 e2
+        Arr es     -> findArr leftCF es
 
         _ -> None
 
-    find1 :: (Exp -> Exp) -> Exp -> Reduction
-    find1 c e = case find e of
-                  Step s flt e'   -> Step s flt (c e')
-                  StepC s e1' e2' -> StepC s (c e1') (c e2')
-                  r               -> r
+    find1 :: Bool -> (Exp -> Exp) -> Exp -> Reduction
+    find1 leftCF c e = case find leftCF e of
+                         Step s flt e'   -> Step s flt (c e')
+                         StepC s e1' e2' -> StepC s (c e1') (c e2')
+                         r               -> r
 
-    find2 :: (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction
-    find2 c e1 e2
-      = case find1 (`c` e2) e1 of
-          None -> find1 (e1 `c`) e2
+    find2 :: Bool -> (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction
+    find2 leftCF c e1 e2
+      = case find1 leftCF (`c` e2) e1 of
+          None -> find1 (leftCF && choiceFree e1) (e1 `c`) e2
           r    -> r
 
-    findArr :: [Exp] -> Reduction
-    findArr []     = None
-    findArr (e:es) = case find1 k e of
-                       None -> find1 ks (Arr es)
-                       r    -> r
+    findArr :: Bool -> [Exp] -> Reduction
+    findArr _ []     = None
+    findArr leftCF (e:es) = case find1 leftCF k e of
+                              None -> find1 (leftCF && choiceFree e) ks (Arr es)
+                              r    -> r
       where
         k e'         = Arr (e':es)
         ks (Arr es') = Arr (e:es')
@@ -735,10 +726,10 @@ reducePrimOp ChkDecides  (Arr [e]) = Just $ Done "ChkDec1" e
 reducePrimOp _ _ = Nothing
 
 ------------------------------------
-reduceMatch ::  NameSupply -> Ident -> Term -> Reduction
+reduceMatch ::  NameSupply -> Ident -> Term -> Blob -> Reduction
 -- :~> reduction
 
-reduceMatch _fresh x tm
+reduceMatch _fresh x tm _
 -- We always push down a variable that is not mentioned or bound in t
 -- Thus    x ~> (x := 7)  is not allowed
 -- Reason: when pushing (x~>) inside, we don't want to capture.
@@ -746,10 +737,10 @@ reduceMatch _fresh x tm
   | x `elem` allVarsTerm tm
   = error "unimplemented: reduceMatch, possible name clash"
 
-reduceMatch fresh x tm
+reduceMatch fresh x tm blob
   = case tm of
         -- Blocks
-        TBlock t             -> Step  "MBlock" (FloatB (tbs t) emptyHeap) (x :~> t)
+        TBlock t             -> Step  "MBlock" (FloatB (tbs t) emptyHeap) (SArr blob x t)
 
         -- Matching
         Und                  -> Done "MWild" $ Var x
@@ -759,74 +750,74 @@ reduceMatch fresh x tm
         TFail                -> Done "Mfail"    $ Fail
 
         (t1 :@% t2)          -> Step "MApp" (mkExiFloat [u1,u2]) $
-                                     Var x :=: ((u1 :~> t1) :@ (u2 :~> t2))
+                                     Var x :=: ((u1 ~~> t1) :@ (u2 ~~> t2))
                              where u1:u2:_ = fresh
-        (t1 :=:% t2)         -> Done "MUnif"    $ (x :~> t1) :=: (x :~> t2)
+        (t1 :=:% t2)         -> Done "MUnif"    $ (SArr blob x t1) :=: (SArr blob x t2)
         (t1 :|:% t2)         -> Done "MChoice"  $
-                                (Blk (tbs t1) emptyHeap $ x :~> t1) :|:
-                                (Blk (tbs t2) emptyHeap $ x :~> t2)
-        (t1 :>% t2)          -> Step "MSemi"  (mkExiFloat1 u) $ (u :~> t1) :> (x :~> t2)
+                                (Blk (tbs t1) emptyHeap $ SArr blob x t1) :|:
+                                (Blk (tbs t2) emptyHeap $ SArr blob x t2)
+        (t1 :>% t2)          -> Step "MSemi"  (mkExiFloat1 u) $ (u ~~> t1) :> SArr blob x t2
                               where u = fresh!!0
         (t1 `Where` t2)      -> Step "MWhere" (mkExiFloat [u,w]) $
-                                (Var w :=: (x :~> t1)) :> (u :~> t2) :> Var w
+                                (Var w :=: SArr blob x t1) :> (u ~~> t2) :> Var w
                              where u:w:_ = fresh
 
         TArr ts              -> Step "MTup" (mkExiFloat xs) $
-                                (Var x :=: Arr (map Var xs)) :> Arr (zipWith (:~>) xs ts)
+                                (Var x :=: Arr (map Var xs)) :> Arr (zipWith (SArr blob) xs ts)
                               where xs = take (length ts) fresh
 
-        Rng t      -> Step "MColon" (mkExiFloat1 u) $ (u :~> t) :@ Var x
+        Rng t      -> Step "MColon" (mkExiFloat1 u) $ (u ~~> t) :@ Var x
                    where u = fresh!!0
 
-        (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: (x :~> t)
-        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> (x :~> t)
+        (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: SArr blob x t
+        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> SArr NoBlob i t  -- XXX should this be NoBlob
 
         (t1 :..% t2) -> Step "MEnum" (mkExiFloat [u1,u2]) $
-                        Var x :=: ((u1 :~> t1) :.. (u2 :~> t2))
+                        Var x :=: ((u1 ~~> t1) :.. (u2 ~~> t2))
                       where u1:u2:_ = fresh
 
         -- Functions
-        Fun at fx bt -> matchFun fresh x at fx bt
+        Fun at fx bt -> matchFun fresh x at fx bt blob
 
         If t0 t1 t2 -> Done "MIf" $
                        Iter IF (Blk (sing u `S.union` tbs t0) emptyHeap
-                                    ((u :~> t0) :> Dly (Blk (tbs t1) emptyHeap (x :~> t1))))
-                               (mkCrl (Blk (tbs t2) emptyHeap (x :~> t2)))
+                                    ((u ~~> t0) :> Dly (Blk (tbs t1) emptyHeap (SArr blob x t1))))
+                               (mkCrl (Blk (tbs t2) emptyHeap (SArr blob x t2)))
                      where u = fresh!!0
 
         For t0 t1    -> Step "MFor" (mkExiFloat1 y) $
                         (Arr [Var x, Var y] :=:
                          Iter FOR (Blk (sing u `S.union` tbs t0) emptyHeap
-                                       ((u :~> t0) :> Lam w (BlkE $ w :~> t1)))
+                                       ((u ~~> t0) :> Lam w (BlkE $ SArr blob w t1)))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                       where y:u:w:_ = fresh
 
         Check fx t -> Done ("MCheck " ++ show fx) $
-                      matchCheck fresh x fx t
+                      matchCheck fresh x fx t blob
 
-matchFun :: NameSupply -> Ident -> Term -> Effect -> Term -> Reduction
-matchFun fresh f at fx bt
+matchFun :: NameSupply -> Ident -> Term -> Effect -> Term -> Blob -> Reduction
+matchFun fresh f at fx bt blob
   = Done "MFun" $
 --    fun_verify :>
     the_lambda
   where
     u:p:q:fresh2 = fresh
     the_lambda = Lam u $ Blk (S.fromList [p,q] `S.union` tbs at) emptyHeap $
-                 (Var p :=: (u :~> at))       :>
-                 (Var q :=: (Var f :@ Var p)) :>
-                 (q :~> TBlock bt)
+                 (Var p :=: SArr NoBlob u at)       :>        -- Should it be Blob, or inherit blobiness from u?
+                 (if blob == NoBlob then ((Var q :=: (Var f :@ Var p)) :>) else ( (IntE 99999) :>))
+                 (q ~~> TBlock bt)
 
     fun_verify = Verify [u] [] $
                  Blk (sing q `S.union` tbs at) emptyHeap $
-                 (u :~> at) :>
-                 matchCheck fresh2 q fx bt
+                 (u ~~> at) :>
+                 matchCheck fresh2 q fx bt NoBlob
 
-matchCheck :: NameSupply -> Ident -> Effect -> Term -> Exp
-matchCheck fresh x fx t
-  | Iterates <- fx = x :~> t   -- check<iterates> is a no-op
+matchCheck :: NameSupply -> Ident -> Effect -> Term -> Blob -> Exp
+matchCheck fresh x fx t blob
+  | Iterates <- fx = SArr blob x t   -- check<iterates> is a no-op
   | otherwise        = (Prm chk_op :@) $
-                       Var x :=: Iter ALL (Blk (sing u `S.union` tbs t) emptyHeap $ u :~> t)
+                       Var x :=: Iter ALL (Blk (sing u `S.union` tbs t) emptyHeap $ u ~~> t)
                                       (Arr [])
   where
     u  = fresh !! 0
@@ -861,6 +852,29 @@ reduceIter cxt ic b1 e2
                                                 Iter ic (mergeStep b1 NoFloats er) e2
       -- Note that we update the RuleName to give
       -- more info about where the reduction happened
+
+
+choiceFree :: Exp -> Bool
+choiceFree Var{} = True
+choiceFree Lit{} = True
+choiceFree Prm{} = True
+choiceFree Lam{} = True
+choiceFree (Dly b) = choiceFreeB b
+choiceFree (e1 :> e2) = choiceFree e1 && choiceFree e2
+choiceFree (_ :|: _) = False
+choiceFree Fail = True
+choiceFree (e1 :=: e2) = choiceFree e1 && choiceFree e2
+choiceFree (SArr _ _ _) = False         -- force ~> to happen
+choiceFree (e1 :@ e2) = choiceFree e1 && choiceFree e2
+choiceFree (e1 :.. e2) = choiceFree e1 && choiceFree e2
+choiceFree (Arr es) = and (map choiceFree es)
+choiceFree (Iter _ b1 e2) = choiceFreeB b1 && choiceFree e2
+choiceFree (Crl b) = choiceFreeB b
+choiceFree Verify{} = True
+
+choiceFreeB :: Blk -> Bool
+choiceFreeB (Blk _ _ e) = choiceFree e
+
 
 --------------------------------------------------------------------------------
 --
@@ -926,7 +940,7 @@ occfvs (e1 :> e2)     = occfvs e1 `S.union` occfvs e2
 occfvs (b1 :|: b2)    = occfvsB b1 `S.union` occfvsB b2
 occfvs Fail           = S.empty
 occfvs (e1 :=: e2)    = occfvs e1 `S.union` occfvs e2
-occfvs (i :~> _)      = sing i  -- XXX what should we do here
+occfvs (SArr _ i _)   = sing i  -- XXX what should we do here
 occfvs (e1 :@ e2)     = occfvs e1 `S.union` occfvs e2
 occfvs (e1 :.. e2)    = occfvs e1 `S.union` occfvs e2
 occfvs (Arr es)       = S.unions (map occfvs es)
@@ -935,8 +949,7 @@ occfvs (Crl b)        = occfvsB b
 occfvs Verify{}       = S.empty
 
 occfvsB :: Blk -> Set Ident
-occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs))
-                         `S.difference` is
+occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.difference` is
 
 -- All /free/ variables
 freeVars :: Exp -> Set Ident
@@ -946,7 +959,7 @@ freeVars (Prm {})    = S.empty
 freeVars (Lam i e)   = i `S.delete` freeVarsBlk e
 freeVars (e1 :>  e2) = freeVars e1 `S.union` freeVars e2
 freeVars (e1 :=: e2) = freeVars e1 `S.union` freeVars e2
-freeVars (i  :~> t ) = sing i `S.union` freeVarsTerm t
+freeVars (SArr _ i t) = sing i `S.union` freeVarsTerm t
 freeVars (e1 :@  e2) = freeVars e1 `S.union` freeVars e2
 freeVars (Arr es)    = S.unions $ map freeVars es
 freeVars (b1 :|: b2) = freeVarsBlk b1 `S.union` freeVarsBlk b2
@@ -959,7 +972,7 @@ freeVars Verify{}    = S.empty
 
 freeVarsBlk :: Blk -> Set Ident
 freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` freeVars e)
-                             `S.difference` is
+                              `S.difference` is
 
 freeVarsTerm :: Term -> Set Ident
 -- All variables mentioned, either as occurrences or binders,
@@ -973,18 +986,15 @@ freeVarsTerm (e1 :>%  e2) = freeVarsTerm e1 `S.union` freeVarsTerm e2
 freeVarsTerm (e1 `Where`  e2) = freeVarsTerm e1 `S.union` freeVarsTerm e2
 freeVarsTerm (e1 :=:% e2)  = freeVarsTerm e1 `S.union` freeVarsTerm e2
 freeVarsTerm (e1 :@%  e2)  = freeVarsTerm e1 `S.union` freeVarsTerm e2
-freeVarsTerm (Fun t1 _ t2) = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2)
-                             `S.difference` tbs t1
+freeVarsTerm (Fun t1 _ t2) = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2) `S.difference` tbs t1
 freeVarsTerm (Rng e)       = freeVarsTerm e
 freeVarsTerm (TArr es)     = S.unions $ map freeVarsTerm es
 freeVarsTerm (b1 :|:% b2)  = freeVarsTermBlock b1 `S.union` freeVarsTermBlock b2
 freeVarsTerm (e1 :..% e2)  = freeVarsTerm e1 `S.union` freeVarsTerm e2
 freeVarsTerm TFail         = S.empty
-freeVarsTerm (If t1 t2 t3) = ((freeVarsTerm t1 `S.union` freeVarsTermBlock t2)
-                               `S.difference` tbs t1)
+freeVarsTerm (If t1 t2 t3) = ((freeVarsTerm t1 `S.union` freeVarsTermBlock t2) `S.difference` tbs t1)
                              `S.union` freeVarsTermBlock t3
-freeVarsTerm (For t1 t2)   = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2)
-                             `S.difference` tbs t1
+freeVarsTerm (For t1 t2)   = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2) `S.difference` tbs t1
 freeVarsTerm (i :-> e)     = sing i `S.union` freeVarsTerm e
 freeVarsTerm (TBlock t)    = freeVarsTermBlock t
 freeVarsTerm (Check _ t)   = freeVarsTerm t
@@ -1001,7 +1011,7 @@ allVars (Prm {})    = []
 allVars (Lam i e)   = i : allVarsBlk e
 allVars (e1 :>  e2) = allVars e1 ++ allVars e2
 allVars (e1 :=: e2) = allVars e1 ++ allVars e2
-allVars (i  :~> e ) = i : allVarsTerm e
+allVars (SArr _ i e) = i : allVarsTerm e
 allVars (e1 :@  e2) = allVars e1 ++ allVars e2
 allVars (Arr es)    = concatMap allVars es
 allVars (b1 :|: b2) = allVarsBlk b1 ++ allVarsBlk b2
@@ -1045,7 +1055,7 @@ expSize (Prm {})    = 1
 expSize (Lam _ e)   = 1 + blkSize e
 expSize (e1 :>  e2) = 1 + expSize e1 + expSize e2
 expSize (e1 :=: e2) = 1 + expSize e1 + expSize e2
-expSize (_  :~> e ) = 2 + termSize e
+expSize (SArr _ _  e) = 2 + termSize e
 expSize (e1 :@  e2) = 1 + expSize e1 + expSize e2
 expSize (Arr es)    = 1 + sum (map expSize es)
 expSize (b1 :|: b2) = 1 + blkSize b1 + blkSize b2
@@ -1098,7 +1108,7 @@ rename sub = ren
     ren (Var i :=: Var j) | Just j' <- lookup i sub, j == j' = Var j
     ren (e1 :> e2) = ren e1 :> ren e2
     ren (e1 :=: e2) = ren e1 :=: ren e2
-    ren (i :~> t) = fromMaybe i (lookup i sub) :~> renT t
+    ren (SArr b i t) = SArr b (fromMaybe i (lookup i sub)) (renT t)
     ren (e1 :@ e2) = ren e1 :@ ren e2
     ren (Arr es) = Arr (map ren es)
     ren (b1 :|: b2) = renB b1 :|: renB b2
@@ -1175,7 +1185,7 @@ freshVarsBlk :: Blk -> [Ident]
 freshVarsBlk b = idenSupply L.\\ allVarsBlk b
 
 freshVarsTerm :: Term -> [Ident]
-freshVarsTerm t = freshVars (Name "" :~> t)
+freshVarsTerm t = freshVars (Name "" ~~> t)
 
 --freshVar :: Exp -> Ident
 --freshVar = (!!0) . freshVars
