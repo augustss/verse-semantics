@@ -62,16 +62,17 @@ infixr 4 :|:
 infixr 5 :=:
 
 data Term
-  = TVar Ident              -- x
-  | TLit Lit                -- k
-  | TPrm PrimOp             -- op
-  | Term :>%  Term          -- t1; t2
-  | Term :|:% Term          -- t1 | t2
-  | TFail                   -- fail
-  | Term :=:% Term          -- t1 = t2
-  | Term :@%  Term          -- t1[t2]
-  | Term :..% Term          -- t1 .. t2
-  | TArr [Term]             -- array{t1,...,t2}
+  = TVar Ident                -- x
+  | TLit Lit                  -- k
+  | TPrm PrimOp               -- op
+  | Term :>%  Term            -- t1; t2
+  | Term :|:% Term            -- t1 | t2
+  | TFail                     -- fail
+  | Term :=:% Term            -- t1 = t2
+  | Term :@%  Term            -- t1[t2]
+  | Term :..% Term            -- t1 .. t2
+  | TArr [Term]               -- array{t1,...,t2}
+  | TOfType Term Effect Term  -- t1 |><fx> t2
 
   | Und                     -- _
   | Term `Where` Term       -- t1 where t2
@@ -97,6 +98,7 @@ data Exp
   | Exp :@  Exp           -- e1[e2]
   | Exp :.. Exp           -- e1 .. e2
   | Arr [Exp]             -- array{e1,...,e2}
+  | OfType Exp Effect Exp -- e1 |><fx> e2
 
   | Lam Ident Blk          -- \ x . e
   | Iter IterCtx Blk Exp   -- if/for
@@ -325,6 +327,8 @@ srcToTerm (F.DefineV x)          = srcToCoreIdent x := Rng (TVar (Name "any"))
 srcToTerm (F.DefineIE i e)       = srcToCoreIdent i :-> srcToTerm e
 srcToTerm (F.If3 e1 e2 e3)       = If (srcToTerm e1) (srcToTerm e2) (srcToTerm e3)
 srcToTerm (F.For2 e1 e2)         = For (srcToTerm e1) (srcToTerm e2)
+srcToTerm (F.OfType t1 fx t2)
+  | Just eff <- toCoreEff fx     = TOfType (srcToTerm t1) eff (srcToTerm t2)
 srcToTerm (F.One e)              = If (x := srcToTerm e) (TVar x) TFail
   where
     x = mkName "oneBinder"  -- Hack; hope this is not free in 'e'!
@@ -651,6 +655,8 @@ reduceBlock cxt parent@(Blk locals leqns ex)
                 -- inner_cxt: update the ReductionContext for when we walk inside the block
                 inner_cxt = cxt { rc_depth = rc_depth cxt + 1, rc_eqns = all_eqns  }
 
+        OfType e1 _fx e2  -> Done "RunOfType" (e2 :@ e1)
+
         Verify skols as e -> reduceVerify cxt skols as e
 
         -- Catch-all cases for context C; just walk downwards
@@ -755,7 +761,7 @@ reduceMatch fresh x tm blob
         TVar i               -> Done "MVar"  $ Var x :=: Var i
         TLit k               -> Done "MLit"  $ Var x :=: Lit k
         TPrm o               -> Done "MPrim" $ Var x :=: Prm o
-        TFail                -> Done "Mfail"    $ Fail
+        TFail                -> Done "Mfail" $ Fail
 
         (t1 :@% t2)          -> Step "MApp" (mkExiFloat [u1,u2]) $
                                      Var x :=: ((u1 ~~> t1) :@ (u2 ~~> t2))
@@ -800,6 +806,10 @@ reduceMatch fresh x tm blob
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                       where y:u:w:_ = fresh
+
+        TOfType t1 fx t2 -> Done ("TOfType " ++ show fx) $
+                            (OfType (u1 :~> t1) fx (u2 :~> t2))
+                      where u1:u2:_ = fresh
 
         Check fx t -> Done ("MCheck " ++ show fx) $
                       matchCheck fresh x fx t blob
@@ -916,26 +926,27 @@ reduceVerify cxt skols as blk
 
 -- Top level binders
 tbs :: Term -> Set Ident
-tbs Und{}           = S.empty
-tbs TLit{}          = S.empty
-tbs TVar{}          = S.empty
-tbs TPrm{}          = S.empty
-tbs (t1 :>% t2)     = tbs t1 `S.union` tbs t2
-tbs (t1 `Where` t2) = tbs t1 `S.union` tbs t2
-tbs (t1 :=:% t2)    = tbs t1 `S.union` tbs t2
-tbs (t1 :@% t2)     = tbs t1 `S.union` tbs t2
-tbs (t1 :..% t2)    = tbs t1 `S.union` tbs t2
-tbs TFail{}         = S.empty
-tbs (_ :|:% _)      = S.empty
-tbs (TArr ts)       = S.unions $ map tbs ts
-tbs Fun{}           = S.empty
-tbs If{}            = S.empty
-tbs For{}           = S.empty
-tbs (Rng t)         = tbs t
-tbs (x := t)        = sing x `S.union` tbs t   -- (:=) binds
-tbs (_ :-> t)       = tbs t                  -- (:->) does not bind
-tbs (TBlock {})     = S.empty
-tbs (Check _ t)     = tbs t
+tbs Und{}             = S.empty
+tbs TLit{}            = S.empty
+tbs TVar{}            = S.empty
+tbs TPrm{}            = S.empty
+tbs (t1 :>% t2)       = tbs t1 `S.union` tbs t2
+tbs (t1 `Where` t2)   = tbs t1 `S.union` tbs t2
+tbs (t1 :=:% t2)      = tbs t1 `S.union` tbs t2
+tbs (t1 :@% t2)       = tbs t1 `S.union` tbs t2
+tbs (t1 :..% t2)      = tbs t1 `S.union` tbs t2
+tbs TFail{}           = S.empty
+tbs (_ :|:% _)        = S.empty
+tbs (TArr ts)         = S.unions $ map tbs ts
+tbs Fun{}             = S.empty
+tbs If{}              = S.empty
+tbs For{}             = S.empty
+tbs (Rng t)           = tbs t
+tbs (x := t)          = sing x `S.union` tbs t   -- (:=) binds
+tbs (_ :-> t)         = tbs t                  -- (:->) does not bind
+tbs (TBlock {})       = S.empty
+tbs (TOfType t1 _ t2) = tbs t1 `S.union` tbs t2
+tbs (Check _ t)       = tbs t
 
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Ident
@@ -955,6 +966,7 @@ occfvs (Arr es)       = S.unions (map occfvs es)
 occfvs (Iter _ b1 e2) = occfvsB b1 `S.union` occfvs e2
 occfvs (Crl b)        = occfvsB b
 occfvs Verify{}       = S.empty
+occfvs (OfType e1 _ e2) = occfvs e1 `S.union` occfvs e2
 
 occfvsB :: Blk -> Set Ident
 occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.difference` is
@@ -977,6 +989,7 @@ freeVars (Dly b)     = freeVarsBlk b
 freeVars (Crl b)     = freeVarsBlk b
 freeVars (Iter _ b1 e2) = freeVarsBlk b1 `S.union` freeVars e2
 freeVars Verify{}    = S.empty
+freeVars (OfType e1 _ e2) = freeVars e1 `S.union` freeVars e2
 
 freeVarsBlk :: Blk -> Set Ident
 freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` freeVars e)
@@ -1006,6 +1019,7 @@ freeVarsTerm (For t1 t2)   = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2) `S
 freeVarsTerm (i :-> e)     = sing i `S.union` freeVarsTerm e
 freeVarsTerm (TBlock t)    = freeVarsTermBlock t
 freeVarsTerm (Check _ t)   = freeVarsTerm t
+freeVarsTerm (TOfType t1 _ t2) = freeVarsTerm t1 `S.union` freeVarsTerm t2
 
 freeVarsTermBlock :: Term -> Set Ident
 freeVarsTermBlock t = freeVarsTerm t `S.difference` tbs t
@@ -1027,8 +1041,9 @@ allVars (e1 :.. e2) = allVars e1 ++ allVars e2
 allVars Fail        = []
 allVars (Dly b)     = allVarsBlk b
 allVars (Crl b)     = allVarsBlk b
-allVars (Iter _ b1 e2) = allVarsBlk b1 ++ allVars e2
-allVars Verify{}    = []
+allVars (Iter _ b1 e2)   = allVarsBlk b1 ++ allVars e2
+allVars Verify{}         = []
+allVars (OfType e1 _ e2) = allVars e1 ++ allVars e2
 
 allVarsBlk :: Blk -> [Ident]
 allVarsBlk (Blk is eqs e) = S.toList is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -1055,6 +1070,7 @@ allVarsTerm (For t1 t2) = allVarsTerm t1 ++ allVarsTerm t2
 allVarsTerm (i :-> e) = i : allVarsTerm e
 allVarsTerm (TBlock t) = allVarsTerm t
 allVarsTerm (Check _ t) = allVarsTerm t
+allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
 
 expSize :: Exp -> Int
 expSize (Var {})    = 1
@@ -1073,6 +1089,7 @@ expSize (Dly b)     = 1 + blkSize b
 expSize (Crl b)     = 1 + blkSize b
 expSize (Iter _ b1 e2) = 1 + blkSize b1 + expSize e2
 expSize (Verify {})    = 1  -- For now
+expSize (OfType e1 _ e2) = 1 + expSize e1 + expSize e2
 
 blkSize :: Blk -> Int
 blkSize (Blk is eqs e) = S.size is + sum (map eqnSize eqs) + expSize e
@@ -1082,26 +1099,27 @@ eqnSize (_,e) = 1 + expSize e
 
 termSize :: Term -> Int
 -- All variables mentioned, either as occurrences or binders
-termSize (TVar _)         = 1
-termSize Und              = 1
-termSize (TLit _)         = 1
-termSize (TPrm _)         = 1
-termSize (_ := e)         = 1 + termSize e
-termSize (e1 :>%  e2)     = 1 + termSize e1 + termSize e2
-termSize (e1 `Where`  e2) = 1 + termSize e1 + termSize e2
-termSize (e1 :=:% e2)     = 1 + termSize e1 + termSize e2
-termSize (e1 :@%  e2)     = 1 + termSize e1 + termSize e2
-termSize (Fun e1 _ e2)    = 1 + termSize e1 + termSize e2
-termSize (Rng e)          = 1 + termSize e
-termSize (TArr es)        = 1 + sum (map termSize es)
-termSize (b1 :|:% b2)     = 1 + termSize b1 + termSize b2
-termSize (e1 :..% e2)     = 1 + termSize e1 + termSize e2
-termSize TFail            = 1
-termSize (If t1 t2 t3)    = 1 + termSize t1 + termSize t2 + termSize t3
-termSize (For t1 t2)      = 1 + termSize t1 + termSize t2
-termSize (_ :-> e)        = 1 + termSize e
-termSize (TBlock t)       = 1 + termSize t
-termSize (Check _ t)      = 1 + termSize t
+termSize (TVar _)          = 1
+termSize Und               = 1
+termSize (TLit _)          = 1
+termSize (TPrm _)          = 1
+termSize (_ := e)          = 1 + termSize e
+termSize (e1 :>%  e2)      = 1 + termSize e1 + termSize e2
+termSize (e1 `Where`  e2)  = 1 + termSize e1 + termSize e2
+termSize (e1 :=:% e2)      = 1 + termSize e1 + termSize e2
+termSize (e1 :@%  e2)      = 1 + termSize e1 + termSize e2
+termSize (Fun e1 _ e2)     = 1 + termSize e1 + termSize e2
+termSize (Rng e)           = 1 + termSize e
+termSize (TArr es)         = 1 + sum (map termSize es)
+termSize (b1 :|:% b2)      = 1 + termSize b1 + termSize b2
+termSize (e1 :..% e2)      = 1 + termSize e1 + termSize e2
+termSize TFail             = 1
+termSize (If t1 t2 t3)     = 1 + termSize t1 + termSize t2 + termSize t3
+termSize (For t1 t2)       = 1 + termSize t1 + termSize t2
+termSize (_ :-> e)         = 1 + termSize e
+termSize (TBlock t)        = 1 + termSize t
+termSize (Check _ t)       = 1 + termSize t
+termSize (TOfType t1 _ t2) = 1 + termSize t1 + termSize t2
 
 rename :: [(Ident, Ident)] -> Exp -> Exp
 rename sub = ren
@@ -1125,6 +1143,7 @@ rename sub = ren
     ren (Dly b) = Dly (renB b)
     ren (Iter ic b1 e2) = Iter ic (renB b1) (ren e2)
     ren (Crl b) = Crl (renB b)
+    ren (OfType e1 fx e2) = OfType (ren e1) fx (ren e2)
     ren e@Verify{} = e
 
     renB = renameBlk sub
@@ -1151,6 +1170,7 @@ rename sub = ren
     renT (i :-> t) = fromMaybe i (lookup i sub) :-> renT t
     renT (TBlock t) = TBlock (renT t)
     renT (Check fx t) = Check fx (renT t)
+    renT (TOfType t1 fx t2) = TOfType (renT t1) fx (renT t2)
 
 renameBlk :: [(Ident,Ident)] -> Blk -> Blk
 renameBlk sub b@(Blk is eqs e)
