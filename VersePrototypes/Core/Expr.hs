@@ -32,7 +32,7 @@ module Core.Expr
   , Context, isContext, (<@)
 
     -- Binding and substitution
-  , subst
+  , subst, substAssump
   , unbindAs
   , alphaRename
   , alphaRenameVerify

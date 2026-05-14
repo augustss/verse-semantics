@@ -14,7 +14,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import FrontEnd.ENVDesugar( envDesugar )
+-- import FrontEnd.ENVDesugar( envDesugar )
 import Core.Expr  ( allPrimOps, primOpString )
 
 -- Epic libraries
