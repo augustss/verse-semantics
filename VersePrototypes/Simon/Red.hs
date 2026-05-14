@@ -203,6 +203,9 @@ instance Pretty Term where
 
   pPrintPrec l _ (TBlock t)    = braces $ (pPrintL l t)
   pPrintPrec l _ (Check fx t)  = text "check" <> angleBrackets (pPrint fx) <> braces (pPrintL l t)
+  pPrintPrec l _ (TOfType t1 fx t2) = sep [ pPrintPrec l 6 t1
+                                          , text "|>" <> angleBrackets (pPrint fx)
+                                            <+> pPrintPrec l 6 t2 ]
 
 instance Pretty Exp where
   pPrintPrec l p (Var i)     = pPrintPrec l p i
@@ -235,6 +238,10 @@ instance Pretty Exp where
     = sep [ text "verify" <> parens (sep [ fsep (map pPrint rs) <> text ";"
                                          , fsep (map pPrint as) ])
           , nest 2 (braces (pPrintL l e)) ]
+
+  pPrintPrec l _ (OfType e1 fx e2) = sep [ pPrintPrec l 6 e1
+                                         , text "|>" <> angleBrackets (pPrint fx)
+                                           <+> pPrintPrec l 6 e2 ]
 
 instance Pretty Blk where
   pPrintPrec l p (Blk vs eqns e) = ppBlk l p vs eqns e
@@ -807,8 +814,8 @@ reduceMatch fresh x tm blob
                         Var y
                       where y:u:w:_ = fresh
 
-        TOfType t1 fx t2 -> Done ("TOfType " ++ show fx) $
-                            (OfType (u1 :~> t1) fx (u2 :~> t2))
+        TOfType t1 fx t2 -> Step ("TOfType " ++ show fx) (mkExiFloat [u1,u2]) $
+                            (OfType (u1 ~~> t1) fx (u2 ~~> t2))
                       where u1:u2:_ = fresh
 
         Check fx t -> Done ("MCheck " ++ show fx) $
