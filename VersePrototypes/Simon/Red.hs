@@ -208,7 +208,7 @@ instance Pretty Term where
   pPrintPrec _ _ TFail        = text "fail"
 
   pPrintPrec l _ (If t1 t2 t3) = sep [text "if" <> parens (pPrintL l t1), nest 2 (braces (pPrintL l t2)), text "else", nest 2 (braces (pPrintL l t3)) ]
-  pPrintPrec l _ (For t1 t2)   = sep [text "for" <> parens (pPrintL l t1), nest 2 (braces (pPrintL l t2))]
+  pPrintPrec l _ (For t1 t2)   = hsep [text "for" <> parens (pPrintL l t1), nest 2 (braces (pPrintL l t2))]
   pPrintPrec l p (x :-> e)     = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":->" <+> pPrintPrec l 2 e
 
   pPrintPrec l _ (TBlock t)    = braces $ (pPrintL l t)
@@ -470,19 +470,19 @@ thePrelude
   = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
     , (mkName "string",       Lam vp  $ BlkE $ Prm IsStr :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ BlkE $ Var vp)
-    , (mkName "Length",       Lam vp  $ BlkE $ Prm ArrLen :@ (Var vp))
-    , (mkName "prefix'+'",    Lam vp  $ BlkE $ Prm Pls    :@ (Var vp))
-    , (mkName "prefix'-'",    Lam vp  $ BlkE $ Prm Neg    :@ (Var vp))
-    , (mkName "operator'+'",  Lam vpq $ BlkE $ Prm Add    :@ (Var vpq))
-    , (mkName "operator'-'",  Lam vpq $ BlkE $ Prm Sub    :@ (Var vpq))
-    , (mkName "operator'*'",  Lam vpq $ BlkE $ Prm Mul    :@ (Var vpq))
-    , (mkName "operator'/'",  Lam vpq $ BlkE $ Prm Div    :@ (Var vpq))
-    , (mkName "operator'<'",  Lam vpq $ BlkE $ Prm Lt     :@ (Var vpq))
-    , (mkName "operator'<='", Lam vpq $ BlkE $ Prm LEq    :@ (Var vpq))
-    , (mkName "operator'>='", Lam vpq $ BlkE $ Prm GEq    :@ (Var vpq))
-    , (mkName "operator'>'",  Lam vpq $ BlkE $ Prm Gt     :@ (Var vpq))
-    , (mkName "operator'<>'", Lam vpq $ BlkE $ Prm NEq    :@ (Var vpq))
-    , (mkName "operator'..'", Lam vpq $ BlkE $ Prm DotDot :@ (Var vpq))
+    , (mkName "Length",       Prm ArrLen)
+    , (mkName "prefix'+'",    Prm Pls)
+    , (mkName "prefix'-'",    Prm Neg)
+    , (mkName "operator'+'",  Prm Add)
+    , (mkName "operator'-'",  Prm Sub)
+    , (mkName "operator'*'",  Prm Mul)
+    , (mkName "operator'/'",  Prm Div)
+    , (mkName "operator'<'",  Prm Lt)
+    , (mkName "operator'<='", Prm LEq)
+    , (mkName "operator'>='", Prm GEq)
+    , (mkName "operator'>'",  Prm Gt)
+    , (mkName "operator'<>'", Prm NEq)
+    , (mkName "operator'..'", Prm DotDot)
 
     -- [] = \t.\p. isArr[p]; map[t,p]
     , (mkName "prefix'[]'"  , Lam vt  $ BlkE $ Lam vp $ BlkE $
@@ -490,8 +490,7 @@ thePrelude
                               (Prm ArrMap :@ (Arr [Var vt, Var vp])))
     ]
 
-vp,vpq,vt :: Ident
-vpq = mkName "pq"
+vp,vt :: Ident
 vp  = mkName "p"
 vt  = mkName "t"
 
@@ -927,19 +926,21 @@ reduceMatch cxt x tm blob
                         (Arr [Var x, Var y] :=:
                          Iter FOR (Blk (sing u `S.union` tbs0) emptyHeap $
                                    (u ~~> t0') :>
-                                   (Lam w (BlkE $ SArr blob w t1)))
+                                   (Lam w (BlkE $ SArr blob w (TBlock t1))))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                       where
                         (tbs0, t0') = freshenTerm cxt t0
-                        (y,u,w) = freshId3 (cxt `addInScope` tbs0) ("u","u","w")
+                        (y,u,w) = freshId3 (cxt `addInScope` tbs0) ("y","u","w")
 
         TOfType t1 fx t2 -> Step ("TOfType " ++ show fx) (mkExiFloat [u1,u2]) $
                             (OfType (u1 ~~> t1) fx (u2 ~~> t2))
                       where (u1,u2) = freshIds2 cxt "u"
 
         Check fx t -> Done ("MCheck " ++ show fx) $
-                      matchCheck cxt x fx t blob
+                      Var x :=: mkCheck fx (Blk (sing u) emptyHeap $ u ~~> TBlock t)
+                   where
+                      u  = freshId cxt "u"
 
         Splice t -> reduceMatch cxt x t blob
                     -- See (AMP1) in Note [Desugaring ampersand]
@@ -960,24 +961,15 @@ matchFun cxt f at fx bt blob
                  (SArr blob q (TBlock bt))
 
     fun_verify = Verify (sing u) [] $
-                 Blk (sing q `S.union` tbs_at) emptyHeap $
-                 (u ~~> at') :>
-                 matchCheck cxt q fx bt NoBlob
+                 Blk tbs_at emptyHeap $
+                 (SArr blob u at') :>
+                 (mkCheck fx (Blk (sing q) emptyHeap (SArr NoBlob q (TBlock bt))))
 
-matchCheck :: ReductionContext -> Ident -> Effect -> Term -> Blob -> Exp
-matchCheck cxt x fx t blob
-  | Iterates <- fx = SArr blob x t   -- check<iterates> is a no-op
-  | otherwise      = Var x :=:
-                    (Prm chk_op :@
-                      Iter ALL (Blk (sing u) emptyHeap $ u ~~> TBlock t)
-                               (Arr []))
-  where
-    u  = freshId cxt "u"
-    chk_op = case fx of
-               Fails    -> ChkFails
-               Succeeds -> ChkSucceeds
-               Decides  -> ChkDecides
-               Iterates -> error "reduceMatch:check"  -- handled in earlier rule
+mkCheck :: Effect -> Blk -> Exp
+mkCheck Fails    blk = Prm ChkFails    :@ Iter ALL blk (Arr [])
+mkCheck Succeeds blk = Prm ChkSucceeds :@ Iter ALL blk (Arr [])
+mkCheck Decides  blk = Prm ChkDecides  :@ Iter ALL blk (Arr [])
+mkCheck Iterates blk = mkCrl blk
 
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
@@ -1033,7 +1025,7 @@ data Segment a = STrue  a | SFalse [a]
 appendArrs :: ReductionContext -> [Exp] -> Exp
 -- appendArrs [a1, .., an] = a1 `ArrApp` a2 `ArrApp` ... an
 appendArrs _   []      = Arr []
-appendArrs cxt (a1:as) = Crl $ Blk (S.fromList (map fst prs)) [] $
+appendArrs cxt (a1:as) = mkCrl $ Blk (S.fromList (map fst prs)) [] $
                          foldl do_one a1 prs
   where
     do_one rest (r,a) = (Prm ArrApp :@ Arr [rest, a, Var r]) :> Var r
@@ -1084,7 +1076,7 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 
 reduceVerify :: ReductionContext -> Set Ident -> [Assump] -> Blk -> Reduction Exp
 reduceVerify cxt skols as blk
-  | BlkE v <- blk
+  | BlkE v@(Val {}) <- blk
   = Done "VVal" v
 
   | Just reason <- unsat as
