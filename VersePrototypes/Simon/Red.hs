@@ -541,9 +541,6 @@ data ReductionContext
        , rc_skols  :: [Ident]
     }
 
-lookupEqn :: ReductionContext -> Ident -> Maybe Val
-lookupEqn (RC { rc_eqns = eqns }) x = lookup x eqns
-
 --------------------------------------------------------------------------------
 --
 --             The evaluator: reduction rules
@@ -551,8 +548,16 @@ lookupEqn (RC { rc_eqns = eqns }) x = lookup x eqns
 --------------------------------------------------------------------------------
 
 reduceBlock :: ReductionContext -> Blk -> Reduction
-reduceBlock cxt parent@(Blk locals leqns ex) =
-  if traceReductions then
+reduceBlock cxt parent@(Blk locals leqns ex)
+  | not (S.null dead_vars)   -- First try garbage collection
+  = (if traceReductions
+     then trace $ render $ nest (4*rc_depth cxt) $
+          text "reduceBlockGC" <+> (pPrint dead_vars $$ pPrint parent)
+     else id)
+    Delete dead_vars
+
+  | let res = find True ex
+  = if traceReductions then
     trace (render (nest (4*rc_depth cxt) (text "reduceBlock enter parent =" <+> pPrintL prettyNormal parent))) $
     trace (render (nest (4*rc_depth cxt) (text "reduceBlock exit " <+> ((text "parent =" <+> pPrintL prettyNormal parent) $$
                                                                      (text "res    =" <+> pPrintL prettyNormal res))))
@@ -560,20 +565,17 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
     res
   else
     res
-  where
-    res | not (S.null dead_vars) = Delete dead_vars  -- GC rules
-        | otherwise              = find True ex
 
+  where
     -- XXX This needs to construct SCCs from uses inside lambda
     dead_vars :: Set Ident  -- Subset of locals that are unused
     dead_vars = locals `S.difference`
                 (freeVars ex `S.union` (S.unions (map (freeVars . snd) leqns)))
 
-    -- inner_cxt: update the ReductionContext for when we walk inside the block
-    inner_cxt = cxt { rc_depth = rc_depth cxt + 1
-                    , rc_eqns = filter ((`S.notMember` locals) . fst) (rc_eqns cxt)
+    -- all_eqns: add `leqns` to the equations from `cxt`
+    all_eqns = filter ((`S.notMember` locals) . fst) (rc_eqns cxt)
                                 -- The filter implements the side condition for subst
-                                ++ leqns }
+               ++ leqns
 
     find :: Bool -> Exp -> Reduction
     find leftCF expr =    -- leftCF means that the context to the left of the find is choice free
@@ -584,7 +586,10 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
         Val v  :=: Var x  | promotionOK parent x v
                           -> Step "Promote2" (Promote (x, v)) v
 
-        Var i             | Just v <- lookupEqn inner_cxt i -> Done ("Subst " ++ show i) v
+        Var i             | Just v <- lookup i all_eqns
+                          -> Done ("Subst " ++ show i) v
+
+        -- Floating {b}
         Crl blk -> Step "FloatB" (FloatB is' eqs') e'
           where
             Blk is' eqs' e' = freshen (rc_fresh cxt) blk
@@ -642,6 +647,9 @@ reduceBlock cxt parent@(Blk locals leqns ex) =
              -> StepC "B" (mkCrl b1) (mkCrl b2)     -- Found a choice, return it if inside a block
 
         Iter ic b e -> reduceIter inner_cxt ic b e
+             where
+                -- inner_cxt: update the ReductionContext for when we walk inside the block
+                inner_cxt = cxt { rc_depth = rc_depth cxt + 1, rc_eqns = all_eqns  }
 
         Verify skols as e -> reduceVerify cxt skols as e
 
