@@ -21,7 +21,7 @@ import Core.Solver( unsat )
 import Core.Expr as C ( Ident(..), Assump, Effect(..), Lit(..), PrimOp(..) )
 
 import Epic.Print
---import Epic.List hiding ((\\))
+import Epic.List
 
 import Control.Arrow(second)
 import qualified Data.List as L
@@ -83,6 +83,7 @@ data Term
   | Ident := Term           -- x := t
   | Ident :-> Term          -- x ??? t
   | TBlock Term             -- block{ t }
+  | Splice Term             -- ..t
   | Check Effect Term       -- check<fx>{t}
   deriving (Eq, Show)
 
@@ -184,7 +185,13 @@ instance Pretty Term where
   pPrintPrec l _ (Fun e1 fx e2)  = text "fun" <> cat [parens (pPrintPrec l 0 e1), angleBrackets (pPrint fx), braces (pPrintPrec l 0 e2)]
   pPrintPrec l p (x := e)        = maybeParens (p > 2) $ pPrintPrec l 2 x <+> text ":=" <+> pPrintPrec l 2 e
   pPrintPrec l p (e1 :@% e2)     = maybeParens (p > 10) $ cat [pPrintPrec l 10 e1, nest 2 (text "[" <> pPrintPrec l 0 e2 <> text "]")]
-  pPrintPrec l p (e1 :>% e2)     = maybeParens (p > 0) $ pPrintPrec l 1 e1 <> text ";" <+> pPrintPrec l 0 e2
+
+  -- Flatten out t1;t2;t3 into a list
+  pPrintPrec l p tt@(_ :>% _)
+    = maybeParens (p > 0) $ sep $ punctuate (text ";") (map (pPrintL l) $ flat tt)
+    where flat (t1 :>% t2) = flat t1 ++ flat t2
+          flat t = [t]
+
   pPrintPrec l p (e1 `Where` e2) = maybeParens (p > 0) $ pPrintPrec l 1 e1 <+> text "where" <+> pPrintPrec l 0 e2
   pPrintPrec l p (e1 :=:% e2)    = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
@@ -203,6 +210,7 @@ instance Pretty Term where
 
   pPrintPrec l _ (TBlock t)    = braces $ (pPrintL l t)
   pPrintPrec l _ (Check fx t)  = text "check" <> angleBrackets (pPrint fx) <> braces (pPrintL l t)
+  pPrintPrec l _ (Splice t)    = text ".." <> pPrintPrec l 10 t
   pPrintPrec l _ (TOfType t1 fx t2) = sep [ pPrintPrec l 6 t1
                                           , text "|>" <> angleBrackets (pPrint fx)
                                             <+> pPrintPrec l 6 t2 ]
@@ -215,9 +223,13 @@ instance Pretty Exp where
   pPrintPrec l p (SArr NoBlob x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
   pPrintPrec l p (SArr Blob   x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~~>" <+> pPrintPrec l 1 e
   pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ cat [pPrintPrec l 10 e1, nest 2 (text "[" <> pPrintPrec l 0 e2 <> text "]")]
-  pPrintPrec l p ee@(_ :> _) = maybeParens (p > 0) $ sep $ punctuate (text ";") (map (pPrintL l) $ flat ee)
-                               where flat (e1 :> e2) = flat e1 ++ flat e2
-                                     flat e = [e]
+
+  -- Flatten out e1;e2;e3 into a list
+  pPrintPrec l p ee@(_ :> _)
+    = maybeParens (p > 0) $ sep $ punctuate (text ";") (map (pPrintL l) $ flat ee)
+    where flat (e1 :> e2) = flat e1 ++ flat e2
+          flat e = [e]
+
   pPrintPrec l p (e1 :=: e2) = maybeParens (p > 0) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
   pPrintPrec l _ (Arr es)
@@ -239,9 +251,11 @@ instance Pretty Exp where
                                          , fsep (map pPrint as) ])
           , nest 2 (braces (pPrintL l e)) ]
 
-  pPrintPrec l _ (OfType e1 fx e2) = sep [ pPrintPrec l 6 e1
-                                         , text "|>" <> angleBrackets (pPrint fx)
-                                           <+> pPrintPrec l 6 e2 ]
+  pPrintPrec l p (OfType e1 fx e2)
+    = maybeParens (p > 7) $
+      sep [ pPrintPrec l 6 e1
+          , text "|>" <> angleBrackets (pPrint fx)
+             <+> pPrintPrec l 6 e2 ]
 
 instance Pretty Blk where
   pPrintPrec l p (Blk vs eqns e) = ppBlk l p vs eqns e
@@ -308,6 +322,9 @@ root _ = error "root: not an HNF"
 pattern IntE :: Integer -> Exp
 pattern IntE i = Lit (LInt i)
 
+pattern StrE :: String -> Exp
+pattern StrE s = Lit (LStr s)
+
 --------------------------------------------------------------------------------
 --
 --             Convert SrcEssential to Term
@@ -326,6 +343,7 @@ srcToTerm (F.Unify e1 e2)        = srcToTerm e1 :=:% srcToTerm e2
 srcToTerm (F.Seq e1 e2)          = srcToTerm e1 :>% srcToTerm e2
 srcToTerm (F.Where e1 e2)        = srcToTerm e1 `Where` srcToTerm e2
 srcToTerm (F.Range e)            = Rng (srcToTerm e)
+srcToTerm (F.Splice e)           = Splice (srcToTerm e)
 srcToTerm (F.Array es)           = TArr (map srcToTerm es)
 srcToTerm (F.Fail)               = TFail
 srcToTerm (F.Function _ e1 fx e2)
@@ -381,6 +399,14 @@ data Floats = NoFloats
             | FloatB (Set Ident) Heap    -- From (FloatB)
             | Promote (Ident, Exp)       -- From (Promote1) or (Promote2)
   deriving (Eq, Show)
+
+reductionFired :: Reduction -> Bool
+reductionFired None = False
+reductionFired _    = True
+
+orTry :: Reduction -> Reduction -> Reduction
+orTry r1 r2 | reductionFired r1 = r1
+            | otherwise         = r2
 
 mkExiFloat1 :: Ident -> Floats
 -- Single existential only, no heap
@@ -438,6 +464,7 @@ mkCons2 x y xys
 thePrelude :: [Eqn]
 thePrelude
   = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
+    , (mkName "string",       Lam vp  $ BlkE $ Prm IsStr :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ BlkE $ Var vp)
     , (mkName "Length",       Lam vp  $ BlkE $ Prm ArrLen :@ (Var vp))
     , (mkName "prefix'+'",    Lam vp  $ BlkE $ Prm Pls    :@ (Var vp))
@@ -452,11 +479,17 @@ thePrelude
     , (mkName "operator'>'",  Lam vpq $ BlkE $ Prm Gt     :@ (Var vpq))
     , (mkName "operator'<>'", Lam vpq $ BlkE $ Prm NEq    :@ (Var vpq))
     , (mkName "operator'..'", Lam vpq $ BlkE $ Prm DotDot :@ (Var vpq))
+
+    -- [] = \t.\p. isArr[p]; map[t,p]
+    , (mkName "prefix'[]'"  , Lam vt  $ BlkE $ Lam vp $ BlkE $
+                              (Prm IsArr :@ Var vp) :>
+                              (Prm ArrMap :@ (Arr [Var vt, Var vp])))
     ]
 
-vp,vpq :: Ident
+vp,vpq,vt :: Ident
 vpq = mkName "pq"
 vp  = mkName "p"
+vt  = mkName "t"
 
 --------------------------------------------------------------------------------
 --
@@ -607,7 +640,9 @@ reduceBlock cxt parent@(Blk locals leqns ex)
             -- GC rules handled above
 
         -- Primops
-        Prm op :@ v | Just redn <- reducePrimOp op v -> redn
+        Prm op :@ v | reductionFired redn -> redn
+                    where
+                      redn = reducePrimOp op v
 
         -- Unification
         Val v1       :=: Val v2 | v1 == v2                 -> Done    "EqVal" v1
@@ -708,43 +743,105 @@ promotionOK (Blk locals leqns _) x v
 
 
 ------------------------------------
-reducePrimOp :: PrimOp -> Exp -> Maybe Reduction
--- Primops get stuck on values outside the domain
-reducePrimOp Add (Arr [IntE i, IntE j])             = Just $ Done    "Prim+" $ IntE (i + j)
-reducePrimOp Sub (Arr [IntE i, IntE j])             = Just $ Done    "Prim-" $ IntE (i - j)
-reducePrimOp Mul (Arr [IntE i, IntE j])             = Just $ Done    "Prim*" $ IntE (i * j)
-reducePrimOp Div (Arr [IntE i, IntE j])
-  | j /= 0                                          = Just $ Done    "Prim/" $ IntE (i `div` j)
-  | otherwise                                       = Just $ Failure "Prim/"
+reducePrimOp :: PrimOp -> Exp -> Reduction
+reducePrimOp op e
+  = reduceArithOp op e `orTry`
+    reduceRelOp   op e `orTry`
+    reduceCheckOp op e `orTry`
+    reduceArrOp   op e
 
-reducePrimOp Neg (IntE i)                           = Just $ Done    "Prim-neg" $ IntE (- i)
-reducePrimOp Pls (IntE i)                           = Just $ Done    "Prim-pls" $ IntE i
+-----------------
+reduceArithOp :: PrimOp -> Exp -> Reduction
+-- Arithmetic ops get stuck on values outside the domain
+reduceArithOp Add (Arr [IntE i, IntE j]) = Done    "Prim+" $ IntE (i + j)
+reduceArithOp Sub (Arr [IntE i, IntE j]) = Done    "Prim-" $ IntE (i - j)
+reduceArithOp Mul (Arr [IntE i, IntE j]) = Done    "Prim*" $ IntE (i * j)
+reduceArithOp Div (Arr [IntE i, IntE j])
+  | j /= 0                               = Done    "Prim/" $ IntE (i `div` j)
+  | otherwise                            = Failure "Prim/"
 
-reducePrimOp IsInt v@(IntE {})                      = Just $ Done    "Prim-isInt" v
-reducePrimOp IsInt HNF{}                            = Just $ Failure "Prim-isInt"
+reduceArithOp Neg (IntE i)               = Done    "Prim-neg" $ IntE (- i)
+reduceArithOp Pls (IntE i)               = Done    "Prim-pls" $ IntE i
 
-reducePrimOp Lt  (Arr [IntE i, IntE j]) | i<j       = Just $ Done    "Prim-Lt"  $ IntE i
-                                        | otherwise = Just $ Failure "Prim-Lt"
-reducePrimOp LEq (Arr [IntE i, IntE j]) | i<=j      = Just $ Done    "Prim-LEq" $ IntE i
-                                        | otherwise = Just $ Failure "Prim-LEt"
-reducePrimOp GEq (Arr [IntE i, IntE j]) | i>=j      = Just $ Done    "Prim-GEq" $ IntE i
-                                        | otherwise = Just $ Failure "Prim-GEq"
-reducePrimOp Gt  (Arr [IntE i, IntE j]) | i>j       = Just $ Done    "Prim-Gt"  $ IntE i
-                                        | otherwise = Just $ Failure "Prim-Gt"
-reducePrimOp NEq (Arr [IntE i, IntE j]) | i/=j      = Just $ Done    "Prim-NEq" $ IntE i
-                                        | otherwise = Just $ Failure "Prim-NEq"
+reduceArithOp IsInt v@(IntE {})          = Done    "Prim-isInt" v
+reduceArithOp IsInt HNF{}                = Failure "Prim-isInt"
 
-reducePrimOp ArrCons (Arr [x, Arr xs])              = Just $ Done    "Prim-cons" $ Arr (x:xs)
-reducePrimOp ArrLen (Arr xs)                        = Just $ Done    "prim-length" $ IntE (toInteger (length xs))
+reduceArithOp IsStr v@(StrE {})          = Done    "Prim-isStr" v
+reduceArithOp IsStr HNF{}                = Failure "Prim-isStr"
+
+reduceArithOp _ _ = None
+
+
+-----------------
+reduceRelOp :: PrimOp -> Exp -> Reduction
+reduceRelOp Lt  (Arr [IntE i, IntE j]) | i<j       = Done    "Prim-Lt"  $ IntE i
+                                        | otherwise = Failure "Prim-Lt"
+reduceRelOp LEq (Arr [IntE i, IntE j]) | i<=j      = Done    "Prim-LEq" $ IntE i
+                                        | otherwise = Failure "Prim-LEt"
+reduceRelOp GEq (Arr [IntE i, IntE j]) | i>=j      = Done    "Prim-GEq" $ IntE i
+                                        | otherwise = Failure "Prim-GEq"
+reduceRelOp Gt  (Arr [IntE i, IntE j]) | i>j       = Done    "Prim-Gt"  $ IntE i
+                                        | otherwise = Failure "Prim-Gt"
+reduceRelOp NEq (Arr [IntE i, IntE j]) | i/=j      = Done    "Prim-NEq" $ IntE i
+                                        | otherwise = Failure "Prim-NEq"
+reduceRelOp _ _ = None
+
+-----------------
+reduceCheckOp :: PrimOp -> Exp -> Reduction
+-- Check operations
+reduceCheckOp ChkFails    (Arr [])  = Failure "ChkFail"
+reduceCheckOp ChkSucceeds (Arr [e]) = Done "ChkSucc" e
+reduceCheckOp ChkDecides  (Arr [])  = Failure "ChkDec0"
+reduceCheckOp ChkDecides  (Arr [e]) = Done "ChkDec1" e
+reduceCheckOp _ _ = None
+
+-----------------
+reduceArrOp :: PrimOp -> Exp -> Reduction
+-- Array operations
+reduceArrOp ArrCons (Arr [x, Arr xs]) = Done "Prim-cons"   $ Arr (x:xs)
+reduceArrOp ArrLen (Arr xs)           = Done "Prim-length" $ IntE (toInteger (length xs))
 -- Could have some inverse of ArrLen by reducing
 --  (ArrLen :@ e) :=: IntE k  -->  e :=: Arr [_,_,...,_] k new existentials
 
-reducePrimOp ChkFails    (Arr [])  = Just $ Failure "ChkFail"
-reducePrimOp ChkSucceeds (Arr [e]) = Just $ Done "ChkSucc" e
-reducePrimOp ChkDecides  (Arr [])  = Just $ Failure "ChkDec0"
-reducePrimOp ChkDecides  (Arr [e]) = Just $ Done "ChkDec1" e
+reduceArrOp IsArr v@(Arr _) = Done    "Prim-isArr" v
+reduceArrOp IsArr HNF{}     = Failure "Prim-isArr"
 
-reducePrimOp _ _ = Nothing
+reduceArrOp ArrMap (Arr [fun, Arr xs])
+  = Done "Prim-ArrMap" (Arr (map (fun :@) xs))
+
+reduceArrOp ArrApp (Arr [a1,a2,res])
+   | Arr as1 <- a1, Arr as2 <- a2
+   =  -- <vs1>++<vs2> = res  -->  <vs1++vs2> = res
+     Done "Prim-ArrApp1" (Arr (as1++as2) :=: res)
+
+   | Arr [] <- a1
+   = -- <>++a2 = res  -->  a2 = res
+     Done "Prim-ArrApp2" (a2 :=: res)
+
+   | Arr [] <- a2
+   = -- a1++<> = res  -->  a1 = res
+     Done "Prim-ArrApp3" (a1 :=: res)
+
+   | Arr [] <- res
+   = -- a1++a2 = <>  -->  a1=<>; a2=<>
+     Done "Prim-ArrApp4" $
+     (a1 :=: Arr []) :> (a2 :=: Arr [])
+
+   | Arr (v:vs) <- a1
+   , Arr (r:rs) <- res
+   = -- <v:vs>++a2 = <r:rs>  -->  v=r; <vs>++a2 = <rs>; res
+     Done "Prim-ArrApp5" $
+     (v :=: r) :> (Prm ArrApp :@ (Arr [Arr vs, a2, Arr rs])) :> res
+
+   | Arr (Snoc vs v) <- a2
+   , Arr (Snoc rs r) <- res
+   = -- a1++<vs,v> = <rs,r>  -->  a1++<vs> = <rs>; v=r; res
+     Done "Prim-ArrApp6" $
+     (Prm ArrApp :@ (Arr [a1, Arr vs, Arr rs])) :> (v :=: r) :> res
+
+   -- ToDo: worry about duplicating `res`!!
+
+reduceArrOp _ _ = None
 
 ------------------------------------
 reduceMatch ::  NameSupply -> Ident -> Term -> Blob -> Reduction
@@ -783,21 +880,20 @@ reduceMatch fresh x tm blob
                                 (Var w :=: SArr blob x t1) :> (u ~~> t2) :> Var w
                              where u:w:_ = fresh
 
-        TArr ts              -> Step "MTup" (mkExiFloat xs) $
-                                (Var x :=: Arr (map Var xs)) :> Arr (zipWith (SArr blob) xs ts)
-                              where xs = take (length ts) fresh
 
         Rng t      -> Step "MColon" (mkExiFloat1 u) $ (u ~~> t) :@ Var x
                    where u = fresh!!0
 
         (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: SArr blob x t
-        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> SArr NoBlob i t  -- XXX should this be NoBlob
+        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> SArr NoBlob i t
+                      -- XXX should this be NoBlob
 
         (t1 :..% t2) -> Step "MEnum" (mkExiFloat [u1,u2]) $
                         Var x :=: ((u1 ~~> t1) :.. (u2 ~~> t2))
                       where u1:u2:_ = fresh
 
-        -- Functions
+        -- Tuples and functions
+        TArr ts      -> matchTup fresh x ts blob
         Fun at fx bt -> matchFun fresh x at fx bt blob
 
         If t0 t1 t2 -> Done "MIf" $
@@ -821,6 +917,10 @@ reduceMatch fresh x tm blob
         Check fx t -> Done ("MCheck " ++ show fx) $
                       matchCheck fresh x fx t blob
 
+        Splice t -> reduceMatch fresh x t blob
+                    -- See (AMP1) in Note [Desugaring ampersand]
+
+
 matchFun :: NameSupply -> Ident -> Term -> Effect -> Term -> Blob -> Reduction
 matchFun fresh f at fx bt blob
   = Done "MFun" $
@@ -841,9 +941,9 @@ matchFun fresh f at fx bt blob
 matchCheck :: NameSupply -> Ident -> Effect -> Term -> Blob -> Exp
 matchCheck fresh x fx t blob
   | Iterates <- fx = SArr blob x t   -- check<iterates> is a no-op
-  | otherwise        = (Prm chk_op :@) $
-                       Var x :=: Iter ALL (Blk (sing u `S.union` tbs t) emptyHeap $ u ~~> t)
-                                      (Arr [])
+  | otherwise      = (Prm chk_op :@) $
+                     Var x :=: Iter ALL (Blk (sing u `S.union` tbs t) emptyHeap $ u ~~> t)
+                                    (Arr [])
   where
     u  = fresh !! 0
     chk_op = case fx of
@@ -879,6 +979,53 @@ reduceIter cxt ic b1 e2
       -- more info about where the reduction happened
 
 
+---------------------------------------
+matchTup :: NameSupply -> Ident -> [Term] -> Blob -> Reduction
+matchTup fresh x ts blob
+  = Step "MTup" (mkExiFloat fresh_xs) $
+    (Var x :=: appendArrs fresh2 (map mk_in segs)) :>
+    appendArrs fresh2 (map mk_out segs)
+  where
+    mk_in :: Segment (Ident,Term) -> Exp
+    mk_in (STrue (y,_)) = Var y
+    mk_in (SFalse sprs) = Arr [ Var y | (y,_) <- sprs ]
+
+    mk_out :: Segment (Ident,Term) -> Exp
+    mk_out (STrue (y,t)) = SArr blob y t
+    mk_out (SFalse sprs) = Arr [ SArr blob y t | (y,t) <- sprs ]
+
+    (fresh_xs, fresh2) = splitAt (length ts) fresh
+
+    segs :: [Segment (Ident,Term)]
+    segs = segments is_splice (fresh_xs `zip` ts)
+
+    is_splice (y, Splice t) = Just (y,t)
+    is_splice _             = Nothing
+
+data Segment a = STrue  a | SFalse [a]
+
+appendArrs :: NameSupply -> [Exp] -> Exp
+-- appendArrs [a1, .., an] = a1 `ArrApp` a2 `ArrApp` ... an
+appendArrs _     []     = Arr []
+appendArrs fresh (a1:as) = Crl $ Blk (S.fromList (map fst prs)) [] $
+                           foldl do_one a1 prs
+  where
+    do_one rest (r,a) = (Prm ArrApp :@ Arr [rest, a, Var r]) :> Var r
+
+    prs :: [(Ident,Exp)]
+    prs = fresh `zip` as
+
+segments :: (a-> Maybe a) -> [a] -> [Segment a]
+-- Split the list into chunks
+segments _ []              = []
+segments p (t : ts)
+  = case p t of
+      Just t' ->  STrue t' : segments p ts
+      Nothing ->  SFalse (t:ts1) : segments p ts2
+              where
+                (ts1,ts2) = span (isNothing . p) ts
+
+---------------------------------------
 choiceFree :: Exp -> Bool
 choiceFree Var{} = True
 choiceFree Lit{} = True
@@ -953,6 +1100,7 @@ tbs (x := t)          = sing x `S.union` tbs t   -- (:=) binds
 tbs (_ :-> t)         = tbs t                  -- (:->) does not bind
 tbs (TBlock {})       = S.empty
 tbs (TOfType t1 _ t2) = tbs t1 `S.union` tbs t2
+tbs (Splice t)        = tbs t
 tbs (Check _ t)       = tbs t
 
 -- Variable uses, not under lambda/delay
@@ -1026,6 +1174,7 @@ freeVarsTerm (For t1 t2)   = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2) `S
 freeVarsTerm (i :-> e)     = sing i `S.union` freeVarsTerm e
 freeVarsTerm (TBlock t)    = freeVarsTermBlock t
 freeVarsTerm (Check _ t)   = freeVarsTerm t
+freeVarsTerm (Splice t)    = freeVarsTerm t
 freeVarsTerm (TOfType t1 _ t2) = freeVarsTerm t1 `S.union` freeVarsTerm t2
 
 freeVarsTermBlock :: Term -> Set Ident
@@ -1077,6 +1226,7 @@ allVarsTerm (For t1 t2) = allVarsTerm t1 ++ allVarsTerm t2
 allVarsTerm (i :-> e) = i : allVarsTerm e
 allVarsTerm (TBlock t) = allVarsTerm t
 allVarsTerm (Check _ t) = allVarsTerm t
+allVarsTerm (Splice t)  = allVarsTerm t
 allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
 
 expSize :: Exp -> Int
@@ -1126,6 +1276,7 @@ termSize (For t1 t2)       = 1 + termSize t1 + termSize t2
 termSize (_ :-> e)         = 1 + termSize e
 termSize (TBlock t)        = 1 + termSize t
 termSize (Check _ t)       = 1 + termSize t
+termSize (Splice t)        = 1 + termSize t
 termSize (TOfType t1 _ t2) = 1 + termSize t1 + termSize t2
 
 rename :: [(Ident, Ident)] -> Exp -> Exp
@@ -1177,6 +1328,7 @@ rename sub = ren
     renT (i :-> t) = fromMaybe i (lookup i sub) :-> renT t
     renT (TBlock t) = TBlock (renT t)
     renT (Check fx t) = Check fx (renT t)
+    renT (Splice t)   = Splice (renT t)
     renT (TOfType t1 fx t2) = TOfType (renT t1) fx (renT t2)
 
 renameBlk :: [(Ident,Ident)] -> Blk -> Blk
