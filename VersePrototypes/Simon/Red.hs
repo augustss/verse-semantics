@@ -411,19 +411,28 @@ srcToCoreIdent (F.Ident _ s) = Name s
 type RuleName = String
 
 data Reduction a
-  = RedNone                      -- No redex found
-  | RedStep RuleName [Result a]  -- Zero, one, or two results
+  = RedNone                                -- No redex found
+  | RedStep RuleName [Result BlkFloats a]  -- A regular reduction step
+  | VerStep RuleName [Result VerFloats a]  -- A verification step
   deriving (Eq, Show, Functor)
 
-data Result a = Res Floats a
+data Result floats payload = Res floats payload
    deriving( Eq, Show, Functor )
 
--- A Step returns a SBlk
-data Floats = NoFloats
-            | FloatB (Set Ident) Heap    -- From (FloatB)
-            | Promote Ident Exp          -- From (Promote1) or (Promote2)
-            | FloatS SkolIdent Assump
+data BlkFloats   -- Floating out the the innermost enclosing Blk
+  = NoFloats
+  | FloatB (Set Ident) Heap    -- From (FloatB)
+  | Promote Ident Exp          -- From (Promote1) or (Promote2)
   deriving (Eq, Show)
+
+data VerFloats   -- Floating out to the innermost enclosing Verify
+  = NoVerFloats
+  | FloatS SkolIdent Assump
+  deriving (Eq, Show)
+
+
+mapPayload :: (a -> b) -> [Result flt a] -> [Result flt b]
+mapPayload f rs = [ Res flt (f payload) | Res flt payload <- rs ]
 
 reductionFired :: Reduction a -> Bool
 reductionFired RedNone = False
@@ -439,11 +448,11 @@ addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
 addInScopeSkols :: ReductionContext -> Set Ident -> ReductionContext
 addInScopeSkols cxt bndrs = cxt { rc_skols = rc_skols cxt `S.union` bndrs }
 
-mkExiFloat1 :: Ident -> Floats
+mkExiFloat1 :: Ident -> BlkFloats
 -- Single existential only, no heap
 mkExiFloat1 x = FloatB (sing x) emptyHeap
 
-mkExiFloat :: [Ident] -> Floats
+mkExiFloat :: [Ident] -> BlkFloats
 -- Existentials only, no heap
 mkExiFloat xs = FloatB (S.fromList xs) emptyHeap
 
@@ -453,7 +462,7 @@ pattern Failure s = RedStep s []
 pattern Done :: String -> a -> Reduction a
 pattern Done s e = RedStep s [Res NoFloats e]
 
-mkStep :: String -> Floats -> Exp -> Reduction Exp
+mkStep :: String -> BlkFloats -> Exp -> Reduction Exp
 mkStep s flts e = RedStep s [Res flts e]
 
 mkStepC :: RuleName -> Exp -> Exp -> Reduction Exp
@@ -465,14 +474,21 @@ instance Pretty a => Pretty (Reduction a) where
   pPrintPrec _ _ (RedStep s [r]) = sep [ text "Step" <+> text (show s), pPrint r ]
   pPrintPrec _ _ (RedStep s rs)  = sep [ text "StepC" <+> text (show s)
                                        , nest 2 (vcat (map pPrint rs)) ]
+  pPrintPrec _ _ (VerStep s [])  = text "VFailure" <+> text (show s)
+  pPrintPrec _ _ (VerStep s [r]) = sep [ text "VStep" <+> text (show s), pPrint r ]
+  pPrintPrec _ _ (VerStep s rs)  = sep [ text "VStepC" <+> text (show s)
+                                       , nest 2 (vcat (map pPrint rs)) ]
 
-instance Pretty Floats where
+instance Pretty BlkFloats where
   pPrintPrec _ _ NoFloats        = empty
   pPrintPrec _ _ (FloatB is eqs) = text "FB" <> parens (ppBlkIntro is eqs)
   pPrintPrec _ _ (Promote i e)   = text "Prom" <> braces (ppr_eqn (i,e))
+
+instance Pretty VerFloats where
+  pPrintPrec _ _ NoVerFloats     = empty
   pPrintPrec _ _ (FloatS s asm)  = text "FS" <> braces (pPrint s <+> pPrint asm)
 
-instance Pretty a => Pretty (Result a) where
+instance (Pretty flts, Pretty a) => Pretty (Result flts a) where
   pPrintPrec _ _ (Res flts res)
     = sep [ pPrint flts, nest 2 (pPrint res) ]
 
@@ -605,12 +621,9 @@ initialBlk src
 
     u = freshId top_cxt "u"
 
-mergeStep :: HasCallStack => Blk -> Result Exp -> Result Blk
+mergeStep :: HasCallStack => Blk -> Result BlkFloats Exp -> Result BlkFloats Blk
 mergeStep (Blk is eqs _) (Res NoFloats res_e)
   = Res NoFloats (Blk is eqs res_e)
-
-mergeStep (Blk is eqs _) (Res flt@(FloatS {}) res_e)
-  = Res flt (Blk is eqs res_e)
 
 mergeStep (Blk is eqs _) (Res (Promote i v) res_e)
   = assertP "mergeStepP1" (i `S.member` is)
@@ -667,6 +680,7 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns, rc_exis = exis }) blk
   | let res = case reduceExp cxt' blk' of
                 RedNone       -> RedNone
                 RedStep rn rs -> RedStep rn (map (mergeStep blk') rs)
+                VerStep rn rs -> VerStep rn (mapPayload (Blk locals' leqns') rs)
 
   = if traceReductions then
     trace (render $ nest (2*rc_depth cxt) $
@@ -1055,11 +1069,13 @@ reduceIter _ ALL blk@(Blk _ _ Val{}) e2
 reduceIter cxt ic b1 e2
   = case reduceBlock cxt b1 of  -- Find a redex in B context
       RedNone       -> RedNone
+      VerStep rn rs -> VerStep rn (mapPayload (\b -> Iter ic b e2) rs)
+           -- For a VerStep, just wrap the unchanged Iter around the outside
       RedStep rn rs -> Done (show ic ++ " " ++ rn) (foldr iter e2 rs)
            -- Note that we update the RuleName to give
            -- more info about where the reduction happened
   where
-    iter :: Result Blk -> Exp -> Exp
+    iter :: Result BlkFloats Blk -> Exp -> Exp
     iter (Res NoFloats b) e = Iter ic b e
     iter res e = error ("reduceIter " ++ render (pPrint res $$ pPrint e))
 
@@ -1147,21 +1163,22 @@ reduceVerify cxt skols as blk
   | BlkE (Val {}) <- blk
   = Done "VVal" (Arr [])
 
-  | BlkE Fail <- blk
-  = Done "VFail" (Arr [])
-
   | Just reason <- unsat as
   = Done ("VUnsat " ++ render (pPrint reason)) (Arr [])
 
   | otherwise
   = case reduceBlock cxt' blk' of
       RedNone       -> RedNone
-      RedStep rn rs -> Done ("V-" ++ rn) (mkSeqs (map ver rs))
+      RedStep rn rs -> Done ("VR-" ++ rn) (mkSeqs (map wrap_blk rs))
+      VerStep rn rs -> Done ("VV-" ++ rn) (mkSeqs (map wrap_ver rs))
   where
-    ver (Res NoFloats blk'')         = Verify skols' as' blk''
-    ver (Res (FloatS skv asm) blk'') = Verify (skv `S.insert` skols')
-                                              (asm : as') blk''
-    ver r = error ("reduceVerify " ++ render (pPrint r))
+    wrap_blk (Res NoFloats blk'') = Verify skols' as' blk''
+    wrap_blk r = error ("reduceVerify " ++ render (pPrint r))
+
+    wrap_ver (Res NoVerFloats blk'')      = Verify skols' as' blk''
+    wrap_ver (Res (FloatS skv asm) blk'') = Verify (skv `S.insert` skols')
+                                                   (asm : as')
+                                                   blk''
 
     (subst, skols') = freshenBndrs cxt skols
     as'  = renameAssumps subst as
@@ -1181,20 +1198,20 @@ reduceVerifyOp cxt op arg
   = case groundValue (rc_skols cxt) arg of
       Nothing -> RedNone
       Just gv | primOpIsCheck op -> RedNone
-              | primOpCanFail op -> RedStep ("VF-"++show op ++ " " ++ render (pPrint gv)) $
+              | primOpCanFail op -> VerStep ("VF-"++show op ++ " " ++ render (pPrint gv)) $
                                     do_rel_op   gv
-              | otherwise        -> RedStep ("VP-"++show op ++ " " ++ render (pPrint gv)) $
+              | otherwise        -> VerStep ("VP-"++show op ++ " " ++ render (pPrint gv)) $
                                     do_arith_op gv
   where
     r = freshId cxt "r"
     cxt' = addInScopeSkols cxt (sing r)
 
-    do_rel_op :: GroundVal -> [Result Exp]
+    do_rel_op :: GroundVal -> [Result VerFloats Exp]
     do_rel_op gv
       = [ Res (FloatS r (A_Pos (A_RelOp op gv))) (domChecks cxt' op arg `mkSeq` (Var r))
         , Res (FloatS r (A_Neg (A_RelOp op gv))) Fail    ]
 
-    do_arith_op :: GroundVal -> [Result Exp]
+    do_arith_op :: GroundVal -> [Result VerFloats Exp]
     do_arith_op gv
       = [ Res (FloatS r (A_PrimOp r (AO_Prim op) gv))
               (domChecks cxt' op arg `mkSeq` (Var r)) ]
