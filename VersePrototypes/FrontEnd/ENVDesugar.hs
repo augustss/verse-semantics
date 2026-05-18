@@ -37,4 +37,5 @@ primOps =
 primOps' :: [(String, PrimOp)]
 primOps' = primOps ++
   [ ("prefix'[]'",   undefined)
+  , ("prefix'?'",   undefined)
   ]

@@ -77,6 +77,7 @@ data Term
   | Term :..% Term            -- t1 .. t2
   | TArr [Term]               -- array{t1,...,t2}
   | TOfType Term Effect Term  -- t1 |><fx> t2
+  | TTru Term                 -- truth{t}
 
   | Und                     -- _
   | Term `Where` Term       -- t1 where t2
@@ -104,6 +105,7 @@ data Exp
   | Exp :.. Exp           -- e1 .. e2
   | Arr [Exp]             -- array{e1,...,e2}
   | OfType Exp Effect Exp -- e1 |><fx> e2
+  | Tru Exp               -- truth{e{
 
   | Lam Ident Blk          -- \ x . e
   | Iter IterCtx Blk Exp   -- if/for
@@ -203,6 +205,7 @@ instance Pretty Term where
     | l == prettyNormal     = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l _ (TArr [e]) = text "array" <> braces (pPrintL l e)
   pPrintPrec l _ (TArr es)  = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+  pPrintPrec l _ (TTru e)   = text "truth" <> braces (pPrintL l e)
 
   pPrintPrec l p (b1 :|:% b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec l p (e1 :..% e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
@@ -240,6 +243,7 @@ instance Pretty Exp where
     | l == prettyNormal      = text "<" <> sep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l _ (Arr [e])   = text "array" <> braces (pPrintL l e)
   pPrintPrec l _ (Arr es)    = parens $ sep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+  pPrintPrec l _ (Tru e)     = text "truth" <> braces (pPrintL l e)
 
   pPrintPrec l _ (Crl b)     = braces $ pPrintPrec l 0 b
   pPrintPrec l _ (Dly e)     = text "delay" <> braces (pPrintL l e)
@@ -308,6 +312,7 @@ getVal e@Lit{} = Just e
 getVal e@Prm{} = Just e
 getVal e@Lam{} = Just e
 getVal e@(Arr es) | Just _ <- mapM getVal es = Just e
+getVal e@(Tru e') | Just _ <- getVal e' = Just e
 getVal e@Dly{} = Just e
 getVal _ = Nothing
 
@@ -321,6 +326,7 @@ root Prm{} = Prm Add
 root Lam{} = Lam (Name "") (BlkE $ IntE 0)
 root Arr{} = Arr []
 root Dly{} = Dly (IntE 0)
+root Tru{} = Tru (IntE 0)
 root _ = error "root: not an HNF"
 
 pattern IntE :: Integer -> Exp
@@ -376,6 +382,7 @@ srcToTerm (F.Exists is e)        = TBlock (foldr bind_one (srcToTerm e) is)
 
 srcToTerm (F.Check fx e)
   | Just eff <- toCoreEff fx     = Check eff (srcToTerm e)
+srcToTerm (F.Truth e)            = TTru (srcToTerm e)
 
 srcToTerm e = error $ "srcToTerm: unimplemented " ++ show e
 
@@ -498,14 +505,23 @@ thePrelude
     , (mkName "operator'..'", Prm DotDot)
 
     -- [] = \t.\p. isArr[p]; map[t,p]
-    , (mkName "prefix'[]'"  , Lam vt  $ BlkE $ Lam vp $ BlkE $
+    , (mkName "prefix'[]'"  , Lam vt $ BlkE $ Lam vp $ BlkE $
                               (Prm IsArr :@ Var vp) :>
                               (Prm ArrMap :@ (Arr [Var vt, Var vp])))
+
+    -- ? = \t.\x. if (truth{y:any} = x) then truth{t[y]} else x=()
+    , (mkName "prefix'?'"   , Lam vt $ BlkE $ Lam vx $ BlkE $
+                              let y = mkName "_y" in
+                              Iter IF (Blk (sing y) emptyHeap $ ((Tru (Var y) :=: Var vx) :> Dly (Tru (Var vt :@ Var y))))
+                                      (Var vx :=: Arr [])
+      )
+
     ]
 
-vp,vt :: Ident
+vp,vt,vx :: Ident
 vp  = mkName "p"
 vt  = mkName "t"
+vx  = mkName "x"
 
 --------------------------------------------------------------------------------
 --
@@ -676,6 +692,7 @@ reduceBlock1 cxt parent@(Blk locals leqns ex)
 
         Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
         Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
+        Tru e1       :=: Tru e2                            -> Done    "EqTru" $ Tru (e1 :=: e2)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
 
         -- Sequencing
@@ -705,13 +722,15 @@ reduceBlock1 cxt parent@(Blk locals leqns ex)
         -- a constant to proceed outside a failure context.
         Arr es :@ IntE i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i')
                                                      where i' = fromInteger i
-
         Val (Arr es) :@ ei -> mkStep "ITup" (mkExiFloat1 x) $
                               Var x :=: ei :>
                               foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
           where
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
+
+--        Tru e :@ Val v -> Done "ITru" $ e :=: v; v
+        Tru e1 :@ e2 -> Done "ITru" $ e1 :=: e2
 
         SArr b x tm  -> reduceMatch cxt x tm b
 
@@ -732,6 +751,7 @@ reduceBlock1 cxt parent@(Blk locals leqns ex)
         e1 :@  e2  -> find2 leftCF (:@)  e1 e2
         e1 :.. e2  -> find2 leftCF (:..) e1 e2
         Arr es     -> findArr leftCF es
+        Tru e      -> find1 leftCF Tru e
 
         _ -> RedNone
 
@@ -769,7 +789,8 @@ reducePrimOp op e
   = reduceArithOp op e `orTry`
     reduceRelOp   op e `orTry`
     reduceCheckOp op e `orTry`
-    reduceArrOp   op e
+    reduceArrOp   op e `orTry`
+    reduceTruOp   op e
 
 -----------------
 reduceArithOp :: PrimOp -> Exp -> Reduction Exp
@@ -864,6 +885,12 @@ reduceArrOp ArrApp (Arr [a1,a2,res])
 
 reduceArrOp _ _ = RedNone
 
+-----------------
+reduceTruOp :: PrimOp -> Exp -> Reduction Exp
+reduceTruOp IsTru v@(Tru _) = Done    "Prim-isTru" v
+reduceTruOp IsTru HNF{}     = Failure "Prim-isTru"
+reduceTruOp _ _ = RedNone
+
 ------------------------------------
 reduceMatch ::  ReductionContext -> Ident -> Term -> Blob -> Reduction Exp
 -- :~> reduction
@@ -918,6 +945,8 @@ reduceMatch cxt x tm blob
         -- Tuples and functions
         TArr ts      -> matchTup cxt x ts blob
         Fun at fx bt -> matchFun cxt x at fx bt blob
+        TTru t       -> mkStep "MTru" (mkExiFloat [u]) $ (Var x :=: Tru (Var u)) :> Tru (SArr blob u t)
+                       where u = freshId cxt "u"
 
         If t0 t1 t2  -> Done "MIf" $
                         Iter IF (Blk (sing u `S.union` tbs0) emptyHeap $
@@ -1069,6 +1098,7 @@ choiceFree (Arr es) = and (map choiceFree es)
 choiceFree (Iter _ b1 e2) = choiceFreeB b1 && choiceFree e2
 choiceFree (Crl b) = choiceFreeB b
 choiceFree Verify{} = True
+choiceFree (Tru e) = choiceFree e
 
 choiceFreeB :: Blk -> Bool
 choiceFreeB (Blk _ _ e) = choiceFree e
@@ -1130,6 +1160,7 @@ termBndrs tm = go tm
     go (TOfType t1 _ t2) = go t1 `S.union` go t2
     go (Splice t)        = go t
     go (Check _ t)       = go t
+    go (TTru t)          = go t
 
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Ident
@@ -1150,6 +1181,7 @@ occfvs (Iter _ b1 e2) = occfvsB b1 `S.union` occfvs e2
 occfvs (Crl b)        = occfvsB b
 occfvs Verify{}       = S.empty
 occfvs (OfType e1 _ e2) = occfvs e1 `S.union` occfvs e2
+occfvs (Tru e)        = occfvs e
 
 occfvsB :: Blk -> Set Ident
 occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.difference` is
@@ -1173,6 +1205,7 @@ freeVars (Crl b)     = freeVarsBlk b
 freeVars (Iter _ b1 e2) = freeVarsBlk b1 `S.union` freeVars e2
 freeVars Verify{}    = S.empty
 freeVars (OfType e1 _ e2) = freeVars e1 `S.union` freeVars e2
+freeVars (Tru e)     = freeVars e
 
 freeVarsBlk :: Blk -> Set Ident
 freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` freeVars e)
@@ -1207,6 +1240,7 @@ freeVarsTerm (TBlock t)    = freeVarsTermBlock t
 freeVarsTerm (Check _ t)   = freeVarsTerm t
 freeVarsTerm (Splice t)    = freeVarsTerm t
 freeVarsTerm (TOfType t1 _ t2) = freeVarsTerm t1 `S.union` freeVarsTerm t2
+freeVarsTerm (TTru t)      = freeVarsTerm t
 
 freeVarsTermBlock :: Term -> Set Ident
 freeVarsTermBlock t = freeVarsTerm t `S.difference` termBndrs t
@@ -1231,6 +1265,7 @@ allVars (Crl b)     = allVarsBlk b
 allVars (Iter _ b1 e2)   = allVarsBlk b1 ++ allVars e2
 allVars (Verify is _ b)  = S.toList is ++ allVarsBlk b
 allVars (OfType e1 _ e2) = allVars e1 ++ allVars e2
+allVars (Tru e)     = allVars e
 
 allVarsBlk :: Blk -> [Ident]
 allVarsBlk (Blk is eqs e) = S.toList is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -1259,6 +1294,7 @@ allVarsTerm (TBlock t) = allVarsTerm t
 allVarsTerm (Check _ t) = allVarsTerm t
 allVarsTerm (Splice t)  = allVarsTerm t
 allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
+allVarsTerm (TTru t)    = allVarsTerm t
 
 expSize :: Exp -> Int
 expSize (Var {})    = 1
@@ -1278,6 +1314,7 @@ expSize (Crl b)     = 1 + blkSize b
 expSize (Iter _ b1 e2) = 1 + blkSize b1 + expSize e2
 expSize (Verify _ _ b)   = 1 + blkSize b
 expSize (OfType e1 _ e2) = 1 + expSize e1 + expSize e2
+expSize (Tru e)          = 1 + expSize e
 
 blkSize :: Blk -> Int
 blkSize (Blk is eqs e) = S.size is + sum (map eqnSize eqs) + expSize e
@@ -1309,6 +1346,7 @@ termSize (TBlock t)        = 1 + termSize t
 termSize (Check _ t)       = 1 + termSize t
 termSize (Splice t)        = 1 + termSize t
 termSize (TOfType t1 _ t2) = 1 + termSize t1 + termSize t2
+termSize (TTru t)          = 1 + termSize t
 
 --------------------------------------------------------------------------------
 --
@@ -1345,6 +1383,7 @@ rename sub = ren
        where
          sub' = [pr | pr@(x,_) <- sub, not (x `S.member` is)]
          as'  = map (C.substAssump sub') as
+    ren (Tru e) = Tru (ren e)
 
     renB = renameBlk sub
     renT = renameTerm sub
@@ -1377,6 +1416,7 @@ renameTerm sub term = go term
     go (Check fx t)       = Check fx (go t)
     go (Splice t)         = Splice (go t)
     go (TOfType t1 fx t2) = TOfType (go t1) fx (go t2)
+    go (TTru t)           = TTru (go t)
 
 renameBlk :: Renaming -> Blk -> Blk
 renameBlk sub (Blk is eqs e)
@@ -1392,6 +1432,7 @@ substVal sub e@(Var i) = fromMaybe e $ lookup i sub
 substVal _ e@Lit{} = e
 substVal _ e@Prm{} = e
 substVal sub (Arr vs) = Arr (map (substVal sub) vs)
+substVal sub (Tru v) = Tru (substVal sub v)
 substVal sub e@Lam{} | S.null $ S.fromList (map fst sub) `S.intersection` S.fromList (allVars e) = e
                      | otherwise = e -- error "substVal: Lam unimplemented"
 substVal _ e = error $ "substVal: not a Val: " ++ show e
