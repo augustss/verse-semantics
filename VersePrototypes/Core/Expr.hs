@@ -41,7 +41,8 @@ module Core.Expr
   , Effect(..), canSucceed, canFail
 
   -- Primops
-  , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest
+  , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest, primOpIsCheck
+  , primOpDomInt1, primOpDomInt2
   ) where
 
 import Prelude hiding( (<>) )
@@ -512,12 +513,18 @@ primOpString IsFun    = "isFun$"
 primOpString IsGround = "isGround$"
 primOpString IsAny    = "isAny$"
 primOpString IsType   = "isType$"
+
 primOpString ChkFails    = "check<fails>"
 primOpString ChkSucceeds = "check<succeeds>"
 primOpString ChkDecides  = "check<decides>"
 
-primOpCanFail :: PrimOp -> Bool
+primOpIsCheck :: PrimOp -> Bool
+primOpIsCheck ChkFails    = True
+primOpIsCheck ChkSucceeds = True
+primOpIsCheck ChkDecides  = True
+primOpIsCheck _           = False
 
+primOpCanFail :: PrimOp -> Bool
 -- These operations /can/ fail, and /don't/ produce a value
 primOpCanFail Gt     = True
 primOpCanFail Lt     = True
@@ -566,6 +573,26 @@ primOpIsTypeTest IsFun  = True
 primOpIsTypeTest IsType = True
 primOpIsTypeTest IsComp = False  -- Not really a type test
 primOpIsTypeTest _      = False
+
+primOpDomInt1 :: PrimOp -> Bool
+-- Primop takes one Int argument
+primOpDomInt1 Neg = True
+primOpDomInt1 Pls = True
+primOpDomInt1 _   = False
+
+primOpDomInt2 :: PrimOp -> Bool
+-- Primop takes two Int arguments
+primOpDomInt2 Gt  = True
+primOpDomInt2 GEq = True
+primOpDomInt2 Lt  = True
+primOpDomInt2 LEq = True
+primOpDomInt2 NEq = True
+primOpDomInt2 Add = True
+primOpDomInt2 Sub = True
+primOpDomInt2 Mul = True
+primOpDomInt2 Div = True
+primOpDomInt2 _   = False
+
 
 --------------------------------------------------------------------------------
 --
