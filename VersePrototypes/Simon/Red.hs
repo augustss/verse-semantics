@@ -813,7 +813,9 @@ reduceExp cxt parent@(Blk _ _ body)
         ks (Arr es') = Arr (e:es')
         ks e'        = error "findArr" (prettyShow e')
 
+------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
+-- Deal with (x=v) or (v=x)
 reduceVarVal cxt left_or_right parent x v
   | promotionOK parent x v
   = mkStep ("Promote" ++ left_or_right) (Promote x v) v
@@ -1161,10 +1163,13 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 
 reduceVerify :: ReductionContext -> Set Ident -> [Assump] -> Blk -> Reduction Exp
 reduceVerify cxt skols as blk
-  | BlkE (Val {}) <- blk
+  | Blk _ _ (Val {}) <- blk
   = Done "VVal" (Arr [])
+    -- We can finish up with
+    --  verify(r){ exists x {x <- r}. \y. x }
+    -- and this is a successful verification
 
-  | Just reason <- unsat as
+  | Just reason <- unsat all_as
   = Done ("VUnsat " ++ render (pPrint reason)) (Arr [])
 
   | otherwise
@@ -1185,10 +1190,13 @@ reduceVerify cxt skols as blk
     as'  = renameAssumps subst as
     blk' = renameBlk subst blk
 
+    all_as :: [Assump]  -- Includes outer assumptions
+    all_as = case rc_vcxt cxt of
+               NotVerifying       -> as'
+               Verifying outer_as -> outer_as ++ as'
+
     cxt' = cxt { rc_skols = rc_skols cxt `S.union` skols'
-               , rc_vcxt = case rc_vcxt cxt of
-                             NotVerifying       -> Verifying as'
-                             Verifying outer_as -> Verifying (outer_as ++ as') }
+               , rc_vcxt  = Verifying all_as }
 
 reduceVerifyOp :: ReductionContext -> PrimOp -> Exp -> Reduction Exp
 reduceVerifyOp cxt op arg
@@ -1198,7 +1206,14 @@ reduceVerifyOp cxt op arg
   | otherwise
   = case groundValue (rc_skols cxt) arg of
       Nothing -> RedNone
-      Just gv -> reduceVerifyOpGV cxt op gv
+      Just gv | isClosedGV gv -> RedNone
+              | otherwise     -> reduceVerifyOpGV cxt op gv
+
+isClosedGV :: GroundVal -> Bool
+isClosedGV (GVVar {})  = False
+isClosedGV (GVLit {})  = True
+isClosedGV (GVArr gvs) = all isClosedGV gvs
+isClosedGV (GVTru gv)  = isClosedGV gv
 
 reduceVerifyOpGV :: ReductionContext -> PrimOp -> GroundVal -> Reduction Exp
 reduceVerifyOpGV _cxt op _gv
@@ -1209,7 +1224,7 @@ reduceVerifyOpGV cxt op gv
   | Just arg_op <- isUnaryOp op
   , let check_args = mkArgCheck arg_op gv
   = VerStep ("VUnaryOp-" ++ show op) $
-    [ Res (FloatS S.empty [A_Neg assump]) Fail | assump <- check_args ] ++
+    [ Res (FloatS S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
     then [ Res (FloatS S.empty  [A_Neg rel_op]) Fail
          , Res (FloatS S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
@@ -1218,6 +1233,8 @@ reduceVerifyOpGV cxt op gv
     r = freshId cxt "r"
     rel_op = A_RelOp op gv
     bin_op = A_PrimOp r (AO_Prim op) gv
+    stuck :: Exp
+    stuck = Err (render (pPrint op <> brackets (pPrint gv)))
 
 -- Binary operators where the argument is a skolem
 reduceVerifyOpGV cxt op (GVVar r)
@@ -1235,7 +1252,7 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
   , let check_args :: [FailableAssump]
         check_args = mkArgCheck arg1_op gv1 ++ mkArgCheck arg2_op gv2
   = VerStep ("VBinOp-" ++ show op) $
-    [ Res (FloatS S.empty [A_Neg assump]) Fail | assump <- check_args ] ++
+    [ Res (FloatS S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
     then [ Res (FloatS S.empty  [A_Neg rel_op]) Fail
          , Res (FloatS S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
@@ -1244,6 +1261,8 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
     r = freshId cxt "r"
     rel_op = A_RelOp op gv
     bin_op = A_PrimOp r (AO_Prim op) gv
+    stuck :: Exp
+    stuck = Err (render (pPrint op <> brackets (pPrint gv)))
 
 mkArgCheck :: PrimOp -> GroundVal -> [FailableAssump]
 mkArgCheck IsAny _  = []
@@ -1302,6 +1321,7 @@ termBndrs tm = go tm
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Ident
 occfvs (Var x)        = sing x
+occfvs Err{}          = S.empty
 occfvs Lit{}          = S.empty
 occfvs Prm{}          = S.empty
 occfvs Lam{}          = S.empty
@@ -1324,9 +1344,10 @@ occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.diffe
 
 -- All /free/ variables
 freeVars :: Exp -> Set Ident
-freeVars (Var i)     = sing i
+freeVars (Err {})    = S.empty
 freeVars (Lit {})    = S.empty
 freeVars (Prm {})    = S.empty
+freeVars (Var i)     = sing i
 freeVars (Lam i e)   = i `S.delete` freeVarsBlk e
 freeVars (e1 :>  e2) = freeVars e1 `S.union` freeVars e2
 freeVars (e1 :=: e2) = freeVars e1 `S.union` freeVars e2
@@ -1429,6 +1450,7 @@ allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
 allVarsTerm (TTru t)    = allVarsTerm t
 
 expSize :: Exp -> Int
+expSize (Err {})    = 1
 expSize (Var {})    = 1
 expSize (Lit {})    = 1
 expSize (Prm {})    = 1
@@ -1492,6 +1514,7 @@ rename sub = ren
     ren :: Exp -> Exp
     ren e@(Var i) | Just j <- lookup i sub = Var j
                   | otherwise = e
+    ren e@(Err {}) = e
     ren e@(Lit {}) = e
     ren e@(Prm {}) = e
     ren (Lam i b) = let sub' = filter ((/= i) . fst) sub
