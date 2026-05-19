@@ -46,7 +46,7 @@ import GHC.Stack
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = False
+traceReductions = True
 
 --------------------------------------------------------------------------------
 --
@@ -586,6 +586,9 @@ run src = P $ evalBlk 1000000 top_blk
                   | otherwise         -> mkCrl (Blk is eqs expr)
           RedStep _ []                -> Fail
           RedStep _ [Res NoFloats b'] -> evalBlk (fuel-1) b'
+          -- Allow top level choices.  This cannot happen in a real program, but is useful for the REPL
+          RedStep _ rs | let bs = [ b' | Res NoFloats b' <- rs ], length rs == length bs
+                                      -> foldr1 (\ bb ee -> Blk S.empty [] bb :|: Blk S.empty [] ee) (map (evalBlk (fuel-1)) bs)
           RedStep _ _ -> error "impossible: findTopRedex StepC"  -- can only happen with depth>0
 
 initialBlk :: F.SrcEssential -> (ReductionContext, Blk)
