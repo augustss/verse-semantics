@@ -47,7 +47,7 @@ type Verbosity = Int
 type Fuel = Int
 
 lotsOfSteps :: Fuel
-lotsOfSteps = 1000
+lotsOfSteps = 10000
 
 data NormResult
   = NormOK        -- No rewrites apply
