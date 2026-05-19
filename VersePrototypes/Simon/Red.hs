@@ -717,8 +717,11 @@ reduceExp cxt parent@(Blk _ _ body)
         -- Promotion
         Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
                          -> redn
+{-
         Val v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
                          -> redn
+-}
+        HNF e  :=: Var x -> Done "Swap" $ Var x :=: e
 
         -- Primops
         Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
