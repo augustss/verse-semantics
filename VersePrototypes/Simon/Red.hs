@@ -860,12 +860,14 @@ reduceVarVal cxt left_or_right parent x (Arr vs)
     get_e (Just a,  av) = Var a :=: av
     get_e (Nothing, av) = av
 
-    RC { rc_vcxt = vcxt, rc_skols = skols } = cxt
+    RC { rc_skols = skols } = cxt
     cxt' = cxt { rc_skols = skols `S.union` as }
 
-    do_anf v | Verifying {} <- vcxt
+    x_is_skol = x `S.member` skols
+
+    do_anf v | x_is_skol -- `x` is a skolem
              = isNothing (groundValue skols v)
-             | otherwise
+             | otherwise -- `x` is an existential
              = case v of
                  Var {} -> False
                  _      -> not (S.null (freeVars v))
