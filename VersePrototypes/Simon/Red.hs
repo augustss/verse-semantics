@@ -411,8 +411,8 @@ data Result floats payload = Res floats payload
 
 data BlkFloats   -- Floating out the the innermost enclosing Blk
   = NoFloats
-  | FloatB (Set Ident) Heap    -- From (FloatB)
-  | Promote Ident Exp          -- From (Promote1) or (Promote2)
+  | FloatB (Set Ident) Heap         -- From (FloatB)
+  | Promote (Set Ident) Ident Exp   -- From (Promote)
   deriving (Eq, Show)
 
 data VerFloats   -- Floating out to the innermost enclosing Verify
@@ -467,9 +467,10 @@ instance Pretty a => Pretty (Reduction a) where
                                        , nest 2 (vcat (map pPrint rs)) ]
 
 instance Pretty BlkFloats where
-  pPrintPrec _ _ NoFloats        = empty
-  pPrintPrec _ _ (FloatB is eqs) = text "FB" <> parens (ppBlkIntro is eqs)
-  pPrintPrec _ _ (Promote i e)   = text "Prom" <> braces (ppr_eqn (i,e))
+  pPrintPrec _ _ NoFloats         = empty
+  pPrintPrec _ _ (FloatB is eqs)  = text "FB" <> parens (ppBlkIntro is eqs)
+  pPrintPrec _ _ (Promote is i e) = text "Prom" <> braces (sep [ fsep (map pPrint $ S.toList is) <> text ";"
+                                                               , ppr_eqn (i,e) ])
 
 instance Pretty VerFloats where
   pPrintPrec _ _ NoVerFloats     = empty
@@ -614,14 +615,20 @@ mergeStep :: HasCallStack => Blk -> Result BlkFloats Exp -> Result BlkFloats Blk
 mergeStep (Blk is eqs _) (Res NoFloats res_e)
   = Res NoFloats (Blk is eqs res_e)
 
-mergeStep (Blk is eqs _) (Res (Promote i v) res_e)
-  = assertP "mergeStepP1" (i `S.member` is)
-          (pPrint i $$ pPrint (S.toList is) $$
-          pPrint (map (==i) (S.toList is)) $$
-          pPrint (i `S.member` is)) $
+mergeStep (Blk is1 eqs _) (Res (Promote is2 i v) res_e)
+  = -- `i` should be in `is1`, the enclosing binders
+    assertP "mergeStepP1" (i `S.member` is1)
+          (vcat [ pPrint i,  pPrint (S.toList is1)
+                , pPrint (map (==i) (S.toList is1))
+                , pPrint (i `S.member` is1) ]) $
+    -- `i` should not be in the domain of `eqs`; we should have substitute instead
     assertP "mergeStepP2" (i `S.notMember` dom eqs) (pPrint (i, dom eqs)) $
+    -- Likewise the range `v` of the new binding (i<-v) should not have any occurs checks
     assertP "mergeStepP3" (occfvs v `S.disjoint` dom eqs) (pPrint (occfvs v, dom eqs)) $
-    Res NoFloats (Blk is ((i,v) : map (second $ substVal [(i,v)]) eqs) res_e)
+    -- `is2` should be disjoint to `is1`
+    assertP "mergeStepP4" (is1 `S.disjoint` is2) (pPrint is1 $$ pPrint is2) $
+    Res NoFloats (Blk (is1 `S.union` is2)
+                      ((i,v) : map (second $ substVal [(i,v)]) eqs) res_e)
     -- We must substitute for `i` in `eqs`;
     --   e.g. exists x,y { x<-y }.  ...(y=3)...
     -- When we promote (y=3) into the heap, we must substitute to get x<-3
@@ -715,13 +722,9 @@ reduceExp cxt parent@(Blk _ _ body)
               -> Done ("Subst " ++ show i) v
 
         -- Promotion
-        Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
-                         -> redn
-{-
-        Val v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
-                         -> redn
--}
         HNF e  :=: Var x -> Done "Swap" $ Var x :=: e
+        Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt parent x v)
+                         -> redn
 
         -- Primops
         Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
@@ -814,14 +817,40 @@ reduceExp cxt parent@(Blk _ _ body)
         ks e'        = error "findArr" (prettyShow e')
 
 ------------------------------------
-reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
--- Deal with (x=v) or (v=x)
-reduceVarVal cxt left_or_right parent x v
+reduceVarVal :: ReductionContext -> Blk -> Ident -> Val -> Reduction Exp
+-- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
+reduceVarVal cxt parent x (Arr vs)
+  | promotionOK parent x v'
+  = mkStep "PromoteT" (Promote as x xv) v'
+  where
+    prs :: [(Maybe Ident, Val)]
+    prs = zipWith mk_elt (freshIds cxt (repeat "a")) vs
+    as = S.fromList [ a | (Just a, _) <- prs ]
+
+    mk_elt a av | do_anf av = (Just a,  av)
+                | otherwise = (Nothing, av)
+
+    xv = Arr (map get_a prs)
+    v' = Arr (map get_e prs)
+
+    get_a :: (Maybe Ident,Val) -> Exp
+    get_a (Just a,  _)  = Var a
+    get_a (Nothing, av) = av
+
+    get_e :: (Maybe Ident,Val) -> Exp
+    get_e (Just a,  av) = Var a :=: av
+    get_e (Nothing, av) = av
+
+    do_anf (Var {}) = False
+    do_anf v        = not (S.null (freeVars v))
+
+reduceVarVal cxt parent x v
+-- Deal with non-tuple var/val equalities (x=v) or (v=x)
   | promotionOK parent x v
-  = mkStep ("Promote" ++ left_or_right) (Promote x v) v
+  = mkStep "Promote" (Promote S.empty x v) v
 
   | Just asm <- skolemEquality cxt x v
-  = VerStep ("VPromote" ++ left_or_right)
+  = VerStep "VPromote"
      [ Res (FloatS S.empty [A_Pos asm]) v
      , Res (FloatS S.empty [A_Neg asm]) Fail ]
 
@@ -1034,7 +1063,7 @@ reduceMatch cxt x tm blob
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> Blob -> Reduction Exp
 matchFun cxt f at fx bt blob
   = Done "MFun" $
-    fun_verify :>
+--    fun_verify :>
     the_lambda
   where
     (tbs_at, at') = freshenTerm cxt at
