@@ -190,9 +190,11 @@ testeq("Pat5",pass) {:int:=5}                             {5}       # LA is this
 # fail/wrong? testeq("Pat",pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
 testeq("Pat6",pass) {x:int:=1}                            {1}
 # fail/wrong? testeq("Pat",pass) {x:int:='a'}                          {:false}
-testeq("Pat7",pass) {succ(x:any)<closed>:=x+1; (y:succ):=1}       {2}   # XXX or 1?
-testeq("Pat8",pass) {succ(x:any)<closed>:=x+1; y:succ:=1; y}      {2}
-testeq("Pat9",pass) {succ(x:any)<closed>:int:=x+1; succ[5]}       {6}
+
+testeq("Pat7",pass) {succ(x:int)<closed>:=x+1; (y:succ):=1}       {2}   # XXX or 1?
+testeq("Pat8",pass) {succ(x:int)<closed>:=x+1; y:succ:=1; y}      {2}
+testeq("Pat9",pass) {succ(x:int)<closed>:int:=x+1; succ[5]}       {6}
+
 # XXX Not sure about these
 #testeq("Pat10",pass) {x? := 5; x}                          {array{5}}
 #testeq("Pat11",pass) {x? := 1/0; x}                        {array{}}
@@ -232,14 +234,16 @@ testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
 testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-verify("For6",fail) {upto(i:int, n:int)<closed> := { if (i > n) then :false else i | upto[i+1,n] };
-                     for(x:=upto[1,3]){x}}
+
 testeq("For6",fail,skip) {upto(i:int, n:int)<closed> := { if (i > n) then :false else i | upto[i+1,n] };
                      for(x:=upto[1,3]){x}}
                      {(1,2,3)}    # skip, because rejected by the verifier
   # For6: fail because `upto` <iterates>, and Verse does not allow that
   #       Even in testeq, the runtime check discovers this; c.f. check2
   # 'broken' because we no longer do a runtime check for cardinality
+  # We can't hope to verify this test either because the recursive function
+  #    has no return signature
+
 testeq("For6a",pass) {for(x:=1..3){x}}  {(1,2,3)}
 
 # tim=skip: runtime bug
@@ -316,8 +320,9 @@ testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[0]}}     {1}
 testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
 testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
+
 # These are very slow with alternative rules
-testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int)<closed>:=x+1; f[succ]}   {1}
+testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed><decides>:=x[0]; succ(x:int)<closed>:=x+1; f[succ]}   {1}
 testeq("EV16",pass,tim=F00) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int)<closed>:=(); f[badsucc]}  {wrong}
   # EV16: this should go WRONG.. i.e. it gets stuck
 
