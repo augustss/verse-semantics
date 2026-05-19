@@ -51,6 +51,7 @@ import Control.Monad( (>=>))
 -}
 
 import Epic.Print hiding ( (<>) )
+import Epic.List( orElse )
 import Data.Generics.Uniplate.Data( universeBi )
 
 import Text.Megaparsec( unPos )
@@ -474,7 +475,7 @@ run_test tflg test
   | otherwise
   = do { let evaluator = useEvaluator tflg
                          `orElse` testRunner test_info
-                         `orElse` EvalCore
+                         `orElse` EvalEssential
        ; test_res <- case evaluator of
                         EvalCore      -> doEvalCoreTest      tflg test
                         EvalEssential -> doEvalEssentialTest tflg test
@@ -527,11 +528,6 @@ testExprs :: Test -> (SrcExpr, SrcExpr)
 testExprs (TestVerify _ e)     = (e, Array [])
 testExprs (TestDenSem _ e1 e2) = (e1,e2)
 testExprs (TestEvalEq _ e1 e2) = (e1,e2)
-
-infixr 3 `orElse`
-orElse :: Maybe a -> a -> a
-orElse (Just x) _ = x
-orElse Nothing  y = y
 
 ----------------------------------------------------------------
 --

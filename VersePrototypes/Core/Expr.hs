@@ -658,7 +658,7 @@ instance Pretty Path where
 --------------------------------------------------------------------------------
 
 data GroundVal
-  = GVVar Ident
+  = GVVar SkolIdent
   | GVLit Lit
   | GVArr [GroundVal]
   | GVTru GroundVal
@@ -671,8 +671,9 @@ data Assump
   deriving( Eq, Ord, Show )
 
 data FailableAssump
-  = A_GVEq  Ident  GroundVal
-  | A_RelOp PrimOp GroundVal             -- (primOpCanFail op) is True
+  = A_GVEq  Ident  GroundVal   -- e.g. r=3
+  | A_RelOp PrimOp GroundVal   -- e.g. isInt$[r], or intGT$[r1,r2]
+                               -- A_RelOp invariant: (primOpCanFail op) is True
   deriving ( Eq, Ord, Show )
 
 data AssumpOp

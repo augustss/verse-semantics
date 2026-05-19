@@ -116,6 +116,7 @@ data Exp
   | SArr Blob Ident Term   -- e ~> t
 
   | Verify (Set SkolIdent) [Assump] Blk
+  | Err String             -- Stuck/error expression
   deriving (Eq, Show)
 
 data Blk = BlkX (Set Ident) Heap Exp
@@ -263,6 +264,7 @@ instance Pretty Exp where
   pPrintPrec l p (b1 :|: b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec l p (e1 :.. e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
   pPrintPrec _ _ Fail        = text "fail"
+  pPrintPrec _ _ (Err s)     = text "error" <> braces (text s)
 
 
   pPrintPrec l _ (Iter ic b1 b2)
@@ -434,13 +436,13 @@ data VerFloats   -- Floating out to the innermost enclosing Verify
 mapPayload :: (a -> b) -> [Result flt a] -> [Result flt b]
 mapPayload f rs = [ Res flt (f payload) | Res flt payload <- rs ]
 
-reductionFired :: Reduction a -> Bool
-reductionFired RedNone = False
-reductionFired _       = True
+reductionFired :: Reduction a -> Maybe (Reduction a)
+reductionFired RedNone = Nothing
+reductionFired r       = Just r
 
 orTry :: Reduction a -> Reduction a -> Reduction a
-orTry r1 r2 | reductionFired r1 = r1
-            | otherwise         = r2
+orTry RedNone r2 = r2
+orTry r1      _  = r1
 
 addInScopeExis :: ReductionContext -> Set Ident -> ReductionContext
 addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
@@ -712,35 +714,27 @@ reduceExp cxt parent@(Blk _ _ body)
     find :: Bool -> Exp -> Reduction Exp
     find leftCF expr =    -- leftCF means that the context to the left of the find is choice free
       case expr of
-        -- Scope and substitution
-        Var x  :=: Val v  | promotionOK parent x v
-                          -> mkStep "Promote1" (Promote x v) v
-                          | Just asm <- skolemEquality cxt x v
-                          -> VerStep "VPromote1"
-                             [ Res (FloatS S.empty [A_Pos asm]) v
-                             , Res (FloatS S.empty [A_Neg asm]) Fail ]
-        Val v  :=: Var x  | promotionOK parent x v
-                          -> mkStep "Promote2" (Promote x v) v
-                          | Just asm <- skolemEquality cxt x v
-                          -> VerStep "VPromote2"
-                             [ Res (FloatS S.empty [A_Pos asm]) v
-                             , Res (FloatS S.empty [A_Neg asm]) Fail ]
-
-        Var i             | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
-                          -> Done ("Subst " ++ show i) v
-
-        -- Floating {b}
+        -- Floating a nested block {b}
         Crl blk -> mkStep "FloatB" (FloatB is' eqs') e'
           where
             Blk is' eqs' e' = freshenBlk cxt blk
             -- GC rules handled above
 
+        -- Substitution
+        Var i | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
+              -> Done ("Subst " ++ show i) v
+
+        -- Promotion
+        Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
+                         -> redn
+        Val v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
+                         -> redn
+
         -- Primops
-        Prm op :@ v | reductionFired redn -> redn
+        Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
+                    -> redn
                     -- The guard is important; if the primop doesn't fire, we want to
                     -- fall through the "look at sub-expressions" code
-                    where
-                      redn = reducePrimOp cxt op v
 
         -- Unification
         Val v1       :=: Val v2 | v1 == v2                 -> Done    "EqVal" v1
@@ -753,7 +747,6 @@ reduceExp cxt parent@(Blk _ _ body)
 
         -- Sequencing
         Val{}  :>  e2                                      -> Done "Seq1" e2
-
 
         -- Unification, structural
         Val v  :=: (e1 :>  e2) -> Done "Norm1" $ e1 :> (v :=: e2)
@@ -831,6 +824,19 @@ reduceExp cxt parent@(Blk _ _ body)
         k e'         = Arr (e':es)
         ks (Arr es') = Arr (e:es')
         ks e'        = error "findArr" (prettyShow e')
+
+reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
+reduceVarVal cxt left_or_right parent x v
+  | promotionOK parent x v
+  = mkStep ("Promote" ++ left_or_right) (Promote x v) v
+
+  | Just asm <- skolemEquality cxt x v
+  = VerStep ("VPromote" ++ left_or_right)
+     [ Res (FloatS S.empty [A_Pos asm]) v
+     , Res (FloatS S.empty [A_Neg asm]) Fail ]
+
+  | otherwise
+  = RedNone
 
 promotionOK :: Blk -> Ident -> Val -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
@@ -1035,7 +1041,7 @@ reduceMatch cxt x tm blob
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> Blob -> Reduction Exp
 matchFun cxt f at fx bt blob
   = Done "MFun" $
-    fun_verify :>
+--    fun_verify :>
     the_lambda
   where
     (tbs_at, at') = freshenTerm cxt at
@@ -1206,7 +1212,7 @@ reduceVerifyOp cxt op arg
 
 reduceVerifyOpGV :: ReductionContext -> PrimOp -> GroundVal -> Reduction Exp
 reduceVerifyOpGV _cxt op _gv
-  | primOpIsCheck op
+  | primOpIsCheck op    -- ??
   =  RedNone
 
 reduceVerifyOpGV cxt op gv
@@ -1267,7 +1273,7 @@ groundValue :: Set SkolIdent -> Exp -> Maybe GroundVal
 groundValue _  (Lit l)                   = Just (GVLit l)
 groundValue rs (Var v) | v `S.member` rs = Just (GVVar v)
 groundValue rs (Arr vs)                  = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
--- groundValue rs (Tru v)                   = do gv <- groundValue rs v; Just (GVTru gv)
+groundValue rs (Tru v)                   = do { gv <- groundValue rs v; Just (GVTru gv) }
 groundValue _  _                         = Nothing
 
 --------------------------------------------------------------------------------

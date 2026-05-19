@@ -10,7 +10,7 @@ module Epic.List(
     pattern Snoc,
     nub, nubKey, (\\), noDups,
     takeUntil, dropUntil, groupKey,
-    firstJust,
+    firstJust, orElse,
     mapFst, mapSnd
   ) where
 
@@ -109,6 +109,13 @@ dropUntil p (x:xs) | p x       = xs
                    | otherwise = dropUntil p xs
 
 ---------
+-- Maybe utilities
 
 firstJust :: [Maybe a] -> Maybe a
 firstJust = listToMaybe . catMaybes
+
+infixr 3 `orElse`
+orElse :: Maybe a -> a -> a
+orElse (Just x) _ = x
+orElse Nothing  y = y
+
