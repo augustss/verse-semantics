@@ -12,6 +12,7 @@ module Red( Blk(Blk, BlkX), Exp(..), Term(..)
   ) where
 
 import Prelude hiding ((<>))
+import Data.Graph(stronglyConnComp, SCC(..))
 
 import qualified FrontEnd.Expr as F
 import FrontEnd.ToCore( toCoreEff )
@@ -692,10 +693,17 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns, rc_exis = exis }) blk
     else res
 
   where
-    -- XXX This needs to construct SCCs from uses inside lambda
     dead_vars :: Set Ident  -- Subset of locals that are unused
-    dead_vars = locals' `S.difference`
-                (freeVars expr' `S.union` (S.unions (map (freeVars . snd) leqns')))
+    dead_vars =
+        let graph = [ (eqn, i, S.toList $ freeVars e) | eqn@(i, e) <- leqns' ]
+            sccs = stronglyConnComp graph
+            used = foldr f (freeVars expr') sccs
+              where f (AcyclicSCC (i, e)) u | i `S.notMember` u = u
+                                            | otherwise         = freeVars e `S.union` u
+                    f (CyclicSCC ies)     u | S.fromList is `S.disjoint` u = u
+                                            | otherwise         = S.unions (u : map freeVars es)
+                                            where (is, es) = unzip ies
+        in  locals' `S.difference` used
 
     blk'@(Blk locals' leqns' expr') = freshenBlk cxt blk
     cxt' = cxt { rc_depth  = d + 1
