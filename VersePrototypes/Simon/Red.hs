@@ -76,7 +76,6 @@ data Term
   | TFail                     -- fail
   | Term :=:% Term            -- t1 = t2
   | Term :@%  Term            -- t1[t2]
-  | Term :..% Term            -- t1 .. t2
   | TArr [Term]               -- array{t1,...,t2}
   | TOfType Term Effect Term  -- t1 |><fx> t2
   | TTru Term                 -- truth{t}
@@ -104,7 +103,6 @@ data Exp
   | Fail                  -- fail
   | Exp :=: Exp           -- e1 = e2
   | Exp :@  Exp           -- e1[e2]
-  | Exp :.. Exp           -- e1 .. e2
   | Arr [Exp]             -- array{e1,...,e2}
   | OfType Exp Effect Exp -- e1 |><fx> e2
   | Tru Exp               -- truth{e{
@@ -222,7 +220,6 @@ instance Pretty Term where
   pPrintPrec l _ (TTru e)   = text "truth" <> braces (pPrintL l e)
 
   pPrintPrec l p (b1 :|:% b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
-  pPrintPrec l p (e1 :..% e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
   pPrintPrec _ _ TFail        = text "fail"
 
   pPrintPrec l _ (If t1 t2 t3) = sep [text "if" <> parens (pPrintL l t1), nest 2 (braces (pPrintL l t2)), text "else", nest 2 (braces (pPrintL l t3)) ]
@@ -262,7 +259,6 @@ instance Pretty Exp where
   pPrintPrec l _ (Crl b)     = braces $ pPrintPrec l 0 b
   pPrintPrec l _ (Dly e)     = text "delay" <> braces (pPrintL l e)
   pPrintPrec l p (b1 :|: b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
-  pPrintPrec l p (e1 :.. e2) = maybeParens (p > 7) $ pPrintPrec l 8 e1 <> text ".." <> pPrintPrec l 8 e2
   pPrintPrec _ _ Fail        = text "fail"
   pPrintPrec _ _ (Err s)     = text "error" <> braces (text s)
 
@@ -382,14 +378,6 @@ srcToTerm (F.OfType t1 fx t2)
 srcToTerm (F.One e)              = If (x := srcToTerm e) (TVar x) TFail
   where
     x = mkName "oneBinder"  -- Hack; hope this is not free in 'e'!
-
--- Special case for operator'..'[ t1, t2 ]
--- We want to turn that into the syntactic form (t1 @.. t2),
--- because ".." plays a special role in pattern matching
-srcToTerm (F.ApplyD e1 e2)
-  | F.Variable (F.Ident _ "operator'..'") <- e1
-  , F.Array [e2a, e2b] <- e2     = srcToTerm e2a :..% srcToTerm e2b
-
 srcToTerm (F.ApplyD e1 e2)       = srcToTerm e1 :@% srcToTerm e2
 srcToTerm (F.Exists is e)        = TBlock (foldr bind_one (srcToTerm e) is)
                                  where
@@ -754,10 +742,6 @@ reduceExp cxt parent@(Blk _ _ body)
         (e1 :> e2) :=: e3      -> Done "Norm3" $ e1 :> (e2 :=: e3)
         (Val v :=: e1) :=: e2  -> Done "Norm4" $ (v :=: e1) :> (v :=: e2)
 
-        IntE l :.. IntE h     -> Done "Enum"  $ if h < l then Fail else foldr alt Fail [l .. h]
-          where
-            alt i et = BlkE (IntE i) :|: BlkE et
-
         -- Beta (\x.blk)[a] -->  exists x. x = a; blk
         -- NOTE: it should be enough to match with eqs=[]
         Lam x blk :@ arg
@@ -800,7 +784,6 @@ reduceExp cxt parent@(Blk _ _ body)
         e1 :>  e2  -> find2   leftCF (:>)  e1 e2
         e1 :=: e2  -> find2   leftCF (:=:) e1 e2
         e1 :@  e2  -> find2   leftCF (:@)  e1 e2
-        e1 :.. e2  -> find2   leftCF (:..) e1 e2
         Arr es     -> findArr leftCF es
         Tru e      -> find1 leftCF Tru e
 
@@ -855,6 +838,7 @@ reducePrimOp cxt op e
     reduceCheckOp op e `orTry`
     reduceArrOp   op e `orTry`
     reduceTruOp   op e `orTry`
+    reduceDotDot  op e `orTry`
     reduceVerifyOp cxt op e
 
 -----------------
@@ -892,6 +876,12 @@ reduceRelOp Gt  (Arr [IntE i, IntE j]) | i>j       = Done    "Prim-Gt"  $ IntE i
 reduceRelOp NEq (Arr [IntE i, IntE j]) | i/=j      = Done    "Prim-NEq" $ IntE i
                                         | otherwise = Failure "Prim-NEq"
 reduceRelOp _ _ = RedNone
+
+-----------------
+reduceDotDot :: PrimOp -> Exp -> Reduction Exp
+-- Return multiple results for the enumeration.  Get stuck outside the domain
+reduceDotDot DotDot (Arr [IntE l, IntE h]) = RedStep "Prim.." [Res NoFloats (IntE i) | i <- [l .. h]]
+reduceDotDot _ _ = RedNone
 
 -----------------
 reduceCheckOp :: PrimOp -> Exp -> Reduction Exp
@@ -994,10 +984,6 @@ reduceMatch cxt x tm blob
         (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: SArr blob x t
         (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> SArr NoBlob i t
                       -- XXX should this be NoBlob
-
-        (t1 :..% t2) -> mkStep "MEnum" (mkExiFloat [u1,u2]) $
-                        Var x :=: ((u1 ~~> t1) :.. (u2 ~~> t2))
-                      where (u1,u2) = freshIds2 cxt "u"
 
         -- Tuples and functions
         TArr ts      -> matchTup cxt x ts blob
@@ -1152,7 +1138,6 @@ choiceFree Fail = True
 choiceFree (e1 :=: e2) = choiceFree e1 && choiceFree e2
 choiceFree (SArr _ _ _) = False         -- force ~> to happen
 choiceFree (e1 :@ e2) = choiceFree e1 && choiceFree e2
-choiceFree (e1 :.. e2) = choiceFree e1 && choiceFree e2
 choiceFree (Arr es) = and (map choiceFree es)
 choiceFree (Iter _ b1 e2) = choiceFreeB b1 && choiceFree e2
 choiceFree (Crl b) = choiceFreeB b
@@ -1294,7 +1279,6 @@ termBndrs tm = go tm
     go (t1 `Where` t2)   = go t1 `S.union` go t2
     go (t1 :=:% t2)      = go t1 `S.union` go t2
     go (t1 :@% t2)       = go t1 `S.union` go t2
-    go (t1 :..% t2)      = go t1 `S.union` go t2
     go TFail{}           = S.empty
     go (_ :|:% _)        = S.empty
     go (TArr ts)         = S.unions $ map go ts
@@ -1323,7 +1307,6 @@ occfvs Fail           = S.empty
 occfvs (e1 :=: e2)    = occfvs e1 `S.union` occfvs e2
 occfvs (SArr _ i _)   = sing i  -- XXX what should we do here
 occfvs (e1 :@ e2)     = occfvs e1 `S.union` occfvs e2
-occfvs (e1 :.. e2)    = occfvs e1 `S.union` occfvs e2
 occfvs (Arr es)       = S.unions (map occfvs es)
 occfvs (Iter _ b1 e2) = occfvsB b1 `S.union` occfvs e2
 occfvs (Crl b)        = occfvsB b
@@ -1346,7 +1329,6 @@ freeVars (SArr _ i t) = sing i `S.union` freeVarsTerm t
 freeVars (e1 :@  e2) = freeVars e1 `S.union` freeVars e2
 freeVars (Arr es)    = S.unions $ map freeVars es
 freeVars (b1 :|: b2) = freeVarsBlk b1 `S.union` freeVarsBlk b2
-freeVars (e1 :.. e2) = freeVars e1 `S.union` freeVars e2
 freeVars Fail        = S.empty
 freeVars (Dly e)     = freeVars e
 freeVars (Crl b)     = freeVarsBlk b
@@ -1376,7 +1358,6 @@ freeVarsTerm (Fun t1 _ t2) = (freeVarsTerm t1 `S.union` freeVarsTermBlock t2)
 freeVarsTerm (Rng e)       = freeVarsTerm e
 freeVarsTerm (TArr es)     = S.unions $ map freeVarsTerm es
 freeVarsTerm (b1 :|:% b2)  = freeVarsTermBlock b1 `S.union` freeVarsTermBlock b2
-freeVarsTerm (e1 :..% e2)  = freeVarsTerm e1 `S.union` freeVarsTerm e2
 freeVarsTerm TFail         = S.empty
 freeVarsTerm (If t1 t2 t3) = ((freeVarsTerm t1 `S.union` freeVarsTermBlock t2)
                               `S.difference` termBndrs t1)
@@ -1406,7 +1387,6 @@ allVars (SArr _ i e) = i : allVarsTerm e
 allVars (e1 :@  e2) = allVars e1 ++ allVars e2
 allVars (Arr es)    = concatMap allVars es
 allVars (b1 :|: b2) = allVarsBlk b1 ++ allVarsBlk b2
-allVars (e1 :.. e2) = allVars e1 ++ allVars e2
 allVars Fail        = []
 allVars (Dly e)     = allVars e
 allVars (Crl b)     = allVarsBlk b
@@ -1433,7 +1413,6 @@ allVarsTerm (Fun e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
 allVarsTerm (Rng e) = allVarsTerm e
 allVarsTerm (TArr es) = concatMap allVarsTerm es
 allVarsTerm (b1 :|:% b2) = allVarsTerm b1 ++ allVarsTerm b2
-allVarsTerm (e1 :..% e2) = allVarsTerm e1 ++ allVarsTerm e2
 allVarsTerm TFail = []
 allVarsTerm (If t1 t2 t3) = allVarsTerm t1 ++ allVarsTerm t2 ++ allVarsTerm t3
 allVarsTerm (For t1 t2) = allVarsTerm t1 ++ allVarsTerm t2
@@ -1455,7 +1434,6 @@ expSize (SArr _ _  e) = 2 + termSize e
 expSize (e1 :@  e2) = 1 + expSize e1 + expSize e2
 expSize (Arr es)    = 1 + sum (map expSize es)
 expSize (b1 :|: b2) = 1 + blkSize b1 + blkSize b2
-expSize (e1 :.. e2) = 1 + expSize e1 + expSize e2
 expSize Fail        = 1
 expSize (Dly e)     = 1 + expSize e
 expSize (Crl b)     = 1 + blkSize b
@@ -1485,7 +1463,6 @@ termSize (Fun e1 _ e2)     = 1 + termSize e1 + termSize e2
 termSize (Rng e)           = 1 + termSize e
 termSize (TArr es)         = 1 + sum (map termSize es)
 termSize (b1 :|:% b2)      = 1 + termSize b1 + termSize b2
-termSize (e1 :..% e2)      = 1 + termSize e1 + termSize e2
 termSize TFail             = 1
 termSize (If t1 t2 t3)     = 1 + termSize t1 + termSize t2 + termSize t3
 termSize (For t1 t2)       = 1 + termSize t1 + termSize t2
@@ -1521,7 +1498,6 @@ rename sub = ren
     ren (e1 :@ e2) = ren e1 :@ ren e2
     ren (Arr es) = Arr (map ren es)
     ren (b1 :|: b2) = renB b1 :|: renB b2
-    ren (e1 :.. e2) = ren e1 :.. ren e2
     ren e@Fail = e
     ren (Dly e) = Dly (ren e)
     ren (Iter ic b1 e2) = Iter ic (renB b1) (ren e2)
@@ -1549,7 +1525,6 @@ renameTerm sub term = go term
     go (e1 :@% e2)        = go e1 :@% go e2
     go (TArr es)          = TArr (map go es)
     go (b1 :|:% b2)       = go b1 :|:% go b2
-    go (e1 :..% e2)       = go e1 :..% go e2
     go (Where t1 t2)      = Where (go t1) (go t2)
     go (For t1 t2)        = For (go t1) (go t2)
     go (If t1 t2 t3)      = If (go t1) (go t2) (go t3)
