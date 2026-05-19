@@ -491,9 +491,10 @@ mkName s = Name s
 mkCons :: Exp -> Exp -> Exp  -- Array cons
 mkCons a as = Prm ArrCons :@ Arr [a, as]
 
-mkCons2 :: Exp -> Exp -> Exp -> Exp
+mkCons2 :: ReductionContext -> Exp -> Exp -> Exp -> Exp
 -- cons2 = \xy. \xys. exists x y <xs,ys> = <cons x xs, cons y ys>
-mkCons2 x y xys
+-- Note: x, y, and xys are expressions, so we need to avoid accudental capture in those.
+mkCons2 cxt x y xys
   = Crl $ Blk (S.fromList [xs,ys,ar]) emptyHeap $
     -- We need have the two Arr in this order, otherwise choices
     -- in the body of a 'for' will come in the wrong order.
@@ -502,9 +503,7 @@ mkCons2 x y xys
     (Arr [Var xs, Var ys] :=: xys) :>
     Var ar
   where
-    xs  = mkName "xs"
-    ys  = mkName "ys"
-    ar  = mkName "ar"
+    (xs, ys, ar)  = freshId3 cxt ("xs", "ys", "ar")
 
 thePrelude :: [Eqn]
 thePrelude
@@ -1030,7 +1029,7 @@ reduceMatch cxt x tm blob
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> Blob -> Reduction Exp
 matchFun cxt f at fx bt blob
   = Done "MFun" $
---    fun_verify :>
+    fun_verify :>
     the_lambda
   where
     (tbs_at, at') = freshenTerm cxt at
@@ -1059,7 +1058,7 @@ reduceIter _ IF (Blk is eqs (Dly e)) _
 
 reduceIter cxt FOR blk@(Blk _ _ Val{}) e2
   = mkStep "IFor" (mkExiFloat1 x)
-                  (mkCons2 (Var x) (mkCrl blk :@ Var x) e2)
+                  (mkCons2 cxt (Var x) (mkCrl blk :@ Var x) e2)
   where
     x = freshId cxt "x"
 
@@ -1605,7 +1604,7 @@ freshenBndrs (RC { rc_exis = exis, rc_skols = skols }) bndrs
        where
          lcl' = findFresh bad lcl
          subst_acc' = (lcl,lcl'):subst_acc
-         bad x = x `S.member` in_scope || any (bad_rng x) subst_acc
+         bad x = x `S.member` in_scope || any (bad_rng x) subst_acc || x `S.member` bndrs
          bad_rng x (_,y') = x==y'
 
 freshId :: ReductionContext -> String -> Ident
