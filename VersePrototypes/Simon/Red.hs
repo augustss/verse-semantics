@@ -47,7 +47,7 @@ import GHC.Stack
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = True
+traceReductions = False
 
 --------------------------------------------------------------------------------
 --
@@ -569,7 +569,9 @@ runTraced fuel src
           RedStep rule_nm []
              -> Just $ TS { ts_str = rule_nm, ts_payload = BlkE Fail, ts_verb = 1 }
           RedStep rule_nm [Res NoFloats blk']
-             -> Just $ TS { ts_str = rule_nm, ts_payload = blk', ts_verb = 1 }
+             -> -- ppTrace ("------ runTraced: " ++ rule_nm ++ " ----------------")
+                --        (pPrint blk' $$ text "") $
+                Just $ TS { ts_str = rule_nm, ts_payload = blk', ts_verb = 1 }
           red -> error ("runTraced" ++ show red)
 
 run :: F.SrcEssential -> PExp
@@ -1580,7 +1582,7 @@ rename sub = ren
     ren e@(Prm {}) = e
     ren e@(Lam i b) | i `elem` map snd sub =
       -- We need to rename i to something else
-      let i' = findFresh (`notElem` (allVars e ++ map snd sub)) i   -- find an unused variable
+      let i' = findFresh (`elem` (allVars e ++ map snd sub)) i   -- find an unused variable
       in  ren (Lam i' (renameBlk [(i, i')] b))
     ren (Lam i b) = let sub' = filter ((/= i) . fst) sub
                     in Lam i (renameBlk sub' b)
