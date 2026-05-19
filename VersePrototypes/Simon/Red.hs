@@ -1539,7 +1539,11 @@ termSize (TTru t)          = 1 + termSize t
 
 type Renaming = Subst Ident
 
+rangeSubst :: Ord a => Subst a -> S.Set a
+rangeSubst = S.fromList . map snd
+
 rename :: Renaming -> Exp -> Exp
+rename [] = id
 rename sub = ren
   where
     ren :: Exp -> Exp
@@ -1548,6 +1552,10 @@ rename sub = ren
     ren e@(Err {}) = e
     ren e@(Lit {}) = e
     ren e@(Prm {}) = e
+    ren e@(Lam i b) | i `elem` map snd sub =
+      -- We need to rename i to something else
+      let i' = findFresh (`notElem` (allVars e ++ map snd sub)) i   -- find an unused variable
+      in  ren (Lam i' (renameBlk [(i, i')] b))
     ren (Lam i b) = let sub' = filter ((/= i) . fst) sub
                     in Lam i (renameBlk sub' b)
     ren (Var i :=: Var j) | Just j' <- lookup i sub, j == j' = Var j
@@ -1598,6 +1606,12 @@ renameTerm sub term = go term
     go (TTru t)           = TTru (go t)
 
 renameBlk :: Renaming -> Blk -> Blk
+renameBlk sub b@(Blk is _ e) | not (S.disjoint (rangeSubst sub) is)
+  -- If the range of the substitution clashesm we freshen the block.
+  -- Freshening uses a reduction context, so we fake one.  UGLY!
+  = renameBlk sub (freshenBlk fakeCxt b)
+  where fakeCxt = RC { rc_depth = undefined, rc_exis = freeVars e `S.union` is `S.union` rangeSubst sub
+                     , rc_eqns = undefined, rc_skols = S.empty, rc_vcxt = undefined }
 renameBlk sub (Blk is eqs e)
   = Blk is (renameEqns sub' eqs) (rename sub' e)
   where
