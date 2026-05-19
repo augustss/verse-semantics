@@ -653,10 +653,12 @@ data ReductionContext
        , rc_skols  :: Set Ident
        , rc_vcxt   :: VerificationContext
     }
+    deriving (Show)
 
 data VerificationContext
   = NotVerifying
   | Verifying [Assump]    -- In-scope assumnptions for the rc_skols
+    deriving (Show)
 
 --------------------------------------------------------------------------------
 --
@@ -1030,21 +1032,21 @@ reduceMatch cxt x tm blob
         If t0 t1 t2  -> Done "MIf" $
                         Iter IF (Blk (sing u `S.union` tbs0) emptyHeap $
                                  (u ~~> t0') :>
-                                 (Dly (SArr blob x (TBlock t1))))
+                                 (Dly (SArr blob x (TBlock t1'))))
                                 (SArr blob x (TBlock t2))
                       where
-                        (tbs0, t0') = freshenTerm cxt t0
+                        (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
                         u = freshId (cxt `addInScopeExis` tbs0) "u"
 
         For t0 t1    -> mkStep "MFor" (mkExiFloat1 y) $
                         (Arr [Var x, Var y] :=:
                          Iter FOR (Blk (sing u `S.union` tbs0) emptyHeap $
                                    (u ~~> t0') :>
-                                   (Lam w (BlkE $ SArr blob w (TBlock t1))))
+                                   (Lam w (BlkE $ SArr blob w (TBlock t1'))))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                       where
-                        (tbs0, t0') = freshenTerm cxt t0
+                        (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
                         (y,u,w) = freshId3 (cxt `addInScopeExis` tbs0) ("y","u","w")
 
         TOfType t1 fx t2 -> mkStep ("TOfType " ++ show fx) (mkExiFloat [u1,u2]) $
@@ -1063,16 +1065,16 @@ reduceMatch cxt x tm blob
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> Blob -> Reduction Exp
 matchFun cxt f at fx bt blob
   = Done "MFun" $
---    fun_verify :>
+    fun_verify :>
     the_lambda
   where
-    (tbs_at, at') = freshenTerm cxt at
+    (tbs_at, at', bt') = freshenTerm2 cxt at bt
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
     the_lambda = Lam u $ Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
                  (Var p :=: SArr NoBlob u at')       :>
                  (if blob == NoBlob then ((Var q :=: (Var f :@ Var p)) :>)
                                     else ( (IntE 99999) :>))
-                 (SArr blob q (TBlock bt))
+                 (SArr blob q (TBlock bt'))
 
     fun_verify = Verify (sing u) [] $
                  Blk tbs_at emptyHeap $
@@ -1635,6 +1637,16 @@ freshenTerm cxt term
   | otherwise  = (tbndrs', renameTerm subst term)
   where
     tbndrs = termBndrs term
+    (subst, tbndrs') = freshenBndrs cxt tbndrs
+
+-- Use to freshen if/for/fun, because renamings from term1
+-- also need to apply to term2.
+freshenTerm2 :: ReductionContext -> Term -> Term -> (Set Ident, Term, Term)
+freshenTerm2 cxt term1 term2
+  | null subst = (tbndrs, term1, term2)
+  | otherwise  = (tbndrs', renameTerm subst term1, renameTerm subst term2)
+  where
+    tbndrs = termBndrs term1
     (subst, tbndrs') = freshenBndrs cxt tbndrs
 
 freshenBlk :: ReductionContext -> Blk -> Blk
