@@ -42,7 +42,7 @@ module Core.Expr
 
   -- Primops
   , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest, primOpIsCheck
-  , primOpDomInt1, primOpDomInt2
+  , isUnaryOp, isBinOp
   ) where
 
 import Prelude hiding( (<>) )
@@ -574,24 +574,27 @@ primOpIsTypeTest IsType = True
 primOpIsTypeTest IsComp = False  -- Not really a type test
 primOpIsTypeTest _      = False
 
-primOpDomInt1 :: PrimOp -> Bool
--- Primop takes one Int argument
-primOpDomInt1 Neg = True
-primOpDomInt1 Pls = True
-primOpDomInt1 _   = False
+isUnaryOp :: PrimOp -> Maybe PrimOp
+-- Returns the type-testing primop for the argument
+isUnaryOp Pls                      = Just IsInt
+isUnaryOp Neg                      = Just IsInt
+isUnaryOp op | primOpIsTypeTest op = Just IsAny
+isUnaryOp ArrLen                   = Just IsArr
+isUnaryOp _                        = Nothing
 
-primOpDomInt2 :: PrimOp -> Bool
--- Primop takes two Int arguments
-primOpDomInt2 Gt  = True
-primOpDomInt2 GEq = True
-primOpDomInt2 Lt  = True
-primOpDomInt2 LEq = True
-primOpDomInt2 NEq = True
-primOpDomInt2 Add = True
-primOpDomInt2 Sub = True
-primOpDomInt2 Mul = True
-primOpDomInt2 Div = True
-primOpDomInt2 _   = False
+isBinOp :: PrimOp -> Maybe (PrimOp, PrimOp)
+isBinOp Gt     = Just (IsInt, IsInt)
+isBinOp Lt     = Just (IsInt, IsInt)
+isBinOp NEq    = Just (IsInt, IsInt)
+isBinOp GEq    = Just (IsInt, IsInt)
+isBinOp LEq    = Just (IsInt, IsInt)
+isBinOp Add    = Just (IsInt, IsInt)
+isBinOp Sub    = Just (IsInt, IsInt)
+isBinOp Mul    = Just (IsInt, IsInt)
+isBinOp Div    = Just (IsInt, IsInt)
+isBinOp DotDot = Just (IsInt, IsInt)
+isBinOp ArrMap = Just (IsFun, IsArr)
+isBinOp _      = Nothing
 
 
 --------------------------------------------------------------------------------
@@ -655,7 +658,7 @@ instance Pretty Path where
 --------------------------------------------------------------------------------
 
 data GroundVal
-  = GVVar {gv_var :: Ident}
+  = GVVar Ident
   | GVLit Lit
   | GVArr [GroundVal]
   | GVTru GroundVal

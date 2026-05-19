@@ -21,8 +21,8 @@ import Core.Traced
 import Core.Solver( unsat )
 import Core.Expr as C ( Assump, Effect(..), Lit(..), PrimOp(..)
                       , GroundVal(..), Assump(..), FailableAssump(..), AssumpOp(..)
-                      , primOpIsCheck, primOpCanFail, primOpIsTypeTest, substAssump
-                      , primOpDomInt1, primOpDomInt2 )
+                      , primOpIsCheck, primOpCanFail, substAssump
+                      , isUnaryOp, isBinOp )
 import Core.Bind as C
 
 import Epic.Print
@@ -427,7 +427,7 @@ data BlkFloats   -- Floating out the the innermost enclosing Blk
 
 data VerFloats   -- Floating out to the innermost enclosing Verify
   = NoVerFloats
-  | FloatS SkolIdent Assump
+  | FloatS (Set SkolIdent) [Assump]
   deriving (Eq, Show)
 
 
@@ -444,9 +444,6 @@ orTry r1 r2 | reductionFired r1 = r1
 
 addInScopeExis :: ReductionContext -> Set Ident -> ReductionContext
 addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
-
-addInScopeSkols :: ReductionContext -> Set Ident -> ReductionContext
-addInScopeSkols cxt bndrs = cxt { rc_skols = rc_skols cxt `S.union` bndrs }
 
 mkExiFloat1 :: Ident -> BlkFloats
 -- Single existential only, no heap
@@ -718,8 +715,16 @@ reduceExp cxt parent@(Blk _ _ body)
         -- Scope and substitution
         Var x  :=: Val v  | promotionOK parent x v
                           -> mkStep "Promote1" (Promote x v) v
+                          | Just asm <- skolemEquality cxt x v
+                          -> VerStep "VPromote1"
+                             [ Res (FloatS S.empty [A_Pos asm]) v
+                             , Res (FloatS S.empty [A_Neg asm]) Fail ]
         Val v  :=: Var x  | promotionOK parent x v
                           -> mkStep "Promote2" (Promote x v) v
+                          | Just asm <- skolemEquality cxt x v
+                          -> VerStep "VPromote2"
+                             [ Res (FloatS S.empty [A_Pos asm]) v
+                             , Res (FloatS S.empty [A_Neg asm]) Fail ]
 
         Var i             | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
                           -> Done ("Subst " ++ show i) v
@@ -1175,10 +1180,10 @@ reduceVerify cxt skols as blk
     wrap_blk (Res NoFloats blk'') = Verify skols' as' blk''
     wrap_blk r = error ("reduceVerify " ++ render (pPrint r))
 
-    wrap_ver (Res NoVerFloats blk'')      = Verify skols' as' blk''
-    wrap_ver (Res (FloatS skv asm) blk'') = Verify (skv `S.insert` skols')
-                                                   (asm : as')
-                                                   blk''
+    wrap_ver (Res NoVerFloats blk'')       = Verify skols' as' blk''
+    wrap_ver (Res (FloatS sks asms) blk'') = Verify (sks `S.union` skols')
+                                                    (asms ++ as')
+                                                    blk''
 
     (subst, skols') = freshenBndrs cxt skols
     as'  = renameAssumps subst as
@@ -1197,41 +1202,65 @@ reduceVerifyOp cxt op arg
   | otherwise
   = case groundValue (rc_skols cxt) arg of
       Nothing -> RedNone
-      Just gv | primOpIsCheck op -> RedNone
-              | primOpCanFail op -> VerStep ("VF-"++show op ++ " " ++ render (pPrint gv)) $
-                                    do_rel_op   gv
-              | otherwise        -> VerStep ("VP-"++show op ++ " " ++ render (pPrint gv)) $
-                                    do_arith_op gv
+      Just gv -> reduceVerifyOpGV cxt op gv
+
+reduceVerifyOpGV :: ReductionContext -> PrimOp -> GroundVal -> Reduction Exp
+reduceVerifyOpGV _cxt op _gv
+  | primOpIsCheck op
+  =  RedNone
+
+reduceVerifyOpGV cxt op gv
+  | Just arg_op <- isUnaryOp op
+  , let check_args = mkArgCheck arg_op gv
+  = VerStep ("VUnaryOp-" ++ show op) $
+    [ Res (FloatS S.empty [A_Neg assump]) Fail | assump <- check_args ] ++
+    if primOpCanFail op
+    then [ Res (FloatS S.empty  [A_Neg rel_op]) Fail
+         , Res (FloatS S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
+    else [ Res (FloatS (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
   where
     r = freshId cxt "r"
-    cxt' = addInScopeSkols cxt (sing r)
+    rel_op = A_RelOp op gv
+    bin_op = A_PrimOp r (AO_Prim op) gv
 
-    do_rel_op :: GroundVal -> [Result VerFloats Exp]
-    do_rel_op gv
-      = [ Res (FloatS r (A_Pos (A_RelOp op gv))) (domChecks cxt' op arg `mkSeq` (Var r))
-        , Res (FloatS r (A_Neg (A_RelOp op gv))) Fail    ]
-
-    do_arith_op :: GroundVal -> [Result VerFloats Exp]
-    do_arith_op gv
-      = [ Res (FloatS r (A_PrimOp r (AO_Prim op) gv))
-              (domChecks cxt' op arg `mkSeq` (Var r)) ]
-
-domChecks :: ReductionContext -> PrimOp -> Exp -> Exp
-domChecks cxt op arg
-  | primOpIsTypeTest op = Arr []
-  | primOpDomInt1 op    = domCheckInt1 cxt arg
-  | primOpDomInt2 op    = domCheckInt2 cxt arg
-  | otherwise = error ("domChecks: " ++ render (pPrint op))
-
-domCheckInt1 :: ReductionContext -> Exp -> Exp
-domCheckInt1 _cxt arg  = Prm IsInt :@ arg
-
-domCheckInt2 :: ReductionContext -> Exp -> Exp
-domCheckInt2 _ (Arr [arg1,arg2]) = Prm IsInt :@ arg1 :> Prm IsInt :@ arg2
-domCheckInt2 cxt arg             = (arg :=: Arr [Var r1, Var r2]) :>
-                                   Prm IsInt :@ (Var r1) :> Prm IsInt :@ (Var r2)
+-- Binary operators where the argument is a skolem
+reduceVerifyOpGV cxt op (GVVar r)
+  | Just {} <- isBinOp op
+  = VerStep "VBinOp-Arr" [ Res (FloatS rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
+                         , Res (FloatS rs [A_Neg eq_asm]) Fail ]
   where
-    (r1,r2) = freshIds2 cxt "i"
+    rs = S.fromList [r1,r2]
+    (r1,r2) = freshIds2 cxt "r"
+    eq_asm = A_GVEq r (GVArr [GVVar r1, GVVar r2])
+
+-- Binary operators where we can see both arguments
+reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
+  | Just (arg1_op, arg2_op) <- isBinOp op
+  , let check_args :: [FailableAssump]
+        check_args = mkArgCheck arg1_op gv1 ++ mkArgCheck arg2_op gv2
+  = VerStep ("VBinOp-" ++ show op) $
+    [ Res (FloatS S.empty [A_Neg assump]) Fail | assump <- check_args ] ++
+    if primOpCanFail op
+    then [ Res (FloatS S.empty  [A_Neg rel_op]) Fail
+         , Res (FloatS S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
+    else [ Res (FloatS (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
+  where
+    r = freshId cxt "r"
+    rel_op = A_RelOp op gv
+    bin_op = A_PrimOp r (AO_Prim op) gv
+
+mkArgCheck :: PrimOp -> GroundVal -> [FailableAssump]
+mkArgCheck IsAny _  = []
+mkArgCheck op    gv = [A_RelOp op gv]
+
+skolemEquality :: ReductionContext -> Ident -> Exp -> Maybe FailableAssump
+skolemEquality (RC { rc_skols = skols, rc_vcxt = vcxt }) r v
+  | Verifying {} <- vcxt
+  , Just gv <- groundValue skols v
+  , r `S.member` skols
+  = Just (A_GVEq r gv)
+  | otherwise
+  = Nothing
 
 groundValue :: Set SkolIdent -> Exp -> Maybe GroundVal
 -- Like skolValue, but no lambdas
