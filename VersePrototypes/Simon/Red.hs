@@ -47,7 +47,7 @@ import GHC.Stack
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = False
+traceReductions = True
 
 --------------------------------------------------------------------------------
 --
@@ -732,8 +732,12 @@ reduceExp cxt parent@(Blk _ _ body)
               -> Done ("Subst " ++ show i) v
 
         -- Promotion
-        HNF e  :=: Var x -> Done "Swap" $ Var x :=: e
-        Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt parent x v)
+        -- We must try both ways round.  Here's a tricky case
+        --   exists x. ...if( exists y. ..x=y.. )...
+        -- We must fire (Promote2) on x=y
+        Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
+                         -> redn
+        Val v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
                          -> redn
 
         -- Primops
@@ -827,14 +831,19 @@ reduceExp cxt parent@(Blk _ _ body)
         ks e'        = error "findArr" (prettyShow e')
 
 ------------------------------------
-reduceVarVal :: ReductionContext -> Blk -> Ident -> Val -> Reduction Exp
+reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
 -- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
-reduceVarVal cxt parent x (Arr vs)
-  | promotionOK parent x v'
-  = mkStep "PromoteT" (Promote as x xv) v'
+reduceVarVal cxt left_or_right parent x (Arr vs)
+  | promotionOK parent x xv
+  = mkStep ("PromoteT"++left_or_right) (Promote as x xv) v'
+
+  | Just asm <- skolemEquality cxt' x xv
+  = VerStep ("VPromoteT"++left_or_right)
+    [ Res (FloatS as [A_Pos asm]) v'
+    , Res (FloatS as [A_Neg asm]) Fail ]
   where
     prs :: [(Maybe Ident, Val)]
-    prs = zipWith mk_elt (freshIds cxt (repeat "a")) vs
+    prs = zipWith mk_elt (freshIds cxt (repeat "a0")) vs
     as = S.fromList [ a | (Just a, _) <- prs ]
 
     mk_elt a av | do_anf av = (Just a,  av)
@@ -851,16 +860,23 @@ reduceVarVal cxt parent x (Arr vs)
     get_e (Just a,  av) = Var a :=: av
     get_e (Nothing, av) = av
 
-    do_anf (Var {}) = False
-    do_anf v        = not (S.null (freeVars v))
+    RC { rc_vcxt = vcxt, rc_skols = skols } = cxt
+    cxt' = cxt { rc_skols = skols `S.union` as }
 
-reduceVarVal cxt parent x v
+    do_anf v | Verifying {} <- vcxt
+             = isNothing (groundValue skols v)
+             | otherwise
+             = case v of
+                 Var {} -> False
+                 _      -> not (S.null (freeVars v))
+
+reduceVarVal cxt left_or_right parent x v
 -- Deal with non-tuple var/val equalities (x=v) or (v=x)
   | promotionOK parent x v
-  = mkStep "Promote" (Promote S.empty x v) v
+  = mkStep ("Promote"++left_or_right) (Promote S.empty x v) v
 
   | Just asm <- skolemEquality cxt x v
-  = VerStep "VPromote"
+  = VerStep ("VPromote"++left_or_right)
      [ Res (FloatS S.empty [A_Pos asm]) v
      , Res (FloatS S.empty [A_Neg asm]) Fail ]
 
