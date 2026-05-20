@@ -280,9 +280,9 @@ testeq("Dom1",pass) {f9( x := 3|4)<closed>:int := x+1; all{ y:int; f9[y]; y }} {
 
 # Recursion
 testeq("TRec1",pass)
-            {f(n:any)<closed> := if (n = 0) then 1 else f(n-1); f(1)}  {1}
+            {f(n:int)<closed>:int := if (n = 0) then 1 else f(n-1); f(1)}  {1}
 testeq("TRec2",pass)
-            {fac(n:any)<closed> := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
+            {fac(n:int)<closed>:int := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
 
 # SLOW with PLDI; needs 'for'
 # testeq("TRec3",pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
