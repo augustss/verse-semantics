@@ -534,3 +534,5 @@ testeq("run-exitop4", fail, skip){ x:int; f()<closed>:int := {x}; f[]=3; f[] } {
    # skip, because rejected by the verifier
    # Den-sem of f is empty, something wrong
    # Fail because f itself doesn't verify
+
+testeq("for-wrap1", pass) { f(xs := for(1|2){:prefix'-'}):=xs; f[1,2] } { (-1,-2) }
