@@ -118,7 +118,7 @@ testeq("Array6",pass){x:=(1,2); y:=(1,3); one{x=y}}         {:false}
 testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 # tim=skip: looks reasonable, but Tim rejects
 # Array8 is skipped as densem tests treat all as for1. See issue #
-testeq("Array8",pass,skip){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 testeq("Array9",pass){ a := (0,1); all{ a[0] } }                   {array{0}}
 # skip: Array9x needs processing | on the top level
 testeq("Array9x",pass,skip){ a := (0,1); a[0] }                   {0}

@@ -591,8 +591,12 @@ run src = P $ evalBlk 1000000 top_blk
           RedStep _ [Res NoFloats b'] -> evalBlk (fuel-1) b'
           -- Allow top level choices.  This cannot happen in a real program, but is useful for the REPL
           RedStep _ rs | let bs = [ b' | Res NoFloats b' <- rs ], length rs == length bs
-                                      -> foldr1 (\ bb ee -> Blk S.empty [] bb :|: Blk S.empty [] ee) (map (evalBlk (fuel-1)) bs)
+                                      -> mkChoices $ filter (/= Fail) $ map (evalBlk (fuel-1)) bs
           RedStep _ _ -> error "impossible: findTopRedex StepC"  -- can only happen with depth>0
+
+mkChoices :: [Exp] -> Exp
+mkChoices [] = Fail
+mkChoices es = foldr1 (\ l r -> Blk S.empty [] l :|: Blk S.empty [] r) es
 
 initialBlk :: F.SrcEssential -> (ReductionContext, Blk)
 initialBlk src
@@ -1066,6 +1070,17 @@ reduceMatch cxt x tm blob
                         (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
                         u = freshId (cxt `addInScopeExis` tbs0) "u"
 
+        -- Recognize for(i:=e){i}, they are encodings of 'all', and we know that they are
+        -- choice free.
+        For (i := t0) (TVar i') | i == i' ->
+                        Done "MAll" $ Var x :=:
+                         (Iter ALL (Blk (sing u `S.union` tbs0) emptyHeap $
+                                        (u ~~> t0'))
+                                   (Arr []))
+                      where
+                        (tbs0, t0') = freshenTerm cxt t0
+                        u = freshId (cxt `addInScopeExis` tbs0) "u"
+
         For t0 t1    -> mkStep "MFor" (mkExiFloat1 y) $
                         (Arr [Var x, Var y] :=:
                          Iter FOR (Blk (sing u `S.union` tbs0) emptyHeap $
@@ -1205,7 +1220,8 @@ choiceFree (e1 :=: e2) = choiceFree e1 && choiceFree e2
 choiceFree (SArr _ _ _) = False         -- force ~> to happen
 choiceFree (e1 :@ e2) = choiceFree e1 && choiceFree e2
 choiceFree (Arr es) = and (map choiceFree es)
-choiceFree (Iter _ b1 e2) = choiceFreeB b1 && choiceFree e2
+choiceFree (Iter ALL _ _) = True
+choiceFree (Iter _ _ _) = False
 choiceFree (Crl b) = choiceFreeB b
 choiceFree Verify{} = True
 choiceFree (Tru e) = choiceFree e
