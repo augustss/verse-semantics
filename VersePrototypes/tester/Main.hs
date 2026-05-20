@@ -1105,7 +1105,7 @@ testFlags
                      OA.long "max-steps" <>
                      OA.short 'm' <>
                      OA.metavar "NUM" <>
-                     OA.value 10000 <>  -- test M28Jul24-1 takes ages with 1000 steps
+                     OA.value 2000 <>  -- test M28Jul24-1 takes ages with 1000 steps
                      OA.help "Maximum number of rewrite steps"
 
        ; maxNormSteps <- OA.option OA.auto $
