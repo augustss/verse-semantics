@@ -303,16 +303,28 @@ ppr_eqn (i, d) = pPrint i <+> text "<-" <+> pPrint d
 --------------------------------------------------------------------------------
 
 type HNF = Exp
+type HNFV = Exp
 
 -- A HNF, i.e., a value, but not a variable
 pattern HNF :: Exp -> HNF
 pattern HNF e <- (getHNF -> Just e)
 
 getHNF :: Exp -> Maybe HNF
--- A value with a constructor at the top, not a variable
---   E.g.  7, (\x.e),  <x,3>
-getHNF Var{} = Nothing
-getHNF e = getVal e
+getHNF e@Lit{} = Just e
+getHNF e@Prm{} = Just e
+getHNF e@Lam{} = Just e
+getHNF e@Arr{} = Just e
+getHNF e@Tru{} = Just e
+getHNF e@Dly{} = Just e
+getHNF _ = Nothing
+
+-- Like HNF, but also variables
+pattern HNFV :: Exp -> HNFV
+pattern HNFV e <- (getHNFV -> Just e)
+
+getHNFV :: Exp -> Maybe HNFV
+getHNFV e@Var{} = Just e
+getHNFV e = getHNF e
 
 pattern Val :: Exp -> Val
 pattern Val e <- (getVal -> Just e)
@@ -766,10 +778,10 @@ reduceExp cxt parent@(Blk _ _ body)
         -- We must try both ways round.  Here's a tricky case
         --   exists x. ...if( exists y. ..x=y.. )...
         -- We must fire (Promote2) on x=y
-        Var x  :=: Val v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
-                         -> redn
-        Val v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
-                         -> redn
+        Var x   :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
+                          -> redn
+        HNFV v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
+                          -> redn
 
         -- Primops
         Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
