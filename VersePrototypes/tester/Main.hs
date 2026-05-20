@@ -651,9 +651,31 @@ doEvalEssentialTest tflags test
 
 mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk)
 mkBlkToTest tflags (TestEvalEq _ src1 src2)
+  | Variable (Ident _ "wrong") <- src2
+  = -- testeq(...){e1}{wrong} is a special form that means
+    --       see if e1 gets stuck
+    -- It's quite different to, say, testeq(...){e1}{3}
+    do { term <- mk_term tflags src1
+       ; let top_cxt = mkTopCxt vcxt term
+             vcxt | assumeVerified tflags = EV.AssumeVerified
+                  | otherwise             = EV.NotVerifying
+
+             u1 = EV.freshId top_cxt "u1"
+
+             main_exp = EV.Verify S.empty [] $ BlkE $
+                        EV.mkCheck Core.Succeeds  $
+                        BlkE $ u1 EV.~~> TBlock term
+
+             main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
+
+       ; return (top_cxt, main_blk) }
+
+  | otherwise
   = do { term1 <- mk_term tflags src1
        ; term2 <- mk_term tflags src2
-       ; let top_cxt = mkTopCxt tflags (TBlock term1 :>% TBlock term2)
+       ; let top_cxt = mkTopCxt vcxt (TBlock term1 :>% TBlock term2)
+             vcxt | assumeVerified tflags = EV.AssumeVerified
+                  | otherwise             = EV.NotVerifying
 
              (u1,u2,r1,r2) = EV.freshId4 top_cxt ("u1","u2","r1","r2")
 
@@ -669,7 +691,9 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
 mkBlkToTest tflags (TestVerify _ src)
   = do { term <- mk_term tflags src
-       ; let top_cxt = mkTopCxt tflags term
+       ; let top_cxt = mkTopCxt NotVerifying term
+             -- When verifying, ignore the --assume-verified flag
+             -- Start with NotVerifying at the top level
 
              u1 = EV.freshId top_cxt "u1"
 
@@ -684,8 +708,8 @@ mkBlkToTest tflags (TestVerify _ src)
 
 mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
 
-mkTopCxt :: TestFlags -> Term -> ReductionContext
-mkTopCxt tflags term
+mkTopCxt :: VerificationContext -> Term -> ReductionContext
+mkTopCxt vcxt term
   = EV.RC { rc_depth  = 0
           , rc_eqns   = EV.thePrelude
           , rc_exis   = prel_bndrs
@@ -696,9 +720,6 @@ mkTopCxt tflags term
 
     prel_bndrs :: S.Set EV.Ident
     prel_bndrs = S.fromList (map fst EV.thePrelude)
-
-    vcxt | assumeVerified tflags = EV.AssumeVerified
-         | otherwise             = EV.NotVerifying
 
 
 mk_term :: TestFlags -> SrcExpr -> IO EV.Term
@@ -1140,7 +1161,7 @@ testFlags
                      OA.long "max-steps" <>
                      OA.short 'm' <>
                      OA.metavar "NUM" <>
-                     OA.value 10000 <>  -- test M28Jul24-1 takes ages with 1000 steps
+                     OA.value 2000 <>  -- test M28Jul24-1 takes ages with 1000 steps
                      OA.help "Maximum number of rewrite steps"
 
        ; maxNormSteps <- OA.option OA.auto $

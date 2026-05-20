@@ -163,7 +163,7 @@ testeq("All4",pass) {all{x:(1,2,3)}}                           {array{1,2,3}}
 
 # Functions
 testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
-verify("Fun2",Fail){(x:any => y:any => x+2*y)[2][3]}
+verify("Fun2",fail){(x:any => y:any => x+2*y)[2][3]}
 testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
 testeq("Fun4",pass){function(x:int)<closed>{x+1}[2]}              {3}
 testeq("Fun5",pass){function(x:int)<closed>(y:int){x+2*y}[2][3]}  {8}
