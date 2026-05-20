@@ -366,6 +366,16 @@ getCon e@(Tru e') | Just _ <- getCon e' = Just e
 getCon e@Dly{} = Just e
 getCon _ = Nothing
 
+pattern ArrOrTru :: ([Exp] -> Exp) -> [Exp] -> Exp
+pattern ArrOrTru con vs <- (getArrOrTru -> Just (con, vs))
+
+-- If the expression is Arr or Tru, return the constructor and the list of subparts.
+-- For Tru we fake a list.  This way Arr and Tru can share code in some cases.
+getArrOrTru :: Exp -> Maybe ([Exp] -> Exp, [Exp])
+getArrOrTru (Arr es) = Just (Arr, es)
+getArrOrTru (Tru e)  = Just (Tru . (!!0), [e])
+getArrOrTru _ = Nothing
+
 -- Turn every kind of HNF into a trivial one
 root :: HNF -> HNF
 root Lit{} = IntE 0
@@ -778,10 +788,10 @@ reduceExp cxt parent@(Blk _ _ body)
         -- We must try both ways round.  Here's a tricky case
         --   exists x. ...if( exists y. ..x=y.. )...
         -- We must fire (Promote2) on x=y
-        Var x   :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
-                          -> redn
-        HNFV v  :=: Var x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
-                          -> redn
+        Var  x  :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
+                           -> redn
+        HNFV v  :=: Var  x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
+                           -> redn
 
         -- Primops
         Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
@@ -876,7 +886,7 @@ reduceExp cxt parent@(Blk _ _ body)
 ------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
 -- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
-reduceVarVal cxt left_or_right parent x (Arr vs)
+reduceVarVal cxt left_or_right parent x (ArrOrTru con vs)
   | promotionOK parent x xv
   = mkStep ("PromoteT"++left_or_right) (Promote as x xv) v'
 
@@ -892,8 +902,8 @@ reduceVarVal cxt left_or_right parent x (Arr vs)
     mk_elt a av | do_anf av = (Just a,  av)
                 | otherwise = (Nothing, av)
 
-    xv = Arr (map get_a prs)
-    v' = Arr (map get_e prs)
+    xv = con (map get_a prs)
+    v' = con (map get_e prs)
 
     get_a :: (Maybe Ident,Val) -> Exp
     get_a (Just a,  _)  = Var a
