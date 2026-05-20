@@ -12,7 +12,7 @@ module Red( Blk(Blk, BlkX, BlkE), Exp(..), pattern Val, Term(..), Ident(..)
           , ReductionContext(..), VerificationContext(..)
           , thePrelude
           , run, runTraced, isVal
-          , srcToTerm, addInScopeSkols, addInScopeExis, freshId4
+          , srcToTerm, addInScopeSkols, addInScopeExis, freshId, freshId4
           , freeVarsTerm
           , emptyHeap, mkCheck, mkAll
   ) where

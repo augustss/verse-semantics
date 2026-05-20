@@ -651,16 +651,9 @@ doEvalEssentialTest tflags test
 
 mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk)
 mkBlkToTest tflags (TestEvalEq _ src1 src2)
-  = do { term1 <- mk_term src1
-       ; term2 <- mk_term src2
-       ; let top_skols = freeVarsTerm (TBlock term1 :>% TBlock term2)
-                         `S.difference` prel_bndrs
-
-             top_cxt = EV.RC { rc_depth  = 0
-                             , rc_eqns   = EV.thePrelude
-                             , rc_exis   = prel_bndrs
-                             , rc_skols  = top_skols
-                             , rc_vcxt   = vcxt }
+  = do { term1 <- mk_term tflags src1
+       ; term2 <- mk_term tflags src2
+       ; let top_cxt = mkTopCxt tflags (TBlock term1 :>% TBlock term2)
 
              (u1,u2,r1,r2) = EV.freshId4 top_cxt ("u1","u2","r1","r2")
 
@@ -673,28 +666,50 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
              main_blk = EV.Blk (S.fromList [u1,u2,r1,r2]) EV.emptyHeap main_exp
 
        ; return (top_cxt, main_blk) }
-  where
-    fe_flags = testFlagsToFEFlags tflags
 
+mkBlkToTest tflags (TestVerify _ src)
+  = do { term <- mk_term tflags src
+       ; let top_cxt = mkTopCxt tflags term
+
+             u1 = EV.freshId top_cxt "u1"
+
+             main_exp = EV.Verify S.empty [] $ BlkE $
+                        EV.mkCheck Core.Succeeds  $
+                        BlkE $ u1 EV.~~> TBlock term
+
+             main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
+
+       ; return (top_cxt, main_blk) }
+
+
+mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
+
+mkTopCxt :: TestFlags -> Term -> ReductionContext
+mkTopCxt tflags term
+  = EV.RC { rc_depth  = 0
+          , rc_eqns   = EV.thePrelude
+          , rc_exis   = prel_bndrs
+          , rc_skols  = top_skols
+          , rc_vcxt   = vcxt }
+  where
+    top_skols = freeVarsTerm term `S.difference` prel_bndrs
 
     prel_bndrs :: S.Set EV.Ident
     prel_bndrs = S.fromList (map fst EV.thePrelude)
-
-    mk_term :: SrcExpr -> IO EV.Term
-    mk_term src = do { ess <- srcToEssential fe_flags src
-                     ; return (EV.srcToTerm ess) }
-
-    mk_all :: EV.Ident -> EV.Term -> EV.Exp
-    -- Returns all{exists u.  u ~~> block{t} }
-    mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap (u ~~> EV.TBlock t))
 
     vcxt | assumeVerified tflags = EV.AssumeVerified
          | otherwise             = EV.NotVerifying
 
 
-mkBlkToTest _tflags (TestVerify {}) = error "TestVerify"
-mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
+mk_term :: TestFlags -> SrcExpr -> IO EV.Term
+mk_term tflags src = do { ess <- srcToEssential fe_flags src
+                        ; return (EV.srcToTerm ess) }
+  where
+    fe_flags = testFlagsToFEFlags tflags
 
+mk_all :: EV.Ident -> EV.Term -> EV.Exp
+-- Returns all{exists u.  u ~~> block{t} }
+mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap (u ~~> EV.TBlock t))
 
 ----------------------------------------------------------------
 --
@@ -1125,7 +1140,7 @@ testFlags
                      OA.long "max-steps" <>
                      OA.short 'm' <>
                      OA.metavar "NUM" <>
-                     OA.value 2000 <>  -- test M28Jul24-1 takes ages with 1000 steps
+                     OA.value 10000 <>  -- test M28Jul24-1 takes ages with 1000 steps
                      OA.help "Maximum number of rewrite steps"
 
        ; maxNormSteps <- OA.option OA.auto $
@@ -1140,7 +1155,7 @@ testFlags
 
        ; assumeVerified <- OA.switch $
                            OA.long "assume-verified" <>
-                           OA.help "succeeds{} is a no-op"
+                           OA.help "discard runtime verifications"
 
        ; timRun <- OA.switch $
                    OA.long "tim-run" <>
