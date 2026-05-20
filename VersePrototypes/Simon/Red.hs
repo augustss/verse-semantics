@@ -888,7 +888,7 @@ reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction E
 -- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
 reduceVarVal cxt left_or_right parent x (ArrOrTru con vs)
   | promotionOK parent x xv
-  = mkStep ("PromoteT"++left_or_right) (Promote as x xv) v'
+  =  mkStep ("PromoteT"++left_or_right) (Promote as x xv) v'
 
   | Just asm <- skolemEquality cxt' x xv
   = VerStep ("VPromoteT"++left_or_right)
@@ -922,13 +922,14 @@ reduceVarVal cxt left_or_right parent x (ArrOrTru con vs)
              = isNothing (groundValue skols v)
              | otherwise -- `x` is an existential
              = case v of
-                 Var {} -> False
-                 _      -> not (S.null (freeVars v))
+                 Var {} -> False                      -- just a variable
+                 Val {} -> not (S.null (freeVars v))  -- open non-variable
+                 _      -> True                       -- not a value
 
-reduceVarVal cxt left_or_right parent x v
+reduceVarVal cxt left_or_right parent x (Val v)
 -- Deal with non-tuple var/val equalities (x=v) or (v=x)
   | promotionOK parent x v
-  = mkStep ("Promote"++left_or_right) (Promote S.empty x v) v
+  =  mkStep ("Promote"++left_or_right) (Promote S.empty x v) v
 
   | Just asm <- skolemEquality cxt x v
   = VerStep ("VPromote"++left_or_right)
@@ -937,6 +938,7 @@ reduceVarVal cxt left_or_right parent x v
 
   | otherwise
   = RedNone
+reduceVarVal _ _ _ _ _ = RedNone
 
 promotionOK :: Blk -> Ident -> Val -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
@@ -1717,14 +1719,15 @@ renameEqns sub = map (second (rename sub))
 renameAssumps :: Renaming -> [Assump] -> [Assump]
 renameAssumps subst as = map (C.substAssump subst) as
 
+-- substVal is only used to substitute into the RHS of the heap.
+-- Lambdas may still contain variables in the heap, so we leave those alone.
 substVal :: Subst Exp -> Val -> Val
 substVal sub e@(Var i) = fromMaybe e $ lookup i sub
 substVal _ e@Lit{} = e
 substVal _ e@Prm{} = e
 substVal sub (Arr vs) = Arr (map (substVal sub) vs)
 substVal sub (Tru v) = Tru (substVal sub v)
-substVal sub e@Lam{} | S.null $ S.fromList (map fst sub) `S.intersection` S.fromList (allVars e) = e
-                     | otherwise = e -- error "substVal: Lam unimplemented"
+substVal _ e@Lam{} = e
 substVal _ e = error $ "substVal: not a Val: " ++ show e
 
 gcVarsBlk :: Set Ident -> Blk -> Blk
