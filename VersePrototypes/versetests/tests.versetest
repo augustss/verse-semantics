@@ -164,7 +164,6 @@ testeq("All4",pass) {all{x:(1,2,3)}}                           {array{1,2,3}}
 # Functions
 testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
 verify("Fun2",Fail){(x:any => y:any => x+2*y)[2][3]}
-testeq("Fun2",pass,skip){(x:any => y:any => x+2*y)[2][3]}      {8}  # skip, because rejected by the verifier
 testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
 testeq("Fun4",pass){function(x:int)<closed>{x+1}[2]}              {3}
 testeq("Fun5",pass){function(x:int)<closed>(y:int){x+2*y}[2][3]}  {8}
@@ -280,10 +279,9 @@ testeq("JB4",pass,skip,tim=skip) {x:any; y:any; x = y; x = y; x = (z:any => 1)} 
 testeq("Dom1",pass) {f9( x := 3|4)<closed>:int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
 
 # Recursion
-# skip: LA: TRec1, TRec2 need cycle GC
-testeq("TRec1",pass,skip)
+testeq("TRec1",pass)
             {f(n:any)<closed> := if (n = 0) then 1 else f(n-1); f(1)}  {1}
-testeq("TRec2",pass,skip)
+testeq("TRec2",pass)
             {fac(n:any)<closed> := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
 
 # SLOW with PLDI; needs 'for'
@@ -350,9 +348,8 @@ testeq("EV23a",pass) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x,
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
 # tim=skip: Tim does not allow this.  Bug?
-# skip: LA: no verification yet
-verify("EV23b",fail,skip,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
-verify("EV23c",pass,skip,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23b",fail,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23c",pass,broken,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
@@ -503,7 +500,6 @@ testeq("fundom1a", pass) { f(x:=1|2,y:=3|4)<closed>:=x+y; all{ :f } }
                         { (4,5,5,6) }
 # fundom2 should fail.  The domain is not allowed to have extra iterates.
 verify("fundom2", fail) { f(x:=1|2 where y:=3|4)<closed>:=x+y; all{ :f } }
-testeq("fundom2", pass, skip) { f(x:=1|2 where y:=3|4)<closed>:=x+y; all{ :f } } { wrong }    # skip, because rejected by the verifier
 
 # tests for check
 testeq("check1", pass){ check<fails>{ 3=4 } } {3=4}
