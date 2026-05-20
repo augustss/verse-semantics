@@ -331,6 +331,29 @@ getVal _ = Nothing
 isVal :: Exp -> Bool
 isVal e = isJust (getVal e)
 
+pattern Comp :: Exp -> Exp
+pattern Comp v <- (getComp -> Just v)
+
+-- Comparable values
+getComp :: Exp -> Maybe Exp
+getComp e@Lit{} = Just e
+getComp e@(Arr es) | Just _ <- mapM getComp es = Just e
+getComp e@(Tru e') | Just _ <- getComp e' = Just e
+getComp _ = Nothing
+
+pattern Con :: Exp -> Exp
+pattern Con v <- (getCon -> Just v)
+
+-- Constants, no further reductions possible
+getCon :: Exp -> Maybe Exp
+getCon e@Lit{} = Just e
+getCon e@Prm{} = Just e
+getCon e@Lam{} = Just e
+getCon e@(Arr es) | Just _ <- mapM getCon es = Just e
+getCon e@(Tru e') | Just _ <- getCon e' = Just e
+getCon e@Dly{} = Just e
+getCon _ = Nothing
+
 -- Turn every kind of HNF into a trivial one
 root :: HNF -> HNF
 root Lit{} = IntE 0
@@ -511,7 +534,9 @@ thePrelude :: [Eqn]
 thePrelude
   = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
     , (mkName "string",       Lam vp  $ BlkE $ Prm IsStr :@ (Var vp) :> Var vp)
+    , (mkName "comparable",   Lam vp  $ BlkE $ Prm IsComp :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ BlkE $ Var vp)
+    , (mkName "void",         Lam vp  $ BlkE $ Arr [])
     , (mkName "Length",       Prm ArrLen)
     , (mkName "prefix'+'",    Prm Pls)
     , (mkName "prefix'-'",    Prm Neg)
@@ -929,6 +954,9 @@ reduceArithOp IsInt HNF{}                = Failure "Prim-isInt"
 
 reduceArithOp IsStr v@(StrE {})          = Done    "Prim-isStr" v
 reduceArithOp IsStr HNF{}                = Failure "Prim-isStr"
+
+reduceArithOp IsComp (Comp v)            = Done    "Prim-isComp" v
+reduceArithOp IsComp (Con _)             = Failure "Prim-isComp"
 
 reduceArithOp _ _ = RedNone
 
