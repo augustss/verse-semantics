@@ -14,13 +14,13 @@
 module Main(main) where
 
 import FrontEnd.CopyHook
-import FrontEnd.Desugar as FrontEnd
-import FrontEnd.ToCore  as FrontEnd ( convertToPrepdCore )
-import FrontEnd.Flags   as FrontEnd
+import FrontEnd.Desugar as FE
+import FrontEnd.ToCore  as FE ( convertToPrepdCore )
+import FrontEnd.Flags   as FE
 import FrontEnd.Expr    as Src
 import FrontEnd.Prelude( findPrelude )
 
-import qualified Red as Simon
+import Red as EV    -- "EV" for "Essential verse evaluator"
 
 import qualified Parser.Verse               as V
 import qualified Parser.Compat              as PC
@@ -66,6 +66,7 @@ import System.Directory( doesFileExist, removeFile )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
@@ -207,16 +208,16 @@ instance Read DenSem where
                   ++ [(MON_DS, r) | ("ppo", r) <- lex s]
 
 data TestType =
-  TPass | TFail | TLoop                -- Expected behaviour
+  TestPass | TestFail | TestLoop                -- Expected behaviour
   deriving (Eq)
 
 data TimSkip = TimNone | TimSkip String | TimError String
   deriving (Eq, Show)
 
 instance Show TestType where
-  show TPass = "pass"
-  show TFail = "fail"
-  show TLoop = "loop"
+  show TestPass = "pass"
+  show TestFail = "fail"
+  show TestLoop = "loop"
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
@@ -269,9 +270,9 @@ expectedOutcome :: TestRes -> Maybe NSteps
 -- Expected results; ignore broken-ness
 expectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
   = case (testType info, outcome) of
-      (TPass, TO_Equal ns)                -> Just ns
-      (TFail, TO_NotEqual ns)             -> Just ns
-      (TLoop, TO_Abnormal NormExpired ns) -> Just ns
+      (TestPass, TO_Equal ns)                -> Just ns
+      (TestFail, TO_NotEqual ns)             -> Just ns
+      (TestLoop, TO_Abnormal NormExpired ns) -> Just ns
       _ -> Nothing
 
 unexpectedTestRes :: TestRes -> Maybe NSteps
@@ -285,12 +286,12 @@ unexpectedOutcome :: TestRes -> Maybe NSteps
 -- Unexpected results, not skipped, not exception, not invalid
 unexpectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
  = case (testType info, outcome) of
-      (TPass, TO_NotEqual ns)                -> Just ns
-      (TPass, TO_Abnormal NormExpired ns)    -> Just ns
-      (TFail, TO_Equal ns)                   -> Just ns
-      (TFail, TO_Abnormal NormExpired ns)    -> Just ns
-      (TLoop, TO_Equal ns)                   -> Just ns
-      (TLoop, TO_NotEqual ns)                -> Just ns
+      (TestPass, TO_NotEqual ns)                -> Just ns
+      (TestPass, TO_Abnormal NormExpired ns)    -> Just ns
+      (TestFail, TO_Equal ns)                   -> Just ns
+      (TestFail, TO_Abnormal NormExpired ns)    -> Just ns
+      (TestLoop, TO_Equal ns)                   -> Just ns
+      (TestLoop, TO_NotEqual ns)                -> Just ns
       _ -> Nothing
 
 outcomeIsInvalid :: TestRes -> Bool
@@ -304,19 +305,19 @@ outcomeIsExcn _ = False
 passedButShouldFail :: TestRes -> Bool
 passedButShouldFail (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
-       TFail -> isEqualTO outcome
+       TestFail -> isEqualTO outcome
        _     -> False
 
 failedButShouldPass :: TestRes -> Bool
 failedButShouldPass (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
-       TPass  -> isNotEqualTO outcome
+       TestPass  -> isNotEqualTO outcome
        _      -> False
 
 failedWithLoop :: TestRes -> Bool
 failedWithLoop (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
-       TLoop -> False
+       TestLoop -> False
        _     -> isTimeoutTO outcome
 
 isBrokenPass :: TestRes -> Bool
@@ -440,8 +441,8 @@ timTestInfo (Ident loc status) = TestInfo
 timTestType :: String -> TestType
 -- Any TimTest starting in "S" should pass, e.g. S00, S01
 -- All others should fail.
-timTestType ('S' : _) = TPass
-timTestType _         = TFail
+timTestType ('S' : _) = TestPass
+timTestType _         = TestFail
 
 timSkip :: String -> TimSkip
 timSkip ('S' : _) = TimNone
@@ -513,16 +514,16 @@ showTestResult tflg test test_res
 
     succ_what = case (status, test_type) of
              (TS_Broken,_) -> "broken "
-             (_, TPass)    -> "success"
-             (_, TFail)    -> "failure"
-             (_, TLoop)    -> "loop   "
+             (_, TestPass)    -> "success"
+             (_, TestFail)    -> "failure"
+             (_, TestLoop)    -> "loop   "
 
     fail_what
       | failedWithLoop test_res = "timeout"
       | otherwise = case test_type of
-                      TPass -> "failure"
-                      TFail -> "success"
-                      TLoop -> "termination"
+                      TestPass -> "failure"
+                      TestFail -> "success"
+                      TestLoop -> "termination"
 
 testExprs :: Test -> (SrcExpr, SrcExpr)
 testExprs (TestVerify _ e)     = (e, Array [])
@@ -583,15 +584,15 @@ doEvalCoreTest tflg test
 -- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
 equivValue :: Core.Expr -> Maybe Core.Expr -> Bool
 equivValue e1 (Just e2) = Core.norm e1 == Core.norm e2
-equivValue e1 Nothing   = not (isVal e1)
+equivValue e1 Nothing   = not (Core.isVal e1)
 
 
-srcToCore :: HasCallStack => FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
+srcToCore :: HasCallStack => FE.Flags -> Bool -> SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e
-  = do { e1 :: SrcCore <- FrontEnd.desugar flags add_verification e
-       ; FrontEnd.convertToPrepdCore flags e1 }
+  = do { e1 :: SrcCore <- FE.desugar flags add_verification e
+       ; FE.convertToPrepdCore flags e1 }
 
-mkFEFlags :: TestFlags -> Bool -> FrontEnd.Flags
+mkFEFlags :: TestFlags -> Bool -> FE.Flags
 mkFEFlags tflg add_verification
   = setPreludeFlag add_verification tflg $
     testFlagsToFEFlags tflg
@@ -621,60 +622,79 @@ evalCoreExpr flags test e = normalizeExpr rules (maxSteps flags) e
 doEvalEssentialTest :: TestFlags -> Test -> IO TestRes
 -- doEvalEssentialTest = error "doEvalEssentialTest"
 
-doEvalEssentialTest tflg test
-  = do { let (src1, src2) = testExprs test
-             flags        = mkFEFlags tflg add_verif
-             add_verif    = desugarForVerification test
-
-             src_to_ess src = srcToEssential flags src
-
-       ; ess1 <- src_to_ess src1
-
-       -- mb_v2 is Nothing if e2 is "wrong", which
-       -- tells us that we expect e1 to get stuck
-       ; mb_v2 <- case src2 of
-                     Variable (Ident _ "wrong") -> pure Nothing
-                     _ -> do { ess2 <- src_to_ess src2
-                             ; let (_,tr2) = evalEssentialExpr tflg ess2
-                             ; return (Just (Core.Traced.getTerm tr2)) }
-
-       ; let (res1,tr1)  = evalEssentialExpr tflg ess1
-             v1          = Core.Traced.getTerm tr1
-             test_passed = equivBlk v1 mb_v2
-             n_steps     = length (Core.Traced.getTrace tr1)
+doEvalEssentialTest tflags test
+  = do { (cxt,blk) <- mkBlkToTest tflags test
+       ; let (res1,tr1) = EV.runTraced (maxSteps tflags) cxt blk
+             v1         = Core.Traced.getTerm tr1
+             n_steps    = length (Core.Traced.getTrace tr1)
 
              outcome :: TestOutcome
              outcome = case res1 of
-                NormOK | test_passed -> TO_Equal n_steps
-                       | otherwise   -> TO_NotEqual n_steps
-                _                    -> TO_Abnormal res1 n_steps
+                NormOK | BlkE (EV.Val {}) <- v1 -> TO_Equal n_steps
+                       | otherwise              -> TO_NotEqual n_steps
+                _                               -> TO_Abnormal res1 n_steps
 
              details :: Doc
              -- Show this if the the outcome is unexpected
              details = text "-----------------------------------------------"
                        $$ nest 2 (vcat
-                          [ text "Expression" <+> pPrint src1
-                          , text "evaluates to" <+>  pPrint v1
-                          , text "while" <+> pPrint src2
-                          , text "evaluates to" <+> pPrint mb_v2  ])
+                          [ text "Expression" <+> pPrint blk
+                          , text "evaluates to" <+>  pPrint v1  ])
 
        -- Display the trace if asked for, regardless of success/failure
-       ; when (showTrace tflg) $
-         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflg) tr1 }
+       ; when (showTrace tflags) $
+         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflags) tr1 }
 
        ; return (TestRes { tr_info = testInfo test
                          , tr_outcome = outcome
                          , tr_details = details }) }
 
-evalEssentialExpr :: TestFlags -> SrcEssential
-                  -> (NormResult, Traced Simon.Blk)
-evalEssentialExpr flags e = Simon.runTraced (maxSteps flags) e
+mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk)
+mkBlkToTest tflags (TestEvalEq _ src1 src2)
+  = do { term1 <- mk_term src1
+       ; term2 <- mk_term src2
+       ; let top_skols = freeVarsTerm (TBlock term1 :>% TBlock term2)
+                         `S.difference` prel_bndrs
 
--- | Equivalence on values (or stuck expressions)
--- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
-equivBlk :: Simon.Blk -> Maybe Simon.Blk -> Bool
-equivBlk b1                (Just b2) = b1 == b2  -- Not right: need alpha renaming
-equivBlk (Simon.Blk _ _ e) Nothing   = not (Simon.isVal e)
+             top_cxt = EV.RC { rc_depth  = 0
+                             , rc_eqns   = EV.thePrelude
+                             , rc_exis   = prel_bndrs
+                             , rc_skols  = top_skols
+                             , rc_vcxt   = vcxt }
+
+             (u1,u2,r1,r2) = EV.freshId4 top_cxt ("u1","u2","r1","r2")
+
+             main_exp = EV.Var r1 EV.:=: mk_all u1 term1 EV.:>
+                        EV.Var r2 EV.:=: mk_all u2 term2 EV.:>
+                        EV.Verify S.empty [] $ BlkE $
+                        EV.mkCheck Core.Succeeds  $
+                        BlkE $ EV.Var r1 EV.:=: EV.Var r2
+
+             main_blk = EV.Blk (S.fromList [u1,u2,r1,r2]) EV.emptyHeap main_exp
+
+       ; return (top_cxt, main_blk) }
+  where
+    fe_flags = testFlagsToFEFlags tflags
+
+
+    prel_bndrs :: S.Set EV.Ident
+    prel_bndrs = S.fromList (map fst EV.thePrelude)
+
+    mk_term :: SrcExpr -> IO EV.Term
+    mk_term src = do { ess <- srcToEssential fe_flags src
+                     ; return (EV.srcToTerm ess) }
+
+    mk_all :: EV.Ident -> EV.Term -> EV.Exp
+    -- Returns all{exists u.  u ~~> block{t} }
+    mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap (u ~~> EV.TBlock t))
+
+    vcxt | assumeVerified tflags = EV.AssumeVerified
+         | otherwise             = EV.NotVerifying
+
+
+mkBlkToTest _tflags (TestVerify {}) = error "TestVerify"
+mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
+
 
 ----------------------------------------------------------------
 --
@@ -734,7 +754,7 @@ evalDenSem flags test e = do
   where
     runner = forceSem flags <|> dfltRunner
     dfltRunner = testRunner $ testInfo test
-    flgs = FrontEnd.defaultFlags{ fReportError = ErrNone }
+    flgs = FE.defaultFlags{ fReportError = ErrNone }
     err  = error "runD: exception in evalDenSem"
     go   = runD flgs err . getEssential flgs
 
@@ -794,16 +814,16 @@ checkResults tflg test@TestDenSem{} (src1, _core1) (src2, mb_v2)
 
                succ_what = case (status, typ) of
                         (TS_Broken,_) -> "broken "
-                        (_, TPass)    -> "success"
-                        (_, TFail)    -> "failure"
-                        (_, TLoop)    -> "loop   "
+                        (_, TestPass)    -> "success"
+                        (_, TestFail)    -> "failure"
+                        (_, TestLoop)    -> "loop   "
 
                fail_what
                  | failedWithLoop test_res = "timeout"
                  | otherwise = case typ of
-                                 TPass -> "failure"
-                                 TFail -> "success"
-                                 TLoop -> "termination"
+                                 TestPass -> "failure"
+                                 TestFail -> "success"
+                                 TestLoop -> "termination"
 
          ; show_result tflg status outcome test_herald test_res succ_what
            fail_what src1 v1 src2 mb_v2 n_steps
@@ -930,9 +950,9 @@ pTestType :: V.Parser TestType
 pTestType = V.lexeme $ do
   i <- V.many V.pAlpha -- cannot use V.pIdent, "fail" is a reserved
   case T.toLower $ TE.decodeLatin1 $ B.pack $ i of
-    "pass"    -> pure TPass
-    "fail"    -> pure TFail
-    "loop"    -> pure TLoop
+    "pass"    -> pure TestPass
+    "fail"    -> pure TestFail
+    "loop"    -> pure TestLoop
     _         -> fail "pTestType"
 
 pTestStatus :: V.Parser TestStatus
@@ -1170,7 +1190,7 @@ testFlags
 
        ; return (TestFlags { .. }) }
 
-testFlagsToFEFlags :: TestFlags -> FrontEnd.Flags
+testFlagsToFEFlags :: TestFlags -> FE.Flags
 testFlagsToFEFlags t =
   let flags = defaultFlags
   in  flags{ fSplit        = split t, fSimplify = simplify t
@@ -1348,11 +1368,11 @@ displayTest test | TimSkip _ <- testTimSkip (testInfo test) = return ()
                  | testStatus (testInfo test) /= TS_Normal  = return ()
 displayTest test = do
   let retCode :: TestType -> String
-      retCode TFail | Just err <- bad = err
-                    | otherwise = "F00"
-      retCode TPass | Just err <- bad = err
-                    | otherwise = "S00"
-      retCode TLoop = "S00"  -- What should this be?
+      retCode TestFail | Just err <- bad = err
+                       | otherwise = "F00"
+      retCode TestPass | Just err <- bad = err
+                       | otherwise = "S00"
+      retCode TestLoop = "S00"  -- What should this be?
 
       -- Error code, if this is a bad test.
       bad = case testTimSkip (testInfo test) of
@@ -1457,7 +1477,7 @@ ppTim = pp
           where (q, ql, _) = fixity "()"
         ApplyD f a -> maybeParens (prec > q) $ pp False ql f <> brackets (ppArg a)
           where (q, ql, _) = fixity "()"
-        Blk es -> ppBlk es
+        Src.Blk es -> ppBlk es
         Macro1 (Ident _ "one")  [] b -> text "first" <> pp False 10 b
         Macro1 (Ident _ "all")  [] b -> text "for"   <> pp False 10 b
         Macro1 (Ident _ "type") [] b -> text "type"  <> pp False 10 b
@@ -1493,7 +1513,7 @@ ppTim = pp
         Option me -> text "option" <> braces (maybe empty (pp True 0) me)
         Exists is e -> pp sem prec $ eSeq $ vars ++ unBlk e
           where vars = map (\ i -> InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))) is
-                unBlk (Blk es) = es
+                unBlk (Src.Blk es) = es
                 unBlk ee = [ee]
 
         _ -> error $ "ppTim: unimplemented " ++ take 100 (show expr)

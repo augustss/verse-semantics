@@ -7,8 +7,14 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 
-module Red( Blk(Blk, BlkX), Exp(..), Term(..)
+module Red( Blk(Blk, BlkX, BlkE), Exp(..), pattern Val, Term(..), Ident(..)
+          , (~~>)
+          , ReductionContext(..), VerificationContext(..)
+          , thePrelude
           , run, runTraced, isVal
+          , srcToTerm, addInScopeSkols, addInScopeExis, freshId4
+          , freeVarsTerm
+          , emptyHeap, mkCheck, mkAll
   ) where
 
 import Prelude hiding ((<>))
@@ -176,6 +182,15 @@ mkSeqs :: [Exp] -> Exp
 mkSeqs []     = Arr []
 mkSeqs [e]    = e
 mkSeqs (e:es) = e `mkSeq` mkSeqs es
+
+mkCheck :: Effect -> Blk -> Exp
+mkCheck Fails    blk = Prm ChkFails    :@ Iter ALL blk (Arr [])
+mkCheck Succeeds blk = Prm ChkSucceeds :@ Iter ALL blk (Arr [])
+mkCheck Decides  blk = Prm ChkDecides  :@ Iter ALL blk (Arr [])
+mkCheck Iterates blk = mkCrl blk
+
+mkAll :: Blk -> Exp
+mkAll b = Iter ALL b (Arr [])
 
 --------------------------------------------------------------------------------
 --
@@ -440,6 +455,35 @@ srcToCoreIdent (F.Ident _ s) = Name s
 
 --------------------------------------------------------------------------------
 --
+--             Reduction context
+--
+--------------------------------------------------------------------------------
+
+data ReductionContext
+  = RC { rc_depth  :: Int         -- Number of enclosing Blks
+
+       , rc_exis   :: Set Ident
+       , rc_eqns   :: Heap        -- In-scope equations for the rc_exis
+
+       , rc_skols  :: Set Ident
+       , rc_vcxt   :: VerificationContext
+    }
+    deriving (Show)
+
+data VerificationContext
+  = AssumeVerified        -- verify{} --> ()
+  | NotVerifying          -- Outside verify{}
+  | Verifying [Assump]    -- Inside verify{}; in-scope assumptions for the rc_skols
+  deriving (Show)
+
+addInScopeExis :: ReductionContext -> Set Ident -> ReductionContext
+addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
+
+addInScopeSkols :: ReductionContext -> Set Ident -> ReductionContext
+addInScopeSkols cxt bndrs = cxt { rc_skols = rc_skols cxt `S.union` bndrs }
+
+--------------------------------------------------------------------------------
+--
 --             Reductions
 --
 --------------------------------------------------------------------------------
@@ -477,9 +521,6 @@ reductionFired r       = Just r
 orTry :: Reduction a -> Reduction a -> Reduction a
 orTry RedNone r2 = r2
 orTry r1      _  = r1
-
-addInScopeExis :: ReductionContext -> Set Ident -> ReductionContext
-addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
 
 mkExiFloat1 :: Ident -> BlkFloats
 -- Single existential only, no heap
@@ -597,12 +638,10 @@ vx  = mkName "x"
 --             The evaluator: driver
 --
 
-runTraced :: Fuel -> F.SrcEssential -> (NormResult, Traced Blk)
-runTraced fuel src
+runTraced :: Fuel -> ReductionContext -> Blk -> (NormResult, Traced Blk)
+runTraced fuel top_cxt top_blk
   = normalize step valid fuel top_blk
   where
-    (top_cxt, top_blk) = initialBlk src
-
     valid :: Blk -> Bool
     valid _ = True
 
@@ -698,22 +737,6 @@ mergeStep (Blk is1 eqs1 _) (Res (FloatB is2 eqs2) res_e)
 dom :: Heap -> Set Ident
 dom eqs = S.fromList (map fst eqs)
 
-data ReductionContext
-  = RC { rc_depth  :: Int         -- Number of enclosing Blks
-
-       , rc_exis   :: Set Ident
-       , rc_eqns   :: Heap        -- In-scope equations for the rc_exis
-
-       , rc_skols  :: Set Ident
-       , rc_vcxt   :: VerificationContext
-    }
-    deriving (Show)
-
-data VerificationContext
-  = NotVerifying
-  | Verifying [Assump]    -- In-scope assumnptions for the rc_skols
-    deriving (Show)
-
 --------------------------------------------------------------------------------
 --
 --             The evaluator: reduction rules
@@ -788,16 +811,18 @@ reduceExp cxt parent@(Blk _ _ body)
         -- We must try both ways round.  Here's a tricky case
         --   exists x. ...if( exists y. ..x=y.. )...
         -- We must fire (Promote2) on x=y
+        -- Also: the guard is important; if `reduceVarVal` doesn't fire, we want to
+        -- fall through the "look at sub-expressions" code
         Var  x  :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
                            -> redn
         HNFV v  :=: Var  x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
                            -> redn
 
         -- Primops
+        -- The guard is important; if the primop doesn't fire, we want to
+        -- fall through the "look at sub-expressions" code
         Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
                     -> redn
-                    -- The guard is important; if the primop doesn't fire, we want to
-                    -- fall through the "look at sub-expressions" code
 
         -- Unification
         Val v1       :=: Val v2 | v1 == v2                 -> Done    "EqVal" v1
@@ -809,7 +834,8 @@ reduceExp cxt parent@(Blk _ _ body)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
 
         -- Sequencing
-        Val{}  :>  e2                                      -> Done "Seq1" e2
+        (e1 :> e2) :> e3 -> Done "Norm5" $ e1 :> (e2 :> e3)
+        Val{}  :>  e2    -> Done "Seq1" e2
 
         -- Unification, structural
         Val v  :=: (e1 :>  e2) -> Done "Norm1" $ e1 :> (v :=: e2)
@@ -885,24 +911,32 @@ reduceExp cxt parent@(Blk _ _ body)
 
 ------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
+
+-- Tuple values
 -- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
 reduceVarVal cxt left_or_right parent x (ArrOrTru con vs)
+  -- Try rule (PromoteT) to promote an existential `x`, where `x` is
+  -- bound by the /immediately-enclosing/ block, namely `parent`
   | promotionOK parent x xv
   =  mkStep ("PromoteT"++left_or_right) (Promote as x xv) v'
 
+  -- Try rule (VPromoteT) to promote a skolem `x`, where `x` can
+  -- be bound by /any/ enclosing `verify`
   | Just asm <- skolemEquality cxt' x xv
   = VerStep ("VPromoteT"++left_or_right)
     [ Res (FloatS as [A_Pos asm]) v'
     , Res (FloatS as [A_Neg asm]) Fail ]
   where
     prs :: [(Maybe Ident, Val)]
-    prs = zipWith mk_elt (freshIds cxt (repeat "a0")) vs
+    -- (Just a,  v)   for values v that should be A-normalised
+    -- (Nothing, v)   for other values e.g. 7
+    prs = zipWith mk_anf (freshIds cxt (repeat "a0")) vs
     as = S.fromList [ a | (Just a, _) <- prs ]
 
-    mk_elt a av | do_anf av = (Just a,  av)
+    mk_anf a av | do_anf av = (Just a,  av)
                 | otherwise = (Nothing, av)
 
-    xv = con (map get_a prs)
+    xv = con (map get_a prs)   -- The ANF'd version of (Arr vs)
     v' = con (map get_e prs)
 
     get_a :: (Maybe Ident,Val) -> Exp
@@ -925,9 +959,12 @@ reduceVarVal cxt left_or_right parent x (ArrOrTru con vs)
                  Var {} -> False                      -- just a variable
                  Val {} -> not (S.null (freeVars v))  -- open non-variable
                  _      -> True                       -- not a value
+    -- ToDo: we'd like better:
+    --   x `S.member` occVars v
+    -- but we are worried about divergence for x=<1,<2,x>>
 
-reduceVarVal cxt left_or_right parent x (Val v)
 -- Deal with non-tuple var/val equalities (x=v) or (v=x)
+reduceVarVal cxt left_or_right parent x (Val v)
   | promotionOK parent x v
   =  mkStep ("Promote"++left_or_right) (Promote S.empty x v) v
 
@@ -947,6 +984,23 @@ promotionOK (Blk locals leqns _) x v
                                             --   i.e. is "flexible"
   && x `S.notMember` dom leqns              -- x must not have an eqn
   && occfvs v `S.disjoint` (sing x `S.union` dom leqns)    -- v must not have variables from eqns
+
+skolemEquality :: ReductionContext -> Ident -> Exp -> Maybe FailableAssump
+skolemEquality (RC { rc_skols = skols, rc_vcxt = vcxt }) r v
+  | Verifying {} <- vcxt
+  , r `S.member` skols
+  , Just gv <- groundValue skols v
+  = Just (A_GVEq r gv)
+  | otherwise
+  = Nothing
+
+groundValue :: Set SkolIdent -> Exp -> Maybe GroundVal
+-- Like skolValue, but no lambdas
+groundValue _  (Lit l)                   = Just (GVLit l)
+groundValue rs (Var v) | v `S.member` rs = Just (GVVar v)
+groundValue rs (Arr vs)                  = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
+groundValue rs (Tru v)                   = do { gv <- groundValue rs v; Just (GVTru gv) }
+groundValue _  _                         = Nothing
 
 
 ------------------------------------
@@ -1075,7 +1129,8 @@ reduceMatch ::  ReductionContext -> Ident -> Term -> Blob -> Reduction Exp
 reduceMatch cxt x tm blob
   = case tm of
         -- Blocks
-        TBlock t -> mkStep  "MBlock" (FloatB tbndrs emptyHeap) (SArr blob x t')
+        TBlock t -> mkStep ("MBlock " ++ render (pPrint tbndrs))
+                           (FloatB tbndrs emptyHeap) (SArr blob x t')
                  where
                    (tbndrs, t') = freshenTerm cxt t
 
@@ -1175,12 +1230,6 @@ matchFun cxt f at fx bt blob
                  Blk tbs_at emptyHeap $
                  (SArr blob u at') :>
                  (mkCheck fx (Blk (sing q) emptyHeap (SArr NoBlob q (TBlock bt))))
-
-mkCheck :: Effect -> Blk -> Exp
-mkCheck Fails    blk = Prm ChkFails    :@ Iter ALL blk (Arr [])
-mkCheck Succeeds blk = Prm ChkSucceeds :@ Iter ALL blk (Arr [])
-mkCheck Decides  blk = Prm ChkDecides  :@ Iter ALL blk (Arr [])
-mkCheck Iterates blk = mkCrl blk
 
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
@@ -1290,6 +1339,9 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 
 reduceVerify :: ReductionContext -> Set Ident -> [Assump] -> Blk -> Reduction Exp
 reduceVerify cxt skols as blk
+  | AssumeVerified <- rc_vcxt cxt  -- Discard verify{} when AssumeVerified
+  = Done "VDiscard" (Arr [])
+
   | Blk _ _ (Val {}) <- blk
   = Done "VVal" (Arr [])
     -- We can finish up with
@@ -1395,23 +1447,6 @@ mkArgCheck :: PrimOp -> GroundVal -> [FailableAssump]
 mkArgCheck IsAny _  = []
 mkArgCheck op    gv = [A_RelOp op gv]
 
-skolemEquality :: ReductionContext -> Ident -> Exp -> Maybe FailableAssump
-skolemEquality (RC { rc_skols = skols, rc_vcxt = vcxt }) r v
-  | Verifying {} <- vcxt
-  , Just gv <- groundValue skols v
-  , r `S.member` skols
-  = Just (A_GVEq r gv)
-  | otherwise
-  = Nothing
-
-groundValue :: Set SkolIdent -> Exp -> Maybe GroundVal
--- Like skolValue, but no lambdas
-groundValue _  (Lit l)                   = Just (GVLit l)
-groundValue rs (Var v) | v `S.member` rs = Just (GVVar v)
-groundValue rs (Arr vs)                  = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
-groundValue rs (Tru v)                   = do { gv <- groundValue rs v; Just (GVTru gv) }
-groundValue _  _                         = Nothing
-
 --------------------------------------------------------------------------------
 --
 --             Free and bound variables
@@ -1469,26 +1504,26 @@ occfvs (Tru e)        = occfvs e
 occfvsB :: Blk -> Set Ident
 occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.difference` is
 
--- All /free/ variables
+-- All /free/ /existential/ variables
 freeVars :: Exp -> Set Ident
-freeVars (Err {})    = S.empty
-freeVars (Lit {})    = S.empty
-freeVars (Prm {})    = S.empty
-freeVars (Var i)     = sing i
-freeVars (Lam i e)   = i `S.delete` freeVarsBlk e
-freeVars (e1 :>  e2) = freeVars e1 `S.union` freeVars e2
-freeVars (e1 :=: e2) = freeVars e1 `S.union` freeVars e2
-freeVars (SArr _ i t) = sing i `S.union` freeVarsTerm t
-freeVars (e1 :@  e2) = freeVars e1 `S.union` freeVars e2
-freeVars (Arr es)    = S.unions $ map freeVars es
-freeVars (b1 :|: b2) = freeVarsBlk b1 `S.union` freeVarsBlk b2
-freeVars Fail        = S.empty
-freeVars (Dly e)     = freeVars e
-freeVars (Crl b)     = freeVarsBlk b
-freeVars (Iter _ b1 e2) = freeVarsBlk b1 `S.union` freeVars e2
-freeVars Verify{}    = S.empty
+freeVars (Err {})         = S.empty
+freeVars (Lit {})         = S.empty
+freeVars (Prm {})         = S.empty
+freeVars (Var i)          = sing i
+freeVars (Lam i e)        = i `S.delete` freeVarsBlk e
+freeVars (e1 :>  e2)      = freeVars e1 `S.union` freeVars e2
+freeVars (e1 :=: e2)      = freeVars e1 `S.union` freeVars e2
+freeVars (SArr _ i t)     = sing i `S.union` freeVarsTerm t
+freeVars (e1 :@  e2)      = freeVars e1 `S.union` freeVars e2
+freeVars (Arr es)         = S.unions $ map freeVars es
+freeVars (Tru e)          = freeVars e
+freeVars (b1 :|: b2)      = freeVarsBlk b1 `S.union` freeVarsBlk b2
+freeVars Fail             = S.empty
+freeVars (Dly e)          = freeVars e
+freeVars (Crl b)          = freeVarsBlk b
+freeVars (Iter _ b1 e2)   = freeVarsBlk b1 `S.union` freeVars e2
+freeVars (Verify s _ b)   = freeVarsBlk b `S.difference` s  -- No free exis in assumptions
 freeVars (OfType e1 _ e2) = freeVars e1 `S.union` freeVars e2
-freeVars (Tru e)     = freeVars e
 
 freeVarsBlk :: Blk -> Set Ident
 freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` freeVars e)
@@ -1800,6 +1835,12 @@ freshId3 cxt (s1,s2,s3)
   = case freshIds cxt [s1,s2,s3] of
       [n1,n2,n3] -> (n1,n2,n3)
       _          -> error "freshId3"
+
+freshId4 :: ReductionContext -> (String,String,String,String) -> (Ident,Ident,Ident,Ident)
+freshId4 cxt (s1,s2,s3,s4)
+  = case freshIds cxt [s1,s2,s3,s4] of
+      [n1,n2,n3,n4] -> (n1,n2,n3,n4)
+      _             -> error "freshId4"
 
 freshIds :: ReductionContext -> [String] -> [Ident]
 -- Return a list same length as input
