@@ -536,3 +536,22 @@ testeq("run-exitop4", fail, skip){ x:int; f()<closed>:int := {x}; f[]=3; f[] } {
    # Fail because f itself doesn't verify
 
 testeq("for-wrap1", pass) { f(xs := for(1|2){:prefix'-'}):=xs; f[1,2] } { (-1,-2) }
+
+
+#####
+# tests extracted from meetings.versetest
+testeq("M8Apr25-1", pass){ succ(x:int)<closed>:int := x+1
+                         ; h->f:=function(:int)<closed>{:int}
+                         ; h=succ
+                         ; f[3] } { 4 }
+testeq("jan1", pass){ (f(x:int)<closed><succeeds>:= x); y:int; f[y]=3} {3}
+testeq("M9Aug24-1", pass){ foo(x:any)<closed><decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+testeq("M5Aug24-1", pass, tim=skip_rej ) { G(X:int)<closed>:void = if (X = 2) then G(2); G[7] } {()}
+testeq("M5Aug24-2", loop, tim=skip_rej ) { G(X:int)<closed>:void = if (X = 2) then G(2); G[2] } {7}
+testeq("S1Aug24-4", pass) { f(x:int)<decides><closed> := x=3
+                          ; all{ exists a { f[a] } } } { array{3} }
+testeq("M28Jul24-1", loop, tim=skip_rej ) { F(X:int)<closed><decides>:void = if (X = 2) then fail
+                             ; Y := all{(F[1]; G[1]) | (G[2]; F[2])}
+                             ; G(X:int)<closed>:void = if (X = 2) then G(2)
+                             ; Y } { array{1} }
+testeq("T29Jul24-1", pass ){ f( all{1} )<closed> := 0; f[ array{1} ] = 0 } {0}
