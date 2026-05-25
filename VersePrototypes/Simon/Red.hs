@@ -8,8 +8,8 @@
 
 
 module Red( Blk(Blk, BlkX, BlkE), Exp(..), pattern Val, Term(..), Ident(..)
-          , (~~>)
-          , ReductionContext(..), VerificationContext(..)
+          , matchTop, topMatchContext
+          , ReductionContext(..), VerificationContext(..), MatchContext
           , thePrelude
           , run, runTraced, isVal
           , srcToTerm, addInScopeSkols, addInScopeExis, freshId, freshId4
@@ -106,7 +106,6 @@ data Exp
   | Exp :=: Exp           -- e1 = e2
   | Exp :@  Exp           -- e1[e2]
   | Arr [Exp]             -- array{e1,...,e2}
-  | OfType Exp Effect Exp -- e1 |><fx> e2
   | Tru Exp               -- truth{e}
   | Map [(Gnd, Exp)]      -- map{...}
 
@@ -114,17 +113,30 @@ data Exp
   | Iter IterCtx Blk Exp   -- if/for
   | Dly Exp                -- delay{e}
   | Crl Blk                -- {...}
-  | SArr Blob Ident Term   -- e ~> t
-
-  | Verify (Set SkolIdent) [Assump] Blk
   | Err String             -- Stuck/error expression
+
+  | Match MatchContext Ident Term   -- e ~> t
+  | OfType Exp Effect Exp           -- e1 |><fx> e2
+  | Verify (Set SkolIdent)
+           [Assump]
+           Blk
   deriving (Eq, Ord, Show)
 
 data Blk = BlkX (Set Ident) Heap Exp
   deriving (Eq, Ord, Show)
 
-data Blob = Blob | NoBlob
-  deriving (Eq, Ord, Show)
+data MatchContext = MC { mc_blob :: Blob, mc_polarity :: Polarity }
+  deriving(Eq,Ord,Show)
+
+data Blob
+  = MTop     -- Written 'o' in the rules.  Do not generate f[x] in (MFun)
+  | MNested  -- Written 'bullet' in the rules. Do generate f[x] in (MFun)
+  deriving (Eq, ord, Show)
+
+data Polarity
+  = Positive   -- u ~>+ t    -->   t[u]
+  | Negative   -- u ~>- t    -->   u |> t
+  deriving(Eq,Ord,Show)
 
 type Eqn = (Ident, Val)
 type Heap = [Eqn]  -- Invariant: all identifiers in the domain are distinct
@@ -137,8 +149,21 @@ emptyHeap = []
 --    (A)  dom(eqs)    `subset`   X
 --    (B)  occfvs(eqs) `disjoint` dom(eqs)
 
-(~~>) :: Ident -> Term -> Exp
-i ~~> t = SArr Blob i t
+matchTop :: MatchContext -> Ident -> Term -> Exp
+matchTop mc i t = Match (mc { mc_blob = MTop }) i t
+
+matchNested :: MatchContext -> Ident -> Term -> Exp
+matchNested mc i t = Match (mc { mc_blob = MNested }) i t
+
+matchFlip :: MatchContext -> Ident -> Term -> Exp
+matchFlip mc i t = Match (mc { mc_polarity = pol }) i t
+ where
+   pol = case mc_polarity mc of
+            Positive -> Negative
+            Negative -> Positive
+
+topMatchContext :: MatchContext
+topMatchContext = MC { mc_blob = MTop, mc_polarity = Positive }
 
 {-# COMPLETE Blk #-}
 pattern Blk :: (Set Ident) -> Heap -> Exp -> Blk
@@ -252,8 +277,7 @@ instance Pretty Exp where
   pPrintPrec l p (Lit i)     = pPrintPrec l p i
   pPrintPrec l p (Prm o)     = pPrintPrec l p o
   pPrintPrec l p (Lam i b)   = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 0 b
-  pPrintPrec l p (SArr NoBlob x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>" <+> pPrintPrec l 1 e
-  pPrintPrec l p (SArr Blob   x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~~>" <+> pPrintPrec l 1 e
+  pPrintPrec l p (Match cxt x e) = maybeParens (p > 1) $ pPrintPrec l 1 x <+> text "~>"<> pPrint cxt <+> pPrintPrec l 1 e
   pPrintPrec l p (e1 :@ e2)  = maybeParens (p > 10) $ cat [pPrintPrec l 10 e1, nest 2 (text "[" <> pPrintPrec l 0 e2 <> text "]")]
 
   -- Flatten out e1;e2;e3 into a list
@@ -294,6 +318,17 @@ instance Pretty Exp where
 
 instance Pretty Blk where
   pPrintPrec l p (Blk vs eqns e) = ppBlk l p vs eqns e
+
+instance Pretty MatchContext where
+  pPrint (MC b p) = parens (pPrint b <> pPrint p)
+
+instance Pretty Blob where
+  pPrint MTop    = char 'o'
+  pPrint MNested = char '⦁'   -- Nearest thing to \bullet
+
+instance Pretty Polarity where
+  pPrint Positive = char '+'
+  pPrint Negative = char '-'
 
 ppBlk :: PrettyLevel -> Rational -> Set Ident -> Heap -> Exp -> Doc
 ppBlk l p vs eqns e
@@ -543,7 +578,8 @@ data BlkFloats   -- Floating out the the innermost enclosing Blk
 
 data VerFloats   -- Floating out to the innermost enclosing Verify
   = NoVerFloats
-  | FloatS (Set SkolIdent) [Assump]
+  | FloatRigid (Set SkolIdent) [Assump]
+  | FloatFlexi (Set SkolIdent) Ident Exp
   deriving (Eq, Show)
 
 
@@ -597,7 +633,8 @@ instance Pretty BlkFloats where
 
 instance Pretty VerFloats where
   pPrintPrec _ _ NoVerFloats     = empty
-  pPrintPrec _ _ (FloatS s asm)  = text "FS" <> braces (pPrint s <+> pPrint asm)
+  pPrintPrec _ _ (FloatRigid s asm)  = text "FR" <> braces (pPrint s <+> pPrint asm)
+  pPrintPrec _ _ (FloatFlexi s i e)  = text "FF" <> braces (pPrint s <+> pPrint i <+> equals <+> pPrint e)
 
 instance (Pretty flts, Pretty a) => Pretty (Result flts a) where
   pPrintPrec _ _ (Res flts res)
@@ -726,21 +763,20 @@ initialBlk :: F.SrcEssential -> (ReductionContext, Blk)
 initialBlk src
   = (top_cxt, top_blk)
   where
+    u = freshId top_cxt "u"
     term = srcToTerm src
     top_skols   = freeVarsTerm term `S.difference` init_locals
     init_locals = termBndrs term `S.union` S.fromList (map fst thePrelude)
 
     top_blk = Blk (sing u `S.union` init_locals)
                   thePrelude
-                  (u ~~> term)
+                  (matchTop topMatchContext u term)
 
     top_cxt = RC { rc_depth  = 0
                  , rc_eqns   = emptyHeap
                  , rc_exis   = S.empty
                  , rc_skols  = top_skols
                  , rc_vcxt   = NotVerifying }
-
-    u = freshId top_cxt "u"
 
 mergeStep :: HasCallStack => Blk -> Result BlkFloats Exp -> Result BlkFloats Blk
 mergeStep (Blk is eqs _) (Res NoFloats res_e)
@@ -913,7 +949,7 @@ reduceExp cxt parent@(Blk _ _ body)
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
-        SArr b x tm  -> reduceMatch cxt x tm b
+        Match b x tm  -> reduceMatch cxt x tm b
 
         -- Choice and failure
         Fail -> Failure "Fail"
@@ -922,7 +958,15 @@ reduceExp cxt parent@(Blk _ _ body)
 
         Iter ic b e -> reduceIter cxt ic b e
 
-        OfType e1 _fx e2  -> Done "RunOfType" (e2 :@ e1)
+        OfType e1 _fx e2 | Verifying {} <- rc_vcxt cxt
+                         , skolValue skols e1
+                         , skolValue skols e2
+                         -> VerStep "Skolemise"
+                            [Res (FloatFlexi (sing sk) sk (e2 :@ e1))
+                                 (Var sk)]
+                         where
+                           skols = rc_skols cxt
+                           sk = freshId cxt "sk"
 
         Verify skols as e -> reduceVerify cxt skols as e
 
@@ -986,8 +1030,8 @@ reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
   -- be bound by /any/ enclosing `verify`
   | Just asm <- skolemEquality cxt' x xv
   = VerStep ("VPromoteT"++left_or_right)
-    [ Res (FloatS as [A_Pos asm]) v'
-    , Res (FloatS as [A_Neg asm]) Fail ]
+    [ Res (FloatRigid as [A_Pos asm]) v'
+    , Res (FloatRigid as [A_Neg asm]) Fail ]
   where
     prs :: [(Maybe Ident, Val)]
     -- (Just a,  v)   for values v that should be A-normalised
@@ -1032,8 +1076,8 @@ reduceVarVal cxt left_or_right parent x (Val v)
 
   | Just asm <- skolemEquality cxt x v
   = VerStep ("VPromote"++left_or_right)
-     [ Res (FloatS S.empty [A_Pos asm]) v
-     , Res (FloatS S.empty [A_Neg asm]) Fail ]
+     [ Res (FloatRigid S.empty [A_Pos asm]) v
+     , Res (FloatRigid S.empty [A_Neg asm]) Fail ]
 
   | otherwise
   = RedNone
@@ -1064,6 +1108,9 @@ groundValue rs (Arr vs)                  = do { gvs <- mapM (groundValue rs) vs;
 groundValue rs (Tru v)                   = do { gv <- groundValue rs v; Just (GVTru gv) }
 groundValue _  _                         = Nothing
 
+skolValue :: Set SkolIdent -> Exp -> Bool
+-- A value whose only free vars are skolems
+skolValue rs e = isVal e && S.null (freeVars e `S.difference` rs)
 
 ------------------------------------
 reducePrimOp :: ReductionContext -> PrimOp -> Exp -> Reduction Exp
@@ -1206,14 +1253,14 @@ reduceTruOp IsTru HNF{}     = Failure "Prim-isTru"
 reduceTruOp _ _ = RedNone
 
 ------------------------------------
-reduceMatch ::  ReductionContext -> Ident -> Term -> Blob -> Reduction Exp
+reduceMatch ::  ReductionContext -> Ident -> Term -> MatchContext -> Reduction Exp
 -- :~> reduction
 
-reduceMatch cxt x tm blob
+reduceMatch cxt x tm mc
   = case tm of
         -- Blocks
         TBlock t -> mkStep ("MBlock " ++ render (pPrint tbndrs))
-                           (FloatB tbndrs emptyHeap) (SArr blob x t')
+                           (FloatB tbndrs emptyHeap) (Match mc x t')
                  where
                    (tbndrs, t') = freshenTerm cxt t
 
@@ -1225,38 +1272,40 @@ reduceMatch cxt x tm blob
         TFail                -> Done "Mfail" $ Fail
 
         (t1 :@% t2)          -> mkStep "MApp" (mkExiFloat [u1,u2]) $
-                                     Var x :=: ((u1 ~~> t1) :@ (u2 ~~> t2))
+                                     Var x :=: (matchTop mc u1 t1 :@ matchTop mc u2 t2)
                              where (u1,u2) = freshIds2 cxt "u"
-        (t1 :=:% t2)         -> Done "MUnif"    $ (SArr blob x t1) :=: (SArr blob x t2)
+        (t1 :=:% t2)         -> Done "MUnif"    $ (Match mc x t1) :=: (Match mc x t2)
         (t1 :|:% t2)         -> Done "MChoice"  $
-                                (BlkE $ SArr blob x (TBlock t1)) :|:
-                                (BlkE $ SArr blob x (TBlock t2))
+                                (BlkE $ Match mc x (TBlock t1)) :|:
+                                (BlkE $ Match mc x (TBlock t2))
 
-        (t1 :>% t2)          -> mkStep "MSemi"  (mkExiFloat1 u) $ (u ~~> t1) :> SArr blob x t2
+        (t1 :>% t2)          -> mkStep "MSemi"  (mkExiFloat1 u) $ matchTop mc u t1 :> Match mc x t2
                               where u = freshId cxt "u"
         (t1 `Where` t2)      -> mkStep "MWhere" (mkExiFloat [u,w]) $
-                                (Var w :=: SArr blob x t1) :> (u ~~> t2) :> Var w
+                                (Var w :=: Match mc x t1) :> matchTop mc u t2 :> Var w
                              where (u,w) = freshIds2 cxt "u"
 
-        Rng t      -> mkStep "MColon" (mkExiFloat1 u) $ (u ~~> t) :@ Var x
-                   where u = freshId cxt "u"
+        Rng t -> case mc_polarity mc of
+                    Positive -> mkStep "MColon+" (mkExiFloat1 u) $ matchTop mc u t :@ Var x
+                    Negative -> mkStep "Mcolon=" (mkExiFloat1 u) $ OfType (Var x) Succeeds (matchTop mc u t)
+              where
+                u = freshId cxt "u"
 
-        (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: SArr blob x t
-        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> SArr NoBlob i t
-                      -- XXX should this be NoBlob
+        (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: Match mc x t
+        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> Match mc i t
 
         -- Tuples and functions
-        TArr ts      -> matchTup cxt x ts blob
-        TMap kvs     -> matchMap cxt x kvs blob
-        Fun at fx bt -> matchFun cxt x at fx bt blob
-        TTru t       -> mkStep "MTru" (mkExiFloat [u]) $ (Var x :=: Tru (Var u)) :> Tru (SArr blob u t)
+        TArr ts      -> matchTup cxt x ts mc
+        TMap kvs     -> matchMap cxt x kvs mc
+        Fun at fx bt -> matchFun cxt x at fx bt mc
+        TTru t       -> mkStep "MTru" (mkExiFloat [u]) $ (Var x :=: Tru (Var u)) :> Tru (Match mc u t)
                        where u = freshId cxt "u"
 
         If t0 t1 t2  -> Done "MIf" $
                         Iter IF (Blk (sing u `S.union` tbs0) emptyHeap $
-                                 (u ~~> t0') :>
-                                 (Dly (SArr blob x (TBlock t1'))))
-                                (SArr blob x (TBlock t2))
+                                 matchTop mc u t0' :>
+                                 Dly (Match mc x (TBlock t1')))
+                                (Match mc x (TBlock t2))
                       where
                         (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
                         u = freshId (cxt `addInScopeExis` tbs0) "u"
@@ -1266,7 +1315,7 @@ reduceMatch cxt x tm blob
         For (i := t0) (TVar i') | i == i' ->
                         Done "MAll" $ Var x :=:
                          (Iter ALL (Blk (sing u `S.union` tbs0) emptyHeap $
-                                        (u ~~> t0'))
+                                        matchTop mc u t0')
                                    (Arr []))
                       where
                         (tbs0, t0') = freshenTerm cxt t0
@@ -1275,8 +1324,8 @@ reduceMatch cxt x tm blob
         For t0 t1    -> mkStep "MFor" (mkExiFloat1 y) $
                         (Arr [Var x, Var y] :=:
                          Iter FOR (Blk (sing u `S.union` tbs0) emptyHeap $
-                                   (u ~~> t0') :>
-                                   (Lam w (BlkE $ SArr blob w (TBlock t1'))))
+                                   (matchTop mc u t0') :>
+                                   (Lam w (BlkE $ Match mc w (TBlock t1'))))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                       where
@@ -1284,36 +1333,39 @@ reduceMatch cxt x tm blob
                         (y,u,w) = freshId3 (cxt `addInScopeExis` tbs0) ("y","u","w")
 
         TOfType t1 fx t2 -> mkStep ("TOfType " ++ show fx) (mkExiFloat [u1,u2]) $
-                            (OfType (u1 ~~> t1) fx (u2 ~~> t2))
+                            (OfType (matchTop mc u1 t1) fx (matchTop mc u2 t2))
                       where (u1,u2) = freshIds2 cxt "u"
 
         Check fx t -> Done ("MCheck " ++ show fx) $
-                      Var x :=: mkCheck fx (Blk (sing u) emptyHeap $ u ~~> TBlock t)
+                      Var x :=: mkCheck fx (Blk (sing u) emptyHeap $
+                                            matchTop mc u (TBlock t))
                    where
                       u  = freshId cxt "u"
 
-        Splice t -> reduceMatch cxt x t blob
+        Splice t -> reduceMatch cxt x t mc
                     -- See (AMP1) in Note [Desugaring ampersand]
 
 
-matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> Blob -> Reduction Exp
-matchFun cxt f at fx bt blob
+matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> MatchContext -> Reduction Exp
+matchFun cxt f at fx bt mc
   = Done "MFun" $
     fun_verify :>
     the_lambda
   where
     (tbs_at, at', bt') = freshenTerm2 cxt at bt
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
+
     the_lambda = Lam u $ Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
-                 (Var p :=: SArr NoBlob u at')       :>
-                 (if blob == NoBlob then ((Var q :=: (Var f :@ Var p)) :>)
-                                    else ( (IntE 99999) :>))
-                 (SArr blob q (TBlock bt'))
+                 (Var p :=: matchNested mc u at')        :>
+                 (if mc_blob mc == MNested
+                  then Var q :=: (Var f :@ Var p)
+                  else IntE 99999)                       :>
+                 (Match mc q (TBlock bt'))
 
     fun_verify = Verify (sing u) [] $
                  Blk tbs_at emptyHeap $
-                 (SArr blob u at') :>
-                 (mkCheck fx (Blk (sing q) emptyHeap (SArr NoBlob q (TBlock bt))))
+                 (matchFlip mc u at') :>
+                 (mkCheck fx (Blk (sing q) emptyHeap (matchTop mc q (TBlock bt))))
 
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
@@ -1343,8 +1395,8 @@ reduceIter cxt ic b1 e2
     iter res e = error ("reduceIter " ++ render (pPrint res $$ pPrint e))
 
 ---------------------------------------
-matchTup :: ReductionContext -> Ident -> [Term] -> Blob -> Reduction Exp
-matchTup cxt x ts blob
+matchTup :: ReductionContext -> Ident -> [Term] -> MatchContext -> Reduction Exp
+matchTup cxt x ts mc
   = mkStep "MTup" (mkExiFloat fresh_xs) $
     (Var x :=: appendArrs cxt2 (map mk_in segs)) :>
     appendArrs cxt2 (map mk_out segs)
@@ -1354,8 +1406,8 @@ matchTup cxt x ts blob
     mk_in (SFalse sprs) = Arr [ Var y | (y,_) <- sprs ]
 
     mk_out :: Segment (Ident,Term) -> Exp
-    mk_out (STrue (y,t)) = SArr blob y t
-    mk_out (SFalse sprs) = Arr [ SArr blob y t | (y,t) <- sprs ]
+    mk_out (STrue (y,t)) = Match mc y t
+    mk_out (SFalse sprs) = Arr [ Match mc y t | (y,t) <- sprs ]
 
     fresh_xs = freshIds cxt ["x" | _ <- ts]
     cxt2 = cxt { rc_exis = rc_exis cxt `S.union` S.fromList fresh_xs }  -- Yuk
@@ -1410,7 +1462,7 @@ choiceFree (e1 :> e2) = choiceFree e1 && choiceFree e2
 choiceFree (_ :|: _) = False
 choiceFree Fail = True
 choiceFree (e1 :=: e2) = choiceFree e1 && choiceFree e2
-choiceFree (SArr _ _ _) = False         -- force ~> to happen
+choiceFree (Match _ _ _) = False         -- force ~> to happen
 choiceFree (e1 :@ e2) = choiceFree e1 && choiceFree e2
 choiceFree (Arr es) = and (map choiceFree es)
 choiceFree (Iter ALL _ _) = True
@@ -1453,10 +1505,10 @@ reduceVerify cxt skols as blk
     wrap_blk (Res NoFloats blk'') = Verify skols' as' blk''
     wrap_blk r = error ("reduceVerify " ++ render (pPrint r))
 
-    wrap_ver (Res NoVerFloats blk'')       = Verify skols' as' blk''
-    wrap_ver (Res (FloatS sks asms) blk'') = Verify (sks `S.union` skols')
-                                                    (asms ++ as')
-                                                    blk''
+    wrap_ver (Res NoVerFloats blk'')           = Verify skols' as' blk''
+    wrap_ver (Res (FloatRigid sks asms) blk'') = Verify (sks `S.union` skols')
+                                                        (asms ++ as')
+                                                        blk''
 
     (subst, skols') = freshenBndrs cxt skols
     as'  = renameAssumps subst as
@@ -1496,11 +1548,11 @@ reduceVerifyOpGV cxt op gv
   | Just arg_op <- isUnaryOp op
   , let check_args = mkArgCheck arg_op gv
   = VerStep ("VUnaryOp-" ++ show op) $
-    [ Res (FloatS S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
+    [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
-    then [ Res (FloatS S.empty  [A_Neg rel_op]) Fail
-         , Res (FloatS S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
-    else [ Res (FloatS (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
+    then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
+         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
+    else [ Res (FloatRigid (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
   where
     r = freshId cxt "r"
     rel_op = A_RelOp op gv
@@ -1511,8 +1563,8 @@ reduceVerifyOpGV cxt op gv
 -- Binary operators where the argument is a skolem
 reduceVerifyOpGV cxt op (GVVar r)
   | Just {} <- isBinOp op
-  = VerStep "VBinOp-Arr" [ Res (FloatS rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
-                         , Res (FloatS rs [A_Neg eq_asm]) Fail ]
+  = VerStep "VBinOp-Arr" [ Res (FloatRigid rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
+                         , Res (FloatRigid rs [A_Neg eq_asm]) Fail ]
   where
     rs = S.fromList [r1,r2]
     (r1,r2) = freshIds2 cxt "r"
@@ -1524,11 +1576,11 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
   , let check_args :: [FailableAssump]
         check_args = mkArgCheck arg1_op gv1 ++ mkArgCheck arg2_op gv2
   = VerStep ("VBinOp-" ++ show op) $
-    [ Res (FloatS S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
+    [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
-    then [ Res (FloatS S.empty  [A_Neg rel_op]) Fail
-         , Res (FloatS S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
-    else [ Res (FloatS (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
+    then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
+         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
+    else [ Res (FloatRigid (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
   where
     r = freshId cxt "r"
     rel_op = A_RelOp op gv
@@ -1586,7 +1638,7 @@ occfvs (e1 :> e2)     = occfvs e1 `S.union` occfvs e2
 occfvs (b1 :|: b2)    = occfvsB b1 `S.union` occfvsB b2
 occfvs Fail           = S.empty
 occfvs (e1 :=: e2)    = occfvs e1 `S.union` occfvs e2
-occfvs (SArr _ i _)   = sing i  -- XXX what should we do here
+occfvs (Match _ i _)   = sing i  -- XXX what should we do here
 occfvs (e1 :@ e2)     = occfvs e1 `S.union` occfvs e2
 occfvs (Arr es)       = S.unions (map occfvs es)
 occfvs (Iter _ b1 e2) = occfvsB b1 `S.union` occfvs e2
@@ -1608,7 +1660,7 @@ freeVars (Var i)          = sing i
 freeVars (Lam i e)        = i `S.delete` freeVarsBlk e
 freeVars (e1 :>  e2)      = freeVars e1 `S.union` freeVars e2
 freeVars (e1 :=: e2)      = freeVars e1 `S.union` freeVars e2
-freeVars (SArr _ i t)     = sing i `S.union` freeVarsTerm t
+freeVars (Match _ i t)     = sing i `S.union` freeVarsTerm t
 freeVars (e1 :@  e2)      = freeVars e1 `S.union` freeVars e2
 freeVars (Arr es)         = S.unions $ map freeVars es
 freeVars (Tru e)          = freeVars e
@@ -1668,7 +1720,7 @@ allVars (Prm {})    = []
 allVars (Lam i e)   = i : allVarsBlk e
 allVars (e1 :>  e2) = allVars e1 ++ allVars e2
 allVars (e1 :=: e2) = allVars e1 ++ allVars e2
-allVars (SArr _ i e) = i : allVarsTerm e
+allVars (Match _ i e) = i : allVarsTerm e
 allVars (e1 :@  e2) = allVars e1 ++ allVars e2
 allVars (Arr es)    = concatMap allVars es
 allVars (b1 :|: b2) = allVarsBlk b1 ++ allVarsBlk b2
@@ -1718,7 +1770,7 @@ expSize (Prm {})    = 1
 expSize (Lam _ e)   = 1 + blkSize e
 expSize (e1 :>  e2) = 1 + expSize e1 + expSize e2
 expSize (e1 :=: e2) = 1 + expSize e1 + expSize e2
-expSize (SArr _ _  e) = 2 + termSize e
+expSize (Match _ _  e) = 2 + termSize e
 expSize (e1 :@  e2) = 1 + expSize e1 + expSize e2
 expSize (Arr es)    = 1 + sum (map expSize es)
 expSize (b1 :|: b2) = 1 + blkSize b1 + blkSize b2
@@ -1793,7 +1845,7 @@ rename sub = ren
     ren (Var i :=: Var j) | Just j' <- lookup i sub, j == j' = Var j
     ren (e1 :> e2) = ren e1 :> ren e2
     ren (e1 :=: e2) = ren e1 :=: ren e2
-    ren (SArr b i t) = SArr b (fromMaybe i (lookup i sub)) (renT t)
+    ren (Match b i t) = Match b (fromMaybe i (lookup i sub)) (renT t)
     ren (e1 :@ e2) = ren e1 :@ ren e2
     ren (Arr es) = Arr (map ren es)
     ren (b1 :|: b2) = renB b1 :|: renB b2

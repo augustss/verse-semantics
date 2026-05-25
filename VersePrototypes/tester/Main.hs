@@ -664,7 +664,7 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
              main_exp = EV.Verify S.empty [] $ BlkE $
                         EV.mkCheck Core.Succeeds  $
-                        BlkE $ u1 EV.~~> TBlock term
+                        BlkE $ EV.matchTop topMatchContext u1 (TBlock term)
 
              main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
 
@@ -699,7 +699,7 @@ mkBlkToTest tflags (TestVerify _ src)
 
              main_exp = EV.Verify S.empty [] $ BlkE $
                         EV.mkCheck Core.Succeeds  $
-                        BlkE $ u1 EV.~~> TBlock term
+                        BlkE $ EV.matchTop topMatchContext u1 (TBlock term)
 
              main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
 
@@ -730,7 +730,8 @@ mk_term tflags src = do { ess <- srcToEssential fe_flags src
 
 mk_all :: EV.Ident -> EV.Term -> EV.Exp
 -- Returns all{exists u.  u ~~> block{t} }
-mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap (u ~~> EV.TBlock t))
+mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap
+                              (EV.matchTop topMatchContext u (EV.TBlock t)))
 
 ----------------------------------------------------------------
 --
