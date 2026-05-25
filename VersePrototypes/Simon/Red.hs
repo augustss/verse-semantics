@@ -404,8 +404,11 @@ root _ = error "root: not an HNF"
 pattern IntE :: Integer -> Exp
 pattern IntE i = Lit (LInt i)
 
-pattern StrE :: String -> Exp
-pattern StrE s = Lit (LStr s)
+--pattern StrE :: String -> Exp
+--pattern StrE s = Lit (LStr s)
+
+pattern CharE :: Char -> Exp
+pattern CharE s = Lit (LChar s)
 
 --------------------------------------------------------------------------------
 --
@@ -418,6 +421,7 @@ srcToTerm (F.Variable i)
   | F.isSrcUnderscore i          = Und
   | otherwise                    = TVar (srcToCoreIdent i)
 srcToTerm (F.EPrim o)            = TPrm o
+srcToTerm (F.Lit (LStr s))       = TArr $ map (TLit . LChar) s
 srcToTerm (F.Lit k)              = TLit k
 srcToTerm (F.DefineE i e)        = srcToCoreIdent i := srcToTerm e
 srcToTerm (F.Choice e1 e2)       = srcToTerm e1 :|:% srcToTerm e2
@@ -596,7 +600,9 @@ mkCons2 cxt x y xys
 thePrelude :: [Eqn]
 thePrelude
   = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
-    , (mkName "string",       Lam vp  $ BlkE $ Prm IsStr :@ (Var vp) :> Var vp)
+    , (mkName "char",         Lam vp  $ BlkE $ Prm IsChar :@ (Var vp) :> Var vp)
+    , (mkName "nat",          Lam vp  $ BlkE $ Prm IsNat :@ (Var vp) :> Var vp)
+--    , (mkName "string",       Lam vp  $ BlkE $ Prm IsStr :@ (Var vp) :> Var vp)
     , (mkName "comparable",   Lam vp  $ BlkE $ Prm IsComp :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ BlkE $ Var vp)
     , (mkName "void",         Lam vp  $ BlkE $ Arr [])
@@ -1018,6 +1024,7 @@ reducePrimOp cxt op e
 reduceArithOp :: PrimOp -> Exp -> Reduction Exp
 -- Arithmetic ops get stuck on values outside the domain
 reduceArithOp Add (Arr [IntE i, IntE j]) = Done    "Prim+" $ IntE (i + j)
+reduceArithOp Add (Arr [Arr as, Arr bs]) = Done    "Prim+arr" $ Arr (as ++ bs)
 reduceArithOp Sub (Arr [IntE i, IntE j]) = Done    "Prim-" $ IntE (i - j)
 reduceArithOp Mul (Arr [IntE i, IntE j]) = Done    "Prim*" $ IntE (i * j)
 reduceArithOp Div (Arr [IntE i, IntE j])
@@ -1030,8 +1037,14 @@ reduceArithOp Pls (IntE i)               = Done    "Prim-pls" $ IntE i
 reduceArithOp IsInt v@(IntE {})          = Done    "Prim-isInt" v
 reduceArithOp IsInt HNF{}                = Failure "Prim-isInt"
 
-reduceArithOp IsStr v@(StrE {})          = Done    "Prim-isStr" v
-reduceArithOp IsStr HNF{}                = Failure "Prim-isStr"
+reduceArithOp IsNat v@(IntE i) | i >= 0  = Done    "Prim-isNat" v
+reduceArithOp IsNat HNF{}                = Failure "Prim-isNat"
+
+--reduceArithOp IsStr v@(StrE {})          = Done    "Prim-isStr" v
+--reduceArithOp IsStr HNF{}                = Failure "Prim-isStr"
+
+reduceArithOp IsChar v@(CharE {})        = Done    "Prim-isChar" v
+reduceArithOp IsChar HNF{}               = Failure "Prim-isChar"
 
 reduceArithOp IsComp (Comp v)            = Done    "Prim-isComp" v
 reduceArithOp IsComp (Con _)             = Failure "Prim-isComp"

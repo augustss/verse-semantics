@@ -472,7 +472,7 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
+ | IsInt | IsNat | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
  | IsComp | IsAny | IsType
 
    -- Checking
@@ -504,6 +504,7 @@ primOpString LEq = "intLE$"
 primOpString NEq = "intNE$"
 
 primOpString IsInt    = "isInt$"
+primOpString IsNat    = "isNat$"
 primOpString IsStr    = "isStr$"
 primOpString IsChar   = "isChar$"
 primOpString IsArr    = "isArr$"
@@ -532,6 +533,7 @@ primOpCanFail NEq    = True
 primOpCanFail GEq    = True
 primOpCanFail LEq    = True
 primOpCanFail IsInt  = True
+primOpCanFail IsNat  = True
 primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
