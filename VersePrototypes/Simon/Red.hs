@@ -53,7 +53,7 @@ import GHC.Stack
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = False
+traceReductions = True
 
 --------------------------------------------------------------------------------
 --
@@ -86,6 +86,7 @@ data Term
   | TArr [Term]               -- array{t1,...,t2}
   | TOfType Term Effect Term  -- t1 |><fx> t2
   | TTru Term                 -- truth{t}
+  | TMap [(Term, Term)]        -- map{...}
 
   | Und                     -- _
   | Term `Where` Term       -- t1 where t2
@@ -112,7 +113,8 @@ data Exp
   | Exp :@  Exp           -- e1[e2]
   | Arr [Exp]             -- array{e1,...,e2}
   | OfType Exp Effect Exp -- e1 |><fx> e2
-  | Tru Exp               -- truth{e{
+  | Tru Exp               -- truth{e}
+  | Map [(Gnd, Exp)]      -- map{...}
 
   | Lam Ident Blk          -- \ x . e
   | Iter IterCtx Blk Exp   -- if/for
@@ -230,10 +232,12 @@ instance Pretty Term where
   pPrintPrec l p (e1 :=:% e2)    = maybeParens (p > 5) $ pPrintPrec l 6 e1 <+> text "=" <+> pPrintPrec l 6 e2
 
   pPrintPrec l _ (TArr es)
-    | l == prettyNormal     = text "<" <> hsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+    | l == prettyNormal     = text "<" <> hsep (punctuate (text ",") (map (pPrintL l) es)) <> text ">"
   pPrintPrec l _ (TArr [e]) = text "array" <> braces (pPrintL l e)
-  pPrintPrec l _ (TArr es)  = parens $ hsep $ punctuate (text ",") $ map (pPrintPrec l 0) es
+  pPrintPrec l _ (TArr es)  = parens $ hsep $ punctuate (text ",") $ map (pPrintL l) es
   pPrintPrec l _ (TTru e)   = text "truth" <> braces (pPrintL l e)
+  pPrintPrec l _ (TMap kes) = text "map" <> braces
+     (hsep (punctuate (text ",") (map (\ (k, e) -> pPrintPrec l 4 k <+> text "=>" <+> pPrintPrec l 4 e) kes)))
 
   pPrintPrec l p (b1 :|:% b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec _ _ TFail        = text "fail"
@@ -277,6 +281,8 @@ instance Pretty Exp where
   pPrintPrec l p (b1 :|: b2) = maybeParens (p > 4) $ pPrintPrec l 5 b1 <+> text "|" <+> pPrintPrec l 4 b2
   pPrintPrec _ _ Fail        = text "fail"
   pPrintPrec _ _ (Err s)     = text "error" <> braces (text s)
+  pPrintPrec l _ (Map kes)   = text "map" <> braces
+     (hsep (punctuate (text ",") (map (\ (k, e) -> pPrintPrec l 4 k <+> text "=>" <+> pPrintPrec l 4 e) kes)))
 
 
   pPrintPrec l _ (Iter ic b1 b2)
@@ -331,6 +337,7 @@ getHNF e@Lam{} = Just e
 getHNF e@Arr{} = Just e
 getHNF e@Tru{} = Just e
 getHNF e@Dly{} = Just e
+getHNF e@Map{} = Just e
 getHNF _ = Nothing
 
 -- Like HNF, but also variables
@@ -345,7 +352,7 @@ pattern Val :: Exp -> Val
 pattern Val e <- (getVal -> Just e)
 
 -- Values
-getVal :: Exp -> Maybe Exp
+getVal :: Exp -> Maybe Val
 getVal e@Var{} = Just e
 getVal e@Lit{} = Just e
 getVal e@Prm{} = Just e
@@ -353,6 +360,7 @@ getVal e@Lam{} = Just e
 getVal e@(Arr es) | Just _ <- mapM getVal es = Just e
 getVal e@(Tru e') | Just _ <- getVal e' = Just e
 getVal e@Dly{} = Just e
+getVal e@(Map kvs) | Just _ <- mapM (getVal . snd) kvs = Just e
 getVal _ = Nothing
 
 isVal :: Exp -> Bool
@@ -366,30 +374,46 @@ getComp :: Exp -> Maybe Exp
 getComp e@Lit{} = Just e
 getComp e@(Arr es) | Just _ <- mapM getComp es = Just e
 getComp e@(Tru e') | Just _ <- getComp e' = Just e
+getComp e@(Map kvs) | Just _ <- mapM (getComp . snd) kvs = Just e
 getComp _ = Nothing
 
-pattern Con :: Exp -> Exp
+type Con = Exp
+pattern Con :: Con -> Exp
 pattern Con v <- (getCon -> Just v)
 
 -- Constants, no further reductions possible
-getCon :: Exp -> Maybe Exp
+getCon :: Exp -> Maybe Con
 getCon e@Lit{} = Just e
 getCon e@Prm{} = Just e
 getCon e@Lam{} = Just e
 getCon e@(Arr es) | Just _ <- mapM getCon es = Just e
 getCon e@(Tru e') | Just _ <- getCon e' = Just e
 getCon e@Dly{} = Just e
+getCon e@(Map kvs) | Just _ <- mapM (getCon . snd) kvs = Just e
 getCon _ = Nothing
 
-pattern ArrOrTru :: ([Exp] -> Exp) -> [Exp] -> Exp
-pattern ArrOrTru con vs <- (getArrOrTru -> Just (con, vs))
+type Gnd = Exp
+pattern Gnd :: Exp -> Gnd
+pattern Gnd v <- (getGnd -> Just v)
+
+-- Ground values, Con, but no functions
+getGnd :: Exp -> Maybe Gnd
+getGnd e@Lit{} = Just e
+getGnd e@(Arr es) | Just _ <- mapM getGnd es = Just e
+getGnd e@(Tru e') | Just _ <- getGnd e' = Just e
+getGnd e@(Map kvs) | Just _ <- mapM (getGnd . snd) kvs = Just e
+getGnd _ = Nothing
+
+pattern ArrOrTruOrMap :: ([Exp] -> Exp) -> [Exp] -> Exp
+pattern ArrOrTruOrMap con vs <- (getArrOrTruOrMap -> Just (con, vs))
 
 -- If the expression is Arr or Tru, return the constructor and the list of subparts.
 -- For Tru we fake a list.  This way Arr and Tru can share code in some cases.
-getArrOrTru :: Exp -> Maybe ([Exp] -> Exp, [Exp])
-getArrOrTru (Arr es) = Just (Arr, es)
-getArrOrTru (Tru e)  = Just (Tru . (!!0), [e])
-getArrOrTru _ = Nothing
+getArrOrTruOrMap :: Exp -> Maybe ([Exp] -> Exp, [Exp])
+getArrOrTruOrMap (Arr es) = Just (Arr, es)
+getArrOrTruOrMap (Tru e)  = Just (Tru . (!!0), [e])
+getArrOrTruOrMap (Map kvs)= Just (Map . zip ks, vs) where (ks, vs) = unzip kvs
+getArrOrTruOrMap _ = Nothing
 
 -- Turn every kind of HNF into a trivial one
 root :: HNF -> HNF
@@ -451,6 +475,13 @@ srcToTerm (F.Exists is e)        = TBlock (foldr bind_one (srcToTerm e) is)
 srcToTerm (F.Check fx e)
   | Just eff <- toCoreEff fx     = Check eff (srcToTerm e)
 srcToTerm (F.Truth e)            = TTru (srcToTerm e)
+srcToTerm (F.Macro1 m _ kes) | m == F.Ident undefined "map" =
+  case kes of
+    F.Array xs -> TMap $ map keyValue xs
+    x          -> TMap [keyValue x]
+  where keyValue :: F.SrcEssential -> (Term, Term)
+        keyValue (F.Function F.Closed k suc v) | suc == F.effSucceeds = (srcToTerm k, srcToTerm v)
+        keyValue kv = error $ "map: not a key-value pair " ++ prettyShow kv
 
 srcToTerm e = error $ "srcToTerm: unimplemented " ++ show e
 
@@ -754,7 +785,7 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns, rc_exis = exis }) blk
   | not (S.null dead_vars)   -- First try garbage collection
   = (if traceReductions
      then trace $ render $ nest (4*rc_depth cxt) $
-          text "reduceBlockGC" <+> (pPrint dead_vars $$ pPrint blk')
+          text "reduceBlockGC" <+> (pPrint dead_vars $$ text "---" $$ pPrint blk')
      else id)
     Done ("GC " ++ show dead_vars) (gcVarsBlk dead_vars blk')
 
@@ -837,6 +868,8 @@ reduceExp cxt parent@(Blk _ _ body)
         Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
         Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
         Tru e1       :=: Tru e2                            -> Done    "EqTru" $ Tru (e1 :=: e2)
+        Val (Map kvs1) :=: Map kvs2 | map fst kvs1 == map fst kvs2 ->
+          Done "EqMap" $ Map (zipWith (\ (k1, v1) (_, e2) -> (k1, v1 :=: e2)) kvs1 kvs2)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
 
         -- Sequencing
@@ -870,8 +903,14 @@ reduceExp cxt parent@(Blk _ _ body)
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
---        Tru e :@ Val v -> Done "ITru" $ e :=: v; v
         Tru e1 :@ e2 -> Done "ITru" $ e1 :=: e2
+
+        Val (Map kvs) :@ ei -> mkStep "IMap" (mkExiFloat1 x) $
+                               Var x :=: ei :>
+                               foldr alt Fail (map (\ (k,v)  -> (Var x :=: k) :> v) kvs)
+          where
+            x = freshId cxt "x"
+            alt e1 e2 = BlkE e1 :|: BlkE e2
 
         SArr b x tm  -> reduceMatch cxt x tm b
 
@@ -892,6 +931,7 @@ reduceExp cxt parent@(Blk _ _ body)
         e1 :=: e2  -> find2   leftCF (:=:) e1 e2
         e1 :@  e2  -> find2   leftCF (:@)  e1 e2
         Arr es     -> findArr leftCF es
+        Map kvs    -> findMap leftCF kvs
         Tru e      -> find1 leftCF Tru e
 
         _ -> RedNone
@@ -915,12 +955,22 @@ reduceExp cxt parent@(Blk _ _ body)
         ks (Arr es') = Arr (e:es')
         ks e'        = error "findArr" (prettyShow e')
 
+    findMap :: Bool -> [(Gnd,Exp)] -> Reduction Exp
+    findMap _ []          = RedNone
+    findMap leftCF (e@(kk,vv):es) = case find1 leftCF k vv of
+                              RedNone -> find1 (leftCF && choiceFree vv) ks (Map es)
+                              r       -> r
+      where
+        k e'         = Map ((kk,e'):es)
+        ks (Map es') = Map (e:es')
+        ks e'        = error "findMap" (prettyShow e')
+
 ------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
 
 -- Tuple values
 -- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
-reduceVarVal cxt left_or_right parent x (ArrOrTru con vs)
+reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
   -- Try rule (PromoteT) to promote an existential `x`, where `x` is
   -- bound by the /immediately-enclosing/ block, namely `parent`
   | promotionOK parent x xv
@@ -1092,6 +1142,9 @@ reduceArrOp ArrLen (Arr xs)           = Done "Prim-length" $ IntE (toInteger (le
 reduceArrOp IsArr v@(Arr _) = Done    "Prim-isArr" v
 reduceArrOp IsArr HNF{}     = Failure "Prim-isArr"
 
+reduceArrOp IsMap v@(Map _) = Done    "Prim-isMap" v
+reduceArrOp IsMap HNF{}     = Failure "Prim-isMap"
+
 reduceArrOp ArrMap (Arr [fun, Arr xs])
   = Done "Prim-ArrMap" (Arr (map (fun :@) xs))
 
@@ -1177,6 +1230,7 @@ reduceMatch cxt x tm blob
 
         -- Tuples and functions
         TArr ts      -> matchTup cxt x ts blob
+        TMap kvs     -> matchMap cxt x kvs blob
         Fun at fx bt -> matchFun cxt x at fx bt blob
         TTru t       -> mkStep "MTru" (mkExiFloat [u]) $ (Var x :=: Tru (Var u)) :> Tru (SArr blob u t)
                        where u = freshId cxt "u"
@@ -1321,6 +1375,17 @@ segments p (t : ts)
                 (ts1,ts2) = span (isNothing . p) ts
 
 ---------------------------------------
+matchMap :: ReductionContext -> Ident -> [(Term, Term)] -> Blob -> Reduction Exp
+matchMap cxt x akvs _blob =
+  mkStep "MMap" (mkExiFloat fresh_xs) $ Var x :=: Map (zipWith (\ y (k, e) -> (con k, y ~~> e)) fresh_xs akvs)
+  where fresh_xs = freshIds cxt ["x" | _ <- akvs]
+        con (TLit l) = Lit l
+        con (TArr es) = Arr $ map con es
+        con (TTru e) = Tru (con e)
+        con (TMap kvs) = Map $ map (\ (k,v) -> (con k, con v)) kvs
+        con e = error $ "map: key is not a constant: " ++ prettyShow e
+
+---------------------------------------
 choiceFree :: Exp -> Bool
 choiceFree Var{} = True
 choiceFree Lit{} = True
@@ -1339,6 +1404,7 @@ choiceFree (Iter _ _ _) = False
 choiceFree (Crl b) = choiceFreeB b
 choiceFree Verify{} = True
 choiceFree (Tru e) = choiceFree e
+choiceFree (Map kvs) = and (map (choiceFree . snd) kvs)
 
 choiceFreeB :: Blk -> Bool
 choiceFreeB (Blk _ _ e) = choiceFree e
@@ -1492,6 +1558,7 @@ termBndrs tm = go tm
     go (Splice t)        = go t
     go (Check _ t)       = go t
     go (TTru t)          = go t
+    go (TMap kvs)        = S.unions $ map (go . snd) kvs
 
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Ident
@@ -1513,6 +1580,7 @@ occfvs (Crl b)        = occfvsB b
 occfvs Verify{}       = S.empty
 occfvs (OfType e1 _ e2) = occfvs e1 `S.union` occfvs e2
 occfvs (Tru e)        = occfvs e
+occfvs (Map kvs)      = S.unions (map (occfvs . snd) kvs)
 
 occfvsB :: Blk -> Set Ident
 occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.difference` is
@@ -1537,6 +1605,7 @@ freeVars (Crl b)          = freeVarsBlk b
 freeVars (Iter _ b1 e2)   = freeVarsBlk b1 `S.union` freeVars e2
 freeVars (Verify s _ b)   = freeVarsBlk b `S.difference` s  -- No free exis in assumptions
 freeVars (OfType e1 _ e2) = freeVars e1 `S.union` freeVars e2
+freeVars (Map kvs)        = S.unions (map (freeVars . snd) kvs)
 
 freeVarsBlk :: Blk -> Set Ident
 freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` freeVars e)
@@ -1571,6 +1640,7 @@ freeVarsTerm (Check _ t)   = freeVarsTerm t
 freeVarsTerm (Splice t)    = freeVarsTerm t
 freeVarsTerm (TOfType t1 _ t2) = freeVarsTerm t1 `S.union` freeVarsTerm t2
 freeVarsTerm (TTru t)      = freeVarsTerm t
+freeVarsTerm (TMap kvs)    = S.unions $ map (freeVarsTerm . snd) kvs
 
 freeVarsTermBlock :: Term -> Set Ident
 freeVarsTermBlock t = freeVarsTerm t `S.difference` termBndrs t
@@ -1595,6 +1665,7 @@ allVars (Iter _ b1 e2)   = allVarsBlk b1 ++ allVars e2
 allVars (Verify is _ b)  = S.toList is ++ allVarsBlk b
 allVars (OfType e1 _ e2) = allVars e1 ++ allVars e2
 allVars (Tru e)     = allVars e
+allVars (Map kvs)   = concatMap (allVars . snd) kvs
 
 allVarsBlk :: Blk -> [Ident]
 allVarsBlk (Blk is eqs e) = S.toList is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -1623,6 +1694,7 @@ allVarsTerm (Check _ t) = allVarsTerm t
 allVarsTerm (Splice t)  = allVarsTerm t
 allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
 allVarsTerm (TTru t)    = allVarsTerm t
+allVarsTerm (TMap kvs) = concatMap (allVarsTerm . snd) kvs
 
 expSize :: Exp -> Int
 expSize (Err {})    = 1
@@ -1643,6 +1715,7 @@ expSize (Iter _ b1 e2) = 1 + blkSize b1 + expSize e2
 expSize (Verify _ _ b)   = 1 + blkSize b
 expSize (OfType e1 _ e2) = 1 + expSize e1 + expSize e2
 expSize (Tru e)          = 1 + expSize e
+expSize (Map kvs)    = 1 + sum (map (expSize . fst) kvs) + sum (map (expSize . snd) kvs)
 
 blkSize :: Blk -> Int
 blkSize (Blk is eqs e) = S.size is + sum (map eqnSize eqs) + expSize e
@@ -1674,6 +1747,7 @@ termSize (Check _ t)       = 1 + termSize t
 termSize (Splice t)        = 1 + termSize t
 termSize (TOfType t1 _ t2) = 1 + termSize t1 + termSize t2
 termSize (TTru t)          = 1 + termSize t
+termSize (TMap kvs)        = 1 + sum (map (termSize . fst) kvs) + sum (map (termSize . snd) kvs)
 
 --------------------------------------------------------------------------------
 --
@@ -1718,6 +1792,7 @@ rename sub = ren
        where
          sub' = [pr | pr@(x,_) <- sub, not (x `S.member` is)]
     ren (Tru e) = Tru (ren e)
+    ren (Map kvs) = Map (map (second ren) kvs)
 
     renB = renameBlk sub
     renT = renameTerm sub
@@ -1748,6 +1823,7 @@ renameTerm sub term = go term
     go (Splice t)         = Splice (go t)
     go (TOfType t1 fx t2) = TOfType (go t1) fx (go t2)
     go (TTru t)           = TTru (go t)
+    go (TMap kvs)         = TMap (map (second go) kvs)
 
 renameBlk :: Renaming -> Blk -> Blk
 renameBlk sub b@(Blk is _ e) | not (S.disjoint (rangeSubst sub) is)
@@ -1776,6 +1852,7 @@ substVal _ e@Prm{} = e
 substVal sub (Arr vs) = Arr (map (substVal sub) vs)
 substVal sub (Tru v) = Tru (substVal sub v)
 substVal _ e@Lam{} = e
+substVal sub (Map kvs) = Map (map (second (substVal sub)) kvs)
 substVal _ e = error $ "substVal: not a Val: " ++ show e
 
 gcVarsBlk :: Set Ident -> Blk -> Blk

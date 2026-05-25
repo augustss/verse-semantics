@@ -473,7 +473,7 @@ data PrimOp
 
    -- Type tests
  | IsInt | IsNat | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
- | IsComp | IsAny | IsType
+ | IsComp | IsAny | IsType | IsMap
 
    -- Checking
  | ChkFails | ChkSucceeds | ChkDecides
@@ -508,6 +508,7 @@ primOpString IsNat    = "isNat$"
 primOpString IsStr    = "isStr$"
 primOpString IsChar   = "isChar$"
 primOpString IsArr    = "isArr$"
+primOpString IsMap    = "isMap$"
 primOpString IsComp   = "isComp$"
 primOpString IsTru    = "isTru$"
 primOpString IsFun    = "isFun$"
@@ -537,6 +538,7 @@ primOpCanFail IsNat  = True
 primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
+primOpCanFail IsMap  = True
 primOpCanFail IsFun  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
@@ -571,6 +573,7 @@ primOpIsTypeTest IsStr  = True
 primOpIsTypeTest IsChar = True
 primOpIsTypeTest IsTru  = True
 primOpIsTypeTest IsArr  = True
+primOpIsTypeTest IsMap  = True
 primOpIsTypeTest IsFun  = True
 primOpIsTypeTest IsType = True
 primOpIsTypeTest IsComp = False  -- Not really a type test
