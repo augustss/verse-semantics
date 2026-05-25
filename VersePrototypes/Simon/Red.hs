@@ -579,7 +579,7 @@ data BlkFloats   -- Floating out the the innermost enclosing Blk
 data VerFloats   -- Floating out to the innermost enclosing Verify
   = NoVerFloats
   | FloatRigid (Set SkolIdent) [Assump]
-  | FloatFlexi (Set SkolIdent) Ident Exp
+  | FloatFlexi SkolIdent Exp
   deriving (Eq, Show)
 
 
@@ -633,8 +633,8 @@ instance Pretty BlkFloats where
 
 instance Pretty VerFloats where
   pPrintPrec _ _ NoVerFloats     = empty
-  pPrintPrec _ _ (FloatRigid s asm)  = text "FR" <> braces (pPrint s <+> pPrint asm)
-  pPrintPrec _ _ (FloatFlexi s i e)  = text "FF" <> braces (pPrint s <+> pPrint i <+> equals <+> pPrint e)
+  pPrintPrec _ _ (FloatRigid s asm) = text "FR" <> braces (pPrint s <+> pPrint asm)
+  pPrintPrec _ _ (FloatFlexi i e)   = text "FF" <> braces (pPrint i <+> equals <+> pPrint e)
 
 instance (Pretty flts, Pretty a) => Pretty (Result flts a) where
   pPrintPrec _ _ (Res flts res)
@@ -962,7 +962,7 @@ reduceExp cxt parent@(Blk _ _ body)
                          , skolValue skols e1
                          , skolValue skols e2
                          -> VerStep "Skolemise"
-                            [Res (FloatFlexi (sing sk) sk (e2 :@ e1))
+                            [Res (FloatFlexi sk (e2 :@ e1))
                                  (Var sk)]
                          where
                            skols = rc_skols cxt
@@ -972,12 +972,13 @@ reduceExp cxt parent@(Blk _ _ body)
 
         -- Catch-all cases for context C; just walk downwards
         -- Aka "look at sub-expressions"
-        e1 :>  e2  -> find2   leftCF (:>)  e1 e2
-        e1 :=: e2  -> find2   leftCF (:=:) e1 e2
-        e1 :@  e2  -> find2   leftCF (:@)  e1 e2
-        Arr es     -> findArr leftCF es
-        Map kvs    -> findMap leftCF kvs
-        Tru e      -> find1   leftCF Tru e
+        e1 :>  e2       -> find2 leftCF (:>)  e1 e2
+        e1 :=: e2       -> find2 leftCF (:=:) e1 e2
+        e1 :@  e2       -> find2 leftCF (:@)  e1 e2
+        OfType e1 fx e2 -> find2 leftCF (\x y -> OfType x fx y) e1 e2
+        Arr es          -> findArr leftCF es
+        Map kvs         -> findMap leftCF kvs
+        Tru e           -> find1 leftCF Tru e
 
         _ -> RedNone
 
@@ -1509,6 +1510,10 @@ reduceVerify cxt skols as blk
     wrap_ver (Res (FloatRigid sks asms) blk'') = Verify (sks `S.union` skols')
                                                         (asms ++ as')
                                                         blk''
+    wrap_ver (Res (FloatFlexi sk rhs) blk'')
+      | Blk exis hp body <- blk''
+      = Verify (sk `S.insert` skols') as' $
+        Blk exis hp ((Var sk :=: rhs) :> body)
 
     (subst, skols') = freshenBndrs cxt skols
     as'  = renameAssumps subst as
