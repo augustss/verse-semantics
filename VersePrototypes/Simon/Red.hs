@@ -35,7 +35,7 @@ import Core.Bind as C
 import Epic.Print
 import Epic.List
 
-import Control.Arrow(second)
+import Control.Arrow(second, (***))
 import qualified Data.List as L
 import Data.Maybe
 import qualified Data.Set as S
@@ -45,15 +45,9 @@ import Data.Char( isAlpha )
 import Debug.Trace
 import GHC.Stack
 
-{-
-  Potential problems:
-  :sim f:=fun(x:int){x+1}; ((f[y]; y:= -2) | 5)
-
--}
-
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = False
+traceReductions = True
 
 --------------------------------------------------------------------------------
 --
@@ -99,7 +93,7 @@ data Term
   | TBlock Term             -- block{ t }
   | Splice Term             -- ..t
   | Check Effect Term       -- check<fx>{t}
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Exp
   -- Values
@@ -124,13 +118,13 @@ data Exp
 
   | Verify (Set SkolIdent) [Assump] Blk
   | Err String             -- Stuck/error expression
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Blk = BlkX (Set Ident) Heap Exp
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Blob = Blob | NoBlob
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 type Eqn = (Ident, Val)
 type Heap = [Eqn]  -- Invariant: all identifiers in the domain are distinct
@@ -163,7 +157,7 @@ pattern Blk is eqs e <- BlkX is eqs e   -- check invariant
 type Val = Exp
 
 data IterCtx = IF | FOR | ALL
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 pattern BlkE :: Exp -> Blk
 pattern BlkE e <- BlkX (S.null -> True) (null -> True) e
@@ -393,8 +387,8 @@ getCon e@(Map kvs) | Just _ <- mapM (getCon . snd) kvs = Just e
 getCon _ = Nothing
 
 type Gnd = Exp
-pattern Gnd :: Exp -> Gnd
-pattern Gnd v <- (getGnd -> Just v)
+--pattern Gnd :: Exp -> Gnd
+--pattern Gnd v <- (getGnd -> Just v)
 
 -- Ground values, Con, but no functions
 getGnd :: Exp -> Maybe Gnd
@@ -412,7 +406,9 @@ pattern ArrOrTruOrMap con vs <- (getArrOrTruOrMap -> Just (con, vs))
 getArrOrTruOrMap :: Exp -> Maybe ([Exp] -> Exp, [Exp])
 getArrOrTruOrMap (Arr es) = Just (Arr, es)
 getArrOrTruOrMap (Tru e)  = Just (Tru . (!!0), [e])
-getArrOrTruOrMap (Map kvs)= Just (Map . zip ks, vs) where (ks, vs) = unzip kvs
+getArrOrTruOrMap (Map kvs)= Just (Map . mk, ks ++ vs)
+  where (ks, vs) = unzip kvs
+        mk es = uncurry zip (splitAt (length kvs) es)
 getArrOrTruOrMap _ = Nothing
 
 -- Turn every kind of HNF into a trivial one
@@ -475,10 +471,15 @@ srcToTerm (F.Exists is e)        = TBlock (foldr bind_one (srcToTerm e) is)
 srcToTerm (F.Check fx e)
   | Just eff <- toCoreEff fx     = Check eff (srcToTerm e)
 srcToTerm (F.Truth e)            = TTru (srcToTerm e)
+
+-- XXX Hacky translation of maps.  We could instead go via functions
+-- enumerating the arguments.
 srcToTerm (F.Macro1 m _ kes) | m == F.Ident undefined "map" =
-  case kes of
-    F.Array xs -> TMap $ map keyValue xs
-    x          -> TMap [keyValue x]
+  TPrm MkMap :@% TMap
+    (case kes of
+       F.Array xs -> map keyValue xs
+       x          -> [keyValue x]
+    )
   where keyValue :: F.SrcEssential -> (Term, Term)
         keyValue (F.Function F.Closed k suc v) | suc == F.effSucceeds = (srcToTerm k, srcToTerm v)
         keyValue kv = error $ "map: not a key-value pair " ++ prettyShow kv
@@ -932,7 +933,7 @@ reduceExp cxt parent@(Blk _ _ body)
         e1 :@  e2  -> find2   leftCF (:@)  e1 e2
         Arr es     -> findArr leftCF es
         Map kvs    -> findMap leftCF kvs
-        Tru e      -> find1 leftCF Tru e
+        Tru e      -> find1   leftCF Tru e
 
         _ -> RedNone
 
@@ -956,14 +957,19 @@ reduceExp cxt parent@(Blk _ _ body)
         ks e'        = error "findArr" (prettyShow e')
 
     findMap :: Bool -> [(Gnd,Exp)] -> Reduction Exp
-    findMap _ []          = RedNone
-    findMap leftCF (e@(kk,vv):es) = case find1 leftCF k vv of
-                              RedNone -> find1 (leftCF && choiceFree vv) ks (Map es)
-                              r       -> r
+    findMap _      []             = RedNone
+    findMap leftCF (kv@(k,v):kvs) =
+      case find1 leftCF mk1 k of
+        RedNone ->
+          case find1 (leftCF && choiceFree k) mk2 v of
+            RedNone -> find1 (leftCF && choiceFree k && choiceFree v) mk3 (Map kvs)
+            r       -> r
+        r -> r
       where
-        k e'         = Map ((kk,e'):es)
-        ks (Map es') = Map (e:es')
-        ks e'        = error "findMap" (prettyShow e')
+        mk1 k'         = Map ((k', v):kvs)
+        mk2 v'         = Map ((k, v'):kvs)
+        mk3 (Map kvs') = Map (kv:kvs')
+        mk3 e'         = error "findMap" (prettyShow e')
 
 ------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
@@ -1180,7 +1186,18 @@ reduceArrOp ArrApp (Arr [a1,a2,res])
 
    -- ToDo: worry about duplicating `res`!!
 
+-- Make sure the keys are ground and unique
+reduceArrOp MkMap (Map kvs)
+  | let kvs' = L.sort kvs
+  , Just ks <- mapM (getGnd . fst) kvs'
+  , unique ks
+  = Done "Prim-MkMap$" $ Map kvs'
+
 reduceArrOp _ _ = RedNone
+
+-- Check that a sorted array has no duplicates
+unique :: Eq a => [a] -> Bool
+unique xs = and $ zipWith (/=) xs (drop 1 xs)
 
 -----------------
 reduceTruOp :: PrimOp -> Exp -> Reduction Exp
@@ -1377,13 +1394,10 @@ segments p (t : ts)
 ---------------------------------------
 matchMap :: ReductionContext -> Ident -> [(Term, Term)] -> Blob -> Reduction Exp
 matchMap cxt x akvs _blob =
-  mkStep "MMap" (mkExiFloat fresh_xs) $ Var x :=: Map (zipWith (\ y (k, e) -> (con k, y ~~> e)) fresh_xs akvs)
-  where fresh_xs = freshIds cxt ["x" | _ <- akvs]
-        con (TLit l) = Lit l
-        con (TArr es) = Arr $ map con es
-        con (TTru e) = Tru (con e)
-        con (TMap kvs) = Map $ map (\ (k,v) -> (con k, con v)) kvs
-        con e = error $ "map: key is not a constant: " ++ prettyShow e
+  mkStep "MMap" (mkExiFloat $ fresh_ys ++ fresh_zs) $
+    Var x :=: Map (zipWith3 (\ z y (k, e) -> (z ~~> k, y ~~> e)) fresh_zs fresh_ys akvs)
+  where fresh_ys = freshIds cxt ["y" | _ <- akvs]
+        fresh_zs = freshIds cxt ["z" | _ <- akvs]
 
 ---------------------------------------
 choiceFree :: Exp -> Bool
@@ -1404,7 +1418,7 @@ choiceFree (Iter _ _ _) = False
 choiceFree (Crl b) = choiceFreeB b
 choiceFree Verify{} = True
 choiceFree (Tru e) = choiceFree e
-choiceFree (Map kvs) = and (map (choiceFree . snd) kvs)
+choiceFree (Map kvs) = and (map (choiceFree . fst) kvs) && and (map (choiceFree . snd) kvs)
 
 choiceFreeB :: Blk -> Bool
 choiceFreeB (Blk _ _ e) = choiceFree e
@@ -1558,7 +1572,7 @@ termBndrs tm = go tm
     go (Splice t)        = go t
     go (Check _ t)       = go t
     go (TTru t)          = go t
-    go (TMap kvs)        = S.unions $ map (go . snd) kvs
+    go (TMap kvs)        = S.unions $ map (go . fst) kvs ++ map (go . snd) kvs
 
 -- Variable uses, not under lambda/delay
 occfvs :: Exp -> Set Ident
@@ -1580,7 +1594,7 @@ occfvs (Crl b)        = occfvsB b
 occfvs Verify{}       = S.empty
 occfvs (OfType e1 _ e2) = occfvs e1 `S.union` occfvs e2
 occfvs (Tru e)        = occfvs e
-occfvs (Map kvs)      = S.unions (map (occfvs . snd) kvs)
+occfvs (Map kvs)      = S.unions $ map (occfvs . fst) kvs ++ map (occfvs . snd) kvs
 
 occfvsB :: Blk -> Set Ident
 occfvsB (Blk is eqs e) = (S.unions (occfvs e : map (occfvs . snd) eqs)) `S.difference` is
@@ -1605,7 +1619,7 @@ freeVars (Crl b)          = freeVarsBlk b
 freeVars (Iter _ b1 e2)   = freeVarsBlk b1 `S.union` freeVars e2
 freeVars (Verify s _ b)   = freeVarsBlk b `S.difference` s  -- No free exis in assumptions
 freeVars (OfType e1 _ e2) = freeVars e1 `S.union` freeVars e2
-freeVars (Map kvs)        = S.unions (map (freeVars . snd) kvs)
+freeVars (Map kvs)        = S.unions $ map (freeVars . fst) kvs ++ map (freeVars . snd) kvs
 
 freeVarsBlk :: Blk -> Set Ident
 freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` freeVars e)
@@ -1640,7 +1654,7 @@ freeVarsTerm (Check _ t)   = freeVarsTerm t
 freeVarsTerm (Splice t)    = freeVarsTerm t
 freeVarsTerm (TOfType t1 _ t2) = freeVarsTerm t1 `S.union` freeVarsTerm t2
 freeVarsTerm (TTru t)      = freeVarsTerm t
-freeVarsTerm (TMap kvs)    = S.unions $ map (freeVarsTerm . snd) kvs
+freeVarsTerm (TMap kvs)    = S.unions $ map (freeVarsTerm . fst) kvs ++ map (freeVarsTerm . snd) kvs
 
 freeVarsTermBlock :: Term -> Set Ident
 freeVarsTermBlock t = freeVarsTerm t `S.difference` termBndrs t
@@ -1665,7 +1679,7 @@ allVars (Iter _ b1 e2)   = allVarsBlk b1 ++ allVars e2
 allVars (Verify is _ b)  = S.toList is ++ allVarsBlk b
 allVars (OfType e1 _ e2) = allVars e1 ++ allVars e2
 allVars (Tru e)     = allVars e
-allVars (Map kvs)   = concatMap (allVars . snd) kvs
+allVars (Map kvs)   = concatMap (allVars . fst) kvs ++ concatMap (allVars . snd) kvs
 
 allVarsBlk :: Blk -> [Ident]
 allVarsBlk (Blk is eqs e) = S.toList is ++ concatMap (allVars . snd) eqs ++ allVars e
@@ -1694,7 +1708,7 @@ allVarsTerm (Check _ t) = allVarsTerm t
 allVarsTerm (Splice t)  = allVarsTerm t
 allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
 allVarsTerm (TTru t)    = allVarsTerm t
-allVarsTerm (TMap kvs) = concatMap (allVarsTerm . snd) kvs
+allVarsTerm (TMap kvs)  = concatMap (allVarsTerm . fst) kvs ++ concatMap (allVarsTerm . snd) kvs
 
 expSize :: Exp -> Int
 expSize (Err {})    = 1
@@ -1792,7 +1806,7 @@ rename sub = ren
        where
          sub' = [pr | pr@(x,_) <- sub, not (x `S.member` is)]
     ren (Tru e) = Tru (ren e)
-    ren (Map kvs) = Map (map (second ren) kvs)
+    ren (Map kvs) = Map (map (ren *** ren) kvs)
 
     renB = renameBlk sub
     renT = renameTerm sub
@@ -1823,7 +1837,7 @@ renameTerm sub term = go term
     go (Splice t)         = Splice (go t)
     go (TOfType t1 fx t2) = TOfType (go t1) fx (go t2)
     go (TTru t)           = TTru (go t)
-    go (TMap kvs)         = TMap (map (second go) kvs)
+    go (TMap kvs)         = TMap (map (go *** go) kvs)
 
 renameBlk :: Renaming -> Blk -> Blk
 renameBlk sub b@(Blk is _ e) | not (S.disjoint (rangeSubst sub) is)
@@ -1852,7 +1866,7 @@ substVal _ e@Prm{} = e
 substVal sub (Arr vs) = Arr (map (substVal sub) vs)
 substVal sub (Tru v) = Tru (substVal sub v)
 substVal _ e@Lam{} = e
-substVal sub (Map kvs) = Map (map (second (substVal sub)) kvs)
+substVal sub (Map kvs) = Map (map (substVal sub *** substVal sub) kvs)
 substVal _ e = error $ "substVal: not a Val: " ++ show e
 
 gcVarsBlk :: Set Ident -> Blk -> Blk

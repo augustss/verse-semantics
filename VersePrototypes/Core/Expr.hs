@@ -475,6 +475,9 @@ data PrimOp
  | IsInt | IsNat | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
  | IsComp | IsAny | IsType | IsMap
 
+ -- Maps
+ | MkMap
+
    -- Checking
  | ChkFails | ChkSucceeds | ChkDecides
  deriving
@@ -516,6 +519,8 @@ primOpString IsGround = "isGround$"
 primOpString IsAny    = "isAny$"
 primOpString IsType   = "isType$"
 
+primOpString MkMap    = "mkMap$"
+
 primOpString ChkFails    = "check<fails>"
 primOpString ChkSucceeds = "check<succeeds>"
 primOpString ChkDecides  = "check<decides>"
@@ -546,6 +551,8 @@ primOpCanFail IsType = True
 primOpCanFail ArrApp = True
 primOpCanFail DotDot = True  -- Can fail when unification fails
 primOpCanFail ArrCons = True  -- if run backwards
+
+primOpCanFail MkMap  = False
 
 -- chk<succeeds>[ <> ] is simply stuck; can't fail
 primOpCanFail ChkSucceeds = False
