@@ -348,7 +348,7 @@ testeq("EV23a",pass) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x,
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
 # tim=skip: Tim does not allow this.  Bug?
-verify("EV23b",fail,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23b",pass,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
 verify("EV23c",pass,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'

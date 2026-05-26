@@ -553,6 +553,10 @@ addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
 addInScopeSkols :: ReductionContext -> Set Ident -> ReductionContext
 addInScopeSkols cxt bndrs = cxt { rc_skols = rc_skols cxt `S.union` bndrs }
 
+insideVerify :: ReductionContext -> Bool
+insideVerify (RC { rc_vcxt = Verifying {} }) = True
+insideVerify _                               = False
+
 --------------------------------------------------------------------------------
 --
 --             Reductions
@@ -895,8 +899,12 @@ reduceExp cxt parent@(Blk _ _ body)
         -- Primops
         -- The guard is important; if the primop doesn't fire, we want to
         -- fall through the "look at sub-expressions" code
-        Prm op :@ v | Just redn <- reductionFired (reducePrimOp cxt op v)
-                    -> redn
+        Prm op :@ v  | Just redn <- reductionFired (reducePrimOp op v)
+                     -> redn
+        e1     :@ e2 | Just redn <- reductionFired (reduceVerifyApp cxt e1 e2)
+                     -> redn
+
+
 
         -- Unification
         Val v1       :=: Val v2 | v1 == v2                 -> Done    "EqVal" v1
@@ -958,12 +966,14 @@ reduceExp cxt parent@(Blk _ _ body)
 
         Iter ic b e -> reduceIter cxt ic b e
 
-        OfType e1 _fx e2 | Verifying {} <- rc_vcxt cxt
+        OfType e1 _fx e2 | insideVerify cxt
                          , skolValue skols e1
                          , skolValue skols e2
                          -> VerStep "Skolemise"
                             [Res (FloatFlexi sk (e2 :@ e1))
                                  (Var sk)]
+                         | not (insideVerify cxt)
+                         -> Done "OfType" (e2 :@ e1)
                          where
                            skols = rc_skols cxt
                            sk = freshId cxt "sk"
@@ -1114,15 +1124,14 @@ skolValue :: Set SkolIdent -> Exp -> Bool
 skolValue rs e = isVal e && S.null (freeVars e `S.difference` rs)
 
 ------------------------------------
-reducePrimOp :: ReductionContext -> PrimOp -> Exp -> Reduction Exp
-reducePrimOp cxt op e
+reducePrimOp ::PrimOp -> Exp -> Reduction Exp
+reducePrimOp op e
   = reduceArithOp op e `orTry`
     reduceRelOp   op e `orTry`
     reduceCheckOp op e `orTry`
     reduceArrOp   op e `orTry`
     reduceTruOp   op e `orTry`
-    reduceDotDot  op e `orTry`
-    reduceVerifyOp cxt op e
+    reduceDotDot  op e
 
 -----------------
 reduceArithOp :: PrimOp -> Exp -> Reduction Exp
@@ -1293,7 +1302,7 @@ reduceMatch cxt x tm mc
                 u = freshId cxt "u"
 
         (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: Match mc x t
-        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> Match mc i t
+        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> matchNested mc i t
 
         -- Tuples and functions
         TArr ts      -> matchTup cxt x ts mc
@@ -1349,24 +1358,34 @@ reduceMatch cxt x tm mc
 
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> MatchContext -> Reduction Exp
 matchFun cxt f at fx bt mc
-  = Done "MFun" $
-    fun_verify :>
-    the_lambda
+  = Done "MFun" $ fun_verify `mkSeq` the_lambda
   where
     (tbs_at, at', bt') = freshenTerm2 cxt at bt
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
 
     the_lambda = Lam u $ Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
                  (Var p :=: matchNested mc u at')        :>
-                 (if mc_blob mc == MNested
-                  then Var q :=: (Var f :@ Var p)
-                  else IntE 99999)                       :>
+                 wrap_code :>
                  (Match mc q (TBlock bt'))
 
-    fun_verify = Verify (sing u) [] $
+    wrap_code = case mc_blob mc of
+                  MNested -> Var q :=: (Var f :@ Var p)
+                  MTop    -> IntE 99999
+
+    -- Don't generate a verify{} if AssumeVerified,
+    -- or if we are already inside a verify
+    fun_verify = case rc_vcxt cxt of
+                    AssumeVerified -> Arr []
+                    Verifying {}   -> Arr []
+                    NotVerifying   -> the_verify
+
+    mc_verify = mc { mc_blob = MNested }
+    the_verify = Verify (sing u) [] $
                  Blk tbs_at emptyHeap $
-                 (matchFlip mc u at') :>
-                 (mkCheck fx (Blk (sing q) emptyHeap (matchTop mc q (TBlock bt))))
+                 (matchFlip mc_verify u at') :>
+                 (mkCheck fx (Blk (sing q) emptyHeap $
+                    wrap_code :>
+                    (Match mc_verify q (TBlock bt'))))
 
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
@@ -1485,9 +1504,6 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 
 reduceVerify :: ReductionContext -> Set Ident -> [Assump] -> Blk -> Reduction Exp
 reduceVerify cxt skols as blk
-  | AssumeVerified <- rc_vcxt cxt  -- Discard verify{} when AssumeVerified
-  = Done "VDiscard" (Arr [])
-
   | Blk _ _ (Val {}) <- blk
   = Done "VVal" (Arr [])
     -- We can finish up with
@@ -1527,16 +1543,27 @@ reduceVerify cxt skols as blk
     cxt' = cxt { rc_skols = rc_skols cxt `S.union` skols'
                , rc_vcxt  = Verifying all_as }
 
-reduceVerifyOp :: ReductionContext -> PrimOp -> Exp -> Reduction Exp
-reduceVerifyOp cxt op arg
+reduceVerifyApp :: ReductionContext -> Exp -> Exp -> Reduction Exp
+reduceVerifyApp cxt fun arg
   | NotVerifying <- rc_vcxt cxt
   = RedNone
 
+  | Prm op <- fun
+  , Just gv <- groundValue (rc_skols cxt) arg
+  , not (isClosedGV gv)
+  = reduceVerifyOpGV cxt op gv
+
+  | Var f <- fun
+  , f `S.member` rc_skols cxt
+  , Just gv <- groundValue (rc_skols cxt) arg
+  , let ap_op = A_PrimOp r AO_Apply (GVArr [GVVar f, gv])
+  = VerStep "VSkolApply" $
+    [ Res (FloatRigid (sing r) [ap_op]) (Var r)  ]
+
   | otherwise
-  = case groundValue (rc_skols cxt) arg of
-      Nothing -> RedNone
-      Just gv | isClosedGV gv -> RedNone
-              | otherwise     -> reduceVerifyOpGV cxt op gv
+  = RedNone
+  where
+    r = freshId cxt "apr"
 
 isClosedGV :: GroundVal -> Bool
 isClosedGV (GVVar {})  = False

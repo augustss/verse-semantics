@@ -623,16 +623,21 @@ doEvalEssentialTest :: TestFlags -> Test -> IO TestRes
 -- doEvalEssentialTest = error "doEvalEssentialTest"
 
 doEvalEssentialTest tflags test
-  = do { (cxt,blk) <- mkBlkToTest tflags test
+  = do { (cxt, blk, should_be_stuck) <- mkBlkToTest tflags test
        ; let (res1,tr1) = EV.runTraced (maxSteps tflags) cxt blk
-             v1         = Core.Traced.getTerm tr1
-             n_steps    = length (Core.Traced.getTrace tr1)
+             v1          = Core.Traced.getTerm tr1
+             n_steps     = length (Core.Traced.getTrace tr1)
+             reached_val = case v1 of
+                             BlkE (EV.Val {}) -> True
+                             _                -> False
 
              outcome :: TestOutcome
              outcome = case res1 of
-                NormOK | BlkE (EV.Val {}) <- v1 -> TO_Equal n_steps
-                       | otherwise              -> TO_NotEqual n_steps
-                _                               -> TO_Abnormal res1 n_steps
+                         NormOK | should_be_stuck == not reached_val
+                                -> TO_Equal n_steps
+                                | otherwise
+                                -> TO_NotEqual n_steps
+                         _      -> TO_Abnormal res1 n_steps
 
              details :: Doc
              -- Show this if the the outcome is unexpected
@@ -649,7 +654,7 @@ doEvalEssentialTest tflags test
                          , tr_outcome = outcome
                          , tr_details = details }) }
 
-mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk)
+mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk, Bool)
 mkBlkToTest tflags (TestEvalEq _ src1 src2)
   | Variable (Ident _ "wrong") <- src2
   = -- testeq(...){e1}{wrong} is a special form that means
@@ -662,13 +667,13 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
              u1 = EV.freshId top_cxt "u1"
 
-             main_exp = EV.Verify S.empty [] $ BlkE $
+             main_exp = -- EV.Verify S.empty [] $ BlkE $
                         EV.mkCheck Core.Succeeds  $
                         BlkE $ EV.matchTop topMatchContext u1 (TBlock term)
 
              main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
 
-       ; return (top_cxt, main_blk) }
+       ; return (top_cxt, main_blk, True) }
 
   | otherwise
   = do { term1 <- mk_term tflags src1
@@ -681,13 +686,13 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
              main_exp = EV.Var r1 EV.:=: mk_all u1 term1 EV.:>
                         EV.Var r2 EV.:=: mk_all u2 term2 EV.:>
-                        EV.Verify S.empty [] $ BlkE $
+                        -- EV.Verify S.empty [] $ BlkE $
                         EV.mkCheck Core.Succeeds  $
                         BlkE $ EV.Var r1 EV.:=: EV.Var r2
 
              main_blk = EV.Blk (S.fromList [u1,u2,r1,r2]) EV.emptyHeap main_exp
 
-       ; return (top_cxt, main_blk) }
+       ; return (top_cxt, main_blk, False) }
 
 mkBlkToTest tflags (TestVerify _ src)
   = do { term <- mk_term tflags src
@@ -703,7 +708,7 @@ mkBlkToTest tflags (TestVerify _ src)
 
              main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
 
-       ; return (top_cxt, main_blk) }
+       ; return (top_cxt, main_blk, False) }
 
 
 mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
