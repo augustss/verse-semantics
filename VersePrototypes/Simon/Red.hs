@@ -47,7 +47,7 @@ import GHC.Stack
 
 -- Show every reduction step
 traceReductions :: Bool
-traceReductions = True
+traceReductions = False
 
 --------------------------------------------------------------------------------
 --
