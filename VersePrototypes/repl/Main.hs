@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 module Main(main) where
-
+--import Debug.Trace
 import Prelude
 
 import Core.Expr     as Core
@@ -33,7 +33,8 @@ import qualified SLS (den)
 import qualified Pom (den)
 import qualified PomPom (denS, ForUnionMode(..), ForUnitMode(..), IfUnionMode(..), Config(..), defaultConfig)
 import qualified SemClass (den)
-import ENVDesugar (envDesugar)
+import qualified Red as Simon (run)
+import FrontEnd.ENVDesugar (envDesugar)
 
 -- Epic libraries
 import Epic.Repl
@@ -228,6 +229,7 @@ theCommandSet = CommandSet
       , Cmd "pom-densem [EXPR]"    "Evaluate [last] expression"            cPomDensem
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cSemClassDensem
       , Cmd "ppom [EXPR]"          "Evaluate [last] expression"            cPomPomDensem
+      , Cmd "simon [EXPR]"         "Reduce [last] expression"              cSimon
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -374,6 +376,7 @@ cParseLine line' s
   = tryIt (\_exc -> pure s) (updateLastExpr s) $ do
     let !line = substitute (cs_variables s) line'
         !prog = LP.parseToSrcExpr "<interactive>" (B.pack line)
+--    traceM $ "cParseLine " ++ show prog
     pure prog
 
 variableSigil :: Char
@@ -467,14 +470,14 @@ cEval
        ; prepd_core <- runD flags Core.Fail (getCore flags e)
        ; let rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules
-       ; let (res, tr) = Core.normalize (fRewriteSteps flags) rules prepd_core
+       ; let (res, tr) = Core.normalizeExpr rules (fRewriteSteps flags) prepd_core
 
        ; let eval_doc = addHeader "Evaluate" $
                         case res of
-                          NormOK      -> text "Result = " <+> pPrint (Core.term tr)
+                          NormOK      -> text "Result = " <+> pPrint (Core.getTerm tr)
                           NormExpired -> text "Ran out of fuel"
                           NormInvalid -> hang (text "Reached an invalid expression:") 2
-                                         (pPrint (Core.term tr))
+                                         (pPrint (Core.getTerm tr))
        ; displayDoc eval_doc
 
        ; when (fTraceEval flags) $ do
@@ -590,6 +593,26 @@ cSemClassDensem
        ; e_ds <- eSlsDesugar flags e_ess
        ; let res = SemClass.den e_ds
        ; let den_sem = addHeader "M Den-sem" $ text $ show res
+       ; if fQuiet flags then
+           displayDoc $ text $ show res
+         else
+           displayDoc den_sem
+{-
+       ; let resU = Pom.denU e_ds
+       ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
+       ; displayDoc den_semU
+-}
+       ; return () }
+
+cSimon :: CmdRunner CState
+cSimon
+  = getInputExpr $ \e s ->
+    tryIt (\_ -> pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- eSlsDesugar flags e_ess
+       ; let res = Simon.run e_ds
+       ; let den_sem = addHeader "Simon reduction" $ text $ show res
        ; if fQuiet flags then
            displayDoc $ text $ show res
          else

@@ -32,7 +32,7 @@ module Core.Expr
   , Context, isContext, (<@)
 
     -- Binding and substitution
-  , subst
+  , subst, substAssump
   , unbindAs
   , alphaRename
   , alphaRenameVerify
@@ -41,7 +41,8 @@ module Core.Expr
   , Effect(..), canSucceed, canFail
 
   -- Primops
-  , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest
+  , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest, primOpIsCheck
+  , isUnaryOp, isBinOp
   ) where
 
 import Prelude hiding( (<>) )
@@ -458,20 +459,27 @@ inRangeType n
 data PrimOp
  = -- Operations on integers
    Add | Sub | Mul | Div | Neg
+ | Pls                               -- prefix +
 
    -- Operations on arrays
  | ArrLen
  | DotDot     -- dotDot$[v,n] = (v = (0 | 1 | .. | n)); ()
  | ArrApp     -- arrApp$[ Tup as, Tup bs, r ] =  r=(as++bs); r
  | ArrMap     -- arrMap$[t,a]
+ | ArrCons    -- arrCons$[x,xs] = <x,..xs>
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
- | IsComp | IsAny | IsType
+ | IsInt | IsNat | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
+ | IsComp | IsAny | IsType | IsMap
 
+ -- Maps
+ | MkMap
+
+   -- Checking
+ | ChkFails | ChkSucceeds | ChkDecides
  deriving
    ( Eq, Ord, Bounded, Enum, Show, Data )
 
@@ -484,11 +492,13 @@ primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
 primOpString Neg = "intNeg$"
+primOpString Pls = "intPls$"
 
 primOpString ArrLen   = "arrLen$"
 primOpString DotDot   = "dotDot$"
 primOpString ArrApp   = "arrApp$"
 primOpString ArrMap   = "arrMap$"
+primOpString ArrCons  = "arrCons$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -497,9 +507,11 @@ primOpString LEq = "intLE$"
 primOpString NEq = "intNE$"
 
 primOpString IsInt    = "isInt$"
+primOpString IsNat    = "isNat$"
 primOpString IsStr    = "isStr$"
 primOpString IsChar   = "isChar$"
 primOpString IsArr    = "isArr$"
+primOpString IsMap    = "isMap$"
 primOpString IsComp   = "isComp$"
 primOpString IsTru    = "isTru$"
 primOpString IsFun    = "isFun$"
@@ -507,8 +519,19 @@ primOpString IsGround = "isGround$"
 primOpString IsAny    = "isAny$"
 primOpString IsType   = "isType$"
 
-primOpCanFail :: PrimOp -> Bool
+primOpString MkMap    = "mkMap$"
 
+primOpString ChkFails    = "check<fails>"
+primOpString ChkSucceeds = "check<succeeds>"
+primOpString ChkDecides  = "check<decides>"
+
+primOpIsCheck :: PrimOp -> Bool
+primOpIsCheck ChkFails    = True
+primOpIsCheck ChkSucceeds = True
+primOpIsCheck ChkDecides  = True
+primOpIsCheck _           = False
+
+primOpCanFail :: PrimOp -> Bool
 -- These operations /can/ fail, and /don't/ produce a value
 primOpCanFail Gt     = True
 primOpCanFail Lt     = True
@@ -516,15 +539,25 @@ primOpCanFail NEq    = True
 primOpCanFail GEq    = True
 primOpCanFail LEq    = True
 primOpCanFail IsInt  = True
+primOpCanFail IsNat  = True
 primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
+primOpCanFail IsMap  = True
 primOpCanFail IsFun  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
 primOpCanFail IsType = True
 primOpCanFail ArrApp = True
 primOpCanFail DotDot = True  -- Can fail when unification fails
+primOpCanFail ArrCons = True  -- if run backwards
+
+primOpCanFail MkMap  = False
+
+-- chk<succeeds>[ <> ] is simply stuck; can't fail
+primOpCanFail ChkSucceeds = False
+primOpCanFail ChkFails    = True
+primOpCanFail ChkDecides  = True
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
@@ -532,6 +565,7 @@ primOpCanFail Sub      = False
 primOpCanFail Mul      = False
 primOpCanFail Div      = False
 primOpCanFail Neg      = False
+primOpCanFail Pls      = False
 primOpCanFail ArrLen   = False
 primOpCanFail ArrMap   = False
 
@@ -546,10 +580,34 @@ primOpIsTypeTest IsStr  = True
 primOpIsTypeTest IsChar = True
 primOpIsTypeTest IsTru  = True
 primOpIsTypeTest IsArr  = True
+primOpIsTypeTest IsMap  = True
 primOpIsTypeTest IsFun  = True
 primOpIsTypeTest IsType = True
 primOpIsTypeTest IsComp = False  -- Not really a type test
 primOpIsTypeTest _      = False
+
+isUnaryOp :: PrimOp -> Maybe PrimOp
+-- Returns the type-testing primop for the argument
+isUnaryOp Pls                      = Just IsInt
+isUnaryOp Neg                      = Just IsInt
+isUnaryOp op | primOpIsTypeTest op = Just IsAny
+isUnaryOp ArrLen                   = Just IsArr
+isUnaryOp _                        = Nothing
+
+isBinOp :: PrimOp -> Maybe (PrimOp, PrimOp)
+isBinOp Gt     = Just (IsInt, IsInt)
+isBinOp Lt     = Just (IsInt, IsInt)
+isBinOp NEq    = Just (IsInt, IsInt)
+isBinOp GEq    = Just (IsInt, IsInt)
+isBinOp LEq    = Just (IsInt, IsInt)
+isBinOp Add    = Just (IsInt, IsInt)
+isBinOp Sub    = Just (IsInt, IsInt)
+isBinOp Mul    = Just (IsInt, IsInt)
+isBinOp Div    = Just (IsInt, IsInt)
+isBinOp DotDot = Just (IsInt, IsInt)
+isBinOp ArrMap = Just (IsFun, IsArr)
+isBinOp _      = Nothing
+
 
 --------------------------------------------------------------------------------
 --
@@ -612,7 +670,7 @@ instance Pretty Path where
 --------------------------------------------------------------------------------
 
 data GroundVal
-  = GVVar {gv_var :: Ident}
+  = GVVar SkolIdent
   | GVLit Lit
   | GVArr [GroundVal]
   | GVTru GroundVal
@@ -625,8 +683,9 @@ data Assump
   deriving( Eq, Ord, Show )
 
 data FailableAssump
-  = A_GVEq  Ident  GroundVal
-  | A_RelOp PrimOp GroundVal             -- (primOpCanFail op) is True
+  = A_GVEq  Ident  GroundVal   -- e.g. r=3
+  | A_RelOp PrimOp GroundVal   -- e.g. isInt$[r], or intGT$[r1,r2]
+                               -- A_RelOp invariant: (primOpCanFail op) is True
   deriving ( Eq, Ord, Show )
 
 data AssumpOp
@@ -672,7 +731,7 @@ data Effect
   | Succeeds
   | Decides
   | Iterates
- deriving ( Eq, Ord )
+ deriving ( Eq, Ord, Data )
 
 instance Show Effect where
   show Fails    = "fails"

@@ -82,13 +82,15 @@ expToSrcExpr' l (R.Assume e)      = Src.Macro1 (macro l "assume") [] (lexp e)
 -- expToSrcExpr' _ (Alloc3 )      = XXX
 -- expToSrcExpr' QualName         = ???
 -- expToSrcExpr' Domain           = ???
-expToSrcExpr' l (R.Inst (L _ (R.Name "ci")) e) = Src.ChoiceIndex (lexp e)
+expToSrcExpr' _ (R.Inst (L _ (R.Name "ci")) e) = Src.ChoiceIndex (lexp e)
 expToSrcExpr' _ (R.Inst (L _ (R.Name "choice_index")) e) = Src.ChoiceIndex (lexp e)
 expToSrcExpr' l (R.Inst (L _ (R.Name "rtype")) e) = Src.Macro1 (macro l "rtype") [] (lexp e)
+expToSrcExpr' l (R.Inst (L _ (R.Name "map")) e) = Src.Macro1 (macro l "map") [] (lexp e)
 expToSrcExpr' _ (R.Inst (L _ (R.ParenInvoke (L _ (R.Name "relation")) e1)) e2) = Src.Relation (lexp e1) Src.effSucceeds (lexp e2)
 expToSrcExpr' _ (R.Inst (L _ (R.ParenInvoke (L _ (R.Name "rel")) e1)) e2) = Src.Relation (lexp e1) Src.effSucceeds (lexp e2)
 expToSrcExpr' l (R.InfixOp lhs op rhs)  = Src.InfixOp (lexp lhs) (inOp l op) (lexp rhs)
 expToSrcExpr' l (R.PostfixOp e op)      = Src.PostfixOp (lexp e) (postOp l op)
+expToSrcExpr' _ (R.IfElse e1 e2)        = Src.If2E (lexp e1) (lexp e2)
 expToSrcExpr' _ (R.IfThenElse e1 e2 e3) = Src.If3 (lexp e1) (lexp e2) (lexp e3)
 expToSrcExpr' _ (R.ForDo e1 e2)         = Src.For2 (lexp e1) (lexp e2)
 expToSrcExpr' _ (R.Block e)             = Src.Block (lexp e)
@@ -125,6 +127,7 @@ expToSrcExpr' _ (R.IfArchetypeName _ e1 e2) | x1 == x2 = x1
 expToSrcExpr' _ (R.IfArchetypeName _ _ e2) = lexp e2
 -- TODO: Jeff: parser does not export pretty instances
 -- expToSrcExpr' _ e = error $ "expToSrcExpr': unimp " ++ show (pretty e) ++ "\n" ++ show e
+expToSrcExpr' _ (R.PrefixColonFx e fx) = Src.Colon (lexp e) (refImplEffToSrcEff fx)
 expToSrcExpr' _ e = error $ "expToSrcExpr': unimp " ++ "\n" ++ show e
 
 newtype M a = M { unM :: Label -> (Label, a) }

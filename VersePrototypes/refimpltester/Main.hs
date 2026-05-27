@@ -322,7 +322,7 @@ srcToCore flags add_verification e = do
 evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Core.Expr)
 evalExpr tflg e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
-  let (r, tr) = normalize steps (everywhere runtimeRules) ce
+  let (r, tr) = normalizeExpr (everywhere runtimeRules) steps ce
       v = term tr
       steps = 20000
   when (showTrace tflg) $ do

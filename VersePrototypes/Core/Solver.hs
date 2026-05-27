@@ -706,7 +706,7 @@ instance Pretty Equality where
 --------------------------------------------------------------------------------
 
 -- >>> unsatAsms test4
--- Just (Arith [GVVar {gv_var = $I1},GVLit 0,GVVar {gv_var = $R10}])
+-- Just (Arith [GVVar $I1,GVLit 0,GVVar $R10])
 
 _test4 :: [Assump]
 _test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
@@ -720,7 +720,7 @@ _test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
     r5              = Bind.ident "$R5"
 
 -- >>> unsatAsms test3
--- Just (Arith [GVVar {gv_var = $I1},GVLit 0,GVVar {gv_var = $R10}])
+-- Just (Arith [GVVar $I1,GVLit 0,GVVar $R10])
 
 _test3 :: [Assump]
 _test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
@@ -732,7 +732,7 @@ _test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
     r10             = Bind.ident "$R10"
 
 -- >>> unsatAsms test2
--- Just (Arith [GVVar {gv_var = $I1},GVLit 0,GVVar {gv_var = $R10}])
+-- Just (Arith [GVVar $I1,GVLit 0,GVVar $R10])
 
 _test2 :: [Assump]
 _test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
@@ -744,7 +744,7 @@ _test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
     r10       = Bind.ident "$R10"
 
 -- >>> unsatAsms test1
--- Just (Arith [GVVar {gv_var = $I1},GVLit 0])
+-- Just (Arith [GVVar $I1,GVLit 0])
 
 _test1 :: [Assump]
 _test1 = [i1_gt_0, i1_eq_0]
@@ -755,7 +755,7 @@ _test1 = [i1_gt_0, i1_eq_0]
 
 
 -- >>> unsatAsms test0
--- Just (Arith [GVVar {gv_var = $I1},GVLit 0])
+-- Just (Arith [GVVar $I1,GVLit 0])
 
 _test0 :: [Assump]
 _test0 = [i1_gt_zero, zero_gt_i1]

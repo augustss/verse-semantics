@@ -26,3 +26,7 @@ errorMessage msg = error $ "error: " ++ msg
 assert :: (HasCallStack) => Bool -> String -> a -> a
 assert True _ a = a
 assert False s _ = error $ "assert: " ++ s
+
+assertP :: (HasCallStack) => String -> Bool -> Doc -> a -> a
+assertP _ True _ a = a
+assertP s False doc _ = error $ "assert: " ++ showWithHerald s doc

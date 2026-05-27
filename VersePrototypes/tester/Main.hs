@@ -12,23 +12,27 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Main(main) where
-import Control.Applicative((<|>))
 
 import FrontEnd.CopyHook
-import FrontEnd.Desugar as FrontEnd ( desugar, runD, addPrelude, sDesugarExpr )
-import FrontEnd.ToCore  as FrontEnd ( convertToPrepdCore )
-import FrontEnd.Flags   as FrontEnd
+import FrontEnd.Desugar as FE
+import FrontEnd.ToCore  as FE ( convertToPrepdCore )
+import FrontEnd.Flags   as FE
 import FrontEnd.Expr    as Src
 import FrontEnd.Prelude( findPrelude )
 
+import Red as EV    -- "EV" for "Essential verse evaluator"
+
 import qualified Parser.Verse               as V
 import qualified Parser.Compat              as PC
+
 
 import Core.Expr as Core
 import Core.Traced
 import Core.Verifier( verificationRules )
 import Core.Rules ( runtimeRules )
-import Core.Rule( everywhere, normalize, NormResult(..) )
+import Core.Rule( everywhere, normalizeExpr )
+
+{- Imports for denotational semantics
 
 -- verse-densem
 import SExp
@@ -42,9 +46,12 @@ import qualified TimE   (den)
 import qualified Pom    (den)
 import qualified PomPom (denS, defaultConfig)
 import qualified SemClass (den)
-import ENVDesugar (envDesugar)
+
+import Control.Monad( (>=>))
+-}
 
 import Epic.Print hiding ( (<>) )
+import Epic.List( orElse )
 import Data.Generics.Uniplate.Data( universeBi )
 
 import Text.Megaparsec( unPos )
@@ -54,11 +61,12 @@ import GHC.Stack( HasCallStack )
 
 import Data.List( isPrefixOf )
 import Data.Maybe
-import Control.Monad( unless, when, guard, (>=>))
+import Control.Monad( unless, when, guard )
 import System.Directory( doesFileExist, removeFile )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
@@ -128,45 +136,6 @@ runTests test_flags
 --
 -----------------------------------------------
 
-{- Note [Testing densem in the tester]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-  * To test the semantic functions for different denotational semantics we abuse
-    'TestType' in 'TestInfo' to track which semantic function to call. This is
-    purely a descision to enable the tester to use the semantic functions as
-    fast as possible. In general, the tester should know less about the tests,
-    see #77.
-
-  * We try to keep the data pipeline for the tester as similar as possible when
-    testing densem or normal tests. Thus we define a parser ('pTestDenSem') to
-    parse a "testds" call in a .versetest file. This parser decides the correct
-    semantic function to run in 'pTestRunner' which propogates this information
-    to the 'testRunner' field of 'pTestInfo'. Each semantic function is built
-    into the tester and is one of this set: { "tim", "dls", "sls", "els" }. We
-    have precisely chosen this format for these symbols so that the
-    'foo.versetest' files are valid verse.
-
-  * A 'TestDenSem info e1 e2' is morally the same as a 'TestEvalEq info e1 e2',
-    only instead of evaluating e1, then e2 and checking for equivalence with
-    'equivValue', 'TestDenSem' Expects that 'e2' /is only/ a literal string that
-    represents the result of the semantic function applied to 'e1'.
-
-    For example:
-
-    -- in tests.versetest
-    testds("DS1", tim){ (1,2) }     { "[{{r=<1,2>}}]" }
-
-    becomes 'TestDenSem tinfo e1 e2' where:
-      tinfo = TestInfo {..., testType = Tim_DS }
-      e1    = (1,2)
-      e2    = "[{{r=<1,2>}}]"
-
-  * We diverge from the normal data pipeline in 'checkResults' by calling
-    'evalDenSem' and then construct the output exactly like the normal
-    pipeline. 'evalDenSem' is responsible for dispatching the TestRunner to the
-    semantic functions for each denotational semantics.
--}
-
-
 data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo SrcExpr SrcExpr  -- testeq( name ) {code} { value }
@@ -184,25 +153,33 @@ testSrc (TestEvalEq _ e1 _) = e1
 testSrc (TestVerify _ e)    = e
 testSrc (TestDenSem _ e1 _) = e1
 
-isDenSemTest :: Test -> Bool
-isDenSemTest (TestDenSem _ _ _) = True
-isDenSemTest _ = False
-
 data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
                  -- The stuff in the parens is the TestInfo
   TestInfo
     { testMName    :: !(Maybe String)
     , testLocStart :: !Loc
     , testLocEnd   :: !Loc
-    , testType     :: !TestType           -- Default test type
-    , testRunner   :: !(Maybe TestRunner) -- the function the test data is passed to, Nothing is evaluation/verification
+    , testType     :: !TestType          -- Default test type
+    , testRunner   :: !(Maybe Evaluator) -- The function the test data is passed to,
+                                         -- Nothing is evaluation/verification
     , testStatus   :: !TestStatus
-    , testTimSkip  :: !TimSkip            -- skip (or error code) when converting to Tim's format
+    , testTimSkip  :: !TimSkip           -- Skip (or error code) when converting to Tim's format
     }
     deriving (Show)
 
-data TestRunner = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS | PPM_DS | MON_DS   -- denotational semantic functions
-instance Show TestRunner where
+data Evaluator
+  = EvalCore           -- Desguar to ICFP Core and rewrites
+  | EvalEssential      -- Rewrite Essential Verse directly
+  | EvalDenSem DenSem  -- Use (this variant of) denotational semantics
+
+data DenSem = Tim_DS | DLS_DS | SLS_DS | ELS_DS | POM_DS | PPM_DS | MON_DS   -- denotational semantic functions
+
+instance Show Evaluator where
+  show EvalCore        = "core"
+  show EvalEssential   = "essential"
+  show (EvalDenSem ds) = show ds
+
+instance Show DenSem where
   -- INFO: Ideally these should correspond to their respective commands in the
   -- repl just without the ':' prefix, i.e., dls-densem here is :dls-densem in
   -- the repl. But this would require changing the frontend parser to handle the
@@ -216,7 +193,12 @@ instance Show TestRunner where
   show PPM_DS = "ppo"
   show MON_DS = "mon"
 
-instance Read TestRunner where
+instance Read Evaluator where
+  readsPrec _ s =    [ (EvalDenSem ds, r) | (ds,r) <- reads s ]
+                  ++ [ (EvalCore,      r) | ("core",r)      <- lex s ]
+                  ++ [ (EvalEssential, r) | ("essential",r) <- lex s ]
+
+instance Read DenSem where
   readsPrec _ s =    [(Tim_DS, r) | ("tim", r) <- lex s]
                   ++ [(DLS_DS, r) | ("dls", r) <- lex s]
                   ++ [(SLS_DS, r) | ("sls", r) <- lex s]
@@ -226,16 +208,16 @@ instance Read TestRunner where
                   ++ [(MON_DS, r) | ("ppo", r) <- lex s]
 
 data TestType =
-  TPass | TFail | TLoop                -- Expected behaviour
+  TestPass | TestFail | TestLoop                -- Expected behaviour
   deriving (Eq)
 
 data TimSkip = TimNone | TimSkip String | TimError String
   deriving (Eq, Show)
 
 instance Show TestType where
-  show TPass = "pass"
-  show TFail = "fail"
-  show TLoop = "loop"
+  show TestPass = "pass"
+  show TestFail = "fail"
+  show TestLoop = "loop"
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
@@ -247,79 +229,104 @@ testName :: TestInfo -> String
 testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocStart ti)))) (testMName ti)
 
 data TestRes = TestRes { tr_info    :: TestInfo
-                       , tr_outcome :: TestOutcome }
+                       , tr_outcome :: TestOutcome
+                       , tr_details :: Doc }
   deriving (Show)
 
-data TestOutcome = TO_Equal                -- Terminated, results equal
-                 | TO_NotEqual             -- Terminated, results differ
+type NSteps = Int
+
+data TestOutcome = TO_Equal    NSteps       -- Terminated, results equal
+                 | TO_NotEqual NSteps       -- Terminated, results differ
+                 | TO_Abnormal NormResult NSteps   -- Could not reach a normal form;
+                                                   -- the NormResult is never NormOK
                  | TO_Excn
-                 | TO_Abnormal NormResult   -- Could not reach a normal form;
-                                            -- the NormResult is never NormOK
                  | TO_Skipped               -- We didn't run this test
                  deriving( Eq, Show )
+
+isEqualTO :: TestOutcome -> Bool
+isEqualTO (TO_Equal {}) = True
+isEqualTO _             = False
+
+isNotEqualTO :: TestOutcome -> Bool
+isNotEqualTO (TO_NotEqual {}) = True
+isNotEqualTO _                = False
+
+isTimeoutTO ::  TestOutcome -> Bool
+isTimeoutTO (TO_Abnormal NormExpired _) = True
+isTimeoutTO _                           = False
 
 skipTestRes :: TestRes -> Bool
 skipTestRes (TestRes { tr_info = info }) = testStatus info == TS_Skip
 
-expectedTestRes :: TestRes -> Bool
+expectedTestRes :: TestRes -> Maybe NSteps
 -- Expected results, not skipped; account for broken-ness
 expectedTestRes tr@(TestRes { tr_info = info })
   = case testStatus info of
       TS_Normal -> expectedOutcome tr
       TS_Broken -> unexpectedOutcome tr
-      TS_Skip   -> False
+      TS_Skip   -> Nothing
 
-expectedOutcome :: TestRes -> Bool
+expectedOutcome :: TestRes -> Maybe NSteps
 -- Expected results; ignore broken-ness
 expectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
-  = case testType info of
-      TPass  -> outcome == TO_Equal
-      TFail  -> outcome == TO_NotEqual
-      TLoop  -> outcome == TO_Abnormal NormExpired
+  = case (testType info, outcome) of
+      (TestPass, TO_Equal ns)                -> Just ns
+      (TestFail, TO_NotEqual ns)             -> Just ns
+      (TestLoop, TO_Abnormal NormExpired ns) -> Just ns
+      _ -> Nothing
 
-unexpectedTestRes :: TestRes -> Bool
+unexpectedTestRes :: TestRes -> Maybe NSteps
 unexpectedTestRes tr@(TestRes { tr_info = info })
   = case testStatus info of
       TS_Normal -> unexpectedOutcome tr
       TS_Broken -> expectedOutcome tr
-      TS_Skip -> False
+      TS_Skip   -> Nothing
 
-unexpectedOutcome :: TestRes -> Bool
+unexpectedOutcome :: TestRes -> Maybe NSteps
 -- Unexpected results, not skipped, not exception, not invalid
 unexpectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
- = case testType info of
-      TPass -> outcome == TO_NotEqual || outcome == TO_Abnormal NormExpired
-      TFail -> outcome == TO_Equal    || outcome == TO_Abnormal NormExpired
-      TLoop -> outcome == TO_Equal    || outcome == TO_NotEqual
+ = case (testType info, outcome) of
+      (TestPass, TO_NotEqual ns)                -> Just ns
+      (TestPass, TO_Abnormal NormExpired ns)    -> Just ns
+      (TestFail, TO_Equal ns)                   -> Just ns
+      (TestFail, TO_Abnormal NormExpired ns)    -> Just ns
+      (TestLoop, TO_Equal ns)                   -> Just ns
+      (TestLoop, TO_NotEqual ns)                -> Just ns
+      _ -> Nothing
 
-outcomeIs :: TestOutcome -> TestRes -> Bool
-outcomeIs oc1 (TestRes { tr_outcome = oc2 }) = oc1 == oc2
+outcomeIsInvalid :: TestRes -> Bool
+outcomeIsInvalid (TestRes { tr_outcome = TO_Abnormal NormInvalid _ }) = True
+outcomeIsInvalid _ = False
+
+outcomeIsExcn :: TestRes -> Bool
+outcomeIsExcn (TestRes { tr_outcome = TO_Excn }) = True
+outcomeIsExcn _ = False
 
 passedButShouldFail :: TestRes -> Bool
 passedButShouldFail (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
-       TFail -> outcome == TO_Equal
+       TestFail -> isEqualTO outcome
        _     -> False
 
 failedButShouldPass :: TestRes -> Bool
 failedButShouldPass (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
-       TPass  -> outcome == TO_NotEqual
+       TestPass  -> isNotEqualTO outcome
        _      -> False
 
 failedWithLoop :: TestRes -> Bool
 failedWithLoop (TestRes { tr_info = info, tr_outcome = outcome })
   = case testType info of
-       TLoop -> False
-       _     -> outcome == TO_Abnormal NormExpired
+       TestLoop -> False
+       _     -> isTimeoutTO outcome
 
 isBrokenPass :: TestRes -> Bool
 isBrokenPass tr@(TestRes { tr_info = info })
-  = testStatus info == TS_Broken && expectedOutcome tr
+  = testStatus info == TS_Broken && isJust (expectedOutcome tr)
 
 isBrokenFail :: TestRes -> Bool
 isBrokenFail tr@(TestRes { tr_info = info })
-   = testStatus info == TS_Broken && unexpectedOutcome tr
+   = testStatus info == TS_Broken && isJust (unexpectedOutcome tr)
 
 -----------------------------------------------
 --
@@ -341,12 +348,12 @@ runTestFile tflg (fn, ts)
 
       ; let n_tests      = length res
             n_skipped    = count skipTestRes          res
-            expected     = filter expectedTestRes      res  -- Excludes skipped
+            expected     = filter (isJust . expectedTestRes)      res  -- Excludes skipped
             n_expected   = length expected
-            unexpected   = filter unexpectedTestRes    res  -- Excludes skipped, invalid, exn
+            unexpected   = filter (isJust . unexpectedTestRes)    res  -- Excludes skipped, invalid, exn
             n_unexpected = length unexpected
-            n_invalid    = count (outcomeIs (TO_Abnormal NormInvalid)) res
-            n_excn       = count (outcomeIs TO_Excn)       res
+            n_invalid    = count outcomeIsInvalid res
+            n_excn       = count outcomeIsExcn    res
       ; putStrLn ""
       ; putStrLn "------------ Overall summary ---------------------------"
       ; putStrLn $ "Number of tests: " ++ show n_tests
@@ -417,21 +424,364 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: HasCallStack => FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
-srcToCore flags add_verification e
-  = do { e1 :: SrcCore <- FrontEnd.desugar flags add_verification e
-       ; FrontEnd.convertToPrepdCore flags e1 }
 
-evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Int, Traced Core.Expr)
-evalExpr flags test e = (r1,length (trace tr),tr)
+type TimTag = Src.Ident
+
+timTestInfo :: TimTag -> TestInfo
+timTestInfo (Ident loc status) = TestInfo
+  { testMName    = Nothing
+  , testLocStart = loc
+  , testLocEnd   = loc
+  , testType     = timTestType status
+  , testRunner   = Nothing
+  , testStatus   = TS_Normal
+  , testTimSkip  = timSkip status
+  }
+
+timTestType :: String -> TestType
+-- Any TimTest starting in "S" should pass, e.g. S00, S01
+-- All others should fail.
+timTestType ('S' : _) = TestPass
+timTestType _         = TestFail
+
+timSkip :: String -> TimSkip
+timSkip ('S' : _) = TimNone
+timSkip s         = TimError s
+
+----------------------------
+runTest :: HasCallStack => TestFlags -> Test -> IO TestRes
+runTest tflg test
+  =  catch (run_test tflg test)
+           (\e -> do { exn_handler e
+                     ; pure (TestRes { tr_info = info, tr_outcome = TO_Excn
+                                     , tr_details = empty })})
   where
-    (r1,tr) = normalize (maxSteps flags) rules e
-    rules   =
-      case test of
+    info        = testInfo test
+    test_herald = testHerald test
+    exn_handler :: SomeException -> IO ()
+    exn_handler e
+      = -- unless (noError tflg) $
+        do { putStrLn $ test_herald ++ "Exception:" ++ show e
+           ; putStrLn "" }
+
+-- | `doTest` does the actual work of parsing, converting to core, and
+-- evaluating/verifying; each of which can throw an exception.
+run_test :: HasCallStack => TestFlags -> Test -> IO TestRes
+run_test tflg test
+  | TS_Skip <- testStatus test_info
+  = do { when (noisy tflg) (putStrLn $ testHerald test ++ "Skipped")
+       ; pure (TestRes { tr_info = test_info, tr_outcome = TO_Skipped
+                       , tr_details = empty }) }
+
+  | otherwise
+  = do { let evaluator = useEvaluator tflg
+                         `orElse` testRunner test_info
+                         `orElse` EvalEssential
+       ; test_res <- case evaluator of
+                        EvalCore      -> doEvalCoreTest      tflg test
+                        EvalEssential -> doEvalEssentialTest tflg test
+                        EvalDenSem ds -> doEvalDenSemTest    tflg ds test
+       ; showTestResult tflg test test_res
+       ; return test_res }
+  where
+    test_info = testInfo test
+
+showTestResult :: TestFlags -> Test -> TestRes -> IO ()
+showTestResult tflg test test_res
+  | Just n_steps <- expectedTestRes test_res -- What to display if all is well
+  = when (noisy tflg) $
+    putStrLn $ test_herald ++ "Expected " ++ succ_what
+                           ++ " in " ++ printf "%5d" n_steps ++ " steps"
+
+  | TS_Broken <- status
+  = putStrLn $ test_herald ++ "Broken test now pass"
+
+  | TO_Abnormal NormInvalid _ <- outcome
+  = putStrLn $ test_herald ++ "Crash: rewrite yields invalid results"
+
+  | otherwise   -- TS_Normal
+  = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
+       ; when (logUnexpected tflg) $ logUnexpectedToFile test_res
+       ; unless (noError tflg) $
+         displayDoc (tr_details test_res) }
+
+  where
+    test_herald = testHerald test
+    outcome     = tr_outcome test_res
+    info        = testInfo test
+    test_type   = testType info
+    status      = testStatus info
+
+    succ_what = case (status, test_type) of
+             (TS_Broken,_) -> "broken "
+             (_, TestPass)    -> "success"
+             (_, TestFail)    -> "failure"
+             (_, TestLoop)    -> "loop   "
+
+    fail_what
+      | failedWithLoop test_res = "timeout"
+      | otherwise = case test_type of
+                      TestPass -> "failure"
+                      TestFail -> "success"
+                      TestLoop -> "termination"
+
+testExprs :: Test -> (SrcExpr, SrcExpr)
+testExprs (TestVerify _ e)     = (e, Array [])
+testExprs (TestDenSem _ e1 e2) = (e1,e2)
+testExprs (TestEvalEq _ e1 e2) = (e1,e2)
+
+----------------------------------------------------------------
+--
+--          Use the Core evaluator
+--
+----------------------------------------------------------------
+
+doEvalCoreTest :: TestFlags -> Test -> IO TestRes
+doEvalCoreTest tflg test
+  = do { let (src1, src2) = testExprs test
+             flags        = mkFEFlags tflg add_verif
+             add_verif    = desugarForVerification test
+
+       ; core1 <- srcToCore flags add_verif src1
+
+       -- mb_v2 is Nothing if e2 is "wrong", which
+       -- tells us that we expect e1 to get stuck
+       ; mb_v2 <- case src2 of
+                     Variable (Ident _ "wrong") -> pure Nothing
+                     _ -> do { core2 <- srcToCore flags False src2
+                             ; let (_,tr2) = evalCoreExpr tflg test core2
+                             ; return (Just (Core.Traced.getTerm tr2)) }
+
+       ; let (res1,tr1) = evalCoreExpr tflg test core1
+             v1          = Core.Traced.getTerm tr1
+             n_steps     = length (getTrace tr1)
+             test_passed = equivValue v1 mb_v2
+
+             outcome :: TestOutcome
+             outcome = case res1 of
+                NormOK | test_passed -> TO_Equal n_steps
+                       | otherwise   -> TO_NotEqual n_steps
+                _                    -> TO_Abnormal res1 n_steps
+
+             details :: Doc
+             -- Show this if the the outcome is unexpected
+             details = text "-----------------------------------------------"
+                       $$ nest 2 (vcat
+                          [ text "Expression" <+> pPrint src1
+                          , text "evaluates to" <+>  pPrint v1
+                          , text "while" <+> pPrint src2
+                          , text "evaluates to" <+> pPrint mb_v2  ])
+
+       -- Display the trace if asked for, regardless of success/failure
+       ; when (showTrace tflg) $
+         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflg) tr1 }
+
+       ; return (TestRes { tr_info = testInfo test
+                         , tr_outcome = outcome
+                         , tr_details = details }) }
+
+-- | Equivalence on values (or stuck expressions)
+-- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
+equivValue :: Core.Expr -> Maybe Core.Expr -> Bool
+equivValue e1 (Just e2) = Core.norm e1 == Core.norm e2
+equivValue e1 Nothing   = not (Core.isVal e1)
+
+
+srcToCore :: HasCallStack => FE.Flags -> Bool -> SrcExpr -> IO Core.Expr
+srcToCore flags add_verification e
+  = do { e1 :: SrcCore <- FE.desugar flags add_verification e
+       ; FE.convertToPrepdCore flags e1 }
+
+mkFEFlags :: TestFlags -> Bool -> FE.Flags
+mkFEFlags tflg add_verification
+  = setPreludeFlag add_verification tflg $
+    testFlagsToFEFlags tflg
+
+
+desugarForVerification :: Test -> Bool
+desugarForVerification TestEvalEq{}   = False
+desugarForVerification TestDenSem{}   = False
+desugarForVerification TestVerify{}   = True
+
+evalCoreExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
+evalCoreExpr flags test e = normalizeExpr rules (maxSteps flags) e
+  where
+    rules = case test of
         TestEvalEq {} -> everywhere runtimeRules
         TestVerify {} -> everywhere verificationRules
-        TestDenSem {} -> error "evalExpr: found a densem test...impossibly"
+        TestDenSem {} -> error "evalCoreExpr: found a densem test...impossibly"
 
+
+
+----------------------------------------------------------------
+--
+--          Use the Essential Verse evaluator
+--
+----------------------------------------------------------------
+
+doEvalEssentialTest :: TestFlags -> Test -> IO TestRes
+-- doEvalEssentialTest = error "doEvalEssentialTest"
+
+doEvalEssentialTest tflags test
+  = do { (cxt,blk) <- mkBlkToTest tflags test
+       ; let (res1,tr1) = EV.runTraced (maxSteps tflags) cxt blk
+             v1         = Core.Traced.getTerm tr1
+             n_steps    = length (Core.Traced.getTrace tr1)
+
+             outcome :: TestOutcome
+             outcome = case res1 of
+                NormOK | BlkE (EV.Val {}) <- v1 -> TO_Equal n_steps
+                       | otherwise              -> TO_NotEqual n_steps
+                _                               -> TO_Abnormal res1 n_steps
+
+             details :: Doc
+             -- Show this if the the outcome is unexpected
+             details = text "-----------------------------------------------"
+                       $$ nest 2 (vcat
+                          [ text "Expression" <+> pPrint blk
+                          , text "evaluates to" <+>  pPrint v1  ])
+
+       -- Display the trace if asked for, regardless of success/failure
+       ; when (showTrace tflags) $
+         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflags) tr1 }
+
+       ; return (TestRes { tr_info = testInfo test
+                         , tr_outcome = outcome
+                         , tr_details = details }) }
+
+mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk)
+mkBlkToTest tflags (TestEvalEq _ src1 src2)
+  | Variable (Ident _ "wrong") <- src2
+  = -- testeq(...){e1}{wrong} is a special form that means
+    --       see if e1 gets stuck
+    -- It's quite different to, say, testeq(...){e1}{3}
+    do { term <- mk_term tflags src1
+       ; let top_cxt = mkTopCxt vcxt term
+             vcxt | assumeVerified tflags = EV.AssumeVerified
+                  | otherwise             = EV.NotVerifying
+
+             u1 = EV.freshId top_cxt "u1"
+
+             main_exp = EV.Verify S.empty [] $ BlkE $
+                        EV.mkCheck Core.Succeeds  $
+                        BlkE $ u1 EV.~~> TBlock term
+
+             main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
+
+       ; return (top_cxt, main_blk) }
+
+  | otherwise
+  = do { term1 <- mk_term tflags src1
+       ; term2 <- mk_term tflags src2
+       ; let top_cxt = mkTopCxt vcxt (TBlock term1 :>% TBlock term2)
+             vcxt | assumeVerified tflags = EV.AssumeVerified
+                  | otherwise             = EV.NotVerifying
+
+             (u1,u2,r1,r2) = EV.freshId4 top_cxt ("u1","u2","r1","r2")
+
+             main_exp = EV.Var r1 EV.:=: mk_all u1 term1 EV.:>
+                        EV.Var r2 EV.:=: mk_all u2 term2 EV.:>
+                        EV.Verify S.empty [] $ BlkE $
+                        EV.mkCheck Core.Succeeds  $
+                        BlkE $ EV.Var r1 EV.:=: EV.Var r2
+
+             main_blk = EV.Blk (S.fromList [u1,u2,r1,r2]) EV.emptyHeap main_exp
+
+       ; return (top_cxt, main_blk) }
+
+mkBlkToTest tflags (TestVerify _ src)
+  = do { term <- mk_term tflags src
+       ; let top_cxt = mkTopCxt NotVerifying term
+             -- When verifying, ignore the --assume-verified flag
+             -- Start with NotVerifying at the top level
+
+             u1 = EV.freshId top_cxt "u1"
+
+             main_exp = EV.Verify S.empty [] $ BlkE $
+                        EV.mkCheck Core.Succeeds  $
+                        BlkE $ u1 EV.~~> TBlock term
+
+             main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
+
+       ; return (top_cxt, main_blk) }
+
+
+mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
+
+mkTopCxt :: VerificationContext -> Term -> ReductionContext
+mkTopCxt vcxt term
+  = EV.RC { rc_depth  = 0
+          , rc_eqns   = EV.thePrelude
+          , rc_exis   = prel_bndrs
+          , rc_skols  = top_skols
+          , rc_vcxt   = vcxt }
+  where
+    top_skols = freeVarsTerm term `S.difference` prel_bndrs
+
+    prel_bndrs :: S.Set EV.Ident
+    prel_bndrs = S.fromList (map fst EV.thePrelude)
+
+
+mk_term :: TestFlags -> SrcExpr -> IO EV.Term
+mk_term tflags src = do { ess <- srcToEssential fe_flags src
+                        ; return (EV.srcToTerm ess) }
+  where
+    fe_flags = testFlagsToFEFlags tflags
+
+mk_all :: EV.Ident -> EV.Term -> EV.Exp
+-- Returns all{exists u.  u ~~> block{t} }
+mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap (u ~~> EV.TBlock t))
+
+----------------------------------------------------------------
+--
+--          Use the denotational semantics
+--
+----------------------------------------------------------------
+
+{- Note [Testing densem in the tester]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+  * To test the semantic functions for different denotational semantics we abuse
+    'TestType' in 'TestInfo' to track which semantic function to call. This is
+    purely a descision to enable the tester to use the semantic functions as
+    fast as possible. In general, the tester should know less about the tests,
+    see #77.
+
+  * We try to keep the data pipeline for the tester as similar as possible when
+    testing densem or normal tests. Thus we define a parser ('pTestDenSem') to
+    parse a "testds" call in a .versetest file. This parser decides the correct
+    semantic function to run in 'pTestRunner' which propogates this information
+    to the 'testRunner' field of 'pTestInfo'. Each semantic function is built
+    into the tester and is one of this set: { "tim", "dls", "sls", "els" }. We
+    have precisely chosen this format for these symbols so that the
+    'foo.versetest' files are valid verse.
+
+  * A 'TestDenSem info e1 e2' is morally the same as a 'TestEvalEq info e1 e2',
+    only instead of evaluating e1, then e2 and checking for equivalence with
+    'equivValue', 'TestDenSem' Expects that 'e2' /is only/ a literal string that
+    represents the result of the semantic function applied to 'e1'.
+
+    For example:
+
+    -- in tests.versetest
+    testds("DS1", tim){ (1,2) }     { "[{{r=<1,2>}}]" }
+
+    becomes 'TestDenSem tinfo e1 e2' where:
+      tinfo = TestInfo {..., testType = Tim_DS }
+      e1    = (1,2)
+      e2    = "[{{r=<1,2>}}]"
+
+  * We diverge from the normal data pipeline in 'checkResults' by calling
+    'evalDenSem' and then construct the output exactly like the normal
+    pipeline. 'evalDenSem' is responsible for dispatching the TestRunner to the
+    semantic functions for each denotational semantics.
+-}
+
+
+doEvalDenSemTest :: TestFlags -> DenSem -> Test -> IO TestRes
+doEvalDenSemTest _tflg _test
+  = error "doEvalDenSemTest"
+
+{-
 -- Eval using a semantic function.
 evalDenSem :: TestFlags -> Test -> SrcExpr -> IO (NormResult, Int, Expr)
 evalDenSem flags test e = do
@@ -440,7 +790,7 @@ evalDenSem flags test e = do
   where
     runner = forceSem flags <|> dfltRunner
     dfltRunner = testRunner $ testInfo test
-    flgs = FrontEnd.defaultFlags{ fReportError = ErrNone }
+    flgs = FE.defaultFlags{ fReportError = ErrNone }
     err  = error "runD: exception in evalDenSem"
     go   = runD flgs err . getEssential flgs
 
@@ -475,131 +825,10 @@ showASCII = concatMap ascii . show
         ascii '\8801' = "="
         ascii '\n' = ""
         ascii c = [c]
-
-type TimTag = Src.Ident
-
-timTestInfo :: TimTag -> TestInfo
-timTestInfo (Ident loc status) = TestInfo
-  { testMName    = Nothing
-  , testLocStart = loc
-  , testLocEnd   = loc
-  , testType     = timTestType status
-  , testRunner   = Nothing
-  , testStatus   = TS_Normal
-  , testTimSkip  = timSkip status
-  }
-
-timTestType :: String -> TestType
--- Any TimTest starting in "S" should pass, e.g. S00, S01
--- All others should fail.
-timTestType ('S' : _) = TPass
-timTestType _         = TFail
-
-timSkip :: String -> TimSkip
-timSkip ('S' : _) = TimNone
-timSkip s         = TimError s
-
-----------------------------
-runTest :: HasCallStack => TestFlags -> Test -> IO TestRes
-runTest tflg test@(TestVerify _ e)     = doTestCatchingExn tflg test e (Array [])
-runTest tflg test@(TestDenSem _ e1 e2) = doTestCatchingExn tflg test e1 e2
-runTest tflg test@(TestEvalEq _ e1 e2) = doTestCatchingExn tflg test e1 e2
-
-mkFEFlags :: TestFlags -> Bool -> FrontEnd.Flags
-mkFEFlags tflg add_verification
-  = setPreludeFlag add_verification tflg $
-    testFlagsToFEFlags tflg
-
-----------------------------
-data TestMode = TEval | TVerify Effect deriving (Eq, Show)
-
--- | `doTestCatchingExn` runs the actual test, catching any exceptions that are
--- thrown during parsing, desugaring, or execution/verification
-doTestCatchingExn :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
-doTestCatchingExn tflg test p1 p2
-  | TS_Skip <- testStatus info
-  = do { when (noisy tflg) (putStrLn $ test_herald ++ "Skipped")
-       ; pure (TestRes { tr_info = info, tr_outcome = TO_Skipped }) }
-  | otherwise
-  = do { catch (doTest tflg test p1 p2)
-               (\e -> do { exn_handler e
-                         ; pure (TestRes { tr_info = info, tr_outcome = TO_Excn }) })
-        }
-  where
-    info        = testInfo test
-    test_herald = testHerald test
-    exn_handler :: SomeException -> IO ()
-    exn_handler e
-      = -- unless (noError tflg) $
-        do { putStrLn $ test_herald ++ "Failure:"
-           ; putStrLn "The expression";       putStrLn (show p1) -- ppIndent p1
-           ; putStrLn "or the expression";    ppIndent p2
-           ; putStrLn "caused an exception:"; print e
-           ; putStrLn "" }
+-}
 
 
--- | `doTest` does the actual work of parsing, converting to core, and
--- evaluating/verifying; each of which can throw an exception.
-doTest :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
-doTest tflg test src1 src2 = do
-  do { let flags1    = mkFEFlags tflg add_verif
-           flags     = if isDenSemTest test then flags1{ fReportError = ErrNone } else flags1
-           add_verif = desugarForVerification test
-
-     ; core1 <-
-       -- Don't convert to core for densem tests.  This is so ugly
-       if isDenSemTest test then return Core.Fail
-                            else srcToCore flags add_verif src1
-
-     -- Display the desugared output
-     ; when (showDesugared tflg) $
-       displayDoc (sep [text (testHerald test) <+> text "desugared:", pPrint core1])
-
-     ; mb_core2 <- case src2 of
-                     Variable (Ident _ "wrong") -> pure Nothing
-                     _       -> do { core2 <- srcToCore flags False src2
-                                   ; pure (Just core2) }
-
-     ; checkResults tflg test (src1, core1) (src2, mb_core2)
-
-     }
-
-desugarForVerification :: Test -> Bool
-desugarForVerification TestEvalEq{}   = False
-desugarForVerification TestDenSem{}   = False
-desugarForVerification TestVerify{}   = True
-
-
--- Jeff: Yes this is a mess, but for now its necessary to preserve the output
--- format between standard tests and densem tests.
-show_result
-    :: ( Pretty a1
-       , Pretty a2
-       , Pretty a3
-       , Pretty a4
-       ) => TestFlags -> TestStatus -> TestOutcome -> String -> TestRes
-         -> String -> String -> a1 -> a2 -> a3 -> a4 -> Int -> IO ()
-show_result
-  tflg status outcome test_herald test_res succ_what fail_what src1 v1 src2 mb_v2 n_steps
-  | expectedTestRes test_res -- What to display if all is well
-  = when (noisy tflg) $
-    putStrLn $ test_herald ++ "Expected " ++ succ_what
-                           ++ " in " ++ printf "%5d" n_steps ++ " steps"
-  | TS_Broken <- status
-  = putStrLn $ test_herald ++ "Broken test now pass"
-  | TO_Abnormal NormInvalid <- outcome
-  = putStrLn $ test_herald ++ "Crash: rewrite yields invalid results"
-  | otherwise   -- TS_Normal
-  = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
-       ; when (logUnexpected tflg) $ logUnexpectedToFile test_res
-       ; unless (noError tflg) $
-         do { putStrLn "-----------------------------------------------"
-            ; putStrLn "The expression"; ppIndent src1
-            ; putStrLn "evaluates to";   ppIndent v1
-            ; putStrLn "while";          ppIndent src2
-            ; putStrLn "evaluates to";   ppIndent mb_v2 } }
-
-
+{-
 -- | `checkResults` just compares the results of two evaluations and prints out
 --   the appropriate message, it does _not_ throw or catch any exceptions.
 checkResults :: TestFlags -> Test -> (SrcExpr, Expr) -> (SrcExpr, Maybe Expr) -> IO TestRes
@@ -621,71 +850,24 @@ checkResults tflg test@TestDenSem{} (src1, _core1) (src2, mb_v2)
 
                succ_what = case (status, typ) of
                         (TS_Broken,_) -> "broken "
-                        (_, TPass)    -> "success"
-                        (_, TFail)    -> "failure"
-                        (_, TLoop)    -> "loop   "
+                        (_, TestPass)    -> "success"
+                        (_, TestFail)    -> "failure"
+                        (_, TestLoop)    -> "loop   "
 
                fail_what
                  | failedWithLoop test_res = "timeout"
                  | otherwise = case typ of
-                                 TPass -> "failure"
-                                 TFail -> "success"
-                                 TLoop -> "termination"
+                                 TestPass -> "failure"
+                                 TestFail -> "success"
+                                 TestLoop -> "termination"
 
          ; show_result tflg status outcome test_herald test_res succ_what
            fail_what src1 v1 src2 mb_v2 n_steps
          ; -- Display the trace if asked for, regardless of success/failure
          ; when (showTrace tflg) $ putStrLn "Test is a den-sem test, trace not implemented"
          ; pure test_res }
+-}
 
-checkResults tflg test (src1, core1) (src2, mb_core2)
-  = do { show_result tflg status outcome test_herald test_res succ_what fail_what
-                     src1 v1 src2 mb_core2 n_steps
-
-       -- Display the trace if asked for, regardless of success/failure
-       ; when (showTrace tflg) $
-         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflg) tr1 }
-
-       ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
-  where
-    (res1,ln1,tr1) = evalExpr tflg test core1
-    v1           = Core.Traced.term tr1
-    n_steps      = ln1
-    mb_v2        = fmap ((\(_,_,tr) -> term tr) . evalExpr tflg test) mb_core2
-                   -- Really we should check res2 as well, but it is always boring
-    test_herald  = testHerald test
-    info         = testInfo test
-    typ          = testType info
-    status       = testStatus info
-    test_passed  = equivValue v1 mb_v2
-
-    outcome :: TestOutcome
-    outcome = case res1 of
-       NormOK | test_passed -> TO_Equal
-              | otherwise   -> TO_NotEqual
-       _                    -> TO_Abnormal res1
-
-    test_res = TestRes { tr_info = info, tr_outcome = outcome }
-
-    succ_what = case (status, typ) of
-             (TS_Broken,_) -> "broken "
-             (_, TPass)    -> "success"
-             (_, TFail)    -> "failure"
-             (_, TLoop)    -> "loop   "
-
-    fail_what
-      | failedWithLoop test_res = "timeout"
-      | otherwise               = case typ of
-                                    TPass -> "failure"
-                                    TFail -> "success"
-                                    TLoop -> "termination" -- this case probably never happens?
-
-
--- | Equivalence on values (or stuck expressions)
--- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
-equivValue :: Core.Expr -> Maybe Core.Expr -> Bool
-equivValue e1 (Just e2) = Core.norm e1 == Core.norm e2
-equivValue e1 Nothing   = not (isVal e1)
 
 testHerald :: Test -> String
 -- Prints fixed-width herald string
@@ -702,9 +884,6 @@ baseName = reverse . takeWhile (/= '/') . reverse
 
 noisy :: TestFlags -> Bool
 noisy = not . quiet
-
-ppIndent :: Pretty a => a -> IO ()
-ppIndent x = displayDoc (text "  " <+> pPrint x)
 
 -----------------------------------------------
 --
@@ -807,9 +986,9 @@ pTestType :: V.Parser TestType
 pTestType = V.lexeme $ do
   i <- V.many V.pAlpha -- cannot use V.pIdent, "fail" is a reserved
   case T.toLower $ TE.decodeLatin1 $ B.pack $ i of
-    "pass"    -> pure TPass
-    "fail"    -> pure TFail
-    "loop"    -> pure TLoop
+    "pass"    -> pure TestPass
+    "fail"    -> pure TestFail
+    "loop"    -> pure TestLoop
     _         -> fail "pTestType"
 
 pTestStatus :: V.Parser TestStatus
@@ -831,15 +1010,17 @@ pTimSkip = do
     s                 -> pure (TimError s)
   OA.<|> pure TimNone
 
-pTestRunner :: V.Parser TestRunner
+pTestRunner :: V.Parser Evaluator
 pTestRunner = V.choice
-    [ V.pKeyword "tim" *> pure Tim_DS
-    , V.pKeyword "sls" *> pure SLS_DS
-    , V.pKeyword "dls" *> pure DLS_DS
-    , V.pKeyword "els" *> pure ELS_DS
-    , V.pKeyword "pom" *> pure POM_DS
-    , V.pKeyword "ppo" *> pure PPM_DS
-    , V.pKeyword "mon" *> pure MON_DS
+    [ V.pKeyword "tim" *> pure (EvalDenSem Tim_DS)
+    , V.pKeyword "sls" *> pure (EvalDenSem SLS_DS)
+    , V.pKeyword "dls" *> pure (EvalDenSem DLS_DS)
+    , V.pKeyword "els" *> pure (EvalDenSem ELS_DS)
+    , V.pKeyword "pom" *> pure (EvalDenSem POM_DS)
+    , V.pKeyword "ppo" *> pure (EvalDenSem PPM_DS)
+    , V.pKeyword "mon" *> pure (EvalDenSem MON_DS)
+    , V.pKeyword "core"     *> pure EvalCore
+    , V.pKeyword "essental" *> pure EvalEssential
     ] <* V.pComma
 
 
@@ -879,8 +1060,8 @@ data TestFlags = TestFlags
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , allAsIter      :: !Bool                -- encode all as iter
   , dsUniform      :: !Bool
-  , forceSem       :: !(Maybe TestRunner)  -- use this den-sem
   , fileNames      :: ![FilePath]          -- input files
+  , useEvaluator   :: !(Maybe Evaluator)
   }
   deriving (Show)
 
@@ -980,7 +1161,7 @@ testFlags
                      OA.long "max-steps" <>
                      OA.short 'm' <>
                      OA.metavar "NUM" <>
-                     OA.value 1000 <>  -- test M28Jul24-1 takes ages with 1000 steps
+                     OA.value 2000 <>  -- test M28Jul24-1 takes ages with 1000 steps
                      OA.help "Maximum number of rewrite steps"
 
        ; maxNormSteps <- OA.option OA.auto $
@@ -995,7 +1176,7 @@ testFlags
 
        ; assumeVerified <- OA.switch $
                            OA.long "assume-verified" <>
-                           OA.help "succeeds{} is a no-op"
+                           OA.help "discard runtime verifications"
 
        ; timRun <- OA.switch $
                    OA.long "tim-run" <>
@@ -1036,15 +1217,16 @@ testFlags
                         OA.long "ds-uniform" <>
                         OA.help "use uniform desugaring"
 
-       ; forceSem  <- OA.optional $ OA.option OA.auto $
-                        OA.long "force-sem" <>
-                        OA.help "force use of a particular semantics"
-
        ; fileNames <- OA.many $
                       OA.argument OA.str (OA.metavar "FILES...")
+
+       ; useEvaluator <- OA.optional $ OA.option OA.auto $
+                         OA.long "evaluator" <>
+                         OA.help "use a particular semantics"
+
        ; return (TestFlags { .. }) }
 
-testFlagsToFEFlags :: TestFlags -> FrontEnd.Flags
+testFlagsToFEFlags :: TestFlags -> FE.Flags
 testFlagsToFEFlags t =
   let flags = defaultFlags
   in  flags{ fSplit        = split t, fSimplify = simplify t
@@ -1222,11 +1404,11 @@ displayTest test | TimSkip _ <- testTimSkip (testInfo test) = return ()
                  | testStatus (testInfo test) /= TS_Normal  = return ()
 displayTest test = do
   let retCode :: TestType -> String
-      retCode TFail | Just err <- bad = err
-                    | otherwise = "F00"
-      retCode TPass | Just err <- bad = err
-                    | otherwise = "S00"
-      retCode TLoop = "S00"  -- What should this be?
+      retCode TestFail | Just err <- bad = err
+                       | otherwise = "F00"
+      retCode TestPass | Just err <- bad = err
+                       | otherwise = "S00"
+      retCode TestLoop = "S00"  -- What should this be?
 
       -- Error code, if this is a bad test.
       bad = case testTimSkip (testInfo test) of
@@ -1331,7 +1513,7 @@ ppTim = pp
           where (q, ql, _) = fixity "()"
         ApplyD f a -> maybeParens (prec > q) $ pp False ql f <> brackets (ppArg a)
           where (q, ql, _) = fixity "()"
-        Blk es -> ppBlk es
+        Src.Blk es -> ppBlk es
         Macro1 (Ident _ "one")  [] b -> text "first" <> pp False 10 b
         Macro1 (Ident _ "all")  [] b -> text "for"   <> pp False 10 b
         Macro1 (Ident _ "type") [] b -> text "type"  <> pp False 10 b
@@ -1367,7 +1549,7 @@ ppTim = pp
         Option me -> text "option" <> braces (maybe empty (pp True 0) me)
         Exists is e -> pp sem prec $ eSeq $ vars ++ unBlk e
           where vars = map (\ i -> InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))) is
-                unBlk (Blk es) = es
+                unBlk (Src.Blk es) = es
                 unBlk ee = [ee]
 
         _ -> error $ "ppTim: unimplemented " ++ take 100 (show expr)

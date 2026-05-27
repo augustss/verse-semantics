@@ -185,7 +185,7 @@ executable refimpltester
 
 library verse-densem
     import:           general-libs
-    hs-source-dirs:   verse-densem
+    hs-source-dirs:   verse-densem Simon
     default-extensions:  TypeOperators
     exposed-modules:
                       SExp
@@ -201,13 +201,13 @@ library verse-densem
                       MultiSet
                       ValueS
                       Map
-                      ENVDesugar
                       PomSet
                       PomPom
                       SemClass
                       ValueP
                       ENVP
                       EQD
+                      Red
     build-depends:    verse-libs,
                       base,
                       containers,
@@ -261,6 +261,7 @@ library verse-libs
                       FrontEnd.Prelude
                       FrontEnd.Desugar
                       FrontEnd.ToCore
+                      FrontEnd.ENVDesugar
                       Core.Bind
                       Core.Expr
                       Core.Solver

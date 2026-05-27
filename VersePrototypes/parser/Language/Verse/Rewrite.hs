@@ -40,7 +40,7 @@ import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Loc (L (..), Loc (..), liftL1, loc)
+import Language.Verse.Loc (L (..), Loc (..), liftL1, loc, mkL)
 import Language.Verse.Path (Path)
 import Language.Verse.Path qualified as Path
 import Language.Verse.SimpleName
@@ -77,7 +77,7 @@ import Language.Verse.Exp
   , expToPat
   )
 import Language.Verse.Exp qualified as Parse
-import Language.Verse.Rewrite.Exp
+import Language.Verse.Rewrite.Exp as Exp
 
 import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error, (-))
 
@@ -296,15 +296,15 @@ rewriteExp expr = for expr $ \case
     pure $ Enum (map (extract . snd) xs) -- Ignore attributes
   If e -> do
     e' <- rewriteExp e
-    pure $ IfThenElse e' (Tuple [] <$ expr) (Tuple [] <$ expr)
+    pure $ Exp.IfElse e' (Tuple [] <$ expr)
   IfThen e1 e2 -> do
     e1' <- rewriteExp e1
     e2' <- rewriteExp e2
     pure $ IfThenElse e1' e2' (Tuple [] <$ expr)
-  IfElse e1 e2 -> do
+  Parse.IfElse e1 e2 -> do
     e1' <- rewriteExp e1
     e2' <- rewriteExp e2
-    pure $ IfThenElse e1' (Tuple [] <$ expr) e2'
+    pure $ Exp.IfElse e1' e2'
   Parse.IfThenElse e1 e2 e3 ->
     IfThenElse <$> rewriteExp e1 <*> rewriteExp e2 <*> rewriteExp e3
   For e ->
@@ -434,6 +434,14 @@ rewritePat = \ case
   InfixColon (extract -> Parse.Var _e1 i@(extract -> Parse.IdentName x) e2) e -> do
     access <- getDefSpecs e2
     Alloc2 access (Ident.Name x <$ i) <$> rewriteExp e
+
+  Parse.PrefixColon (extract -> ExpSpecs e1 bs) ->
+    PrefixColonFx <$> rewriteExp e1 <*> pure (head $ map get_eff bs)
+    where get_eff x | isPredefined "succeeds" x = Effect.Succeeds
+                    | isPredefined "fails"    x = Effect.Fails
+                    | isPredefined "decides"  x = Effect.Decides
+                    | otherwise = error $ "expSpecs with unknown effect: " ++ show x
+
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
   Parse.PatTuple xs  -> do
     xs' <- traverse (\(L l x) -> L l <$> rewritePat x) xs
@@ -552,6 +560,10 @@ rewriteDef pat rhs = case extract pat of
     rewriteDef' Val p
       (prefixColon e')
       (rhs `ofType` e')
+  InfixArrow p1@(extract -> Parse.Name (Parse.IdentName n1)) p2@(extract -> Parse.Name (Parse.IdentName n2)) -> do
+    let x1 = mkL (loc p1) $ Ident.Name n1
+    let x2 = mkL (loc p2) $ Ident.Name n2
+    pure $ List [mixfixArrowColonEqual x1 x2 rhs]
   InfixArrow p1 p2 -> do
     x1 <- freshIdent $ loc p1
     x2 <- freshIdent $ loc p2

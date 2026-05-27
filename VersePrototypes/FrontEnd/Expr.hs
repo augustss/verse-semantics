@@ -196,6 +196,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Exists [Ident] SrcExpr         -- exists xs . e
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
+  | Colon SrcExpr Eff              -- :t<fx>
 
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
@@ -742,6 +743,7 @@ instance Pretty SrcExpr where
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
+          Colon e fx -> text ":" <> ppr 10 e <> pPrint fx
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec lvl p s <+> text "in", indent $ braces (pPrintPrec lvl 0 e)]
 
@@ -885,6 +887,7 @@ compos f e@(MVLam { mvl_dom = e1, mvl_rng = e2 })
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
+compos f (Colon e fx)       = Colon <$> f e <*> pure fx
 compos f (Splice e)         = Splice <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
@@ -951,6 +954,7 @@ getVisibleBinders = go
     go (Range e)      = go e
     go (Guard e1 _)   = go e1
     go (Truth e)      = go e
+    go (Colon e _)    = go e
     go (ChoiceIndex e)= go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
@@ -988,6 +992,7 @@ getFree = fvs_blk
     fvs (Wrong {})        = []
     fvs (Array es)        = concatMap fvs es
     fvs (Truth e)         = fvs e
+    fvs (Colon e _)       = fvs e
     fvs (Macro2 (Ident _ "relation") e1 e2)  = (fvs e1 ++ fvs e2) `remove` getVisibleBinders e1
     fvs (Tuple es)        = concatMap fvs es
     fvs (EffAttr e _)     = fvs e

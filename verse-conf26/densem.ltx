@@ -130,6 +130,7 @@ $$
   \textbf{Desirable laws} \\
   \begin{array}{rclcl}
 %     \vmempty \vmbind k & = & \vmempty \\
+     \vminject( \{ \} ) & = & \vmempty \\
      \vmempty \vmseq   s & = & \vmempty & = & s \vmseq \vmempty \\
      \vmempty \vmappend   s & = & s        & = & s \vmappend \vmempty \\
      \vmempty \vmunion s & = & s        & = & s \vmunion \vmempty \\
@@ -157,13 +158,11 @@ $$
     \vmcollapse & :: & \Vm{a} \rightarrow \powerset{a} \\
     \vmcollapse(s) & = & \vmfold( \cup, \{\}, s ) \\[1mm]
 
+    \vmflatten & :: & \Vm{\powerset{b}} \rightarrow \Vm{b} \\
+    \vmflatten( S ) & = & \vmmapset( \bigcup, \; S ) \\[1mm]
+
     \vmmapfilter & :: & (a \rightarrow \powerset{b}) \rightarrow \Vm{a} \rightarrow \Vm{b} \\
-    \vmmapfilter( f, S ) & = & \mathit{flatten}(\; \vmmap( f, S ) \; ) \\
-    & \multicolumn{2}{l}{\text{where}} \\
-    && \begin{array}[t]{@@{}l}
-         \mathit{flatten} :: \Vm{\powerset{b}} \rightarrow \Vm{b} \\
-         \mathit{flatten}( S ) = \vmmapset( \bigcup, \; S )
-       \end{array} \\
+    \vmmapfilter( f, S ) & = & \vmflatten(\; \vmmap( f, S ) \; ) \\
 
 \end{array}
 \end{array}
@@ -410,6 +409,252 @@ $$
 \end{array}
 $$
 \caption{Denotational semantics of Essential Verse, Part 1}
+\label{fig:E-sls1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+
+% -------------- IF -----------------
+\multicolumn{2}{@@{}l}{\rulename{sif} \; \hfill
+  \semess{E}{u}{v}{|if3 t_0 t_1 t_2|} }
+& = & \begin{array}[t]{@@{\;}l@@{\,}l}
+        (\vminject(\EV) \vmseq \semess{B}{u}{v}{t_1} \vmhide xs)
+            \vmunion
+          (\vminject(\conCompl( \HIDE{\EV}{xs} )) \vmseq \semess{B}{u}{v}{t_2}) \\
+        \textbf{where} \; \xs = \semap{I}{|t_0|}, \; \EV = \vmone( xs, \semap{C}{|t_0|} )
+      \end{array}
+\\[5mm]
+
+\end{array} \\
+
+\begin{array}{@@{}l@@{\;\;}c@@{\;\;}l}
+
+% -------------- CHOICE-INDEX -----------------
+\multicolumn{3}{@@{}l}{\rulename{sindex} \;\; \semess{E}{u}{v}{|choiceindex t|}} \\
+& = & \vmindex( \; u, \; \vmtelescope( \semap{I}{t}, \; \semess{E}{j}{v}{t} \vmhide \{j\} ) \; )
+      \hspace{1cm} j \not\in \freevars{t,u,v} \\
+%   & = & \vmunions \begin{array}[t]{@@{}l@@{\,}l}
+%   \{ & \vmindex( u, S ) \\
+%   \vb & \rho \in \Env \\
+%   , & |let| \; S :: \Vm{\Env}
+%           = \vmprune( \; (\vminject( \{ \rho \} ) \vmhide \{ \semap{I}{t}, j, v \})
+%                     \vmseq \semess{E}{j}{v}{t} \; ) \;\}\\
+%     \end{array} \\
+\\
+%  E[ choiceIndex( 8 | 7 | fail | 8 ) ] uv  = [ {{ u=0,v=8 }} | {{ u=1,v=7 }} | {{ u=2,v=8}}} ]
+
+%        ε⟦choice_index{at}⟧ix := ∪(ρ:env). 
+%            let(aρm:=Prune((<ρ>-BVS[at]-{j,y}) * ε⟦at⟧jy - {i})).
+%            <aρ | i:ℕm, i<|aρm|m, aρ:aρm_i * <bρ:env | bρ.i=i>>
+
+% FOR
+% ------------- Direct semantics for FOR ---------------
+% \multicolumn{2}{@@{}l}{\rulename{sfor} \; \hfill \semess{E}{u}{v}{|fordo t_0 t_1|}}
+%   & = & \vmfold ( op, z, \semapp{C}{|t_0|} ) \\
+% && \multicolumn{2}{@@{}l}{\textbf{where} \hfill
+%        p,q,u_1,u_2,v_1,v_2 \not\in \freevars{t_0,t_1,u,v}}\\
+% &&& \begin{array}[t]{@@{}r@@{\;}c@@{\;}l}
+%       xs & = & \semap{I}{|t_0|} \\
+%       S_1 :: \Vm{\Env} & = & \semess{B}{p}{q}{|t_1|} \\
+%       z :: \Vm{\Env} & = & \vminject \conBrack{u=|emptytup|,v=|emptytup|}  \\
+%       op & :: & \powerset{\Env} \rightarrow \Vm{\Env} \rightarrow \Vm{\Env} \\
+%       op(\EV, m) & = & \vminject \conBrack{u=u_1 \fununion u_2, v=v_1 \fununion v_2} \\
+%          & &  \vmseq ( (\vminject(\EV)  \vmseq S_1 \vmseq \vminject \conBrack{u_1=|arr p|,v_1=|arr q|} \vmhide \{p,q\}) \\
+%       & & \hspace{5mm}  \vmunion (\vminject(\conCompl(\HIDE{\EV}{xs}) ) \vmseq
+%                          \vminject \conBrack{u_1=|emptytup|,v_1=|emptytup|}  )) \\
+%       & & \vmseq (m \vmseq \vminject \conBrack{u=u_2, v=v_2} \vmhide \{u,v\} ) \\
+%       & & \vmhide \{ u_1, u_2, v_1, v_2 \}
+%     \end{array}
+
+% -------------- RELATIONS -----------------
+\multicolumn{3}{@@{}l}{\rulename{srel} \;\;
+  \semess{E}{h}{f}{|relation at bt|}} \\
+    & = & \vminject 
+            \begin{array}[t]{@@{}l@@{\;}l}
+              \{ & \rho \in \Env \hfill \{u_a,v_a,u_b,v_b\} \not\in \freevars{at,bt,h,f} \\
+              \vb & |let|\; S :: \Vm{ \Env } =
+                           \begin{array}[t]{@@{}l}
+                             (\vminject( \{ \rho \} ) \vmhide \{ u_a, v_a, \semap{I}{at} \} \\
+                             \; \vmseq \semess{E}{u_a}{v_a}{|at|}) \vmhide \{ u_b,v_b,\semap{I}{bt} \} \\
+                             \vmseq \semess{E}{u_b}{v_b}{|bt|} )
+                             \end{array} \\
+               , & \envlk{\rho}{h} = \envlk{\rho}{f}
+                           = \Rel( \vmmap(\; \lambda \rho. (\envlk{\rho}{u_a},\envlk{\rho}{v_b} ),\;
+                           \vmprune(S) \;))\; \}
+           \end{array}
+            \\
+            \\
+
+
+% -------------- FUNCTIONS -----------------
+\multicolumn{3}{@@{}l}{\rulename{sfun} \;\;
+   \semess{E}{h}{f}{|functionOCX q at fx bt|}} \\
+& = & \vmunions \{\; \vmmapfilter( |keep|(\rho), |funs|(\rho)) \vb  \rho \in \Env \;\} \\
+& \multicolumn{2}{@@{}l}{\text{where}} \\
+&& S_a :: \Vm{\Env} = \semess{E}{x}{w}{|at|} \\
+&& S_b :: \Vm{\Env} = \semess{E}{j}{z}{|bt|} \\[1mm]
+&& |funs| : \Env \rightarrow \Vm{ \Vm { \Val,\Env}}  \hspace{5mm} \# \; (x, (w,j,z)) \\
+&& |funs|(\rho) \begin{array}[t]{@@{}ll}
+     = & \vmpi(\; |domvs|, |rngvs| \;) \\
+     \multicolumn{2}{@@{}l}{\text{where}} \\
+     & |dom|:\Vm{\Env} \\
+     & |dom| = (\vminject\{ \rho \} \vmhide \semap{I}{|at|} \vmhide \{x,w\}) \vmseq S_a \\[1mm]
+     & |domvs|:\Vm{\Val} \\
+     & |domvs| = \vmmap(\, \lambda \rho.\, \envlk{\rho}{x}, \;|dom| \,) \\[1mm]
+
+     & |rngvs| :: \Vm{ \Val, \Env } \\
+     & |rngvs| = \vmunions \begin{array}[t]{@@{}l@@{\,}l}
+       \{ & \vmintersects \begin{array}[t]{@@{}l@@{\,}l}
+         \{ &   (\vminject( \{ \rho \} ) \vmhide \semap{I}{|bt|}) \vmseq S_b \\
+         \vb & \rho \in \vmcollapse( |dom| ), \envlk{\rho}{x} = xv \; \}\\
+        \end{array} \\
+       \vb & xv \in \vmcollapse( |domvs| )  \; \}\\
+    \end{array} \\
+
+% rngvs grabbing triples
+%     & |rngvs| :: \Vm{ \Val, (\Val,\Val,\Val) } \\
+%     & |rngvs| = \vmunions \begin{array}[t]{@@{}l@@{\,}l}
+%       \{ & xv \in \vmcollapse( |domvs| ) \\
+%       \vbvb & \vmintersects \begin{array}[t]{@@{}l@@{\,}l}
+%         \{ &  \rho \in \vmcollapse( |dom| ), \envlk{\rho}{x} = xv \\
+%         \vbvb & \vmmap \begin{array}[t]{@@{}l@@{\,}l}
+%           ( & \lambda \rho'. (xv, (\envlk{\rho'}{w}, \envlk{\rho'}{j}, \envlk{\rho'}{w})) \\
+%           , & (\vminject( \{ \rho \} ) \vmhide \semap{I}{|bt|}) \vmseq S_b \; ) \; \} \; \}\\
+%           \end{array}
+%        \end{array}
+%    \end{array} \\
+
+  \end{array} \\ \\[-2mm]
+&& |keep| :: \Env \rightarrow \Vm{\Val,\Env} \rightarrow \powerset{ \Env }
+                        \hspace{5mm} \# \; \text{Singleton or empty}\\
+&& |keep|(\rho)(|fun|) = \left\{ \begin{array}{ll}
+                          \{ \rho \} & \text{if}\; |pick|( \rho, |fun|) \\
+                           \{  \} & \text{otherwise} \\
+                        \end{array} \right. \\
+&& \begin{array}{@@{}l@@{\;}c@@{\;}l}
+     |pick| & :: & \Env \rightarrow \Vm{\Val,\Env} \rightarrow Bool \\
+     |pick|(\rho, |fun|) & = & |case| \; q \; |of| \\
+         & & \begin{array}[t]{l} 
+                          |eff closed| \rightarrow |fr| = |fm| \; \wedge |hr| = |hm| \\
+                          |eff open|   \rightarrow
+                          \begin{array}[t]{l}
+                             \forall v \in \dom(|fm|).\;|fm(v)| = |fr(v)| \; \wedge \\
+                             \forall v \in \dom(|hm|).\;|hm(v)| = |hr(v)| \; \wedge \\
+                             \forall v \not\in \dom(|fm|).\;|hr(v)| = |fr(v)| \\
+                          \end{array}
+                        \end{array} \\
+
+     & \multicolumn{2}{@@{}l}{\textbf{where}} \\
+     && \begin{array}[t]{@@{}l}
+         |pfun| = \vmprune(|fun|) \\
+         |fm,hm| :: \Value \\
+         |fm| = \Fun(\vmmap(\lambda (x,\rho').\, (x,\envlk{\rho'}{z}), \; |pfun|)) \\
+         |hm| = \Fun(\vmmap(\lambda (\_,\rho').\, (\envlk{\rho'}{w},\envlk{\rho'}{j}), \; |pfun|)) \\
+         |fr,hr| :: \Value \\
+         |fr| = \envlk{\rho}{f} \\
+         |hr| = \envlk{\rho}{h}
+         \end{array} \\
+
+\end{array}
+\end{array}
+\end{array}
+$$
+\caption{Denotational semantics of Essential Verse, Part 2}
+\label{fig:E-sls1}
+\end{figure}
+
+
+% ------------------------------------------------------------------------------------
+%
+%            The semantics itself: this time, using distinguished variables
+%
+% ------------------------------------------------------------------------------------
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+  & \semap{E}{|t|} & : & \VmENV  \\
+
+% Wildcards and atoms
+\rulename{swild}  &  \semap{E}{|_|} & = & \vminject \conBrack{\vin = \vout} \\
+\rulename{svar}   &  \semap{E}{|x|} & = & \vminject \conBrack{\vin = \vout = x} \\
+\rulename{sconst} &  \semap{E}{|k|} & = & \vminject \conBrack{\vin = \vout = k}\\
+\rulename{sprim}  &  \semap{E}{|o|} & = & \vminject \conBrack{\vin = \vout = o} \\
+
+% Capture input and output
+\rulename{sbind} &  \semap{E}{|x:=t|} & = &
+   \vminject\conBrack{x=\vin} \vmseq \semap{E}{t} \\
+% \rulename{ssquig} &  \semess{E}{u}{v}{|esssquig x t|} & = &
+%    \vminject\conBrack{x=u} \vmseq \semess{E}{u}{v}{t} \\
+
+% Tuples
+\multicolumn{2}{@@{}l}{\rulename{stup} \; \hfill \semap{E}{|array (t_1,xdots,t_n)|}}
+  & = & (\vminject \conBrack{ u=|arr (u_1, xdots, u_n)|, v=|arr (v_1, xdots, v_n)|} \\
+  &&&   \; \vmseq \semess{D}{u_1}{v_1}{t_1}
+         \vmseq \mydots
+         \vmseq \semess{D}{u_n}{v_n}{t_n}) \\
+&&&      \vmhide { \{u_1,\mydots u_n,v_1 \mydots v_n\} }
+         \hfill u_i,v_i\not\in \freevars{t_1 \mydots t_n} \\
+
+% Choice and failure
+\rulename{sfail} &  \semap{E}{|fail|} & = & \vmempty \\
+\rulename{schoice} &  \semap{E}{|t_1 `choice` t_2|}
+  & = & \semap{B}{t_1} \vmappend \semap{B}{t_2} \\
+% \rulename{suchoice} &  \semess{E}{u}{v}{|t_1 `uchoice` t_2|}
+%   & = & \semess{B}{u}{v}{t_1} \vmunion \semess{B}{u}{v}{t_2} \\
+
+% Unification and matching
+\rulename{sunify} &  \semap{E}{|t_1 == t_2|} & = &   \semap{E} {t_1} \vmseq \semap{E}{t_2} \\
+\rulename{ssquig} &  \semap{E}{|matches t_1 t_2|} & = &
+   (\semess{D}{\vin}{w}{t_1} \vmseq \semess{D}{w}{\vout}{t_2}) \vmhide \{w\} \hfill w \not\in \freevars{t_1,t_2,u,v} \\
+
+% Sequencing
+\rulename{sseq} &  \semap{E}{|t_1 ; t_2|} & = &  \semapp{C}{t_1} \vmseq \semap{E}{t_2} \\
+\rulename{swhere} &  \semap{E}{|t_1 where t_2|} & = &  \semap{E}{t_1} \vmseq  \semapp{C}{t_2} \\
+% Dot-dot
+\rulename{sdotdot} &  \semap{E}{|t_1 ..  t_2|}
+  & = & \vminject \conBrack{\vin = \vout} \vmseq \semess{D}{p_1}{q_1}{t_1} \vmseq \semess{D}{p_2}{q_2}{t_2} \vmseq \\
+  & & & \vmunions \{\;  n \in \N \vbvb \vmconcat [ \vminject \conBrack{\vout = q_1+i, i \leq q_2 - q_1}  \vb i \leftarrow [0..n] ]  \; \} \\
+  & & & \vmhide \{p_1,q_1,p_2,q_2\} \hfill  p_1,q_1,p_2,q_2 \not\in \freevars{t_1,t_2} \\[1mm]
+
+% Application and type
+\rulename{sapp} & \semap{E}{|apply1N t_1 t_2|}
+& = &  \vminject \conBrack{\vin = \vout} \vmseq \semess{D}{f}{g}{t_1}
+       \vmseq \semess{D}{p}{q}{t_2}
+       \vmseq \semap{F}{|apply1N g q|}\vout  \\
+    & & & \vmhide \{f,g,p,q\} \hfill f,g,p,q \not\in \freevars{t_1,t_2} \\[1mm]
+\rulename{stype} &  \semap{E}{|:t|} & = & (\semess{D}{p}{q}{t} \vmseq \semap{F}{|apply1N q u|}\vout)
+  \vmhide \{p,q\} \hfill p,q \not\in \freevars{t} \\[1mm]
+
+\end{array}
+  \\ \\
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%       B, C, and F
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{array}{rcll}
+ \semap{B}{|t|} & : & \VmENV \\
+ \semap{B}{|t|} & = & \semap{E}{t} \vmhide \semapp{I}{|t|} \\[1mm]
+ \semapp{C}{|t|} & : & \VmENV \\
+ \semapp{C}{|t|} & = & \semap{E}{|t|} \vmhide \{\vin,\vout\}\\[1mm]
+ \semess{D}{p}{q}{|t|} & : & \VmENV \\
+ \semess{D}{p}{q}{|t|} & = & (\semap{E}{|t|} \vmseq \conBrack{ \vin = p, \vout = q }) \vmhide \{\vin,\vout\}\\[1mm]
+ \semap{F}{|apply1N f x|}r & : & \VmENV \\
+ \semap{F}{|apply1N f x|}r  & = &
+\vmunions \begin{array}[t]{@@{}l@@{\,}l}
+           \{ & \vmmapset(\; \lambda prs. \conBrack{ f = v, \; \fpr{x}{r} \in prs }, \ff \; ) \\
+           \vb & v \in \Val, \; \ff \in \Vm{\Val,\Val} \\
+           , & v = \Fun(\ff) \vee v = \Rel(\ff) \; \}
+           \end{array}
+\end{array} 
+\\
+
+\end{array}
+$$
+\caption{Semantics without explicit u,v}
 \label{fig:E-sls1}
 \end{figure}
 

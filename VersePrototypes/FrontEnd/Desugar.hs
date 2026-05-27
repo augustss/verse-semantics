@@ -5,7 +5,7 @@
 module FrontEnd.Desugar(
     desugar
     , DsM, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr, doIO_D
-    , addPrelude, sDesugarExpr, essToMini
+    , addPrelude, sDesugarExpr, essToMini, srcToEssential
     , miniToCore
   ) where
 
@@ -14,6 +14,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
+-- import FrontEnd.ENVDesugar( envDesugar )
 import Core.Expr  ( allPrimOps, primOpString )
 
 -- Epic libraries
@@ -72,6 +73,23 @@ desugar flgs add_verification e_parsed
        ; return e_ds
        }
 
+srcToEssential :: Flags -> SrcExpr -> IO SrcEssential
+srcToEssential flags e_parsed
+  = runD flags Fail $
+    do { _ <- traceDS "parsed" e_parsed
+
+       -- Prepend prelude from
+       --    verifyprelude.verse, mediumprelude.verse
+--       ; e_prel <- addPrelude e_parsed
+--       ; _ <- traceDS "Add prelude" e_prel
+
+       -- Desugar into Essential Verse by doing superficial desugaring
+       ; e_essential <- sDesugarExpr e_parsed
+
+       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
+
+       ; return e_essential }
+
 --------------------------------------------------------
 --
 --           The S-desugaring
@@ -106,10 +124,13 @@ sDesugarExpr = ds
 
     -- Application
     ds (ApplyD  e1 e2) = ApplyD <$> ds e1 <*> ds e2
-    ds (ApplyS  e1 e2) = applyS <$> ds e1 <*> ds e2
+    ds (ApplyS  e1 e2) = do e1' <- ds e1; e2' <- ds e2; applyS e1' e2'
       where
-        -- This replaces f(e) with check<succeeds>{f[e]}
-        applyS x y = eCheck effSucceeds (ApplyD x y)
+        -- This replaces f(a) with check<succeeds>{f[a]},
+        -- but pulls out expressions, so e1(e2) turns into f:=e1; a:=e2; check<succeed>{f[a])
+        applyS f a | not (isValue f) = do fi <- newIdent (getLoc f) "f"; fa <- applyS (Variable fi) a; return $ DefineE fi f `Seq` fa
+        applyS f a | not (isValue a) = do ai <- newIdent (getLoc a) "a"; fa <- applyS f (Variable ai); return $ DefineE ai a `Seq` fa
+        applyS f a = return $ eCheck effSucceeds (ApplyD f a)
 
     -- (e1 = e2)  --->  Unify
     ds (InfixOp e1 (Op "=")  e2)

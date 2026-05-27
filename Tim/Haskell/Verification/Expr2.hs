@@ -21,7 +21,7 @@ import Epic.List
 import Epic.Print
 import Epic.Uniplate
 import TRS.TRS
-import TRS.Traced(term)
+import TRS.Traced(getTerm)
 import Debug.Trace
 
 main :: IO ()
@@ -689,7 +689,7 @@ fpptr fn c = do
   hClose h
 
 norm :: Config -> Config
-norm = term . (!!0) . f . normalFormFuelTracePlain sys 10000
+norm = getTerm . (!!0) . f . normalFormFuelTracePlain sys 10000
   where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
 ------------------------------------------------------------------
