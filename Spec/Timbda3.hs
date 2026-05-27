@@ -93,7 +93,7 @@ data Expr env env' a b where
         -> Expr env2 env3 a b
         -> Expr env1 env3 a b
 
-eval :: Env env -> Expr env env' u v -> Rel (Env env',u,v)
+eval :: Env env1 -> Expr env1 env2 u v -> Rel (Env env2,u,v)
 eval env (Con k)     = [(env,k,k)]
 eval env (Var x)     = [(env,u,u)] where u=look x env
 eval env Nat         = [(env,h,h)] where h=[(n,n)|n<-[0..5]]
