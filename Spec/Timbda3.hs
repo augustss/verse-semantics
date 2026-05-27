@@ -43,7 +43,8 @@ data Expr env env' a b where
   Var   :: Ident env u -> Expr env env u u
   Nat   :: Expr env env (Nat:->Nat) (Nat:->Nat)
   Lam   :: Expr env env1 a b -> Expr env1 env2 c d -> Expr env env (b:->c) (a:->d)
-  (:>=) :: Expr env env1 i a -> Expr (env1,a) env2 u v -> Expr env env2 u v
+  Def   :: Expr env env1 u v -> Expr env (env1,v) u v
+  (:>:) :: Expr env1 env2 i j -> Expr env2 env3 u v -> Expr env1 env3 u v
   App   :: Eq a => Expr env env1 i1 (a:->b) -> Expr env1 env2 i2 a -> Expr env env2 b b
   Typ   :: Expr env env1 i (a:->b) -> Expr env env1 a b -- :e
   Fail  :: Expr env env1 a b
@@ -60,9 +61,12 @@ eval env (Lam e1 e2) = [ ( env
                        | h <- pi (eval env e1)
                                  (\(env1,_,_) -> eval env1 e2)
                        ]
-eval env (e1:>=e2)   = [ (env2,u,v)
-                       | (env1,_,a) <- eval env e1
-                       , (env2,u,v) <- eval (Add a env1) e2
+eval env (Def e)     = [ (Add v env1,u,v)
+                       | (env1,u,v) <- eval env e
+                       ]
+eval env (e1:>:e2)   = [ (env2,u,v)
+                       | (env1,_,_) <- eval env e1
+                       , (env2,u,v) <- eval env1 e2
                        ]
 eval env (App e1 e2) = [ (env2,b,b)
                        | (env1,_,f)  <- eval env e1
@@ -81,8 +85,8 @@ eval env (e1:|:e2)   = [ (env,a,b) | (_,a,b) <- eval env e1 ] ++
 ---------------------------------------------------------------------------
 -- examples
 
-ex1 = Lam (Typ Nat) (Typ Nat)                -- fun(:nat){:nat}
-ex2 = Lam (Typ Nat :>= Var This) (Var This)  -- fun(x:nat){x}
+ex1 = Lam (Typ Nat) (Typ Nat)          -- fun(:nat){:nat}
+ex2 = Lam (Def (Typ Nat)) (Var This)   -- fun(x:=(:nat)){x}
 
 ---------------------------------------------------------------------------
 
