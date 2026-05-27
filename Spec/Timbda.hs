@@ -42,7 +42,8 @@ data Expr env a where
   App   :: Eq a => Expr env (a:->b) -> Expr env a -> Expr env b
   Img   :: Expr env (a:->b) -> Expr env b -- :e
   Fail  :: Expr env a
-  (:|:) :: Expr env a -> Expr env a -> Expr env a  
+  (:|:) :: Expr env a -> Expr env a -> Expr env a
+  Fix   :: Eq a => Expr env (a:->a) -> Expr env a
   
 eval :: Env env -> Expr env a -> [a]
 eval env (Con k)     = [k]
@@ -53,6 +54,7 @@ eval env (App e1 e2) = [b | f <- eval env e1, (a,b) <- f, a' <- eval env e2, a==
 eval env (Img e)     = [b | f <- eval env e, (a,b) <- f]
 eval env Fail        = []
 eval env (e1 :|: e2) = eval env e1 ++ eval env e2
+eval env (Fix e)     = [ a | f <- eval env e, (a,a') <- f, a==a' ]
 
 ---------------------------------------------------------------------------
 -- examples
