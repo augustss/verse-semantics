@@ -37,15 +37,19 @@ solver s
   | otherwise     = solver s'
   where
     _msg          = pPrint (s_pos s')
+
     -- 1. check if the current solver state is unsatisfiable
     --    e.g. from [x = 1, x = 3] we get a contradication as 1 = 3
-    res           = check s
+    res = check s
+
     -- 2. generate new equalities from the definitions
-    --    e.g. from [x = add[a, 2], a = 1] generates a new equality `x=3` or `add[a, 2] = 3` (TODO: check)
-    facts         = generate s
+    --    e.g. from [x = add[a, 2], a = 1] generates a new equality
+    --         `x=3` or `add[a, 2] = 3` (TODO: check)
+    facts = generate s
+
     -- 3. update the solver state with the new equalities
     --    e.g. from the above we update the solver state with the new equality `x=3`
-    s'            = propagate s facts
+    s' = propagate s facts
 
 
 {- Note [Solver-Rules]
@@ -298,7 +302,7 @@ s |- op1[gv]
 
 {- Note [Checking negated equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consdider the assumption not(r=r).  Is that enough to garantee un-satisfiablity.
+Consider the assumption not(r=r).  Is that enough to garantee un-satisfiablity.
 Currently we say no. Consider T29Jul24-2:
 
     f( x:any ) := x=x
@@ -332,17 +336,32 @@ evalProps s = concatMap (evalProp s) (s_pos s)
 
 evalProp :: Solver -> FailableAssump -> [Prop]
 evalProp s (A_RelOp IsComp gv)
-  = [ MkProp IsComp v' | gvs <- s_tups s, isEqual s gv (GVArr gvs), v' <- gvs ]
+  = -- IsComp[ <a,b> ] =>  isComp[ a ], isComp[ b ]
+    [ MkProp IsComp v' | gvs <- s_tups s, isEqual s gv (GVArr gvs), v' <- gvs ]
 evalProp _ _
   = []
 
 generateEqs :: Solver -> [Equality]
-generateEqs s = filter (not . knownEq s) $
+generateEqs s = ppTrace "generateEqs" (vcat [ text "pos" <+> pPrint (s_pos s)
+                                            , text "neg" <+> pPrint (s_neg s)
+                                            , text "tups" <+> pPrint tup_eqs ]) $
+                filter (not . knownEq s) $
                 (pos ++         -- TODO: why concat pos? don't they get filtered out immediately?
+                 tup_eqs ++
                  evalDefs s ++
                  cseDefs s)
   where
     pos = [MkEqual (GVVar x) y | A_GVEq x y <- s_pos s]
+
+    -- May 26: I think we need this to propagate tuple equalities
+    tup_eqs   -- x=<a,b> x=<c,d>  =>   a=c,b=d
+      = [ MkEqual a c
+        | A_GVEq x (GVArr ab_s) <- s_pos s
+        , cd_s <- s_tups s
+        , isEqual s (GVVar x) (GVArr cd_s)
+        , length ab_s == length cd_s
+        , (a,c) <- ab_s `zip` cd_s
+        , a /= c ]
 
 knownEq :: Solver -> Equality -> Bool
 knownEq s (MkEqual v1 v2) = isEqual s v1 v2
@@ -351,7 +370,7 @@ knownEq s (MkEqual v1 v2) = isEqual s v1 v2
 evalDefs :: Solver -> [Equality]
 evalDefs s = {- ppTrace "TRACE: evalDefs" _msg -} res
   where
-    _msg    = pPrint (defs, res)
+    _msg   = pPrint (defs, res)
     res    = mapMaybe (evalDef s) defs
     defs   = s_def s
 
@@ -498,7 +517,8 @@ type Definition = (Ident, (PrimOp, GroundVal))
 
 mkSolver :: [Assump] -> Solver
 -- Initialise the solver, given a bunch of assumptions
-mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
+mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new
+                         , s_pos = pos, s_neg = neg, s_def = defs }
   where
     defs = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
     pos  = [asm           | A_Pos asm                  <- asms ] ++ defs_result_asms

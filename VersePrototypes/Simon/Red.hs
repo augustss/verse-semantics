@@ -115,7 +115,7 @@ data Exp
   | Crl Blk                -- {...}
   | Err String             -- Stuck/error expression
 
-  | Match MatchContext Ident Term   -- e ~> t
+  | Match MatchContext Ident Term   -- e ~>mc t
   | OfType Exp Effect Exp           -- e1 |><fx> e2
   | Verify (Set SkolIdent)
            [Assump]
@@ -125,7 +125,8 @@ data Exp
 data Blk = BlkX (Set Ident) Heap Exp
   deriving (Eq, Ord, Show)
 
-data MatchContext = MC { mc_blob :: Blob, mc_polarity :: Polarity }
+data MatchContext = MC { mc_blob :: Blob
+                       , mc_polarity :: Polarity }
   deriving(Eq,Ord,Show)
 
 data Blob
@@ -134,8 +135,8 @@ data Blob
   deriving (Eq, ord, Show)
 
 data Polarity
-  = Positive   -- u ~>+ t    -->   t[u]
-  | Negative   -- u ~>- t    -->   u |> t
+  = Positive   -- u ~>+ :t    -->   t[u]
+  | Negative   -- u ~>- :t    -->   u |> t
   deriving(Eq,Ord,Show)
 
 type Eqn = (Ident, Val)
@@ -544,7 +545,10 @@ data ReductionContext
 data VerificationContext
   = AssumeVerified        -- verify{} --> ()
   | NotVerifying          -- Outside verify{}
-  | Verifying [Assump]    -- Inside verify{}; in-scope assumptions for the rc_skols
+  | Verifying             -- Inside verify{}
+        [Assump]    -- In-scope assumptions for the rc_skols
+                    --   including from /outer/ verifys
+        (Set Ident) -- Existentials bound inside the innermost verify
   deriving (Show)
 
 addInScopeExis :: ReductionContext -> Set Ident -> ReductionContext
@@ -552,6 +556,9 @@ addInScopeExis cxt bndrs = cxt { rc_exis = rc_exis cxt `S.union` bndrs }
 
 addInScopeSkols :: ReductionContext -> Set Ident -> ReductionContext
 addInScopeSkols cxt bndrs = cxt { rc_skols = rc_skols cxt `S.union` bndrs }
+
+getInScope :: ReductionContext -> Set Ident
+getInScope (RC { rc_exis = exis, rc_skols = skols }) = exis `S.union` skols
 
 insideVerify :: ReductionContext -> Bool
 insideVerify (RC { rc_vcxt = Verifying {} }) = True
@@ -822,7 +829,8 @@ dom eqs = S.fromList (map fst eqs)
 --------------------------------------------------------------------------------
 
 reduceBlock :: ReductionContext -> Blk -> Reduction Blk
-reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns, rc_exis = exis }) blk
+reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns
+                    , rc_exis = all_exis, rc_vcxt = vcxt }) blk
   | not (S.null dead_vars)   -- First try garbage collection
   = (if traceReductions
      then trace $ render $ nest (4*rc_depth cxt) $
@@ -862,7 +870,11 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns, rc_exis = exis }) blk
     blk'@(Blk locals' leqns' expr') = freshenBlk cxt blk
     cxt' = cxt { rc_depth  = d + 1
                , rc_eqns  = eqns ++ leqns'
-               , rc_exis  = exis `S.union` locals' }
+               , rc_exis  = all_exis `S.union` locals'
+               , rc_vcxt  = case vcxt of
+                              Verifying as vexis -> Verifying as (vexis `S.union` locals')
+                              AssumeVerified     -> AssumeVerified
+                              NotVerifying       -> NotVerifying }
 
 -----------------------------
 reduceExp :: ReductionContext -> Blk -> Reduction Exp
@@ -935,7 +947,7 @@ reduceExp cxt parent@(Blk _ _ body)
             where
               x' = freshenId cxt x
               blk' | x==x'     = blk
-                   | otherwise = renameBlk [(x,x')] blk
+                   | otherwise = renameBlk (mkRenaming cxt x x') blk
 
         -- This rule isn't strictly necessary, but it allows indexing by
         -- a constant to proceed outside a failure context.
@@ -957,7 +969,8 @@ reduceExp cxt parent@(Blk _ _ body)
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
-        Match b x tm  -> reduceMatch cxt x tm b
+        -- x ~>mc tm
+        Match mc x tm  -> reduceMatch cxt x tm mc
 
         -- Choice and failure
         Fail -> Failure "Fail"
@@ -966,17 +979,15 @@ reduceExp cxt parent@(Blk _ _ body)
 
         Iter ic b e -> reduceIter cxt ic b e
 
-        OfType e1 _fx e2 | insideVerify cxt
-                         , skolValue skols e1
-                         , skolValue skols e2
+        OfType e1 _fx e2 | skolValue cxt e1
+                         , skolValue cxt e2
                          -> VerStep "Skolemise"
-                            [Res (FloatFlexi sk (e2 :@ e1))
-                                 (Var sk)]
+                            [Res (FloatFlexi z (e2 :@ e1)) (Var z)]
+
                          | not (insideVerify cxt)
                          -> Done "OfType" (e2 :@ e1)
                          where
-                           skols = rc_skols cxt
-                           sk = freshId cxt "sk"
+                           z = freshId cxt "z"
 
         Verify skols as e -> reduceVerify cxt skols as e
 
@@ -1119,9 +1130,17 @@ groundValue rs (Arr vs)                  = do { gvs <- mapM (groundValue rs) vs;
 groundValue rs (Tru v)                   = do { gv <- groundValue rs v; Just (GVTru gv) }
 groundValue _  _                         = Nothing
 
-skolValue :: Set SkolIdent -> Exp -> Bool
--- A value whose only free vars are skolems
-skolValue rs e = isVal e && S.null (freeVars e `S.difference` rs)
+skolValue :: ReductionContext -> Exp -> Bool
+-- Returns True if
+--   Inside verify{}
+--   Expression is a value
+--   No free var bound inside the verify
+skolValue cxt e
+  | Verifying _ local_exis <- rc_vcxt cxt
+  , isVal e
+  = S.null (freeVars e `S.intersection` local_exis)
+  | otherwise
+  = False
 
 ------------------------------------
 reducePrimOp ::PrimOp -> Exp -> Reduction Exp
@@ -1357,6 +1376,7 @@ reduceMatch cxt x tm mc
 
 
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> MatchContext -> Reduction Exp
+--  x ~>mc function(at)<fx>{bt}
 matchFun cxt f at fx bt mc
   = Done "MFun" $ fun_verify `mkSeq` the_lambda
   where
@@ -1364,8 +1384,8 @@ matchFun cxt f at fx bt mc
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
 
     the_lambda = Lam u $ Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
-                 (Var p :=: matchNested mc u at')        :>
-                 wrap_code :>
+                 (Var p :=: matchNested mc u at') :>
+                 wrap_code                        :>
                  (Match mc q (TBlock bt'))
 
     wrap_code = case mc_blob mc of
@@ -1376,10 +1396,12 @@ matchFun cxt f at fx bt mc
     -- or if we are already inside a verify
     fun_verify = case rc_vcxt cxt of
                     AssumeVerified -> Arr []
-                    Verifying {}   -> Arr []
+                    Verifying {}   -> Arr []   -- Is this right?  SPJ thinks so.
                     NotVerifying   -> the_verify
 
     mc_verify = mc { mc_blob = MNested }
+
+    -- verify(u){ u ~>(flip) at; check<fx>{ wrap; q~>(no-flip) bt } }
     the_verify = Verify (sing u) [] $
                  Blk tbs_at emptyHeap $
                  (matchFlip mc_verify u at') :>
@@ -1526,22 +1548,22 @@ reduceVerify cxt skols as blk
     wrap_ver (Res (FloatRigid sks asms) blk'') = Verify (sks `S.union` skols')
                                                         (asms ++ as')
                                                         blk''
-    wrap_ver (Res (FloatFlexi sk rhs) blk'')
+    wrap_ver (Res (FloatFlexi z rhs) blk'')
       | Blk exis hp body <- blk''
-      = Verify (sk `S.insert` skols') as' $
-        Blk exis hp ((Var sk :=: rhs) :> body)
+      = Verify skols' as' $
+        Blk (z `S.insert` exis) hp ((Var z :=: rhs) :> body)
 
-    (subst, skols') = freshenBndrs cxt skols
+    (subst, skols') = freshenBndrs (emptyRenaming cxt) skols
     as'  = renameAssumps subst as
     blk' = renameBlk subst blk
 
     all_as :: [Assump]  -- Includes outer assumptions
     all_as = case rc_vcxt cxt of
-               NotVerifying       -> as'
-               Verifying outer_as -> outer_as ++ as'
+               NotVerifying         -> as'
+               Verifying outer_as _ -> outer_as ++ as'
 
     cxt' = cxt { rc_skols = rc_skols cxt `S.union` skols'
-               , rc_vcxt  = Verifying all_as }
+               , rc_vcxt  = Verifying all_as S.empty }
 
 reduceVerifyApp :: ReductionContext -> Exp -> Exp -> Reduction Exp
 reduceVerifyApp cxt fun arg
@@ -1743,57 +1765,6 @@ freeVarsTerm (TMap kvs)    = S.unions $ map (freeVarsTerm . fst) kvs ++ map (fre
 freeVarsTermBlock :: Term -> Set Ident
 freeVarsTermBlock t = freeVarsTerm t `S.difference` termBndrs t
 
--- Do NOT use a Set, we use this to count occurrences.
-allVars :: Exp -> [Ident]
--- All variables, including binders
-allVars (Var i)     = [i]
-allVars (Lit {})    = []
-allVars (Prm {})    = []
-allVars (Lam i e)   = i : allVarsBlk e
-allVars (e1 :>  e2) = allVars e1 ++ allVars e2
-allVars (e1 :=: e2) = allVars e1 ++ allVars e2
-allVars (Match _ i e) = i : allVarsTerm e
-allVars (e1 :@  e2) = allVars e1 ++ allVars e2
-allVars (Arr es)    = concatMap allVars es
-allVars (b1 :|: b2) = allVarsBlk b1 ++ allVarsBlk b2
-allVars Fail        = []
-allVars (Dly e)     = allVars e
-allVars (Crl b)     = allVarsBlk b
-allVars (Iter _ b1 e2)   = allVarsBlk b1 ++ allVars e2
-allVars (Verify is _ b)  = S.toList is ++ allVarsBlk b
-allVars (OfType e1 _ e2) = allVars e1 ++ allVars e2
-allVars (Tru e)     = allVars e
-allVars (Map kvs)   = concatMap (allVars . fst) kvs ++ concatMap (allVars . snd) kvs
-
-allVarsBlk :: Blk -> [Ident]
-allVarsBlk (Blk is eqs e) = S.toList is ++ concatMap (allVars . snd) eqs ++ allVars e
-
-allVarsTerm :: Term -> [Ident]
--- All variables mentioned, either as occurrences or binders
-allVarsTerm (TVar i) = [i]
-allVarsTerm Und      = []
-allVarsTerm (TLit _) = []
-allVarsTerm (TPrm _) = []
-allVarsTerm (i := e) = i : allVarsTerm e
-allVarsTerm (e1 :>%  e2) = allVarsTerm e1 ++ allVarsTerm e2
-allVarsTerm (e1 `Where`  e2) = allVarsTerm e1 ++ allVarsTerm e2
-allVarsTerm (e1 :=:% e2) = allVarsTerm e1 ++ allVarsTerm e2
-allVarsTerm (e1 :@%  e2) = allVarsTerm e1 ++ allVarsTerm e2
-allVarsTerm (Fun e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
-allVarsTerm (Rng e) = allVarsTerm e
-allVarsTerm (TArr es) = concatMap allVarsTerm es
-allVarsTerm (b1 :|:% b2) = allVarsTerm b1 ++ allVarsTerm b2
-allVarsTerm TFail = []
-allVarsTerm (If t1 t2 t3) = allVarsTerm t1 ++ allVarsTerm t2 ++ allVarsTerm t3
-allVarsTerm (For t1 t2) = allVarsTerm t1 ++ allVarsTerm t2
-allVarsTerm (i :-> e) = i : allVarsTerm e
-allVarsTerm (TBlock t) = allVarsTerm t
-allVarsTerm (Check _ t) = allVarsTerm t
-allVarsTerm (Splice t)  = allVarsTerm t
-allVarsTerm (TOfType e1 _ e2) = allVarsTerm e1 ++ allVarsTerm e2
-allVarsTerm (TTru t)    = allVarsTerm t
-allVarsTerm (TMap kvs)  = concatMap (allVarsTerm . fst) kvs ++ concatMap (allVarsTerm . snd) kvs
-
 expSize :: Exp -> Int
 expSize (Err {})    = 1
 expSize (Var {})    = 1
@@ -1853,42 +1824,51 @@ termSize (TMap kvs)        = 1 + sum (map (termSize . fst) kvs) + sum (map (term
 --
 --------------------------------------------------------------------------------
 
-type Renaming = Subst Ident
+data Renaming = RN { rn_in_scope :: Set Ident
+                   , rn_subst    :: Subst Ident }
 
-rangeSubst :: Ord a => Subst a -> S.Set a
-rangeSubst = S.fromList . map snd
+nullRenaming :: Renaming -> Bool
+nullRenaming rn = nullSubst (rn_subst rn)
+
+emptyRenaming :: ReductionContext -> Renaming
+emptyRenaming cxt = RN { rn_in_scope = getInScope cxt, rn_subst = emptySubst }
+
+mkRenaming :: ReductionContext -> Ident -> Ident -> Renaming
+mkRenaming cxt x x' = RN { rn_in_scope = getInScope cxt
+                         , rn_subst    = [(x,x')] }
+
+
+lookupRn :: Ident -> Renaming -> Ident
+lookupRn i (RN { rn_subst = sub }) = case lookup i sub of
+                                       Just i' -> i'
+                                       Nothing -> i
 
 rename :: Renaming -> Exp -> Exp
-rename [] = id
-rename sub = ren
+rename sub expr
+  | nullRenaming sub = expr
+  | otherwise        = ren expr
   where
     ren :: Exp -> Exp
-    ren e@(Var i) | Just j <- lookup i sub = Var j
-                  | otherwise = e
-    ren e@(Err {}) = e
-    ren e@(Lit {}) = e
-    ren e@(Prm {}) = e
-    ren e@(Lam i b) | i `elem` map snd sub =
-      -- We need to rename i to something else
-      let i' = findFresh (`elem` (allVars e ++ map snd sub)) i   -- find an unused variable
-      in  ren (Lam i' (renameBlk [(i, i')] b))
-    ren (Lam i b) = let sub' = filter ((/= i) . fst) sub
-                    in Lam i (renameBlk sub' b)
-    ren (Var i :=: Var j) | Just j' <- lookup i sub, j == j' = Var j
-    ren (e1 :> e2) = ren e1 :> ren e2
-    ren (e1 :=: e2) = ren e1 :=: ren e2
-    ren (Match b i t) = Match b (fromMaybe i (lookup i sub)) (renT t)
-    ren (e1 :@ e2) = ren e1 :@ ren e2
-    ren (Arr es) = Arr (map ren es)
-    ren (b1 :|: b2) = renB b1 :|: renB b2
-    ren e@Fail = e
-    ren (Dly e) = Dly (ren e)
+    ren e@(Err {})    = e
+    ren e@(Lit {})    = e
+    ren e@(Prm {})    = e
+    ren e@Fail        = e
+    ren (Var i)       = Var (lookupRn i sub)
+    ren (Lam i b)     = let (sub', i') = freshenBndr S.empty sub i
+                        in Lam i' (renameBlk sub' b)
+    ren (e1 :> e2)    = ren e1 :> ren e2
+    ren (e1 :=: e2)   = ren e1 :=: ren e2
+    ren (Match b i t) = Match b (lookupRn i sub) (renT t)
+    ren (e1 :@ e2)    = ren e1 :@ ren e2
+    ren (Arr es)      = Arr (map ren es)
+    ren (b1 :|: b2)   = renB b1 :|: renB b2
+    ren (Dly e)       = Dly (ren e)
+    ren (Crl b)       = Crl (renB b)
     ren (Iter ic b1 e2) = Iter ic (renB b1) (ren e2)
-    ren (Crl b) = Crl (renB b)
     ren (OfType e1 fx e2) = OfType (ren e1) fx (ren e2)
-    ren (Verify is as b) = Verify is (renameAssumps sub' as) (renameBlk sub' b)
+    ren (Verify is as b) = Verify is' (renameAssumps sub' as) (renameBlk sub' b)
        where
-         sub' = [pr | pr@(x,_) <- sub, not (x `S.member` is)]
+         (sub', is') = freshenBndrs sub is
     ren (Tru e) = Tru (ren e)
     ren (Map kvs) = Map (map (ren *** ren) kvs)
 
@@ -1898,12 +1878,11 @@ rename sub = ren
 renameTerm :: Renaming -> Term -> Term
 renameTerm sub term = go term
   where
-    go e@(TLit {}) = e
-    go e@(TPrm {}) = e
-    go e@TFail     = e
-    go e@Und       = e
-    go e@(TVar i) | Just j <- lookup i sub = TVar j
-                  | otherwise              = e
+    go e@(TLit {})        = e
+    go e@(TPrm {})        = e
+    go e@TFail            = e
+    go e@Und              = e
+    go (TVar i)           = TVar (lookupRn i sub)
     go (e1 :>% e2)        = go e1 :>% go e2
     go (e1 :=:% e2)       = go e1 :=:% go e2
     go (e1 :@% e2)        = go e1 :@% go e2
@@ -1914,8 +1893,8 @@ renameTerm sub term = go term
     go (If t1 t2 t3)      = If (go t1) (go t2) (go t3)
     go (Fun t1 fx t2)     = Fun (go t1) fx (go t2)
     go (Rng t)            = Rng (go t)
-    go (i := t)           = fromMaybe i (lookup i sub) := go t
-    go (i :-> t)          = fromMaybe i (lookup i sub) :-> go t
+    go (i := t)           = lookupRn i sub := go t
+    go (i :-> t)          = lookupRn i sub :-> go t
     go (TBlock t)         = TBlock (go t)
     go (Check fx t)       = Check fx (go t)
     go (Splice t)         = Splice (go t)
@@ -1924,22 +1903,17 @@ renameTerm sub term = go term
     go (TMap kvs)         = TMap (map (go *** go) kvs)
 
 renameBlk :: Renaming -> Blk -> Blk
-renameBlk sub b@(Blk is _ e) | not (S.disjoint (rangeSubst sub) is)
-  -- If the range of the substitution clashesm we freshen the block.
-  -- Freshening uses a reduction context, so we fake one.  UGLY!
-  = renameBlk sub (freshenBlk fakeCxt b)
-  where fakeCxt = RC { rc_depth = undefined, rc_exis = freeVars e `S.union` is `S.union` rangeSubst sub
-                     , rc_eqns = undefined, rc_skols = S.empty, rc_vcxt = undefined }
 renameBlk sub (Blk is eqs e)
-  = Blk is (renameEqns sub' eqs) (rename sub' e)
+  = Blk is' (renameEqns sub' eqs) (rename sub' e)
   where
-    sub' = [pr | pr@(x,_) <- sub, not (x `S.member` is)]
+    (sub', is') = freshenBndrs sub is
 
 renameEqns :: Renaming -> [Eqn] -> [Eqn]
-renameEqns sub = map (second (rename sub))
+renameEqns sub eqns
+  = [ (lookupRn i sub, rename sub e) | (i,e) <- eqns ]
 
 renameAssumps :: Renaming -> [Assump] -> [Assump]
-renameAssumps subst as = map (C.substAssump subst) as
+renameAssumps subst as = map (C.substAssump (rn_subst subst)) as
 
 -- substVal is only used to substitute into the RHS of the heap.
 -- Lambdas may still contain variables in the heap, so we leave those alone.
@@ -1967,46 +1941,28 @@ gcVarsBlk xs (Blk is eqs expr) = Blk (is `S.difference` xs)
 
 freshenTerm :: ReductionContext -> Term -> (Set Ident, Term)
 freshenTerm cxt term
-  | null subst = (tbndrs, term)
-  | otherwise  = (tbndrs', renameTerm subst term)
+  | nullRenaming subst = (tbndrs, term)
+  | otherwise          = (tbndrs', renameTerm subst term)
   where
     tbndrs = termBndrs term
-    (subst, tbndrs') = freshenBndrs cxt tbndrs
+    (subst, tbndrs') = freshenBndrs (emptyRenaming cxt) tbndrs
 
 -- Use to freshen if/for/fun, because renamings from term1
 -- also need to apply to term2.
 freshenTerm2 :: ReductionContext -> Term -> Term -> (Set Ident, Term, Term)
 freshenTerm2 cxt term1 term2
-  | null subst = (tbndrs, term1, term2)
-  | otherwise  = (tbndrs', renameTerm subst term1, renameTerm subst term2)
+  | nullRenaming subst = (tbndrs, term1, term2)
+  | otherwise          = (tbndrs', renameTerm subst term1, renameTerm subst term2)
   where
     tbndrs = termBndrs term1
-    (subst, tbndrs') = freshenBndrs cxt tbndrs
+    (subst, tbndrs') = freshenBndrs (emptyRenaming cxt) tbndrs
 
 freshenBlk :: ReductionContext -> Blk -> Blk
 freshenBlk cxt blk@(Blk locals leqns expr)
-  | null subst = blk
-  | otherwise  = Blk locals' (map ren_eqn leqns) (rename subst expr)
+  | nullRenaming subst = blk
+  | otherwise          = Blk locals' (renameEqns subst leqns) (rename subst expr)
   where
-    (subst, locals') = freshenBndrs cxt locals
-    ren_eqn (i, e) = (fromMaybe i (lookup i subst), rename subst e)
-
-freshenBndrs :: ReductionContext -> Set Ident -> (Renaming, Set Ident)
-freshenBndrs (RC { rc_exis = exis, rc_skols = skols }) bndrs
-  = (subst, S.fromList bndrs_list')
-  where
-    (subst, bndrs_list') = L.mapAccumL do_one [] (S.toList bndrs)
-    in_scope = skols `S.union` exis
-
-    do_one :: Renaming -> Ident -> (Renaming,Ident)
-    do_one subst_acc lcl
-      | lcl `S.member` in_scope = (subst_acc', lcl')
-      | otherwise               = (subst_acc,  lcl)
-       where
-         lcl' = findFresh bad lcl
-         subst_acc' = (lcl,lcl'):subst_acc
-         bad x = x `S.member` in_scope || any (bad_rng x) subst_acc || x `S.member` bndrs
-         bad_rng x (_,y') = x==y'
+    (subst, locals') = freshenBndrs (emptyRenaming cxt) locals
 
 freshId :: ReductionContext -> String -> Ident
 freshId cxt s = case freshIds cxt [s] of
@@ -2046,6 +2002,28 @@ freshenId (RC { rc_exis = exis, rc_skols = skols }) x
   = findFresh bad x
   where
     bad n = n `S.member` exis || n `S.member` skols
+
+freshenBndr :: Set Ident -> Renaming -> Ident -> (Renaming, Ident)
+freshenBndr avoids (RN { rn_in_scope = in_scope, rn_subst = subst }) x
+  | need_fresh = (RN { rn_in_scope = S.insert x' in_scope
+                     , rn_subst    = insertSubst x x' subst }, x')
+  | otherwise  = (RN { rn_in_scope = S.insert x in_scope
+                     , rn_subst    = deleteSubst x subst  }, x)
+  where
+    need_fresh = x `S.member` in_scope
+    x' = findFresh bad x
+    bad i = i `S.member` avoids || i `S.member` in_scope
+
+freshenBndrs :: Renaming -> Set Ident -> (Renaming, Set Ident)
+freshenBndrs rn xs
+  = (rn', S.fromList xs')
+  where
+    (rn', xs') = L.mapAccumL (freshenBndr xs) rn (S.toList xs)
+    -- Treat the current xs as 'avoids'. Consider
+    --   in-scope:  {u0}
+    --   xs:        {u0, u1}
+    -- We must freshen u0; but we should rename it to 'u2',
+    -- not 'u1', to avoid gratuitously renaming u1.
 
 findFresh :: (Ident -> Bool) -> Ident -> Ident
 findFresh bad orig_id@(Name s)

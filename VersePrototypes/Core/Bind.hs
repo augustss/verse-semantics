@@ -16,7 +16,8 @@ module Core.Bind
   , bind, unsafeUnbind, alphaRenameBindWith
   , BindList, bindList, unsafeUnbindList, alphaRenameBindListWith
 
-  , Subst, SubstOps(..), substBind, substBinds
+  , Subst, nullSubst, emptySubst, lookupSubst, deleteSubst, insertSubst
+  , SubstOps(..), substBind, substBinds
   )
  where
 
@@ -195,6 +196,22 @@ unsafeUnbindList (Binder bnd) = let (x,bl)    = unsafeUnbind bnd
 --------------------------------------------------------------------------------
 
 type Subst a = [(Ident,a)]
+
+emptySubst :: Subst a
+emptySubst = []
+
+nullSubst :: Subst a -> Bool
+nullSubst [] = True
+nullSubst _  = False
+
+lookupSubst :: Ident -> Subst a -> Maybe a
+lookupSubst x s = lookup x s
+
+deleteSubst :: Ident -> Subst a -> Subst a
+deleteSubst x s = [ (y,e) | (y,e) <- s, y /= x ]
+
+insertSubst :: Ident -> a -> Subst a -> Subst a
+insertSubst x e s = (x,e):s
 
 data SubstOps s t
   = SubstOps { so_fresh :: [Ident] -> Ident   -- How to freshen
