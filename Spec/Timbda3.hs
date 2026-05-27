@@ -75,14 +75,14 @@ eval env (Typ e)     = [ (env1,a,b)
                        , (a,b)       <- f
                        ]
 eval env Fail        = []
---eval env (e1:|:e2)   = eval env e1 ++ eval env e2 -- does not type check!
 eval env (e1:|:e2)   = [ (env,a,b) | (_,a,b) <- eval env e1 ] ++
                        [ (env,a,b) | (_,a,b) <- eval env e2 ]
 
 ---------------------------------------------------------------------------
 -- examples
 
-ex1 = Lam (Typ Nat) (Typ Nat)
+ex1 = Lam (Typ Nat) (Typ Nat)                -- fun(:nat){:nat}
+ex2 = Lam (Typ Nat :>= Var This) (Var This)  -- fun(x:nat){x}
 
 ---------------------------------------------------------------------------
 
