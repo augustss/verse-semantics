@@ -342,9 +342,9 @@ evalProp _ _
   = []
 
 generateEqs :: Solver -> [Equality]
-generateEqs s = ppTrace "generateEqs" (vcat [ text "pos" <+> pPrint (s_pos s)
-                                            , text "neg" <+> pPrint (s_neg s)
-                                            , text "tups" <+> pPrint tup_eqs ]) $
+generateEqs s = -- ppTrace "generateEqs" (vcat [ text "pos" <+> pPrint (s_pos s)
+                --                            , text "neg" <+> pPrint (s_neg s)
+                --                            , text "tups" <+> pPrint tup_eqs ]) $
                 filter (not . knownEq s) $
                 (pos ++         -- TODO: why concat pos? don't they get filtered out immediately?
                  tup_eqs ++

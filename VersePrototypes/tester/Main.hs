@@ -502,7 +502,10 @@ showTestResult tflg test test_res
   | otherwise   -- TS_Normal
   = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
        ; when (logUnexpected tflg) $ logUnexpectedToFile test_res
-       ; unless (noError tflg) $
+       ; unless (noError tflg || isTimeoutTO outcome) $
+         -- Display more info unless
+         --    (a) timeout, which often gives vast output
+         --    (b) --no-error flag is set
          displayDoc (tr_details test_res) }
 
   where
@@ -661,9 +664,9 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
     --       see if e1 gets stuck
     -- It's quite different to, say, testeq(...){e1}{3}
     do { term <- mk_term tflags src1
-       ; let top_cxt = mkTopCxt vcxt term
-             vcxt | assumeVerified tflags = EV.AssumeVerified
-                  | otherwise             = EV.NotVerifying
+       ; let top_cxt = mkTopCxt mode term
+             mode | assumeVerified tflags = EV.ExecutionOnly
+                  | otherwise             = EV.GenerateVCs
 
              u1 = EV.freshId top_cxt "u1"
 
@@ -678,9 +681,9 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
   | otherwise
   = do { term1 <- mk_term tflags src1
        ; term2 <- mk_term tflags src2
-       ; let top_cxt = mkTopCxt vcxt (TBlock term1 :>% TBlock term2)
-             vcxt | assumeVerified tflags = EV.AssumeVerified
-                  | otherwise             = EV.NotVerifying
+       ; let top_cxt = mkTopCxt mode (TBlock term1 :>% TBlock term2)
+             mode | assumeVerified tflags = EV.ExecutionOnly
+                  | otherwise             = EV.GenerateVCs
 
              (u1,u2,r1,r2) = EV.freshId4 top_cxt ("u1","u2","r1","r2")
 
@@ -696,7 +699,7 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
 mkBlkToTest tflags (TestVerify _ src)
   = do { term <- mk_term tflags src
-       ; let top_cxt = mkTopCxt NotVerifying term
+       ; let top_cxt = mkTopCxt EV.GenerateVCs term
              -- When verifying, ignore the --assume-verified flag
              -- Start with NotVerifying at the top level
 
@@ -713,13 +716,14 @@ mkBlkToTest tflags (TestVerify _ src)
 
 mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
 
-mkTopCxt :: VerificationContext -> Term -> ReductionContext
-mkTopCxt vcxt term
+mkTopCxt :: ReductionMode -> Term -> ReductionContext
+mkTopCxt mode term
   = EV.RC { rc_depth  = 0
           , rc_eqns   = EV.thePrelude
           , rc_exis   = prel_bndrs
           , rc_skols  = top_skols
-          , rc_vcxt   = vcxt }
+          , rc_vcxt   = NotVerifying
+          , rc_mode   = mode }
   where
     top_skols = freeVarsTerm term `S.difference` prel_bndrs
 
@@ -1146,8 +1150,8 @@ testFlags
        ; traceVerbosity <- OA.option OA.auto $
                            OA.long "tr-verbosity" <>
                            OA.metavar "NUM" <>
-                           OA.value 2 <>
-                           OA.help "Verbosity of rewrite trace (0,1,2)"
+                           OA.value 3 <>
+                           OA.help "Verbosity of rewrite trace (0,1,2,3)"
 
        ; logUnexpected <- OA.switch $
                           OA.long "log-unexpected" <>

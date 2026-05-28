@@ -30,10 +30,11 @@ data TraceStep a
   = TS { ts_payload :: a          -- Payload just after the step
        , ts_str     :: String     -- Describes the step
        , ts_verb    :: Verbosity  -- Show this rule at verbosity rw_verb and above
+                                  -- Smaller => more likely to be shown
     }  deriving( Functor, Show )
 
 type Verbosity = Int
-  -- At verbosity level V, when displaying a trace,
+  -- When displaying a trace att verbosity level V (i.e. --traceVerbosity=V)
   -- show only rewrites that have verbosity <= V.
   -- Typical levels are 1,2,3
 
@@ -152,15 +153,16 @@ pPrintTrace show_verb (_ :<-- tr)
     go n (step : steps) = pp_item n step : go (n+1) steps
 
     pp_item n step@(TS { ts_payload = payload, ts_verb = step_verb })
-      | show_verb >= 2 - step_verb
-      = vcat [ text ""   -- NB: (text "") adds a blank line
-             , mkarrow n step
-             , indent (pPrint payload) ]
+      | step_verb <= show_verb
+      = vcat [ mkarrow n step
+             , indent (pPrint payload)
+             , text "" ]   -- NB: (text "") adds a blank line
       | otherwise
       = mkarrow n step
 
     mkarrow n (TS { ts_payload = payload, ts_str = rulename })
-      = text (show n ++ ":--" ++ rulename ++ "-->") <> braces (pPrintBrief payload)
+      = int n <> braces (pPrintBrief payload) <+>
+        text "--->" <+> text rulename
 
 filterTrace :: (String -> Bool) -> Traced t -> Traced t
 filterTrace p (x :<-- nys) = x :<-- go nys

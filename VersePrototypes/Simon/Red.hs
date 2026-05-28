@@ -9,7 +9,8 @@
 
 module Red( Blk(Blk, BlkX, BlkE), Exp(..), pattern Val, Term(..), Ident(..)
           , matchTop, topMatchContext
-          , ReductionContext(..), VerificationContext(..), MatchContext
+          , ReductionContext(..), ReductionMode(..)
+          , VerificationContext(..), MatchContext
           , thePrelude
           , run, runTraced, isVal
           , srcToTerm, addInScopeSkols, addInScopeExis, freshId, freshId4
@@ -41,6 +42,7 @@ import Data.Maybe
 import qualified Data.Set as S
 import Data.Set( Set )
 import Data.Char( isAlpha )
+import Data.List( isPrefixOf )
 
 import Debug.Trace
 import GHC.Stack
@@ -48,6 +50,31 @@ import GHC.Stack
 -- Show every reduction step
 traceReductions :: Bool
 traceReductions = False
+
+ruleVerbosity :: RuleName -> Verbosity
+-- Higher numbers => less likely to be displayed
+ruleVerbosity (RNM ns)
+  | null ns   = 0
+  | otherwise = lookupVerbosity (last ns)
+                -- last ns: Just look at the last component
+
+verbosityTable :: [(String,Verbosity)]
+verbosityTable = [ ("Norm1", 3)
+                 , ("Norm2", 3)
+                 , ("Norm3", 3)
+                 , ("Norm4", 3)
+                 , ("Norm5", 3)
+                 , ("GC",    2)
+                 , ("Seq",   2)  -- Another sort of GC
+                 ]
+
+lookupVerbosity :: String -> Verbosity
+lookupVerbosity s
+  = go verbosityTable
+  where
+    go [] = 0  -- Default to showing everything
+    go ((prefix,v):tbl) | prefix `isPrefixOf` s = v
+                        | otherwise             = go tbl
 
 --------------------------------------------------------------------------------
 --
@@ -539,12 +566,17 @@ data ReductionContext
 
        , rc_skols  :: Set Ident
        , rc_vcxt   :: VerificationContext
+       , rc_mode   :: ReductionMode
     }
     deriving (Show)
 
+data ReductionMode
+  = GenerateVCs     -- Generate verify{} conditions
+  | ExecutionOnly   -- Don't generate verify conditions
+  deriving( Show )
+
 data VerificationContext
-  = AssumeVerified        -- verify{} --> ()
-  | NotVerifying          -- Outside verify{}
+  = NotVerifying          -- Outside verify{}
   | Verifying             -- Inside verify{}
         [Assump]    -- In-scope assumptions for the rc_skols
                     --   including from /outer/ verifys
@@ -570,7 +602,17 @@ insideVerify _                               = False
 --
 --------------------------------------------------------------------------------
 
-type RuleName = String
+newtype RuleName = RNM [String]   -- The list gives a trace of nested invocations
+ deriving( Eq )
+
+instance Show RuleName where
+  show (RNM ns) = foldr1 (\s n -> s ++ "/" ++ n) ns
+
+mkRuleName :: String -> RuleName
+mkRuleName s = RNM [s]
+
+wrapRuleName :: String -> RuleName -> RuleName
+wrapRuleName s (RNM rn) = RNM (s : rn)
 
 data Reduction a
   = RedNone                                -- No redex found
@@ -601,10 +643,6 @@ reductionFired :: Reduction a -> Maybe (Reduction a)
 reductionFired RedNone = Nothing
 reductionFired r       = Just r
 
-orTry :: Reduction a -> Reduction a -> Reduction a
-orTry RedNone r2 = r2
-orTry r1      _  = r1
-
 mkExiFloat1 :: Ident -> BlkFloats
 -- Single existential only, no heap
 mkExiFloat1 x = FloatB (sing x) emptyHeap
@@ -613,17 +651,17 @@ mkExiFloat :: [Ident] -> BlkFloats
 -- Existentials only, no heap
 mkExiFloat xs = FloatB (S.fromList xs) emptyHeap
 
-pattern Failure :: String -> Reduction a
-pattern Failure s = RedStep s []
+mkFailure :: String -> Reduction a
+mkFailure s = RedStep (mkRuleName s) []
 
-pattern Done :: String -> a -> Reduction a
-pattern Done s e = RedStep s [Res NoFloats e]
+mkDone :: String -> a -> Reduction a
+mkDone s e = RedStep (mkRuleName s) [Res NoFloats e]
+
+mkWrapDone :: RuleName -> a -> Reduction a
+mkWrapDone rn e = RedStep rn [Res NoFloats e]
 
 mkStep :: String -> BlkFloats -> Exp -> Reduction Exp
-mkStep s flts e = RedStep s [Res flts e]
-
-mkStepC :: RuleName -> Exp -> Exp -> Reduction Exp
-mkStepC rn e1 e2 = RedStep rn [Res NoFloats e1, Res NoFloats e2]
+mkStep s flts e = RedStep (mkRuleName s) [Res flts e]
 
 instance Pretty a => Pretty (Reduction a) where
   pPrintPrec _ _ RedNone         = text "None"
@@ -739,12 +777,19 @@ runTraced fuel top_cxt top_blk
       = case reduceBlock top_cxt blk of
           RedNone -> Nothing
           RedStep rule_nm []
-             -> Just $ TS { ts_str = rule_nm, ts_payload = BlkE Fail, ts_verb = 1 }
+             -> Just $ mkTraceStep rule_nm (BlkE Fail)
           RedStep rule_nm [Res NoFloats blk']
              -> -- ppTrace ("------ runTraced: " ++ rule_nm ++ " ----------------")
                 --        (pPrint blk' $$ text "") $
-                Just $ TS { ts_str = rule_nm, ts_payload = blk', ts_verb = 1 }
+                Just $ mkTraceStep rule_nm blk'
           red -> error ("runTraced" ++ show red)
+
+
+mkTraceStep :: RuleName -> Blk -> TraceStep Blk
+mkTraceStep rule_nm payload
+  = TS { ts_str     = show rule_nm
+       , ts_payload = payload
+       , ts_verb    = ruleVerbosity rule_nm }
 
 run :: F.SrcEssential -> PExp
 -- An alternative to runTraced
@@ -787,7 +832,8 @@ initialBlk src
                  , rc_eqns   = emptyHeap
                  , rc_exis   = S.empty
                  , rc_skols  = top_skols
-                 , rc_vcxt   = NotVerifying }
+                 , rc_vcxt   = NotVerifying
+                 , rc_mode   = GenerateVCs }
 
 mergeStep :: HasCallStack => Blk -> Result BlkFloats Exp -> Result BlkFloats Blk
 mergeStep (Blk is eqs _) (Res NoFloats res_e)
@@ -836,12 +882,12 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns
      then trace $ render $ nest (4*rc_depth cxt) $
           text "reduceBlockGC" <+> (pPrint dead_vars $$ text "---" $$ pPrint blk')
      else id)
-    Done ("GC " ++ show dead_vars) (gcVarsBlk dead_vars blk')
+    mkDone ("GC" ++ showIds dead_vars) (gcVarsBlk dead_vars blk')
 
   | let res = case reduceExp cxt' blk' of
-                RedNone       -> RedNone
-                RedStep rn rs -> RedStep rn (map (mergeStep blk') rs)
-                VerStep rn rs -> VerStep rn (mapPayload (Blk locals' leqns') rs)
+          RedNone       -> RedNone
+          RedStep rn rs -> RedStep (wrapRuleName blk_nm rn) (map (mergeStep blk') rs)
+          VerStep rn rs -> VerStep (wrapRuleName blk_nm rn) (mapPayload (Blk locals' leqns') rs)
 
   = if traceReductions then
     trace (render $ nest (2*rc_depth cxt) $
@@ -855,6 +901,9 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns
     else res
 
   where
+    blk_nm :: String
+    blk_nm = "Blk" ++ showIds locals'
+
     dead_vars :: Set Ident  -- Subset of locals that are unused
     dead_vars =
         let graph = [ (eqn, i, S.toList $ freeVars e) | eqn@(i, e) <- leqns' ]
@@ -873,7 +922,6 @@ reduceBlock cxt@(RC { rc_depth = d, rc_eqns = eqns
                , rc_exis  = all_exis `S.union` locals'
                , rc_vcxt  = case vcxt of
                               Verifying as vexis -> Verifying as (vexis `S.union` locals')
-                              AssumeVerified     -> AssumeVerified
                               NotVerifying       -> NotVerifying }
 
 -----------------------------
@@ -895,7 +943,7 @@ reduceExp cxt parent@(Blk _ _ body)
 
         -- Substitution
         Var i | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
-              -> Done ("Subst " ++ show i) v
+              -> mkDone ("Subst " ++ show i) v
 
         -- Promotion
         -- We must try both ways round.  Here's a tricky case
@@ -919,25 +967,40 @@ reduceExp cxt parent@(Blk _ _ body)
 
 
         -- Unification
-        Val v1       :=: Val v2 | v1 == v2                 -> Done    "EqVal" v1
-        Lit k1       :=: Lit k2 | k1 /= k2                 -> Failure "EqValFail"
+        Val v1       :=: Val v2 | v1 == v2                 -> mkDone    "EqVal" v1
+        Lit k1       :=: Lit k2 | k1 /= k2                 -> mkFailure "EqValFail"
 
+<<<<<<< HEAD
         Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
         Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
         Tru e1       :=: Tru e2                            -> Done    "EqTru" $ Tru (e1 :=: e2)
         Val (Map kvs1) :=: Map kvs2 | map fst kvs1 == map fst kvs2 ->
           Done "EqMap" $ Map (zipWith (\ (k1, v1) (_, e2) -> (k1, v1 :=: e2)) kvs1 kvs2)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
+||||||| constructed merge base
+        Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
+        Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
+        Tru e1       :=: Tru e2                            -> Done    "EqTru" $ Tru (e1 :=: e2)
+        HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
+=======
+        Val (Arr vs) :=: Arr es | length vs == length es   -> mkDone    "EqTup" $ Arr (zipWith (:=:) vs es)
+        Arr ds       :=: Arr es | length ds /= length es   -> mkFailure "EqTupFail"
+        Tru e1       :=: Tru e2                            -> mkDone    "EqTru" $ Tru (e1 :=: e2)
+        HNF h1       :=: HNF h2 | root h1 /= root h2       -> mkFailure "EqFail"
+>>>>>>> Lots of usability improvements
 
         -- Sequencing
-        (e1 :> e2) :> e3 -> Done "Norm5" $ e1 :> (e2 :> e3)
-        Val{}  :>  e2    -> Done "Seq1" e2
+        (e1 :> e2) :> e3 -> mkDone "Norm5" $ e1 :> (e2 :> e3)
+        Val{}  :>  e2    -> mkDone "Seq1" e2
+
+        -- Walk under lambda, sometimes
+        Lam x e -> reduceLam cxt x e
 
         -- Unification, structural
-        Val v  :=: (e1 :>  e2) -> Done "Norm1" $ e1 :> (v :=: e2)
-        Val v  :=: (e1 :=: e2) -> Done "Norm2" $ (v :=: e1) :> (v :=: e2)
-        (e1 :> e2) :=: e3      -> Done "Norm3" $ e1 :> (e2 :=: e3)
-        (Val v :=: e1) :=: e2  -> Done "Norm4" $ (v :=: e1) :> (v :=: e2)
+        Val v  :=: (e1 :>  e2) -> mkDone "Norm1" $ e1 :> (v :=: e2)
+        Val v  :=: (e1 :=: e2) -> mkDone "Norm2" $ (v :=: e1) :> (v :=: e2)
+        (e1 :> e2) :=: e3      -> mkDone "Norm3" $ e1 :> (e2 :=: e3)
+        (Val v :=: e1) :=: e2  -> mkDone "Norm4" $ (v :=: e1) :> (v :=: e2)
 
         -- Beta (\x.blk)[a] -->  exists x. x = a; blk
         -- NOTE: it should be enough to match with eqs=[]
@@ -951,7 +1014,7 @@ reduceExp cxt parent@(Blk _ _ body)
 
         -- This rule isn't strictly necessary, but it allows indexing by
         -- a constant to proceed outside a failure context.
-        Arr es :@ IntE i | 0 <= i' && i' < length es -> Done "ITup-k" (es !! i')
+        Arr es :@ IntE i | 0 <= i' && i' < length es -> mkDone "ITup-k" (es !! i')
                                                      where i' = fromInteger i
         Val (Arr es) :@ ei -> mkStep "ITup" (mkExiFloat1 x) $
                               Var x :=: ei :>
@@ -960,7 +1023,15 @@ reduceExp cxt parent@(Blk _ _ body)
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
+<<<<<<< HEAD
         Tru e1 :@ e2 -> Done "ITru" $ e1 :=: e2
+||||||| constructed merge base
+--        Tru e :@ Val v -> Done "ITru" $ e :=: v; v
+        Tru e1 :@ e2 -> Done "ITru" $ e1 :=: e2
+=======
+--        Tru e :@ Val v -> mkDone "ITru" $ e :=: v; v
+        Tru e1 :@ e2 -> mkDone "ITru" $ e1 :=: e2
+>>>>>>> Lots of usability improvements
 
         Val (Map kvs) :@ ei -> mkStep "IMap" (mkExiFloat1 x) $
                                Var x :=: ei :>
@@ -973,19 +1044,21 @@ reduceExp cxt parent@(Blk _ _ body)
         Match mc x tm  -> reduceMatch cxt x tm mc
 
         -- Choice and failure
-        Fail -> Failure "Fail"
+        Fail -> mkFailure "Fail"
         b1 :|: b2 | rc_depth cxt > 0 && leftCF
-             -> mkStepC "B" (mkCrl b1) (mkCrl b2)     -- Found a choice, return it if inside a block
+             -> -- Found a choice, return it if inside a block
+                RedStep (mkRuleName "Choice")
+                [ Res NoFloats (mkCrl b1), Res NoFloats (mkCrl b2) ]
 
         Iter ic b e -> reduceIter cxt ic b e
 
         OfType e1 _fx e2 | skolValue cxt e1
                          , skolValue cxt e2
-                         -> VerStep "Skolemise"
+                         -> VerStep (mkRuleName "Skolemise")
                             [Res (FloatFlexi z (e2 :@ e1)) (Var z)]
 
                          | not (insideVerify cxt)
-                         -> Done "OfType" (e2 :@ e1)
+                         -> mkDone "OfType" (e2 :@ e1)
                          where
                            z = freshId cxt "z"
 
@@ -1038,6 +1111,23 @@ reduceExp cxt parent@(Blk _ _ body)
         mk3 e'         = error "findMap" (prettyShow e')
 
 ------------------------------------
+reduceLam :: ReductionContext -> Ident -> Blk -> Reduction Exp
+reduceLam _cxt _x _body = RedNone
+
+{-       NOT YET
+-- Look inside a lambda only when JustMatching
+reduceLam cxt x body
+  | JustMatching <- rc_mode cxt
+  = fmap (Lam x') (reduceBlock cxt' body')
+  | otherwise
+  = RedNone
+  where
+    (subst, x') = freshenBndr (emptyRenaming cxt)
+    body' = renameBlk subst body
+    cxt' = cxt { rc_skols = S.insert x' rc_skols cxt }
+-}
+
+------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
 
 -- Tuple values
@@ -1051,7 +1141,7 @@ reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
   -- Try rule (VPromoteT) to promote a skolem `x`, where `x` can
   -- be bound by /any/ enclosing `verify`
   | Just asm <- skolemEquality cxt' x xv
-  = VerStep ("VPromoteT"++left_or_right)
+  = VerStep (mkRuleName ("VPromoteT"++left_or_right))
     [ Res (FloatRigid as [A_Pos asm]) v'
     , Res (FloatRigid as [A_Neg asm]) Fail ]
   where
@@ -1097,7 +1187,7 @@ reduceVarVal cxt left_or_right parent x (Val v)
   =  mkStep ("Promote"++left_or_right) (Promote S.empty x v) v
 
   | Just asm <- skolemEquality cxt x v
-  = VerStep ("VPromote"++left_or_right)
+  = VerStep (mkRuleName ("VPromote"++left_or_right))
      [ Res (FloatRigid S.empty [A_Pos asm]) v
      , Res (FloatRigid S.empty [A_Neg asm]) Fail ]
 
@@ -1143,121 +1233,134 @@ skolValue cxt e
   = False
 
 ------------------------------------
+data PrimOpResult = P_None | P_Failure | P_Done Exp
+
+orTry :: PrimOpResult -> PrimOpResult -> PrimOpResult
+orTry P_None r2 = r2
+orTry r1     _  = r1
+
 reducePrimOp ::PrimOp -> Exp -> Reduction Exp
 reducePrimOp op e
-  = reduceArithOp op e `orTry`
-    reduceRelOp   op e `orTry`
-    reduceCheckOp op e `orTry`
-    reduceArrOp   op e `orTry`
-    reduceTruOp   op e `orTry`
-    reduceDotDot  op e
+  = case try_it of
+       P_Failure -> mkFailure rule_nm
+       P_Done e' -> mkDone rule_nm e'
+       P_None    -> reduceDotDot op e  -- Returns more than one result
+  where
+    rule_nm :: String
+    rule_nm = "Prim(" ++ show op ++ ")"
+
+    try_it = reduceArithOp op e `orTry`
+             reduceRelOp   op e `orTry`
+             reduceCheckOp op e `orTry`
+             reduceArrOp   op e `orTry`
+             reduceTruOp   op e
 
 -----------------
-reduceArithOp :: PrimOp -> Exp -> Reduction Exp
+reduceArithOp :: PrimOp -> Exp -> PrimOpResult
 -- Arithmetic ops get stuck on values outside the domain
-reduceArithOp Add (Arr [IntE i, IntE j]) = Done    "Prim+" $ IntE (i + j)
-reduceArithOp Add (Arr [Arr as, Arr bs]) = Done    "Prim+arr" $ Arr (as ++ bs)
-reduceArithOp Sub (Arr [IntE i, IntE j]) = Done    "Prim-" $ IntE (i - j)
-reduceArithOp Mul (Arr [IntE i, IntE j]) = Done    "Prim*" $ IntE (i * j)
+reduceArithOp Add (Arr [IntE i, IntE j]) = P_Done    $ IntE (i + j)
+reduceArithOp Add (Arr [Arr as, Arr bs]) = P_Done    $ Arr (as ++ bs)  -- Array append
+reduceArithOp Sub (Arr [IntE i, IntE j]) = P_Done    $ IntE (i - j)
+reduceArithOp Mul (Arr [IntE i, IntE j]) = P_Done    $ IntE (i * j)
 reduceArithOp Div (Arr [IntE i, IntE j])
-  | j /= 0                               = Done    "Prim/" $ IntE (i `div` j)
-  | otherwise                            = Failure "Prim/"
+  | j /= 0                               = P_Done    $ IntE (i `div` j)
+  | otherwise                            = P_Failure
 
-reduceArithOp Neg (IntE i)               = Done    "Prim-neg" $ IntE (- i)
-reduceArithOp Pls (IntE i)               = Done    "Prim-pls" $ IntE i
+reduceArithOp Neg (IntE i)               = P_Done $ IntE (- i)
+reduceArithOp Pls (IntE i)               = P_Done $ IntE i
 
-reduceArithOp IsInt v@(IntE {})          = Done    "Prim-isInt" v
-reduceArithOp IsInt HNF{}                = Failure "Prim-isInt"
+reduceArithOp IsInt v@(IntE {})          = P_Done v
+reduceArithOp IsInt HNF{}                = P_Failure
 
-reduceArithOp IsNat v@(IntE i) | i >= 0  = Done    "Prim-isNat" v
-reduceArithOp IsNat HNF{}                = Failure "Prim-isNat"
+reduceArithOp IsNat v@(IntE i) | i >= 0  = Done v
+reduceArithOp IsNat HNF{}                = Failure
 
---reduceArithOp IsStr v@(StrE {})          = Done    "Prim-isStr" v
---reduceArithOp IsStr HNF{}                = Failure "Prim-isStr"
+--reduceArithOp IsStr v@(StrE {})          = Done v
+--reduceArithOp IsStr HNF{}                = Failure
 
-reduceArithOp IsChar v@(CharE {})        = Done    "Prim-isChar" v
-reduceArithOp IsChar HNF{}               = Failure "Prim-isChar"
+reduceArithOp IsChar v@(CharE {})        = Done v
+reduceArithOp IsChar HNF{}               = Failure
 
-reduceArithOp IsComp (Comp v)            = Done    "Prim-isComp" v
-reduceArithOp IsComp (Con _)             = Failure "Prim-isComp"
+reduceArithOp IsComp (Comp v)            = P_Done v
+reduceArithOp IsComp (Con _)             = P_Failure
 
-reduceArithOp _ _ = RedNone
+reduceArithOp _ _ = P_None
 
 
 -----------------
-reduceRelOp :: PrimOp -> Exp -> Reduction Exp
-reduceRelOp Lt  (Arr [IntE i, IntE j]) | i<j       = Done    "Prim-Lt"  $ IntE i
-                                        | otherwise = Failure "Prim-Lt"
-reduceRelOp LEq (Arr [IntE i, IntE j]) | i<=j      = Done    "Prim-LEq" $ IntE i
-                                        | otherwise = Failure "Prim-LEt"
-reduceRelOp GEq (Arr [IntE i, IntE j]) | i>=j      = Done    "Prim-GEq" $ IntE i
-                                        | otherwise = Failure "Prim-GEq"
-reduceRelOp Gt  (Arr [IntE i, IntE j]) | i>j       = Done    "Prim-Gt"  $ IntE i
-                                        | otherwise = Failure "Prim-Gt"
-reduceRelOp NEq (Arr [IntE i, IntE j]) | i/=j      = Done    "Prim-NEq" $ IntE i
-                                        | otherwise = Failure "Prim-NEq"
-reduceRelOp _ _ = RedNone
+reduceRelOp :: PrimOp -> Exp -> PrimOpResult
+reduceRelOp Lt  (Arr [IntE i, IntE j]) | i<j       = P_Done $ IntE i
+                                       | otherwise = P_Failure
+reduceRelOp LEq (Arr [IntE i, IntE j]) | i<=j      = P_Done $ IntE i
+                                       | otherwise = P_Failure
+reduceRelOp GEq (Arr [IntE i, IntE j]) | i>=j      = P_Done $ IntE i
+                                       | otherwise = P_Failure
+reduceRelOp Gt  (Arr [IntE i, IntE j]) | i>j       = P_Done $ IntE i
+                                       | otherwise = P_Failure
+reduceRelOp NEq (Arr [IntE i, IntE j]) | i/=j      = P_Done $ IntE i
+                                       | otherwise = P_Failure
+reduceRelOp _ _ = P_None
 
 -----------------
 reduceDotDot :: PrimOp -> Exp -> Reduction Exp
 -- Return multiple results for the enumeration.  Get stuck outside the domain
-reduceDotDot DotDot (Arr [IntE l, IntE h]) = RedStep "Prim.." [Res NoFloats (IntE i) | i <- [l .. h]]
+reduceDotDot DotDot (Arr [IntE l, IntE h]) = RedStep (mkRuleName "Prim..")
+                                             [Res NoFloats (IntE i) | i <- [l .. h]]
 reduceDotDot _ _ = RedNone
 
 -----------------
-reduceCheckOp :: PrimOp -> Exp -> Reduction Exp
+reduceCheckOp :: PrimOp -> Exp -> PrimOpResult
 -- Check operations
-reduceCheckOp ChkFails    (Arr [])  = Failure "ChkFail"
-reduceCheckOp ChkSucceeds (Arr [e]) = Done "ChkSucc" e
-reduceCheckOp ChkDecides  (Arr [])  = Failure "ChkDec0"
-reduceCheckOp ChkDecides  (Arr [e]) = Done "ChkDec1" e
-reduceCheckOp _ _ = RedNone
+reduceCheckOp ChkFails    (Arr [])  = P_Failure
+reduceCheckOp ChkSucceeds (Arr [e]) = P_Done e
+reduceCheckOp ChkDecides  (Arr [])  = P_Failure
+reduceCheckOp ChkDecides  (Arr [e]) = P_Done e
+reduceCheckOp _ _ = P_None
 
 -----------------
-reduceArrOp :: PrimOp -> Exp -> Reduction Exp
+reduceArrOp :: PrimOp -> Exp -> PrimOpResult
 -- Array operations
-reduceArrOp ArrCons (Arr [x, Arr xs]) = Done "Prim-cons"   $ Arr (x:xs)
-reduceArrOp ArrLen (Arr xs)           = Done "Prim-length" $ IntE (toInteger (length xs))
+reduceArrOp ArrCons (Arr [x, Arr xs]) = P_Done $ Arr (x:xs)
+reduceArrOp ArrLen (Arr xs)           = P_Done $ IntE (toInteger (length xs))
 -- Could have some inverse of ArrLen by reducing
 --  (ArrLen :@ e) :=: IntE k  -->  e :=: Arr [_,_,...,_] k new existentials
 
-reduceArrOp IsArr v@(Arr _) = Done    "Prim-isArr" v
-reduceArrOp IsArr HNF{}     = Failure "Prim-isArr"
+reduceArrOp IsArr v@(Arr _) = P_Done v
+reduceArrOp IsArr HNF{}     = P_Failure
 
 reduceArrOp IsMap v@(Map _) = Done    "Prim-isMap" v
 reduceArrOp IsMap HNF{}     = Failure "Prim-isMap"
 
 reduceArrOp ArrMap (Arr [fun, Arr xs])
-  = Done "Prim-ArrMap" (Arr (map (fun :@) xs))
+  = P_Done (Arr (map (fun :@) xs))
 
 reduceArrOp ArrApp (Arr [a1,a2,res])
    | Arr as1 <- a1, Arr as2 <- a2
    =  -- <vs1>++<vs2> = res  -->  <vs1++vs2> = res
-     Done "Prim-ArrApp1" (Arr (as1++as2) :=: res)
+     P_Done (Arr (as1++as2) :=: res)
 
    | Arr [] <- a1
    = -- <>++a2 = res  -->  a2 = res
-     Done "Prim-ArrApp2" (a2 :=: res)
+     P_Done (a2 :=: res)
 
    | Arr [] <- a2
    = -- a1++<> = res  -->  a1 = res
-     Done "Prim-ArrApp3" (a1 :=: res)
+     P_Done (a1 :=: res)
 
    | Arr [] <- res
    = -- a1++a2 = <>  -->  a1=<>; a2=<>
-     Done "Prim-ArrApp4" $
-     (a1 :=: Arr []) :> (a2 :=: Arr [])
+     P_Done $ (a1 :=: Arr []) :> (a2 :=: Arr [])
 
    | Arr (v:vs) <- a1
    , Arr (r:rs) <- res
    = -- <v:vs>++a2 = <r:rs>  -->  v=r; <vs>++a2 = <rs>; res
-     Done "Prim-ArrApp5" $
+     P_Done $
      (v :=: r) :> (Prm ArrApp :@ (Arr [Arr vs, a2, Arr rs])) :> res
 
    | Arr (Snoc vs v) <- a2
    , Arr (Snoc rs r) <- res
    = -- a1++<vs,v> = <rs,r>  -->  a1++<vs> = <rs>; v=r; res
-     Done "Prim-ArrApp6" $
+     P_Done $
      (Prm ArrApp :@ (Arr [a1, Arr vs, Arr rs])) :> (v :=: r) :> res
 
    -- ToDo: worry about duplicating `res`!!
@@ -1267,19 +1370,19 @@ reduceArrOp MkMap (Map kvs)
   | let kvs' = L.sort kvs
   , Just ks <- mapM (getGnd . fst) kvs'
   , unique ks
-  = Done "Prim-MkMap$" $ Map kvs'
+  = P_Done "Prim-MkMap$" $ Map kvs'
 
-reduceArrOp _ _ = RedNone
+reduceArrOp _ _ = P_None
 
 -- Check that a sorted array has no duplicates
 unique :: Eq a => [a] -> Bool
 unique xs = and $ zipWith (/=) xs (drop 1 xs)
 
 -----------------
-reduceTruOp :: PrimOp -> Exp -> Reduction Exp
-reduceTruOp IsTru v@(Tru _) = Done    "Prim-isTru" v
-reduceTruOp IsTru HNF{}     = Failure "Prim-isTru"
-reduceTruOp _ _ = RedNone
+reduceTruOp :: PrimOp -> Exp -> PrimOpResult
+reduceTruOp IsTru v@(Tru _) = P_Done v
+reduceTruOp IsTru HNF{}     = P_Failure
+reduceTruOp _     _         = P_None
 
 ------------------------------------
 reduceMatch ::  ReductionContext -> Ident -> Term -> MatchContext -> Reduction Exp
@@ -1294,17 +1397,17 @@ reduceMatch cxt x tm mc
                    (tbndrs, t') = freshenTerm cxt t
 
         -- Matching
-        Und                  -> Done "MWild" $ Var x
-        TVar i               -> Done "MVar"  $ Var x :=: Var i
-        TLit k               -> Done "MLit"  $ Var x :=: Lit k
-        TPrm o               -> Done "MPrim" $ Var x :=: Prm o
-        TFail                -> Done "Mfail" $ Fail
+        Und                  -> mkDone "MWild" $ Var x
+        TVar i               -> mkDone "MVar"  $ Var x :=: Var i
+        TLit k               -> mkDone "MLit"  $ Var x :=: Lit k
+        TPrm o               -> mkDone "MPrim" $ Var x :=: Prm o
+        TFail                -> mkDone "Mfail" $ Fail
 
         (t1 :@% t2)          -> mkStep "MApp" (mkExiFloat [u1,u2]) $
                                      Var x :=: (matchTop mc u1 t1 :@ matchTop mc u2 t2)
                              where (u1,u2) = freshIds2 cxt "u"
-        (t1 :=:% t2)         -> Done "MUnif"    $ (Match mc x t1) :=: (Match mc x t2)
-        (t1 :|:% t2)         -> Done "MChoice"  $
+        (t1 :=:% t2)         -> mkDone "MUnif"    $ (Match mc x t1) :=: (Match mc x t2)
+        (t1 :|:% t2)         -> mkDone "MChoice"  $
                                 (BlkE $ Match mc x (TBlock t1)) :|:
                                 (BlkE $ Match mc x (TBlock t2))
 
@@ -1320,8 +1423,8 @@ reduceMatch cxt x tm mc
               where
                 u = freshId cxt "u"
 
-        (i := t)   -> Done ("MDef " ++ show i) $ Var i :=: Match mc x t
-        (i :-> t)  -> Done ("MArr " ++ show i) $ (Var i :=: Var x) :> matchNested mc i t
+        (i := t)   -> mkDone ("MDef " ++ show i) $ Var i :=: Match mc x t
+        (i :-> t)  -> mkDone ("MArr " ++ show i) $ (Var i :=: Var x) :> matchNested mc i t
 
         -- Tuples and functions
         TArr ts      -> matchTup cxt x ts mc
@@ -1330,7 +1433,7 @@ reduceMatch cxt x tm mc
         TTru t       -> mkStep "MTru" (mkExiFloat [u]) $ (Var x :=: Tru (Var u)) :> Tru (Match mc u t)
                        where u = freshId cxt "u"
 
-        If t0 t1 t2  -> Done "MIf" $
+        If t0 t1 t2  -> mkDone "MIf" $
                         Iter IF (Blk (sing u `S.union` tbs0) emptyHeap $
                                  matchTop mc u t0' :>
                                  Dly (Match mc x (TBlock t1')))
@@ -1342,7 +1445,7 @@ reduceMatch cxt x tm mc
         -- Recognize for(i:=e){i}, they are encodings of 'all', and we know that they are
         -- choice free.
         For (i := t0) (TVar i') | i == i' ->
-                        Done "MAll" $ Var x :=:
+                        mkDone "MAll" $ Var x :=:
                          (Iter ALL (Blk (sing u `S.union` tbs0) emptyHeap $
                                         matchTop mc u t0')
                                    (Arr []))
@@ -1365,7 +1468,7 @@ reduceMatch cxt x tm mc
                             (OfType (matchTop mc u1 t1) fx (matchTop mc u2 t2))
                       where (u1,u2) = freshIds2 cxt "u"
 
-        Check fx t -> Done ("MCheck " ++ show fx) $
+        Check fx t -> mkDone ("MCheck " ++ show fx) $
                       Var x :=: mkCheck fx (Blk (sing u) emptyHeap $
                                             matchTop mc u (TBlock t))
                    where
@@ -1378,7 +1481,7 @@ reduceMatch cxt x tm mc
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> MatchContext -> Reduction Exp
 --  x ~>mc function(at)<fx>{bt}
 matchFun cxt f at fx bt mc
-  = Done "MFun" $ fun_verify `mkSeq` the_lambda
+  = mkDone "MFun" $ fun_verify `mkSeq` the_lambda
   where
     (tbs_at, at', bt') = freshenTerm2 cxt at bt
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
@@ -1392,12 +1495,10 @@ matchFun cxt f at fx bt mc
                   MNested -> Var q :=: (Var f :@ Var p)
                   MTop    -> IntE 99999
 
-    -- Don't generate a verify{} if AssumeVerified,
-    -- or if we are already inside a verify
-    fun_verify = case rc_vcxt cxt of
-                    AssumeVerified -> Arr []
-                    Verifying {}   -> Arr []   -- Is this right?  SPJ thinks so.
-                    NotVerifying   -> the_verify
+    -- Generate a verify{} if we are in GenerateVCs mode
+    fun_verify = case rc_mode cxt of
+                    GenerateVCs -> the_verify
+                    _           -> Arr []
 
     mc_verify = mc { mc_blob = MNested }
 
@@ -1412,7 +1513,7 @@ matchFun cxt f at fx bt mc
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
 reduceIter _ IF (Blk is eqs (Dly e)) _
-  = Done "IIf" $ mkCrl (Blk is eqs e)
+  = mkDone "IIf" $ mkCrl (Blk is eqs e)
 
 reduceIter cxt FOR blk@(Blk _ _ Val{}) e2
   = mkStep "IFor" (mkExiFloat1 x)
@@ -1421,14 +1522,17 @@ reduceIter cxt FOR blk@(Blk _ _ Val{}) e2
     x = freshId cxt "x"
 
 reduceIter _ ALL blk@(Blk _ _ Val{}) e2
-  = Done "IAll" $ mkCons (mkCrl blk) e2
+  = mkDone "IAll" $ mkCons (mkCrl blk) e2
 
 reduceIter cxt ic b1 e2
   = case reduceBlock cxt b1 of  -- Find a redex in B context
       RedNone       -> RedNone
-      VerStep rn rs -> VerStep rn (mapPayload (\b -> Iter ic b e2) rs)
-           -- For a VerStep, just wrap the unchanged Iter around the outside
-      RedStep rn rs -> Done (show ic ++ " " ++ rn) (foldr iter e2 rs)
+
+      VerStep rn rs -> -- For a VerStep, just wrap the unchanged Iter around the outside
+                       VerStep (wrapRuleName (show ic) rn)
+                               (mapPayload (\b -> Iter ic b e2) rs)
+
+      RedStep rn rs -> mkWrapDone (wrapRuleName (show ic) rn) (foldr iter e2 rs)
            -- Note that we update the RuleName to give
            -- more info about where the reduction happened
   where
@@ -1527,19 +1631,19 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 reduceVerify :: ReductionContext -> Set Ident -> [Assump] -> Blk -> Reduction Exp
 reduceVerify cxt skols as blk
   | Blk _ _ (Val {}) <- blk
-  = Done "VVal" (Arr [])
+  = mkDone "VVal" (Arr [])
     -- We can finish up with
     --  verify(r){ exists x {x <- r}. \y. x }
     -- and this is a successful verification
 
   | Just reason <- unsat all_as
-  = Done ("VUnsat " ++ render (pPrint reason)) (Arr [])
+  = mkDone ("VUnsat " ++ render (pPrint reason)) (Arr [])
 
   | otherwise
   = case reduceBlock cxt' blk' of
       RedNone       -> RedNone
-      RedStep rn rs -> Done ("VR-" ++ rn) (mkSeqs (map wrap_blk rs))
-      VerStep rn rs -> Done ("VV-" ++ rn) (mkSeqs (map wrap_ver rs))
+      RedStep rn rs -> mkWrapDone (wrapRuleName "VR" rn) (mkSeqs (map wrap_blk rs))
+      VerStep rn rs -> mkWrapDone (wrapRuleName "VV" rn) (mkSeqs (map wrap_ver rs))
   where
     wrap_blk (Res NoFloats blk'') = Verify skols' as' blk''
     wrap_blk r = error ("reduceVerify " ++ render (pPrint r))
@@ -1563,7 +1667,9 @@ reduceVerify cxt skols as blk
                Verifying outer_as _ -> outer_as ++ as'
 
     cxt' = cxt { rc_skols = rc_skols cxt `S.union` skols'
-               , rc_vcxt  = Verifying all_as S.empty }
+               , rc_vcxt  = Verifying all_as S.empty
+               , rc_mode  = ExecutionOnly }
+                 -- ExecutionOnly: inside verify{}, just execute
 
 reduceVerifyApp :: ReductionContext -> Exp -> Exp -> Reduction Exp
 reduceVerifyApp cxt fun arg
@@ -1579,7 +1685,7 @@ reduceVerifyApp cxt fun arg
   , f `S.member` rc_skols cxt
   , Just gv <- groundValue (rc_skols cxt) arg
   , let ap_op = A_PrimOp r AO_Apply (GVArr [GVVar f, gv])
-  = VerStep "VSkolApply" $
+  = VerStep (mkRuleName "VSkolApply") $
     [ Res (FloatRigid (sing r) [ap_op]) (Var r)  ]
 
   | otherwise
@@ -1601,7 +1707,7 @@ reduceVerifyOpGV _cxt op _gv
 reduceVerifyOpGV cxt op gv
   | Just arg_op <- isUnaryOp op
   , let check_args = mkArgCheck arg_op gv
-  = VerStep ("VUnaryOp-" ++ show op) $
+  = VerStep (mkRuleName ("VUnaryOp" ++ show op)) $
     [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
     then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
@@ -1617,8 +1723,9 @@ reduceVerifyOpGV cxt op gv
 -- Binary operators where the argument is a skolem
 reduceVerifyOpGV cxt op (GVVar r)
   | Just {} <- isBinOp op
-  = VerStep "VBinOp-Arr" [ Res (FloatRigid rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
-                         , Res (FloatRigid rs [A_Neg eq_asm]) Fail ]
+  = VerStep (mkRuleName "VBinOp-Arr")
+    [ Res (FloatRigid rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
+    , Res (FloatRigid rs [A_Neg eq_asm]) Fail ]
   where
     rs = S.fromList [r1,r2]
     (r1,r2) = freshIds2 cxt "r"
@@ -1629,7 +1736,7 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
   | Just (arg1_op, arg2_op) <- isBinOp op
   , let check_args :: [FailableAssump]
         check_args = mkArgCheck arg1_op gv1 ++ mkArgCheck arg2_op gv2
-  = VerStep ("VBinOp-" ++ show op) $
+  = VerStep (mkRuleName ("VBinOp-" ++ show op)) $
     [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
     then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
@@ -1651,6 +1758,9 @@ mkArgCheck op    gv = [A_RelOp op gv]
 --             Free and bound variables
 --
 --------------------------------------------------------------------------------
+
+showIds :: Set Ident -> String
+showIds xs = show (S.toList xs)
 
 -- Top level binders
 termBndrs :: Term -> Set Ident

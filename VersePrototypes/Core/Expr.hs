@@ -481,7 +481,10 @@ data PrimOp
    -- Checking
  | ChkFails | ChkSucceeds | ChkDecides
  deriving
-   ( Eq, Ord, Bounded, Enum, Show, Data )
+   ( Eq, Ord, Bounded, Enum, Data )
+
+instance Show PrimOp where
+  show op = primOpString op
 
 allPrimOps :: [PrimOp]
 allPrimOps = [minBound .. maxBound]
