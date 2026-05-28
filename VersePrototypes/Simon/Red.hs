@@ -159,7 +159,7 @@ data MatchContext = MC { mc_blob :: Blob
 data Blob
   = MTop     -- Written 'o' in the rules.  Do not generate f[x] in (MFun)
   | MNested  -- Written 'bullet' in the rules. Do generate f[x] in (MFun)
-  deriving (Eq, ord, Show)
+  deriving (Eq, Ord, Show)
 
 data Polarity
   = Positive   -- u ~>+ :t    -->   t[u]
@@ -970,24 +970,12 @@ reduceExp cxt parent@(Blk _ _ body)
         Val v1       :=: Val v2 | v1 == v2                 -> mkDone    "EqVal" v1
         Lit k1       :=: Lit k2 | k1 /= k2                 -> mkFailure "EqValFail"
 
-<<<<<<< HEAD
-        Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
-        Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
-        Tru e1       :=: Tru e2                            -> Done    "EqTru" $ Tru (e1 :=: e2)
-        Val (Map kvs1) :=: Map kvs2 | map fst kvs1 == map fst kvs2 ->
-          Done "EqMap" $ Map (zipWith (\ (k1, v1) (_, e2) -> (k1, v1 :=: e2)) kvs1 kvs2)
-        HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
-||||||| constructed merge base
-        Val (Arr vs) :=: Arr es | length vs == length es   -> Done    "EqTup" $ Arr (zipWith (:=:) vs es)
-        Arr ds       :=: Arr es | length ds /= length es   -> Failure "EqTupFail"
-        Tru e1       :=: Tru e2                            -> Done    "EqTru" $ Tru (e1 :=: e2)
-        HNF h1       :=: HNF h2 | root h1 /= root h2       -> Failure "EqFail"
-=======
         Val (Arr vs) :=: Arr es | length vs == length es   -> mkDone    "EqTup" $ Arr (zipWith (:=:) vs es)
         Arr ds       :=: Arr es | length ds /= length es   -> mkFailure "EqTupFail"
         Tru e1       :=: Tru e2                            -> mkDone    "EqTru" $ Tru (e1 :=: e2)
+        Val (Map kvs1) :=: Map kvs2 | map fst kvs1 == map fst kvs2 ->
+          mkDone "EqMap" $ Map (zipWith (\ (k1, v1) (_, e2) -> (k1, v1 :=: e2)) kvs1 kvs2)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> mkFailure "EqFail"
->>>>>>> Lots of usability improvements
 
         -- Sequencing
         (e1 :> e2) :> e3 -> mkDone "Norm5" $ e1 :> (e2 :> e3)
@@ -1023,15 +1011,7 @@ reduceExp cxt parent@(Blk _ _ body)
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
-<<<<<<< HEAD
-        Tru e1 :@ e2 -> Done "ITru" $ e1 :=: e2
-||||||| constructed merge base
---        Tru e :@ Val v -> Done "ITru" $ e :=: v; v
-        Tru e1 :@ e2 -> Done "ITru" $ e1 :=: e2
-=======
---        Tru e :@ Val v -> mkDone "ITru" $ e :=: v; v
         Tru e1 :@ e2 -> mkDone "ITru" $ e1 :=: e2
->>>>>>> Lots of usability improvements
 
         Val (Map kvs) :@ ei -> mkStep "IMap" (mkExiFloat1 x) $
                                Var x :=: ei :>
@@ -1272,14 +1252,14 @@ reduceArithOp Pls (IntE i)               = P_Done $ IntE i
 reduceArithOp IsInt v@(IntE {})          = P_Done v
 reduceArithOp IsInt HNF{}                = P_Failure
 
-reduceArithOp IsNat v@(IntE i) | i >= 0  = Done v
-reduceArithOp IsNat HNF{}                = Failure
+reduceArithOp IsNat v@(IntE i) | i >= 0  = P_Done  v
+reduceArithOp IsNat HNF{}                = P_Failure
 
---reduceArithOp IsStr v@(StrE {})          = Done v
---reduceArithOp IsStr HNF{}                = Failure
+--reduceArithOp IsStr v@(StrE {})          = P_Done v
+--reduceArithOp IsStr HNF{}                = P_Failure
 
-reduceArithOp IsChar v@(CharE {})        = Done v
-reduceArithOp IsChar HNF{}               = Failure
+reduceArithOp IsChar v@(CharE {})        = P_Done v
+reduceArithOp IsChar HNF{}               = P_Failure
 
 reduceArithOp IsComp (Comp v)            = P_Done v
 reduceArithOp IsComp (Con _)             = P_Failure
@@ -1328,8 +1308,8 @@ reduceArrOp ArrLen (Arr xs)           = P_Done $ IntE (toInteger (length xs))
 reduceArrOp IsArr v@(Arr _) = P_Done v
 reduceArrOp IsArr HNF{}     = P_Failure
 
-reduceArrOp IsMap v@(Map _) = Done    "Prim-isMap" v
-reduceArrOp IsMap HNF{}     = Failure "Prim-isMap"
+reduceArrOp IsMap v@(Map _) = P_Done v
+reduceArrOp IsMap HNF{}     = P_Failure
 
 reduceArrOp ArrMap (Arr [fun, Arr xs])
   = P_Done (Arr (map (fun :@) xs))
@@ -1370,7 +1350,7 @@ reduceArrOp MkMap (Map kvs)
   | let kvs' = L.sort kvs
   , Just ks <- mapM (getGnd . fst) kvs'
   , unique ks
-  = P_Done "Prim-MkMap$" $ Map kvs'
+  = P_Done $ Map kvs'
 
 reduceArrOp _ _ = P_None
 
@@ -1590,12 +1570,14 @@ segments p (t : ts)
                 (ts1,ts2) = span (isNothing . p) ts
 
 ---------------------------------------
-matchMap :: ReductionContext -> Ident -> [(Term, Term)] -> Blob -> Reduction Exp
-matchMap cxt x akvs _blob =
-  mkStep "MMap" (mkExiFloat $ fresh_ys ++ fresh_zs) $
-    Var x :=: Map (zipWith3 (\ z y (k, e) -> (z ~~> k, y ~~> e)) fresh_zs fresh_ys akvs)
-  where fresh_ys = freshIds cxt ["y" | _ <- akvs]
-        fresh_zs = freshIds cxt ["z" | _ <- akvs]
+matchMap :: ReductionContext -> Ident -> [(Term, Term)] -> MatchContext -> Reduction Exp
+matchMap cxt x akvs mc
+  = mkStep "MMap" (mkExiFloat $ fresh_ys ++ fresh_zs) $
+    Var x :=: Map (zipWith3 do_one fresh_zs fresh_ys akvs)
+  where
+    fresh_ys = freshIds cxt ["y" | _ <- akvs]
+    fresh_zs = freshIds cxt ["z" | _ <- akvs]
+    do_one z y (k, e) = (matchTop mc z k, matchTop mc y e)
 
 ---------------------------------------
 choiceFree :: Exp -> Bool
