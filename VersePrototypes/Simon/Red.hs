@@ -13,7 +13,8 @@ module Red( Blk(Blk, BlkX, BlkE), Exp(..), pattern Val, Term(..), Ident(..)
           , VerificationContext(..), MatchContext
           , thePrelude
           , run, runTraced, isVal
-          , srcToTerm, addInScopeSkols, addInScopeExis, freshId, freshId4
+          , srcToTerm, addInScopeSkols, addInScopeExis
+          , freshId, freshIds2, freshId4
           , freeVarsTerm
           , emptyHeap, mkCheck, mkAll
   ) where
@@ -64,6 +65,7 @@ verbosityTable = [ ("Norm1", 3)
                  , ("Norm3", 3)
                  , ("Norm4", 3)
                  , ("Norm5", 3)
+                 , ("FloatB", 3)  -- Floats the bindings of {b}
                  , ("GC",    2)
                  , ("Seq",   2)  -- Another sort of GC
                  ]
@@ -177,8 +179,11 @@ emptyHeap = []
 --    (A)  dom(eqs)    `subset`   X
 --    (B)  occfvs(eqs) `disjoint` dom(eqs)
 
-matchTop :: MatchContext -> Ident -> Term -> Exp
-matchTop mc i t = Match (mc { mc_blob = MTop }) i t
+matchTop :: ReductionContext -> MatchContext -> Term -> Exp
+matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
+                    Match (mc { mc_blob = MTop }) u t
+  where
+    u = freshId cxt "u"
 
 matchNested :: MatchContext -> Ident -> Term -> Exp
 matchNested mc i t = Match (mc { mc_blob = MNested }) i t
@@ -632,7 +637,7 @@ data BlkFloats   -- Floating out the the innermost enclosing Blk
 data VerFloats   -- Floating out to the innermost enclosing Verify
   = NoVerFloats
   | FloatRigid (Set SkolIdent) [Assump]
-  | FloatFlexi SkolIdent Exp
+  | FloatFlexi SkolIdent Ident Exp
   deriving (Eq, Show)
 
 
@@ -682,8 +687,9 @@ instance Pretty BlkFloats where
 
 instance Pretty VerFloats where
   pPrintPrec _ _ NoVerFloats     = empty
-  pPrintPrec _ _ (FloatRigid s asm) = text "FR" <> braces (pPrint s <+> pPrint asm)
-  pPrintPrec _ _ (FloatFlexi i e)   = text "FF" <> braces (pPrint i <+> equals <+> pPrint e)
+  pPrintPrec _ _ (FloatRigid s asm)  = text "FR" <> braces (pPrint s <+> pPrint asm)
+  pPrintPrec _ _ (FloatFlexi sk i e) = text "FF" <> braces (pPrint sk <> char ';' <+>
+                                                            pPrint i <+> equals <+> pPrint e)
 
 instance (Pretty flts, Pretty a) => Pretty (Result flts a) where
   pPrintPrec _ _ (Res flts res)
@@ -819,14 +825,12 @@ initialBlk :: F.SrcEssential -> (ReductionContext, Blk)
 initialBlk src
   = (top_cxt, top_blk)
   where
-    u = freshId top_cxt "u"
     term = srcToTerm src
     top_skols   = freeVarsTerm term `S.difference` init_locals
     init_locals = termBndrs term `S.union` S.fromList (map fst thePrelude)
 
-    top_blk = Blk (sing u `S.union` init_locals)
-                  thePrelude
-                  (matchTop topMatchContext u term)
+    top_blk = Blk init_locals thePrelude
+                  (matchTop top_cxt topMatchContext term)
 
     top_cxt = RC { rc_depth  = 0
                  , rc_eqns   = emptyHeap
@@ -1020,9 +1024,6 @@ reduceExp cxt parent@(Blk _ _ body)
             x = freshId cxt "x"
             alt e1 e2 = BlkE e1 :|: BlkE e2
 
-        -- x ~>mc tm
-        Match mc x tm  -> reduceMatch cxt x tm mc
-
         -- Choice and failure
         Fail -> mkFailure "Fail"
         b1 :|: b2 | rc_depth cxt > 0 && leftCF
@@ -1030,19 +1031,11 @@ reduceExp cxt parent@(Blk _ _ body)
                 RedStep (mkRuleName "Choice")
                 [ Res NoFloats (mkCrl b1), Res NoFloats (mkCrl b2) ]
 
-        Iter ic b e -> reduceIter cxt ic b e
-
-        OfType e1 _fx e2 | skolValue cxt e1
-                         , skolValue cxt e2
-                         -> VerStep (mkRuleName "Skolemise")
-                            [Res (FloatFlexi z (e2 :@ e1)) (Var z)]
-
-                         | not (insideVerify cxt)
-                         -> mkDone "OfType" (e2 :@ e1)
-                         where
-                           z = freshId cxt "z"
-
+        Iter ic b e       -> reduceIter cxt ic b e
+        Match mc x tm     -> reduceMatch cxt x tm mc
         Verify skols as e -> reduceVerify cxt skols as e
+        OfType e1 fx e2   | Just redn <- reductionFired $ reduceOfType cxt e1 fx e2
+                          -> redn
 
         -- Catch-all cases for context C; just walk downwards
         -- Aka "look at sub-expressions"
@@ -1383,76 +1376,80 @@ reduceMatch cxt x tm mc
         TPrm o               -> mkDone "MPrim" $ Var x :=: Prm o
         TFail                -> mkDone "Mfail" $ Fail
 
-        (t1 :@% t2)          -> mkStep "MApp" (mkExiFloat [u1,u2]) $
-                                     Var x :=: (matchTop mc u1 t1 :@ matchTop mc u2 t2)
-                             where (u1,u2) = freshIds2 cxt "u"
+        (t1 :@% t2)          -> mkDone "MApp" $
+                                Var x :=: (matchTop cxt mc t1 :@ matchTop cxt mc t2)
         (t1 :=:% t2)         -> mkDone "MUnif"    $ (Match mc x t1) :=: (Match mc x t2)
         (t1 :|:% t2)         -> mkDone "MChoice"  $
                                 (BlkE $ Match mc x (TBlock t1)) :|:
                                 (BlkE $ Match mc x (TBlock t2))
 
-        (t1 :>% t2)          -> mkStep "MSemi"  (mkExiFloat1 u) $ matchTop mc u t1 :> Match mc x t2
-                              where u = freshId cxt "u"
-        (t1 `Where` t2)      -> mkStep "MWhere" (mkExiFloat [u,w]) $
-                                (Var w :=: Match mc x t1) :> matchTop mc u t2 :> Var w
-                             where (u,w) = freshIds2 cxt "u"
+        (t1 :>% t2)          -> mkDone "MSemi" $
+                                matchTop cxt mc t1 :> Match mc x t2
+        (t1 `Where` t2)      -> mkStep "MWhere" (mkExiFloat1 w) $
+                                (Var w :=: Match mc x t1) :> matchTop cxt mc t2 :> Var w
+                             where
+                                w = freshId cxt "w"
 
         Rng t -> case mc_polarity mc of
-                    Positive -> mkStep "MColon+" (mkExiFloat1 u) $ matchTop mc u t :@ Var x
-                    Negative -> mkStep "Mcolon=" (mkExiFloat1 u) $ OfType (Var x) Succeeds (matchTop mc u t)
-              where
-                u = freshId cxt "u"
+                    Positive -> mkDone "MColon+" $ matchTop cxt mc t :@ Var x
+                    Negative -> mkDone "Mcolon-" $ OfType (Var x) Succeeds (matchTop cxt mc t)
 
         (i := t)   -> mkDone ("MDef " ++ show i) $ Var i :=: Match mc x t
         (i :-> t)  -> mkDone ("MArr " ++ show i) $ (Var i :=: Var x) :> matchNested mc i t
 
         -- Tuples and functions
-        TArr ts      -> matchTup cxt x ts mc
         TMap kvs     -> matchMap cxt x kvs mc
         Fun at fx bt -> matchFun cxt x at fx bt mc
-        TTru t       -> mkStep "MTru" (mkExiFloat [u]) $ (Var x :=: Tru (Var u)) :> Tru (Match mc u t)
-                       where u = freshId cxt "u"
+        TArr ts      -> matchTup cxt x ts mc
+        TTru t       -> mkStep "MTru" (mkExiFloat1 u) $
+                        (Var x :=: Tru (Var u)) :> Tru (Match mc u t)
+                       where
+                        u = freshId cxt "u"
 
         If t0 t1 t2  -> mkDone "MIf" $
-                        Iter IF (Blk (sing u `S.union` tbs0) emptyHeap $
-                                 matchTop mc u t0' :>
+                        Iter IF (Blk tbs0 emptyHeap $
+                                 matchTop cxt' mc t0' :>
                                  Dly (Match mc x (TBlock t1')))
                                 (Match mc x (TBlock t2))
                       where
                         (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
-                        u = freshId (cxt `addInScopeExis` tbs0) "u"
+                        cxt' = cxt `addInScopeExis` tbs0
 
-        -- Recognize for(i:=e){i}, they are encodings of 'all', and we know that they are
-        -- choice free.
+        -- Recognize for(i:=e){i}.  It is how 'all' is encoded,
+        -- and we know that it is choice free.
+        -- ToDo: isn't it enough to have for{e}{i} where is a variable
+        --   x ~> for(t0){v}   -->    iter(ALL){exists tbs(t0); D(t0); D(v)}{<>}
+{-
         For (i := t0) (TVar i') | i == i' ->
-                        mkDone "MAll" $ Var x :=:
-                         (Iter ALL (Blk (sing u `S.union` tbs0) emptyHeap $
-                                        matchTop mc u t0')
-                                   (Arr []))
+                        mkDone "MAll" $
+                        Var x :=: mkAll (Blk tbs0 emptyHeap $ matchTop cxt' mc t0')
                       where
                         (tbs0, t0') = freshenTerm cxt t0
-                        u = freshId (cxt `addInScopeExis` tbs0) "u"
+                        cxt' = cxt `addInScopeExis` tbs0
+-}
+        For t0 t1 | TVar i <- t1'
+                  -> mkDone "MAll" $
+                     Var x :=: mkAll (Blk tbs0 emptyHeap $ matchTop cxt' mc t0' :> Var i)
 
-        For t0 t1    -> mkStep "MFor" (mkExiFloat1 y) $
+                  | otherwise
+
+                  -> mkStep "MFor" (mkExiFloat1 y) $
                         (Arr [Var x, Var y] :=:
-                         Iter FOR (Blk (sing u `S.union` tbs0) emptyHeap $
-                                   (matchTop mc u t0') :>
+                         Iter FOR (Blk tbs0 emptyHeap $
+                                   (matchTop cxt' mc t0') :>
                                    (Lam w (BlkE $ Match mc w (TBlock t1'))))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
-                      where
-                        (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
-                        (y,u,w) = freshId3 (cxt `addInScopeExis` tbs0) ("y","u","w")
+                  where
+                    (tbs0, t0', t1') = freshenTerm2 cxt t0 t1
+                    cxt' = cxt `addInScopeExis` tbs0
+                    (y,w) = freshId2 (cxt `addInScopeExis` tbs0) ("y","w")
 
-        TOfType t1 fx t2 -> mkStep ("TOfType " ++ show fx) (mkExiFloat [u1,u2]) $
-                            (OfType (matchTop mc u1 t1) fx (matchTop mc u2 t2))
-                      where (u1,u2) = freshIds2 cxt "u"
+        TOfType t1 fx t2 -> mkDone ("TOfType " ++ show fx) $
+                            (OfType (matchTop cxt mc t1) fx (matchTop cxt mc t2))
 
         Check fx t -> mkDone ("MCheck " ++ show fx) $
-                      Var x :=: mkCheck fx (Blk (sing u) emptyHeap $
-                                            matchTop mc u (TBlock t))
-                   where
-                      u  = freshId cxt "u"
+                      Var x :=: mkCheck fx (BlkE $ matchTop cxt mc (TBlock t))
 
         Splice t -> reduceMatch cxt x t mc
                     -- See (AMP1) in Note [Desugaring ampersand]
@@ -1572,12 +1569,9 @@ segments p (t : ts)
 ---------------------------------------
 matchMap :: ReductionContext -> Ident -> [(Term, Term)] -> MatchContext -> Reduction Exp
 matchMap cxt x akvs mc
-  = mkStep "MMap" (mkExiFloat $ fresh_ys ++ fresh_zs) $
-    Var x :=: Map (zipWith3 do_one fresh_zs fresh_ys akvs)
+  = mkDone "MMap" $ Var x :=: Map (map do_one akvs)
   where
-    fresh_ys = freshIds cxt ["y" | _ <- akvs]
-    fresh_zs = freshIds cxt ["z" | _ <- akvs]
-    do_one z y (k, e) = (matchTop mc z k, matchTop mc y e)
+    do_one (k, e) = (matchTop cxt mc k, matchTop cxt mc e)
 
 ---------------------------------------
 choiceFree :: Exp -> Bool
@@ -1610,6 +1604,26 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 --
 --------------------------------------------------------------------------------
 
+reduceOfType :: ReductionContext -> Exp -> Effect -> Exp -> Reduction Exp
+reduceOfType cxt e1 fx e2
+  | skolValue cxt e2  -- Only true inside verify{}
+  , [sk, z] <- freshIds cxt ["sk", "z"]
+  = let succ_res = Res (FloatFlexi sk z (e2 :@ Var sk)) (Var z)
+        fail_res = Res NoVerFloats                      Fail
+    in
+    VerStep (mkRuleName "Skolemise") $
+    case fx of
+       Succeeds -> [succ_res]
+       Fails    -> [fail_res]
+       Decides  -> [succ_res, fail_res]
+       Iterates -> error "reduceOfType:Iterates"  -- Not sure, probably impossible
+
+   | not (insideVerify cxt)
+   = mkDone "OfType" (e2 :@ e1)
+
+   | otherwise
+   = RedNone
+
 reduceVerify :: ReductionContext -> Set Ident -> [Assump] -> Blk -> Reduction Exp
 reduceVerify cxt skols as blk
   | Blk _ _ (Val {}) <- blk
@@ -1634,9 +1648,9 @@ reduceVerify cxt skols as blk
     wrap_ver (Res (FloatRigid sks asms) blk'') = Verify (sks `S.union` skols')
                                                         (asms ++ as')
                                                         blk''
-    wrap_ver (Res (FloatFlexi z rhs) blk'')
+    wrap_ver (Res (FloatFlexi sk z rhs) blk'')
       | Blk exis hp body <- blk''
-      = Verify skols' as' $
+      = Verify (sk `S.insert` skols') as' $
         Blk (z `S.insert` exis) hp ((Var z :=: rhs) :> body)
 
     (subst, skols') = freshenBndrs (emptyRenaming cxt) skols
@@ -1683,7 +1697,7 @@ isClosedGV (GVTru gv)  = isClosedGV gv
 
 reduceVerifyOpGV :: ReductionContext -> PrimOp -> GroundVal -> Reduction Exp
 reduceVerifyOpGV _cxt op _gv
-  | primOpIsCheck op    -- ??
+  | primOpIsCheck op --  Do not skolemise ChkSucceeds etc
   =  RedNone
 
 reduceVerifyOpGV cxt op gv
@@ -1730,6 +1744,8 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
     bin_op = A_PrimOp r (AO_Prim op) gv
     stuck :: Exp
     stuck = Err (render (pPrint op <> brackets (pPrint gv)))
+
+reduceVerifyOpGV _cxt op gv = error ("reduceVerifyOp " ++ render (pPrint op $$ pPrint gv))
 
 mkArgCheck :: PrimOp -> GroundVal -> [FailableAssump]
 mkArgCheck IsAny _  = []
@@ -1824,7 +1840,7 @@ freeVarsBlk (Blk is eqs e) = (S.unions (map (freeVars . snd) eqs) `S.union` free
                               `S.difference` is
 
 freeVarsTerm :: Term -> Set Ident
--- All variables mentioned, either as occurrences or binders,
+-- All variables mentioned, either as occurrences /or binders/,
 -- freeVarsTermBlock handles the block scope
 freeVarsTerm (TVar i) = sing i
 freeVarsTerm Und      = S.empty
@@ -2064,7 +2080,13 @@ freshId cxt s = case freshIds cxt [s] of
 freshIds2 :: ReductionContext -> String -> (Ident,Ident)
 freshIds2 cxt s = case freshIds cxt (repeat s) of
                    (n1:n2:_) -> (n1,n2)
-                   []        -> error "freshId2"
+                   []        -> error "freshIds2"
+
+freshId2 :: ReductionContext -> (String,String) -> (Ident,Ident)
+freshId2 cxt (s1,s2)
+  = case freshIds cxt [s1,s2] of
+      [n1,n2] -> (n1,n2)
+      _       -> error "freshId2"
 
 freshId3 :: ReductionContext -> (String,String,String) -> (Ident,Ident,Ident)
 freshId3 cxt (s1,s2,s3)

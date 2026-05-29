@@ -586,7 +586,7 @@ primOpIsTypeTest IsArr  = True
 primOpIsTypeTest IsMap  = True
 primOpIsTypeTest IsFun  = True
 primOpIsTypeTest IsType = True
-primOpIsTypeTest IsComp = False  -- Not really a type test
+primOpIsTypeTest IsComp = True  -- ? Not really a type test
 primOpIsTypeTest _      = False
 
 isUnaryOp :: PrimOp -> Maybe PrimOp

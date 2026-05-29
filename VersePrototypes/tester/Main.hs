@@ -256,7 +256,8 @@ isTimeoutTO (TO_Abnormal NormExpired _) = True
 isTimeoutTO _                           = False
 
 skipTestRes :: TestRes -> Bool
-skipTestRes (TestRes { tr_info = info }) = testStatus info == TS_Skip
+skipTestRes (TestRes { tr_outcome = TO_Skipped }) = True
+skipTestRes _                                     = False
 
 expectedTestRes :: TestRes -> Maybe NSteps
 -- Expected results, not skipped; account for broken-ness
@@ -468,7 +469,7 @@ runTest tflg test
 -- evaluating/verifying; each of which can throw an exception.
 run_test :: HasCallStack => TestFlags -> Test -> IO TestRes
 run_test tflg test
-  | TS_Skip <- testStatus test_info
+  | skipThisTest tflg test
   = do { when (noisy tflg) (putStrLn $ testHerald test ++ "Skipped")
        ; pure (TestRes { tr_info = test_info, tr_outcome = TO_Skipped
                        , tr_details = empty }) }
@@ -485,6 +486,16 @@ run_test tflg test
        ; return test_res }
   where
     test_info = testInfo test
+
+skipThisTest :: TestFlags -> Test -> Bool
+skipThisTest tflags test
+  | TS_Skip <- testStatus (testInfo test)
+  = True   -- Test is marked 'skip' in the test file
+  | assumeVerified tflags
+  , TestVerify {} <- test
+  = True   -- Skip verification tests when --assume-verified is set
+  | otherwise
+  = False
 
 showTestResult :: TestFlags -> Test -> TestRes -> IO ()
 showTestResult tflg test test_res
@@ -668,13 +679,11 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
              mode | assumeVerified tflags = EV.ExecutionOnly
                   | otherwise             = EV.GenerateVCs
 
-             u1 = EV.freshId top_cxt "u1"
-
              main_exp = -- EV.Verify S.empty [] $ BlkE $
                         EV.mkCheck Core.Succeeds  $
-                        BlkE $ EV.matchTop topMatchContext u1 (TBlock term)
+                        BlkE $ EV.matchTop top_cxt topMatchContext (TBlock term)
 
-             main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
+             main_blk = EV.BlkE main_exp
 
        ; return (top_cxt, main_blk, True) }
 
@@ -685,15 +694,16 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
              mode | assumeVerified tflags = EV.ExecutionOnly
                   | otherwise             = EV.GenerateVCs
 
-             (u1,u2,r1,r2) = EV.freshId4 top_cxt ("u1","u2","r1","r2")
+             (r1,r2) = EV.freshIds2 top_cxt "r"
+             rs :: S.Set EV.Ident = S.fromList [r1,r2]
 
-             main_exp = EV.Var r1 EV.:=: mk_all u1 term1 EV.:>
-                        EV.Var r2 EV.:=: mk_all u2 term2 EV.:>
+             main_exp = EV.Var r1 EV.:=: mk_all top_cxt term1 EV.:>
+                        EV.Var r2 EV.:=: mk_all top_cxt term2 EV.:>
                         -- EV.Verify S.empty [] $ BlkE $
                         EV.mkCheck Core.Succeeds  $
                         BlkE $ EV.Var r1 EV.:=: EV.Var r2
 
-             main_blk = EV.Blk (S.fromList [u1,u2,r1,r2]) EV.emptyHeap main_exp
+             main_blk = EV.Blk rs EV.emptyHeap main_exp
 
        ; return (top_cxt, main_blk, False) }
 
@@ -703,13 +713,12 @@ mkBlkToTest tflags (TestVerify _ src)
              -- When verifying, ignore the --assume-verified flag
              -- Start with NotVerifying at the top level
 
-             u1 = EV.freshId top_cxt "u1"
+             -- check<succeeds>{ exists u. u ~> tm }
+             check_exp = EV.mkCheck Core.Succeeds $ EV.BlkE $
+                         EV.matchTop top_cxt topMatchContext (TBlock term)
 
-             main_exp = EV.Verify S.empty [] $ BlkE $
-                        EV.mkCheck Core.Succeeds  $
-                        BlkE $ EV.matchTop topMatchContext u1 (TBlock term)
-
-             main_blk = EV.Blk (S.singleton u1) EV.emptyHeap main_exp
+             main_blk = EV.Blk S.empty EV.emptyHeap $
+                        check_exp :> EV.Arr []
 
        ; return (top_cxt, main_blk, False) }
 
@@ -737,10 +746,10 @@ mk_term tflags src = do { ess <- srcToEssential fe_flags src
   where
     fe_flags = testFlagsToFEFlags tflags
 
-mk_all :: EV.Ident -> EV.Term -> EV.Exp
+mk_all :: ReductionContext -> EV.Term -> EV.Exp
 -- Returns all{exists u.  u ~~> block{t} }
-mk_all u t = EV.mkAll (EV.Blk (S.singleton u) EV.emptyHeap
-                              (EV.matchTop topMatchContext u (EV.TBlock t)))
+mk_all cxt t = EV.mkAll $ EV.BlkE $
+               EV.matchTop cxt topMatchContext $ EV.TBlock t
 
 ----------------------------------------------------------------
 --
