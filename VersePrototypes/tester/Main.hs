@@ -642,8 +642,8 @@ doEvalEssentialTest tflags test
              v1          = Core.Traced.getTerm tr1
              n_steps     = length (Core.Traced.getTrace tr1)
              reached_val = case v1 of
-                             BlkE (EV.Val {}) -> True
-                             _                -> False
+                             EV.Blk _is _hp (EV.Val {}) -> True
+                             _                          -> False
 
              outcome :: TestOutcome
              outcome = case res1 of
@@ -679,11 +679,11 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
              mode | assumeVerified tflags = EV.ExecutionOnly
                   | otherwise             = EV.GenerateVCs
 
-             main_exp = -- EV.Verify S.empty [] $ BlkE $
+             main_exp = -- EV.Verify S.empty [] $ mkBlkE $
                         EV.mkCheck Core.Succeeds  $
-                        BlkE $ EV.matchTop top_cxt topMatchContext (TBlock term)
+                        mkBlkE $ EV.matchTop top_cxt topMatchContext (TBlock term)
 
-             main_blk = EV.BlkE main_exp
+             main_blk = EV.mkBlkE main_exp
 
        ; return (top_cxt, main_blk, True) }
 
@@ -699,9 +699,9 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
              main_exp = EV.Var r1 EV.:=: mk_all top_cxt term1 EV.:>
                         EV.Var r2 EV.:=: mk_all top_cxt term2 EV.:>
-                        -- EV.Verify S.empty [] $ BlkE $
+                        -- EV.Verify S.empty [] $ mkBlkE $
                         EV.mkCheck Core.Succeeds  $
-                        BlkE $ EV.Var r1 EV.:=: EV.Var r2
+                        mkBlkE $ EV.Var r1 EV.:=: EV.Var r2
 
              main_blk = EV.Blk rs EV.emptyHeap main_exp
 
@@ -714,7 +714,7 @@ mkBlkToTest tflags (TestVerify _ src)
              -- Start with NotVerifying at the top level
 
              -- check<succeeds>{ exists u. u ~> tm }
-             check_exp = EV.mkCheck Core.Succeeds $ EV.BlkE $
+             check_exp = EV.mkCheck Core.Succeeds $ EV.mkBlkE $
                          EV.matchTop top_cxt topMatchContext (TBlock term)
 
              main_blk = EV.Blk S.empty EV.emptyHeap $
@@ -748,7 +748,7 @@ mk_term tflags src = do { ess <- srcToEssential fe_flags src
 
 mk_all :: ReductionContext -> EV.Term -> EV.Exp
 -- Returns all{exists u.  u ~~> block{t} }
-mk_all cxt t = EV.mkAll $ EV.BlkE $
+mk_all cxt t = EV.mkAll $ EV.mkBlkE $
                EV.matchTop cxt topMatchContext $ EV.TBlock t
 
 ----------------------------------------------------------------

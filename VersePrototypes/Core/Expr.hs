@@ -38,7 +38,7 @@ module Core.Expr
   , alphaRenameVerify
 
     -- Effects
-  , Effect(..), canSucceed, canFail
+  , Effect(..), canSucceed, canFail, intersectEffect
 
   -- Primops
   , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest, primOpIsCheck
@@ -758,6 +758,18 @@ canFail Iterates = True
 canFail Succeeds = False
 canFail Decides  = True
 canFail Fails    = True
+
+intersectEffect :: Effect -> Effect -> Effect
+intersectEffect Iterates fx2      = fx2
+intersectEffect Decides  Iterates = Decides
+intersectEffect Decides  fx2      = fx2
+intersectEffect Fails    Succeeds = contradiction
+intersectEffect Fails    _        = Fails
+intersectEffect Succeeds Fails    = contradiction
+intersectEffect Succeeds _        = Succeeds
+
+contradiction :: Effect
+contradiction = error "intersectEffect"
 
 wrong :: Expr
 wrong = Lit (LInt 0) :@: Lit (LInt 0)

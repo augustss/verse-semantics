@@ -7,12 +7,12 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 
-module Red( Blk(Blk, BlkX, BlkE), Exp(..), pattern Val, Term(..), Ident(..)
+module Red( Blk(Blk, BlkX), Exp(..), pattern Val, Term(..), Ident(..)
           , matchTop, topMatchContext
           , ReductionContext(..), ReductionMode(..)
           , VerificationContext(..), MatchContext
           , thePrelude
-          , run, runTraced, isVal
+          , run, runTraced, isVal, mkBlkE
           , srcToTerm, addInScopeSkols, addInScopeExis
           , freshId, freshIds2, freshId4
           , freeVarsTerm
@@ -31,7 +31,7 @@ import Core.Solver( unsat )
 import Core.Expr as C ( Assump, Effect(..), Lit(..), PrimOp(..)
                       , GroundVal(..), Assump(..), FailableAssump(..), AssumpOp(..)
                       , primOpIsCheck, primOpCanFail, substAssump
-                      , isUnaryOp, isBinOp )
+                      , isUnaryOp, isBinOp, intersectEffect )
 import Core.Bind as C
 
 import Epic.Print
@@ -154,8 +154,9 @@ data Exp
 data Blk = BlkX (Set Ident) Heap Exp
   deriving (Eq, Ord, Show)
 
-data MatchContext = MC { mc_blob :: Blob
-                       , mc_polarity :: Polarity }
+data MatchContext = MC { mc_blob     :: Blob
+                       , mc_polarity :: Polarity
+                       , mc_effect   :: Effect }
   deriving(Eq,Ord,Show)
 
 data Blob
@@ -174,6 +175,10 @@ type Heap = [Eqn]  -- Invariant: all identifiers in the domain are distinct
 emptyHeap :: Heap
 emptyHeap = []
 
+isEmptyHeap :: Heap -> Bool
+isEmptyHeap [] = True
+isEmptyHeap _  = False
+
 -- The equation RHSs have no variables from the LHSs
 -- A block (Blk xs eqs e) satisfies these invariants:
 --    (A)  dom(eqs)    `subset`   X
@@ -185,18 +190,23 @@ matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
   where
     u = freshId cxt "u"
 
-matchNested :: MatchContext -> Ident -> Term -> Exp
-matchNested mc i t = Match (mc { mc_blob = MNested }) i t
+mcNested :: MatchContext -> MatchContext
+mcNested mc = mc { mc_blob = MNested }
 
-matchFlip :: MatchContext -> Ident -> Term -> Exp
-matchFlip mc i t = Match (mc { mc_polarity = pol }) i t
+mcEffect :: Effect -> MatchContext -> MatchContext
+mcEffect fx mc = mc { mc_effect = fx }
+
+mcFlip :: MatchContext -> MatchContext
+mcFlip mc@(MC {mc_polarity = pol}) = mc { mc_polarity = flip_p pol }
  where
-   pol = case mc_polarity mc of
-            Positive -> Negative
-            Negative -> Positive
+   flip_p Positive = Negative
+   flip_p Negative = Positive
 
 topMatchContext :: MatchContext
-topMatchContext = MC { mc_blob = MTop, mc_polarity = Positive }
+topMatchContext = MC { mc_blob = MTop
+                     , mc_polarity = Positive
+                     , mc_effect = Iterates    -- Iterates = no-op
+                     }
 
 {-# COMPLETE Blk #-}
 pattern Blk :: (Set Ident) -> Heap -> Exp -> Blk
@@ -217,14 +227,13 @@ type Val = Exp
 data IterCtx = IF | FOR | ALL
   deriving (Eq, Ord, Show)
 
-pattern BlkE :: Exp -> Blk
-pattern BlkE e <- BlkX (S.null -> True) (null -> True) e
-  where
-    BlkE e = Blk S.empty emptyHeap e
+mkBlkE :: Exp -> Blk
+mkBlkE (Crl b) = b
+mkBlkE e       = Blk S.empty emptyHeap e
 
 mkCrl :: Blk -> Exp
-mkCrl (BlkE e) = e
-mkCrl b        = Crl b
+mkCrl (Blk is hp e) | S.null is, isEmptyHeap hp = e
+mkCrl b                                         = Crl b
 
 mkSeq :: Exp -> Exp -> Exp
 -- Aggressively elminate values, and re-associate to the right
@@ -346,14 +355,19 @@ instance Pretty Exp where
   pPrintPrec l p (OfType e1 fx e2)
     = maybeParens (p > 7) $
       sep [ pPrintPrec l 6 e1
-          , text "|>" <> angleBrackets (pPrint fx)
+          , text "|>" <> pPrintEffect fx
              <+> pPrintPrec l 6 e2 ]
 
 instance Pretty Blk where
   pPrintPrec l p (Blk vs eqns e) = ppBlk l p vs eqns e
 
 instance Pretty MatchContext where
-  pPrint (MC b p) = parens (pPrint b <> pPrint p)
+  pPrint (MC b p fx) = parens (pPrint b <> pPrint p <> pp fx)
+    where
+      pp Iterates = empty
+      pp Succeeds = char 's'
+      pp Decides  = char 'd'
+      pp Fails    = char 'f'
 
 instance Pretty Blob where
   pPrint MTop    = char 'o'
@@ -362,6 +376,10 @@ instance Pretty Blob where
 instance Pretty Polarity where
   pPrint Positive = char '+'
   pPrint Negative = char '-'
+
+pPrintEffect :: Effect -> Doc
+pPrintEffect Iterates = empty
+pPrintEffect fx       = angleBrackets (pPrint fx)
 
 ppBlk :: PrettyLevel -> Rational -> Set Ident -> Heap -> Exp -> Doc
 ppBlk l p vs eqns e
@@ -483,7 +501,7 @@ getArrOrTruOrMap _ = Nothing
 root :: HNF -> HNF
 root Lit{} = IntE 0
 root Prm{} = Prm Add
-root Lam{} = Lam (Name "") (BlkE $ IntE 0)
+root Lam{} = Lam (Name "") (mkBlkE $ IntE 0)
 root Arr{} = Arr []
 root Dly{} = Dly (IntE 0)
 root Tru{} = Tru (IntE 0)
@@ -723,13 +741,13 @@ mkCons2 cxt x y xys
 
 thePrelude :: [Eqn]
 thePrelude
-  = [ (mkName "int",          Lam vp  $ BlkE $ Prm IsInt :@ (Var vp) :> Var vp)
-    , (mkName "char",         Lam vp  $ BlkE $ Prm IsChar :@ (Var vp) :> Var vp)
-    , (mkName "nat",          Lam vp  $ BlkE $ Prm IsNat :@ (Var vp) :> Var vp)
---    , (mkName "string",       Lam vp  $ BlkE $ Prm IsStr :@ (Var vp) :> Var vp)
-    , (mkName "comparable",   Lam vp  $ BlkE $ Prm IsComp :@ (Var vp) :> Var vp)
-    , (mkName "any",          Lam vp  $ BlkE $ Var vp)
-    , (mkName "void",         Lam vp  $ BlkE $ Arr [])
+  = [ (mkName "int",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :> Var vp)
+    , (mkName "char",         Lam vp  $ mkBlkE $ Prm IsChar :@ (Var vp) :> Var vp)
+    , (mkName "nat",          Lam vp  $ mkBlkE $ Prm IsNat :@ (Var vp) :> Var vp)
+--  , (mkName "string",       Lam vp  $ mkBlkE $ Prm IsStr :@ (Var vp) :> Var vp)
+    , (mkName "comparable",   Lam vp  $ mkBlkE $ Prm IsComp :@ (Var vp) :> Var vp)
+    , (mkName "any",          Lam vp  $ mkBlkE $ Var vp)
+    , (mkName "void",         Lam vp  $ mkBlkE $ Arr [])
     , (mkName "Length",       Prm ArrLen)
     , (mkName "prefix'+'",    Prm Pls)
     , (mkName "prefix'-'",    Prm Neg)
@@ -745,12 +763,12 @@ thePrelude
     , (mkName "operator'..'", Prm DotDot)
 
     -- [] = \t.\p. isArr[p]; map[t,p]
-    , (mkName "prefix'[]'"  , Lam vt $ BlkE $ Lam vp $ BlkE $
+    , (mkName "prefix'[]'"  , Lam vt $ mkBlkE $ Lam vp $ mkBlkE $
                               (Prm IsArr :@ Var vp) :>
                               (Prm ArrMap :@ (Arr [Var vt, Var vp])))
 
     -- ? = \t.\x. if (truth{y:any} = x) then truth{t[y]} else x=()
-    , (mkName "prefix'?'"   , Lam vt $ BlkE $ Lam vx $ BlkE $
+    , (mkName "prefix'?'"   , Lam vt $ mkBlkE $ Lam vx $ mkBlkE $
                               let y = mkName "_y" in
                               Iter IF (Blk (sing y) emptyHeap $ ((Tru (Var y) :=: Var vx) :> Dly (Tru (Var vt :@ Var y))))
                                       (Var vx :=: Arr [])
@@ -777,13 +795,13 @@ runTraced fuel top_cxt top_blk
 
     step :: Blk -> Maybe (TraceStep Blk)
     step blk
-      | BlkE Fail <- blk   -- Simon: seems ad-hoc, but otherwise we loop on failure
-      = Nothing
+      | Blk _ _ Fail <- blk   -- Fail will return RedStep; check for naked
+      = Nothing               -- failure here to avoid an infinite loop
       | otherwise
       = case reduceBlock top_cxt blk of
           RedNone -> Nothing
           RedStep rule_nm []
-             -> Just $ mkTraceStep rule_nm (BlkE Fail)
+             -> Just $ mkTraceStep rule_nm (mkBlkE Fail)
           RedStep rule_nm [Res NoFloats blk']
              -> -- ppTrace ("------ runTraced: " ++ rule_nm ++ " ----------------")
                 --        (pPrint blk' $$ text "") $
@@ -1013,7 +1031,7 @@ reduceExp cxt parent@(Blk _ _ body)
                               foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
           where
             x = freshId cxt "x"
-            alt e1 e2 = BlkE e1 :|: BlkE e2
+            alt e1 e2 = mkBlkE e1 :|: mkBlkE e2
 
         Tru e1 :@ e2 -> mkDone "ITru" $ e1 :=: e2
 
@@ -1022,7 +1040,7 @@ reduceExp cxt parent@(Blk _ _ body)
                                foldr alt Fail (map (\ (k,v)  -> (Var x :=: k) :> v) kvs)
           where
             x = freshId cxt "x"
-            alt e1 e2 = BlkE e1 :|: BlkE e2
+            alt e1 e2 = mkBlkE e1 :|: mkBlkE e2
 
         -- Choice and failure
         Fail -> mkFailure "Fail"
@@ -1380,8 +1398,8 @@ reduceMatch cxt x tm mc
                                 Var x :=: (matchTop cxt mc t1 :@ matchTop cxt mc t2)
         (t1 :=:% t2)         -> mkDone "MUnif"    $ (Match mc x t1) :=: (Match mc x t2)
         (t1 :|:% t2)         -> mkDone "MChoice"  $
-                                (BlkE $ Match mc x (TBlock t1)) :|:
-                                (BlkE $ Match mc x (TBlock t2))
+                                (mkBlkE $ Match mc x (TBlock t1)) :|:
+                                (mkBlkE $ Match mc x (TBlock t2))
 
         (t1 :>% t2)          -> mkDone "MSemi" $
                                 matchTop cxt mc t1 :> Match mc x t2
@@ -1390,12 +1408,18 @@ reduceMatch cxt x tm mc
                              where
                                 w = freshId cxt "w"
 
+        Rng t -> mkDone "Mcolon" $
+                 OfType (Var x) (mc_effect mc) (matchTop cxt mc t)
+{-
         Rng t -> case mc_polarity mc of
                     Positive -> mkDone "MColon+" $ matchTop cxt mc t :@ Var x
-                    Negative -> mkDone "Mcolon-" $ OfType (Var x) Succeeds (matchTop cxt mc t)
+                    Negative -> mkDone "Mcolon-" $
+                                OfType (Var x) (mc_effect mc) (matchTop cxt mc t)
+-}
 
         (i := t)   -> mkDone ("MDef " ++ show i) $ Var i :=: Match mc x t
-        (i :-> t)  -> mkDone ("MArr " ++ show i) $ (Var i :=: Var x) :> matchNested mc i t
+        (i :-> t)  -> mkDone ("MArr " ++ show i) $ (Var i :=: Var x) :>
+                                                   Match (mcNested mc) i t
 
         -- Tuples and functions
         TMap kvs     -> matchMap cxt x kvs mc
@@ -1437,7 +1461,7 @@ reduceMatch cxt x tm mc
                         (Arr [Var x, Var y] :=:
                          Iter FOR (Blk tbs0 emptyHeap $
                                    (matchTop cxt' mc t0') :>
-                                   (Lam w (BlkE $ Match mc w (TBlock t1'))))
+                                   (Lam w (mkBlkE $ Match mc w (TBlock t1'))))
                                   (Arr [Arr [], Arr []])) :>
                         Var y
                   where
@@ -1446,10 +1470,12 @@ reduceMatch cxt x tm mc
                     (y,w) = freshId2 (cxt `addInScopeExis` tbs0) ("y","w")
 
         TOfType t1 fx t2 -> mkDone ("TOfType " ++ show fx) $
-                            (OfType (matchTop cxt mc t1) fx (matchTop cxt mc t2))
+                            OfType (matchTop cxt mc t1)
+                                   (fx `intersectEffect` mc_effect mc)
+                                   (matchTop cxt mc t2)
 
         Check fx t -> mkDone ("MCheck " ++ show fx) $
-                      Var x :=: mkCheck fx (BlkE $ matchTop cxt mc (TBlock t))
+                      Var x :=: mkCheck fx (mkBlkE $ matchTop cxt mc (TBlock t))
 
         Splice t -> reduceMatch cxt x t mc
                     -- See (AMP1) in Note [Desugaring ampersand]
@@ -1463,29 +1489,29 @@ matchFun cxt f at fx bt mc
     (tbs_at, at', bt') = freshenTerm2 cxt at bt
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
 
-    the_lambda = Lam u $ Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
-                 (Var p :=: matchNested mc u at') :>
-                 wrap_code                        :>
-                 (Match mc q (TBlock bt'))
+    -- Deal with effects
+    mc_dom = mcEffect Succeeds (mcNested mc)
+    mc_rng = mcEffect fx       mc
+
+    the_lambda = Lam u $
+                 Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
+                 (Var p :=: Match mc_dom u at') :> rng_code
 
     wrap_code = case mc_blob mc of
                   MNested -> Var q :=: (Var f :@ Var p)
                   MTop    -> IntE 99999
+    rng_code = wrap_code :> Match mc_rng q (TBlock bt')
 
     -- Generate a verify{} if we are in GenerateVCs mode
     fun_verify = case rc_mode cxt of
                     GenerateVCs -> the_verify
                     _           -> Arr []
 
-    mc_verify = mc { mc_blob = MNested }
-
     -- verify(u){ u ~>(flip) at; check<fx>{ wrap; q~>(no-flip) bt } }
     the_verify = Verify (sing u) [] $
                  Blk tbs_at emptyHeap $
-                 (matchFlip mc_verify u at') :>
-                 (mkCheck fx (Blk (sing q) emptyHeap $
-                    wrap_code :>
-                    (Match mc_verify q (TBlock bt'))))
+                 Match (mcFlip mc_dom) u at' :>
+                 mkCheck fx (Blk (sing q) emptyHeap rng_code)
 
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
@@ -1510,8 +1536,9 @@ reduceIter cxt ic b1 e2
                                (mapPayload (\b -> Iter ic b e2) rs)
 
       RedStep rn rs -> mkWrapDone (wrapRuleName (show ic) rn) (foldr iter e2 rs)
-           -- Note that we update the RuleName to give
-           -- more info about where the reduction happened
+           -- Note 1: We update the RuleName to give
+           --         more info about where the reduction happened
+           -- Note 2: `rs` may be an empty list, indicating failure
   where
     iter :: Result BlkFloats Blk -> Exp -> Exp
     iter (Res NoFloats b) e = Iter ic b e
@@ -1619,7 +1646,7 @@ reduceOfType cxt e1 fx e2
        Iterates -> error "reduceOfType:Iterates"  -- Not sure, probably impossible
 
    | not (insideVerify cxt)
-   = mkDone "OfType" (e2 :@ e1)
+   = mkDone "OfType" (e2 :@ e1)   -- Ignores <fx>
 
    | otherwise
    = RedNone
