@@ -66,7 +66,7 @@ lemma ext_env_type [TC]:
 text \<open> 
   \section{Relational Evaluator Semantics}
   The interpreter takes an expression and returns a function mapping 
-  an environment to a set of evaluation pairs.
+  an environment to a set of (input, output) pairs.
 \<close>
 
 consts eval :: "i \<Rightarrow> i"
@@ -94,7 +94,7 @@ primrec
          ({ \<langle>fst(fst(x)), snd(snd(x))\<rangle> . x \<in> h }) \<rangle> . 
        h \<in> Pi(eval(e\<^sub>1) ` \<rho>, \<lambda>p. eval(e\<^sub>2) ` ext_env(\<rho>, snd(p))) })"
 
-  "isabelle_eval_let": "eval(Let(e\<^sub>1, e\<^sub>2)) = (\<lambda>\<rho> \<in> Env. 
+  "eval(Let(e\<^sub>1, e\<^sub>2)) = (\<lambda>\<rho> \<in> Env. 
      (\<Union>q \<in> (eval(e\<^sub>1) ` \<rho>). eval(e\<^sub>2) ` ext_env(\<rho>, snd(q))))"
 
   "eval(Any) = (\<lambda>\<rho> \<in> Env. {\<langle> {\<langle>a, a\<rangle> . a \<in> U0}, {\<langle>a, a\<rangle> . a \<in> U0} \<rangle>})"
