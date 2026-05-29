@@ -1,0 +1,6 @@
+session TimbdaSession = ZF +
+  options [document = pdf, document_output = "output"]
+  theories 
+    Timbda1Semantics  (* Put your exact .thy file name here *)
+  document_files
+    "root.tex"
