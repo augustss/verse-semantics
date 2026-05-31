@@ -206,8 +206,9 @@ everywhere r = r <|> dive (everywhere r)
 
 normalizeExpr :: Rule Expr -> Fuel -> Expr
               -> (NormResult, Traced Expr)
-normalizeExpr rules = normalize step valid
+normalizeExpr rules fuel expr = (traceNormResult trace, trace)
   where
+    trace = normalize step valid fuel expr
     step e = case run rules  (S.fromList (occurs e)) [] [] e of
                [] -> Nothing
                (e', lab, v) : _ -> Just (TS { ts_payload = e'

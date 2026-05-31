@@ -9,7 +9,7 @@
 
 module Red( Blk(Blk, BlkX), Exp(..), pattern Val, Term(..), Ident(..)
           , matchTop, topMatchContext
-          , ReductionContext(..), ReductionMode(..)
+          , ReductionContext(..), ReductionMode(..), setJustMatching
           , VerificationContext(..), MatchContext
           , thePrelude
           , run, runTraced, isVal, mkBlkE
@@ -34,7 +34,7 @@ import Core.Expr as C ( Assump, Effect(..), Lit(..), PrimOp(..)
                       , isUnaryOp, isBinOp, intersectEffect )
 import Core.Bind as C
 
-import Epic.Print
+import Epic.Print hiding( mode )
 import Epic.List
 
 import Control.Arrow(second, (***))
@@ -42,7 +42,7 @@ import qualified Data.List as L
 import Data.Maybe
 import qualified Data.Set as S
 import Data.Set( Set )
-import Data.Char( isAlpha )
+import Data.Char( isDigit )
 import Data.List( isPrefixOf )
 
 import Debug.Trace
@@ -154,9 +154,19 @@ data Exp
 data Blk = BlkX (Set Ident) Heap Exp
   deriving (Eq, Ord, Show)
 
+-- The equation RHSs have no variables from the LHSs
+-- A block (Blk xs eqs e) satisfies these invariants:
+--    (A)  dom(eqs)    `subset`   X
+--    (B)  occfvs(eqs) `disjoint` dom(eqs)
+
 data MatchContext = MC { mc_blob     :: Blob
                        , mc_polarity :: Polarity
-                       , mc_effect   :: Effect }
+                       , mc_effect   :: DRContext }
+  deriving(Eq,Ord,Show)
+
+data DRContext
+  = DR_Dom          -- In the domain of a function(at)<fx>{bt}
+  | DR_Rng Effect   -- In the range  of a function(at)<fx>{bt}, with effects <fx>
   deriving(Eq,Ord,Show)
 
 data Blob
@@ -179,11 +189,6 @@ isEmptyHeap :: Heap -> Bool
 isEmptyHeap [] = True
 isEmptyHeap _  = False
 
--- The equation RHSs have no variables from the LHSs
--- A block (Blk xs eqs e) satisfies these invariants:
---    (A)  dom(eqs)    `subset`   X
---    (B)  occfvs(eqs) `disjoint` dom(eqs)
-
 matchTop :: ReductionContext -> MatchContext -> Term -> Exp
 matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
                     Match (mc { mc_blob = MTop }) u t
@@ -193,7 +198,7 @@ matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
 mcNested :: MatchContext -> MatchContext
 mcNested mc = mc { mc_blob = MNested }
 
-mcEffect :: Effect -> MatchContext -> MatchContext
+mcEffect :: DRContext -> MatchContext -> MatchContext
 mcEffect fx mc = mc { mc_effect = fx }
 
 mcFlip :: MatchContext -> MatchContext
@@ -202,10 +207,14 @@ mcFlip mc@(MC {mc_polarity = pol}) = mc { mc_polarity = flip_p pol }
    flip_p Positive = Negative
    flip_p Negative = Positive
 
+addDRContext :: Effect -> DRContext -> Effect
+addDRContext fx1 DR_Dom       = fx1
+addDRContext fx1 (DR_Rng fx2) = fx1 `intersectEffect` fx2
+
 topMatchContext :: MatchContext
-topMatchContext = MC { mc_blob = MTop
+topMatchContext = MC { mc_blob     = MTop
                      , mc_polarity = Positive
-                     , mc_effect = Iterates    -- Iterates = no-op
+                     , mc_effect   = DR_Dom
                      }
 
 {-# COMPLETE Blk #-}
@@ -364,10 +373,11 @@ instance Pretty Blk where
 instance Pretty MatchContext where
   pPrint (MC b p fx) = parens (pPrint b <> pPrint p <> pp fx)
     where
-      pp Iterates = empty
-      pp Succeeds = char 's'
-      pp Decides  = char 'd'
-      pp Fails    = char 'f'
+      pp DR_Dom = empty
+      pp (DR_Rng Succeeds) = char 's'
+      pp (DR_Rng Decides)  = char 'd'
+      pp (DR_Rng Fails)    = char 'f'
+      pp (DR_Rng Iterates) = char 'i'
 
 instance Pretty Blob where
   pPrint MTop    = char 'o'
@@ -594,8 +604,10 @@ data ReductionContext
     deriving (Show)
 
 data ReductionMode
-  = GenerateVCs     -- Generate verify{} conditions
-  | ExecutionOnly   -- Don't generate verify conditions
+  = RM { rm_just_matching :: Bool   -- True <=> run only the 'match' rules, and
+                                    --          recurse under lambda and iter
+       , rm_generate_vcs  :: Bool   -- Whether to generate verify{} conditions
+       }
   deriving( Show )
 
 data VerificationContext
@@ -618,6 +630,16 @@ getInScope (RC { rc_exis = exis, rc_skols = skols }) = exis `S.union` skols
 insideVerify :: ReductionContext -> Bool
 insideVerify (RC { rc_vcxt = Verifying {} }) = True
 insideVerify _                               = False
+
+setJustMatching :: ReductionContext -> ReductionContext
+setJustMatching rc@(RC { rc_mode = mode })
+  = rc { rc_mode = mode { rm_just_matching = True } }
+
+justMatching :: ReductionContext -> Bool
+justMatching (RC { rc_mode = RM { rm_just_matching = jm }}) = jm
+
+generateVCs :: ReductionContext -> Bool
+generateVCs (RC { rc_mode = RM { rm_generate_vcs = gvc } }) = gvc
 
 --------------------------------------------------------------------------------
 --
@@ -658,6 +680,9 @@ data VerFloats   -- Floating out to the innermost enclosing Verify
   | FloatFlexi SkolIdent Ident Exp
   deriving (Eq, Show)
 
+orTry :: Reduction a -> Reduction a -> Reduction a
+orTry RedNone r2 = r2
+orTry r1      _  = r1
 
 mapPayload :: (a -> b) -> [Result flt a] -> [Result flt b]
 mapPayload f rs = [ Res flt (f payload) | Res flt payload <- rs ]
@@ -743,7 +768,8 @@ thePrelude :: [Eqn]
 thePrelude
   = [ (mkName "int",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :> Var vp)
     , (mkName "char",         Lam vp  $ mkBlkE $ Prm IsChar :@ (Var vp) :> Var vp)
-    , (mkName "nat",          Lam vp  $ mkBlkE $ Prm IsNat :@ (Var vp) :> Var vp)
+    , (mkName "nat",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :>
+                                                 Prm GEq :@ Arr [Var vp, IntE 0])
 --  , (mkName "string",       Lam vp  $ mkBlkE $ Prm IsStr :@ (Var vp) :> Var vp)
     , (mkName "comparable",   Lam vp  $ mkBlkE $ Prm IsComp :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ mkBlkE $ Var vp)
@@ -786,7 +812,7 @@ vx  = mkName "x"
 --             The evaluator: driver
 --
 
-runTraced :: Fuel -> ReductionContext -> Blk -> (NormResult, Traced Blk)
+runTraced :: Fuel -> ReductionContext -> Blk -> Traced Blk
 runTraced fuel top_cxt top_blk
   = normalize step valid fuel top_blk
   where
@@ -855,7 +881,8 @@ initialBlk src
                  , rc_exis   = S.empty
                  , rc_skols  = top_skols
                  , rc_vcxt   = NotVerifying
-                 , rc_mode   = GenerateVCs }
+                 , rc_mode   = top_mode }
+    top_mode = RM { rm_generate_vcs = True, rm_just_matching = False }
 
 mergeStep :: HasCallStack => Blk -> Result BlkFloats Exp -> Result BlkFloats Blk
 mergeStep (Blk is eqs _) (Res NoFloats res_e)
@@ -955,14 +982,77 @@ reduceExp cxt parent@(Blk _ _ body)
   = find True body
  where
     find :: Bool -> Exp -> Reduction Exp
-    find leftCF expr =    -- leftCF means that the context to the left of the find is choice free
-      case expr of
-        -- Floating a nested block {b}
-        Crl blk -> mkStep "FloatB" (FloatB is' eqs') e'
-          where
-            Blk is' eqs' e' = freshenBlk cxt blk
-            -- GC rules handled above
+    find leftCF expr  -- leftCF means that the context to the left of the find is choice free
+      = find_step      leftCF expr `orTry`
+        find_verify           expr `orTry`
+        find_admin            expr `orTry`
+        find_recursive leftCF expr `orTry`
+        find_rec_matches      expr
 
+    find_admin expr
+      = case expr of
+          Match mc x tm -> reduceMatch cxt x tm mc
+
+          -- Floating a nested block {b}
+          Crl blk -> mkStep "FloatB" (FloatB is' eqs') e'
+            where
+              Blk is' eqs' e' = freshenBlk cxt blk
+
+          -- Unification, structural
+          Val v  :=: (e1 :>  e2) -> mkDone "Norm1" $ e1 :> (v :=: e2)
+          Val v  :=: (e1 :=: e2) -> mkDone "Norm2" $ (v :=: e1) :> (v :=: e2)
+          (e1 :> e2) :=: e3      -> mkDone "Norm3" $ e1 :> (e2 :=: e3)
+          (Val v :=: e1) :=: e2  -> mkDone "Norm4" $ (v :=: e1) :> (v :=: e2)
+          (e1 :> e2) :> e3       -> mkDone "Norm5" $ e1 :> (e2 :> e3)
+          Val{}  :>  e2          -> mkDone "Seq1" e2
+
+          _ -> RedNone
+
+    find_recursive leftCF expr
+      =  -- Catch-all cases for context C; just walk downwards
+         -- Aka "look at sub-expressions"
+         case expr of
+           e1 :>  e2       -> find2 leftCF (:>)  e1 e2
+           e1 :=: e2       -> find2 leftCF (:=:) e1 e2
+           e1 :@  e2       -> find2 leftCF (:@)  e1 e2
+           OfType e1 fx e2 -> find2 leftCF (\x y -> OfType x fx y) e1 e2 `orTry`
+                              findOfTypeLam e1 fx e2
+           Arr es          -> findArr leftCF es
+           Map kvs         -> findMap leftCF kvs
+           Tru e           -> find1 leftCF Tru e
+           _               -> RedNone
+
+    findOfTypeLam e1 fx (Lam x b)
+       = fmap (\b'' -> OfType e1 fx (Lam x' b'')) (reduceBlock cxt' b')
+       where
+         (cxt', x', b') = freshenLam cxt x b
+    findOfTypeLam _ _ _ = RedNone
+
+
+    find_rec_matches expr
+      | not (justMatching cxt)
+      = RedNone
+      | otherwise
+      = case expr of
+          Lam x b -> fmap (Lam x') (reduceBlock cxt' b')
+                  where
+                    (cxt', x', b') = freshenLam cxt x b
+          Iter ic b e -> fmap (\b' -> Iter ic b' e) (reduceBlock cxt b) `orTry`
+                         find1 False (Iter ic b) e
+                               -- False: irrelevant because we neer fire choices
+          _ -> RedNone
+
+    find_verify expr
+      = case expr of
+           e1 :@ e2          -> reduceVerifyApp cxt e1 e2
+           Verify skols as e -> reduceVerify cxt skols as e
+           _                 -> RedNone
+
+    find_step leftCF expr
+      | justMatching cxt
+      = RedNone
+      | otherwise
+      = case expr of
         -- Substitution
         Var i | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
               -> mkDone ("Subst " ++ show i) v
@@ -973,24 +1063,17 @@ reduceExp cxt parent@(Blk _ _ body)
         -- We must fire (Promote2) on x=y
         -- Also: the guard is important; if `reduceVarVal` doesn't fire, we want to
         -- fall through the "look at sub-expressions" code
-        Var  x  :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
-                           -> redn
         HNFV v  :=: Var  x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
+                           -> redn
+        Var  x  :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
                            -> redn
 
         -- Primops
-        -- The guard is important; if the primop doesn't fire, we want to
-        -- fall through the "look at sub-expressions" code
-        Prm op :@ v  | Just redn <- reductionFired (reducePrimOp op v)
-                     -> redn
-        e1     :@ e2 | Just redn <- reductionFired (reduceVerifyApp cxt e1 e2)
-                     -> redn
-
-
+        Prm op :@ v  -> reducePrimOp op v
 
         -- Unification
-        Val v1       :=: Val v2 | v1 == v2                 -> mkDone    "EqVal" v1
-        Lit k1       :=: Lit k2 | k1 /= k2                 -> mkFailure "EqValFail"
+        Val v1 :=: Val v2 | v1 == v2 -> mkDone    "EqVal" v1
+        Lit k1 :=: Lit k2 | k1 /= k2 -> mkFailure "EqValFail"
 
         Val (Arr vs) :=: Arr es | length vs == length es   -> mkDone    "EqTup" $ Arr (zipWith (:=:) vs es)
         Arr ds       :=: Arr es | length ds /= length es   -> mkFailure "EqTupFail"
@@ -999,23 +1082,10 @@ reduceExp cxt parent@(Blk _ _ body)
           mkDone "EqMap" $ Map (zipWith (\ (k1, v1) (_, e2) -> (k1, v1 :=: e2)) kvs1 kvs2)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> mkFailure "EqFail"
 
-        -- Sequencing
-        (e1 :> e2) :> e3 -> mkDone "Norm5" $ e1 :> (e2 :> e3)
-        Val{}  :>  e2    -> mkDone "Seq1" e2
-
-        -- Walk under lambda, sometimes
-        Lam x e -> reduceLam cxt x e
-
-        -- Unification, structural
-        Val v  :=: (e1 :>  e2) -> mkDone "Norm1" $ e1 :> (v :=: e2)
-        Val v  :=: (e1 :=: e2) -> mkDone "Norm2" $ (v :=: e1) :> (v :=: e2)
-        (e1 :> e2) :=: e3      -> mkDone "Norm3" $ e1 :> (e2 :=: e3)
-        (Val v :=: e1) :=: e2  -> mkDone "Norm4" $ (v :=: e1) :> (v :=: e2)
-
         -- Beta (\x.blk)[a] -->  exists x. x = a; blk
         -- NOTE: it should be enough to match with eqs=[]
         Lam x blk :@ arg
-            -> mkStep ("Beta " ++ show x) (mkExiFloat1 x') $
+            -> mkStep ("Beta(" ++ show x ++ ")") (mkExiFloat1 x') $
                (Var x' :=: arg) :> mkCrl blk'
             where
               x' = freshenId cxt x
@@ -1049,38 +1119,24 @@ reduceExp cxt parent@(Blk _ _ body)
                 RedStep (mkRuleName "Choice")
                 [ Res NoFloats (mkCrl b1), Res NoFloats (mkCrl b2) ]
 
-        Iter ic b e       -> reduceIter cxt ic b e
-        Match mc x tm     -> reduceMatch cxt x tm mc
-        Verify skols as e -> reduceVerify cxt skols as e
-        OfType e1 fx e2   | Just redn <- reductionFired $ reduceOfType cxt e1 fx e2
-                          -> redn
-
-        -- Catch-all cases for context C; just walk downwards
-        -- Aka "look at sub-expressions"
-        e1 :>  e2       -> find2 leftCF (:>)  e1 e2
-        e1 :=: e2       -> find2 leftCF (:=:) e1 e2
-        e1 :@  e2       -> find2 leftCF (:@)  e1 e2
-        OfType e1 fx e2 -> find2 leftCF (\x y -> OfType x fx y) e1 e2
-        Arr es          -> findArr leftCF es
-        Map kvs         -> findMap leftCF kvs
-        Tru e           -> find1 leftCF Tru e
+        Iter ic b e     -> reduceIter cxt ic b e
+        OfType e1 fx e2 -> reduceOfType cxt e1 fx e2
 
         _ -> RedNone
+
 
     find1 :: Bool -> (Exp -> Exp) -> Exp -> Reduction Exp
     find1 leftCF wrap e = fmap wrap (find leftCF e)
 
     find2 :: Bool -> (Exp -> Exp -> Exp) -> Exp -> Exp -> Reduction Exp
     find2 leftCF c e1 e2
-      = case find1 leftCF (`c` e2) e1 of
-          RedNone -> find1 (leftCF && choiceFree e1) (e1 `c`) e2
-          r       -> r
+      = find1 leftCF (`c` e2) e1 `orTry`
+        find1 (leftCF && choiceFree e1) (e1 `c`) e2
 
     findArr :: Bool -> [Exp] -> Reduction Exp
     findArr _ []          = RedNone
-    findArr leftCF (e:es) = case find1 leftCF k e of
-                              RedNone -> find1 (leftCF && choiceFree e) ks (Arr es)
-                              r       -> r
+    findArr leftCF (e:es) = find1 leftCF k e `orTry`
+                            find1 (leftCF && choiceFree e) ks (Arr es)
       where
         k e'         = Arr (e':es)
         ks (Arr es') = Arr (e:es')
@@ -1088,35 +1144,15 @@ reduceExp cxt parent@(Blk _ _ body)
 
     findMap :: Bool -> [(Gnd,Exp)] -> Reduction Exp
     findMap _      []             = RedNone
-    findMap leftCF (kv@(k,v):kvs) =
-      case find1 leftCF mk1 k of
-        RedNone ->
-          case find1 (leftCF && choiceFree k) mk2 v of
-            RedNone -> find1 (leftCF && choiceFree k && choiceFree v) mk3 (Map kvs)
-            r       -> r
-        r -> r
+    findMap leftCF (kv@(k,v):kvs)
+      = find1 leftCF mk1 k `orTry`
+        find1 (leftCF && choiceFree k) mk2 v `orTry`
+        find1 (leftCF && choiceFree k && choiceFree v) mk3 (Map kvs)
       where
         mk1 k'         = Map ((k', v):kvs)
         mk2 v'         = Map ((k, v'):kvs)
         mk3 (Map kvs') = Map (kv:kvs')
         mk3 e'         = error "findMap" (prettyShow e')
-
-------------------------------------
-reduceLam :: ReductionContext -> Ident -> Blk -> Reduction Exp
-reduceLam _cxt _x _body = RedNone
-
-{-       NOT YET
--- Look inside a lambda only when JustMatching
-reduceLam cxt x body
-  | JustMatching <- rc_mode cxt
-  = fmap (Lam x') (reduceBlock cxt' body')
-  | otherwise
-  = RedNone
-  where
-    (subst, x') = freshenBndr (emptyRenaming cxt)
-    body' = renameBlk subst body
-    cxt' = cxt { rc_skols = S.insert x' rc_skols cxt }
--}
 
 ------------------------------------
 reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
@@ -1127,15 +1163,17 @@ reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
   -- Try rule (PromoteT) to promote an existential `x`, where `x` is
   -- bound by the /immediately-enclosing/ block, namely `parent`
   | promotionOK parent x xv
-  =  mkStep ("PromoteT"++left_or_right) (Promote as x xv) v'
+  =  mkStep rule_name (Promote as x xv) v'
 
   -- Try rule (VPromoteT) to promote a skolem `x`, where `x` can
   -- be bound by /any/ enclosing `verify`
   | Just asm <- skolemEquality cxt' x xv
-  = VerStep (mkRuleName ("VPromoteT"++left_or_right))
+  = VerStep (mkRuleName ("V" ++ rule_name))
     [ Res (FloatRigid as [A_Pos asm]) v'
     , Res (FloatRigid as [A_Neg asm]) Fail ]
   where
+    rule_name = "PromoteT" ++ left_or_right ++ "(" ++ show x ++ ")"
+
     prs :: [(Maybe Ident, Val)]
     -- (Just a,  v)   for values v that should be A-normalised
     -- (Nothing, v)   for other values e.g. 7
@@ -1175,15 +1213,18 @@ reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
 -- Deal with non-tuple var/val equalities (x=v) or (v=x)
 reduceVarVal cxt left_or_right parent x (Val v)
   | promotionOK parent x v
-  =  mkStep ("Promote"++left_or_right) (Promote S.empty x v) v
+  =  mkStep rule_name (Promote S.empty x v) v
 
   | Just asm <- skolemEquality cxt x v
-  = VerStep (mkRuleName ("VPromote"++left_or_right))
+  = VerStep (mkRuleName ("V" ++ rule_name ))
      [ Res (FloatRigid S.empty [A_Pos asm]) v
      , Res (FloatRigid S.empty [A_Neg asm]) Fail ]
 
   | otherwise
   = RedNone
+  where
+    rule_name = "Promote"++left_or_right ++ "(" ++ show x ++ ")"
+
 reduceVarVal _ _ _ _ _ = RedNone
 
 promotionOK :: Blk -> Ident -> Val -> Bool
@@ -1226,9 +1267,9 @@ skolValue cxt e
 ------------------------------------
 data PrimOpResult = P_None | P_Failure | P_Done Exp
 
-orTry :: PrimOpResult -> PrimOpResult -> PrimOpResult
-orTry P_None r2 = r2
-orTry r1     _  = r1
+orTryP :: PrimOpResult -> PrimOpResult -> PrimOpResult
+orTryP P_None r2 = r2
+orTryP r1     _  = r1
 
 reducePrimOp ::PrimOp -> Exp -> Reduction Exp
 reducePrimOp op e
@@ -1240,10 +1281,10 @@ reducePrimOp op e
     rule_nm :: String
     rule_nm = "Prim(" ++ show op ++ ")"
 
-    try_it = reduceArithOp op e `orTry`
-             reduceRelOp   op e `orTry`
-             reduceCheckOp op e `orTry`
-             reduceArrOp   op e `orTry`
+    try_it = reduceArithOp op e `orTryP`
+             reduceRelOp   op e `orTryP`
+             reduceCheckOp op e `orTryP`
+             reduceArrOp   op e `orTryP`
              reduceTruOp   op e
 
 -----------------
@@ -1262,9 +1303,6 @@ reduceArithOp Pls (IntE i)               = P_Done $ IntE i
 
 reduceArithOp IsInt v@(IntE {})          = P_Done v
 reduceArithOp IsInt HNF{}                = P_Failure
-
-reduceArithOp IsNat v@(IntE i) | i >= 0  = P_Done  v
-reduceArithOp IsNat HNF{}                = P_Failure
 
 --reduceArithOp IsStr v@(StrE {})          = P_Done v
 --reduceArithOp IsStr HNF{}                = P_Failure
@@ -1382,20 +1420,20 @@ reduceMatch ::  ReductionContext -> Ident -> Term -> MatchContext -> Reduction E
 reduceMatch cxt x tm mc
   = case tm of
         -- Blocks
-        TBlock t -> mkStep ("MBlock " ++ render (pPrint tbndrs))
+        TBlock t -> mkStep ("MBlock" ++ render (pPrint tbndrs))
                            (FloatB tbndrs emptyHeap) (Match mc x t')
                  where
                    (tbndrs, t') = freshenTerm cxt t
 
         -- Matching
         Und                  -> mkDone "MWild" $ Var x
-        TVar i               -> mkDone "MVar"  $ Var x :=: Var i
-        TLit k               -> mkDone "MLit"  $ Var x :=: Lit k
-        TPrm o               -> mkDone "MPrim" $ Var x :=: Prm o
+        TVar i               -> mkDone "MVar"  $ equalsCirc cxt mc x (Var i)
+        TLit k               -> mkDone "MLit"  $ equalsCirc cxt mc x (Lit k)
+        TPrm o               -> mkDone "MPrim" $ equalsCirc cxt mc x (Prm o)
         TFail                -> mkDone "Mfail" $ Fail
 
         (t1 :@% t2)          -> mkDone "MApp" $
-                                Var x :=: (matchTop cxt mc t1 :@ matchTop cxt mc t2)
+                                equalsCirc cxt mc x (matchTop cxt mc t1 :@ matchTop cxt mc t2)
         (t1 :=:% t2)         -> mkDone "MUnif"    $ (Match mc x t1) :=: (Match mc x t2)
         (t1 :|:% t2)         -> mkDone "MChoice"  $
                                 (mkBlkE $ Match mc x (TBlock t1)) :|:
@@ -1408,8 +1446,22 @@ reduceMatch cxt x tm mc
                              where
                                 w = freshId cxt "w"
 
+        Rng t | DR_Rng fx <- mc_effect mc
+              , MNested   <- mc_blob mc
+              -> mkDone "Mcolon1" $
+                 OfType (Var x) fx (matchTop cxt mc t)
+              | otherwise
+              -> mkDone "MColon2" $ matchTop cxt mc t :@ Var x
+
+{-
         Rng t -> mkDone "Mcolon" $
-                 OfType (Var x) (mc_effect mc) (matchTop cxt mc t)
+                 OfType (Var x) fx (matchTop cxt mc t)
+               where
+                 -- ToDo: this seems ad-hoc and smelly
+                 fx = case mc_effect mc of
+                        DR_Dom     -> Succeeds
+                        DR_Rng fx2 -> fx2
+-}
 {-
         Rng t -> case mc_polarity mc of
                     Positive -> mkDone "MColon+" $ matchTop cxt mc t :@ Var x
@@ -1418,7 +1470,7 @@ reduceMatch cxt x tm mc
 -}
 
         (i := t)   -> mkDone ("MDef " ++ show i) $ Var i :=: Match mc x t
-        (i :-> t)  -> mkDone ("MArr " ++ show i) $ (Var i :=: Var x) :>
+        (i :-> t)  -> mkDone ("MArr " ++ show i) $ (equalsCirc cxt mc x (Var i)) :>
                                                    Match (mcNested mc) i t
 
         -- Tuples and functions
@@ -1471,7 +1523,7 @@ reduceMatch cxt x tm mc
 
         TOfType t1 fx t2 -> mkDone ("TOfType " ++ show fx) $
                             OfType (matchTop cxt mc t1)
-                                   (fx `intersectEffect` mc_effect mc)
+                                   (fx `addDRContext` mc_effect mc)
                                    (matchTop cxt mc t2)
 
         Check fx t -> mkDone ("MCheck " ++ show fx) $
@@ -1480,6 +1532,19 @@ reduceMatch cxt x tm mc
         Splice t -> reduceMatch cxt x t mc
                     -- See (AMP1) in Note [Desugaring ampersand]
 
+
+equalsCirc :: ReductionContext -> MatchContext -> Ident -> Exp -> Exp
+equalsCirc cxt mc x e
+  | DR_Rng {} <- mc_effect mc
+  , MNested   <- mc_blob mc
+  = OfType (Var x) Succeeds $
+           -- Why Succeeds?  See M2May25-1
+    Lam i (mkBlkE $ Var i :=: e)
+           -- Important that `e` is inside the lambda: M28Mar25-1
+  | otherwise
+  = Var x :=: e
+  where
+    i = freshId cxt "i"
 
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> MatchContext -> Reduction Exp
 --  x ~>mc function(at)<fx>{bt}
@@ -1490,8 +1555,8 @@ matchFun cxt f at fx bt mc
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
 
     -- Deal with effects
-    mc_dom = mcEffect Succeeds (mcNested mc)
-    mc_rng = mcEffect fx       mc
+    mc_dom = mcEffect DR_Dom      (mcNested mc)
+    mc_rng = mcEffect (DR_Rng fx) mc
 
     the_lambda = Lam u $
                  Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
@@ -1503,9 +1568,8 @@ matchFun cxt f at fx bt mc
     rng_code = wrap_code :> Match mc_rng q (TBlock bt')
 
     -- Generate a verify{} if we are in GenerateVCs mode
-    fun_verify = case rc_mode cxt of
-                    GenerateVCs -> the_verify
-                    _           -> Arr []
+    fun_verify | generateVCs cxt = the_verify
+               | otherwise       = Arr []
 
     -- verify(u){ u ~>(flip) at; check<fx>{ wrap; q~>(no-flip) bt } }
     the_verify = Verify (sing u) [] $
@@ -1691,8 +1755,12 @@ reduceVerify cxt skols as blk
 
     cxt' = cxt { rc_skols = rc_skols cxt `S.union` skols'
                , rc_vcxt  = Verifying all_as S.empty
-               , rc_mode  = ExecutionOnly }
-                 -- ExecutionOnly: inside verify{}, just execute
+               , rc_mode  = mode' }
+
+    -- ExecutionOnly: inside verify{}, just execute;
+    -- do not generate more verifies
+    mode = rc_mode cxt
+    mode' = mode { rm_generate_vcs = False }
 
 reduceVerifyApp :: ReductionContext -> Exp -> Exp -> Reduction Exp
 reduceVerifyApp cxt fun arg
@@ -1962,6 +2030,11 @@ termSize (TMap kvs)        = 1 + sum (map (termSize . fst) kvs) + sum (map (term
 data Renaming = RN { rn_in_scope :: Set Ident
                    , rn_subst    :: Subst Ident }
 
+instance Pretty Renaming where
+  pPrintPrec _ _ (RN { rn_in_scope = in_scope, rn_subst = subst })
+     = text "RN" <> braces (sep [ text "in_scope=" <> pPrint in_scope
+                                , text "subst=" <> pPrint subst ])
+
 nullRenaming :: Renaming -> Bool
 nullRenaming rn = nullSubst (rn_subst rn)
 
@@ -1969,7 +2042,7 @@ emptyRenaming :: ReductionContext -> Renaming
 emptyRenaming cxt = RN { rn_in_scope = getInScope cxt, rn_subst = emptySubst }
 
 mkRenaming :: ReductionContext -> Ident -> Ident -> Renaming
-mkRenaming cxt x x' = RN { rn_in_scope = getInScope cxt
+mkRenaming cxt x x' = RN { rn_in_scope = S.insert x' (getInScope cxt)
                          , rn_subst    = [(x,x')] }
 
 
@@ -2092,6 +2165,13 @@ freshenTerm2 cxt term1 term2
     tbndrs = termBndrs term1
     (subst, tbndrs') = freshenBndrs (emptyRenaming cxt) tbndrs
 
+freshenLam :: ReductionContext -> Ident -> Blk -> (ReductionContext, Ident, Blk)
+freshenLam cxt x b = (cxt', x', b')
+  where
+    (subst, x') = freshenBndr S.empty (emptyRenaming cxt) x
+    b' = renameBlk subst b
+    cxt' = cxt { rc_skols = S.insert x' (rc_skols cxt) }
+
 freshenBlk :: ReductionContext -> Blk -> Blk
 freshenBlk cxt blk@(Blk locals leqns expr)
   | nullRenaming subst = blk
@@ -2171,7 +2251,7 @@ findFresh bad orig_id@(Name s)
   | bad orig_id = go 0
   | otherwise   = orig_id
   where
-    prefix1 = takeWhile isAlpha s
+    prefix1 = reverse $ dropWhile isDigit $ reverse s
     prefix | null prefix1 = "u"
            | otherwise    = prefix1
 

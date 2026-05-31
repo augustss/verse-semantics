@@ -18,7 +18,6 @@ primOps :: [(String, PrimOp)]
 primOps =
   [ ("any",           IsAny)
   , ("int",           IsInt)
-  , ("nat",           IsNat)
   , ("char",          IsChar)
   , ("length",        ArrLen)
   , ("operator'..'",  DotDot)

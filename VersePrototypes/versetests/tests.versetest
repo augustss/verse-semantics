@@ -174,8 +174,9 @@ testeq("Fun6",pass) {one{ pair := (1, function(n:int)<closed>{pair[0]})
    # Needs recursion
 
 # tim=skip: hits a VERSE_ENSURE
-testeq("Fun7",pass,tim=skip) {one{ pair := (1, function(n:int)<closed>{if (n = 0) {1} else  {n * pair[1](n-1)}})
-                        ; pair[1](5) } }  {120}
+testeq("Fun7",pass,tim=skip)
+  {one{ pair := (1, function(n:int)<closed>{if (n = 0) {1} else  {n * pair[1](n-1)}})
+      ; pair[1](5) } }  {120}
    # Needs recursion
 testeq("Fun8",pass) {f(x:int, y:int)<closed>:=2*x+y; f(2,3)}  {7}
 
@@ -208,8 +209,12 @@ testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
 testeq("TB2",pass) {ap0(f(x:int)<closed>:int)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {1}
-testeq("TB3",pass) {ap0(f(x:int)<closed>:=1)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {1}
+
+testeq("TB3",pass) { ap0(f(x:int)<closed>:=1)<closed> := f[0]
+                   ; succ(x:int)<closed>:=x+1
+                   ; ap0[succ]} {1}
   # Surely TB3 should get stuck because succ is not in the domain of ap0?
+
 testeq("TB4",pass) {ap0(f(x:int)<closed>:=2)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {wrong}
   # ap0[succ] gets stuck because succ[0] does not return 2
 testeq("TB5",pass) {ap(f()<closed>:int)<closed> := f[]; five()<closed>:=5; ap[five]} {5}
@@ -335,8 +340,12 @@ testeq("EV17",pass) {
 testeq("EV18",pass,tim=C00) {0[0]}                                {wrong}
 testeq("EV19",pass,tim=P00) {operator'/'(1,0)}                    {wrong}
 
-testeq("EV20",pass) {f(x:int)<closed><succeeds>:=x<10; f[3]}      {3}
-  # Fails under verification -- and it should!
+verify("EV20",fail) {f(x:int)<closed><succeeds>:=x<10}
+  # EV20 Fails under verification -- and it should!
+
+testeq("EV20a",pass) {f(x:int)<closed><decides>:=x<10; f[3]}      {3}
+
+
 testeq("EV21",pass) {f(x:int)<closed><succeeds>:=x<10; f[11]}     {wrong}
 
 # skip: EV22 uses bad
@@ -352,8 +361,11 @@ testeq("EV23int",pass) { swapGood := (t:any => (x:int; y:int; t=(x, y); (y, x)))
 testeq("EV23a",pass) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) }
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
+
 # tim=skip: Tim does not allow this.  Bug?
-verify("EV23b",pass,tim=A00) { swapGood(t:any)<closed> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23b",pass,tim=A00)
+   { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
+
 verify("EV23c",pass,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
@@ -383,9 +395,12 @@ testeq("EV47",pass) { ( +1) ; ( +1) }         {1}
 testeq("EV48",pass) {       + (1=1) }         {1}
 testeq("EV49",pass) {       + (2;1) }         {1}
 testeq("EV50",pass) {       + ( +1) }         {1}
-#
-testeq("EV51",pass) { succ(x:any)<closed>:=intAdd$[x,1]; y:succ       =1; y }     { 2 }
-testeq("EV52",pass) { succ(x:any)<closed>:=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
+
+# EV51a should faile because intAdd[x,1] might fail if x:any
+verify("EV51a",fail) { succ(x:any)<closed>:=intAdd$[x,1]}
+
+testeq("EV51",pass) { succ(x:int)<closed>:=intAdd$[x,1]; y:succ       =1; y }     { 2 }
+testeq("EV52",pass) { succ(x:int)<closed>:=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
 
 # --- What is first?
 # testeq("EV",pass) { first{1} }              {1}
@@ -414,6 +429,7 @@ testeq("AndyExe12", pass)
                                                        ; D = 1; C } }
                                  ; A = 1; B } }
                     { array{array{1}} }
+
 # tim=skip: seems to hang Tim's verifier
 testeq("AndyExe17", pass, tim=skip)
                     { exists F {

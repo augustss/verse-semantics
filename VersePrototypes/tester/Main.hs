@@ -568,7 +568,7 @@ doEvalCoreTest tflg test
 
        ; let (res1,tr1) = evalCoreExpr tflg test core1
              v1          = Core.Traced.getTerm tr1
-             n_steps     = length (getTrace tr1)
+             n_steps     = traceLength tr1
              test_passed = equivValue v1 mb_v2
 
              outcome :: TestOutcome
@@ -638,9 +638,8 @@ doEvalEssentialTest :: TestFlags -> Test -> IO TestRes
 
 doEvalEssentialTest tflags test
   = do { (cxt, blk, should_be_stuck) <- mkBlkToTest tflags test
-       ; let (res1,tr1) = EV.runTraced (maxSteps tflags) cxt blk
-             v1          = Core.Traced.getTerm tr1
-             n_steps     = length (Core.Traced.getTrace tr1)
+       ; let tr1                 = runEssentialEval tflags cxt blk
+             (res1, n_steps, v1) = traceSummary tr1
              reached_val = case v1 of
                              EV.Blk _is _hp (EV.Val {}) -> True
                              _                          -> False
@@ -668,6 +667,15 @@ doEvalEssentialTest tflags test
                          , tr_outcome = outcome
                          , tr_details = details }) }
 
+runEssentialEval :: TestFlags -> ReductionContext -> Blk -> Traced Blk
+runEssentialEval tflags cxt blk
+  | matchFirst tflags = tr1 `appendTrace` tr2
+  | otherwise         = EV.runTraced max_steps cxt blk
+  where
+    max_steps = maxSteps tflags
+    tr1  = EV.runTraced max_steps (setJustMatching cxt) blk
+    tr2  = EV.runTraced max_steps cxt (getTerm tr1)
+
 mkBlkToTest :: TestFlags -> Test -> IO (EV.ReductionContext, EV.Blk, Bool)
 mkBlkToTest tflags (TestEvalEq _ src1 src2)
   | Variable (Ident _ "wrong") <- src2
@@ -675,13 +683,11 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
     --       see if e1 gets stuck
     -- It's quite different to, say, testeq(...){e1}{3}
     do { term <- mk_term tflags src1
-       ; let top_cxt = mkTopCxt mode term
-             mode | assumeVerified tflags = EV.ExecutionOnly
-                  | otherwise             = EV.GenerateVCs
+       ; let top_cxt = mkTopCxt tflags term
 
              main_exp = -- EV.Verify S.empty [] $ mkBlkE $
                         EV.mkCheck Core.Succeeds  $
-                        mkBlkE $ EV.matchTop top_cxt topMatchContext (TBlock term)
+                        mkBlkE $ EV.matchTop top_cxt topMatchContext term
 
              main_blk = EV.mkBlkE main_exp
 
@@ -690,9 +696,7 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
   | otherwise
   = do { term1 <- mk_term tflags src1
        ; term2 <- mk_term tflags src2
-       ; let top_cxt = mkTopCxt mode (TBlock term1 :>% TBlock term2)
-             mode | assumeVerified tflags = EV.ExecutionOnly
-                  | otherwise             = EV.GenerateVCs
+       ; let top_cxt = mkTopCxt tflags (term1 :>% term2)
 
              (r1,r2) = EV.freshIds2 top_cxt "r"
              rs :: S.Set EV.Ident = S.fromList [r1,r2]
@@ -709,13 +713,11 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
 mkBlkToTest tflags (TestVerify _ src)
   = do { term <- mk_term tflags src
-       ; let top_cxt = mkTopCxt EV.GenerateVCs term
-             -- When verifying, ignore the --assume-verified flag
-             -- Start with NotVerifying at the top level
+       ; let top_cxt = mkTopCxt tflags term
 
              -- check<succeeds>{ exists u. u ~> tm }
              check_exp = EV.mkCheck Core.Succeeds $ EV.mkBlkE $
-                         EV.matchTop top_cxt topMatchContext (TBlock term)
+                         EV.matchTop top_cxt topMatchContext term
 
              main_blk = EV.Blk S.empty EV.emptyHeap $
                         check_exp :> EV.Arr []
@@ -725,8 +727,8 @@ mkBlkToTest tflags (TestVerify _ src)
 
 mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
 
-mkTopCxt :: ReductionMode -> Term -> ReductionContext
-mkTopCxt mode term
+mkTopCxt :: TestFlags -> Term -> ReductionContext
+mkTopCxt tflags term
   = EV.RC { rc_depth  = 0
           , rc_eqns   = EV.thePrelude
           , rc_exis   = prel_bndrs
@@ -739,10 +741,12 @@ mkTopCxt mode term
     prel_bndrs :: S.Set EV.Ident
     prel_bndrs = S.fromList (map fst EV.thePrelude)
 
+    mode = RM { rm_generate_vcs = not (assumeVerified tflags)
+              , rm_just_matching = False }
 
 mk_term :: TestFlags -> SrcExpr -> IO EV.Term
 mk_term tflags src = do { ess <- srcToEssential fe_flags src
-                        ; return (EV.srcToTerm ess) }
+                        ; return (TBlock $ EV.srcToTerm ess) }
   where
     fe_flags = testFlagsToFEFlags tflags
 
@@ -1081,6 +1085,7 @@ data TestFlags = TestFlags
   , dsUniform      :: !Bool
   , fileNames      :: ![FilePath]          -- input files
   , useEvaluator   :: !(Maybe Evaluator)
+  , matchFirst     :: !Bool                -- Run matching code first
   }
   deriving (Show)
 
@@ -1242,6 +1247,10 @@ testFlags
        ; useEvaluator <- OA.optional $ OA.option OA.auto $
                          OA.long "evaluator" <>
                          OA.help "use a particular semantics"
+
+       ; matchFirst <- OA.switch $
+                        OA.long "match-first" <>
+                        OA.help "run matching rules first"
 
        ; return (TestFlags { .. }) }
 
