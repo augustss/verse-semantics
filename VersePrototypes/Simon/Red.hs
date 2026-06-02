@@ -10,7 +10,8 @@
 module Red( Blk(Blk, BlkX), Exp(..), pattern Val, Term(..), Ident(..)
           , matchTop, topMatchContext
           , ReductionContext(..), ReductionMode(..), setJustMatching
-          , VerificationContext(..), MatchContext
+          , VerificationContext(..)
+          , MatchContext, mcAssumeVerified
           , thePrelude
           , run, runTraced, isVal, mkBlkE
           , srcToTerm, addInScopeSkols, addInScopeExis
@@ -159,9 +160,11 @@ data Blk = BlkX (Set Ident) Heap Exp
 --    (A)  dom(eqs)    `subset`   X
 --    (B)  occfvs(eqs) `disjoint` dom(eqs)
 
-data MatchContext = MC { mc_blob     :: Blob
-                       , mc_polarity :: Polarity
-                       , mc_effect   :: DRContext }
+data MatchContext
+  = MC { mc_blob     :: Blob
+       , mc_verify   :: Bool  -- True <=> generate verification
+                              --          constraints for definitions
+       , mc_effect   :: DRContext }
   deriving(Eq,Ord,Show)
 
 data DRContext
@@ -173,11 +176,6 @@ data Blob
   = MTop     -- Written 'o' in the rules.  Do not generate f[x] in (MFun)
   | MNested  -- Written 'bullet' in the rules. Do generate f[x] in (MFun)
   deriving (Eq, Ord, Show)
-
-data Polarity
-  = Positive   -- u ~>+ :t    -->   t[u]
-  | Negative   -- u ~>- :t    -->   u |> t
-  deriving(Eq,Ord,Show)
 
 type Eqn = (Ident, Val)
 type Heap = [Eqn]  -- Invariant: all identifiers in the domain are distinct
@@ -191,30 +189,20 @@ isEmptyHeap _  = False
 
 matchTop :: ReductionContext -> MatchContext -> Term -> Exp
 matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
-                    Match (mc { mc_blob = MTop }) u t
+                    Match (mc { mc_blob = MTop, mc_effect = DR_Dom }) u t
   where
     u = freshId cxt "u"
+
+mcAssumeVerified :: MatchContext -> MatchContext
+mcAssumeVerified mc = mc { mc_verify = False }
 
 mcNested :: MatchContext -> MatchContext
 mcNested mc = mc { mc_blob = MNested }
 
-mcEffect :: DRContext -> MatchContext -> MatchContext
-mcEffect fx mc = mc { mc_effect = fx }
-
-mcFlip :: MatchContext -> MatchContext
-mcFlip mc@(MC {mc_polarity = pol}) = mc { mc_polarity = flip_p pol }
- where
-   flip_p Positive = Negative
-   flip_p Negative = Positive
-
-addDRContext :: Effect -> DRContext -> Effect
-addDRContext fx1 DR_Dom       = fx1
-addDRContext fx1 (DR_Rng fx2) = fx1 `intersectEffect` fx2
-
 topMatchContext :: MatchContext
-topMatchContext = MC { mc_blob     = MTop
-                     , mc_polarity = Positive
-                     , mc_effect   = DR_Dom
+topMatchContext = MC { mc_blob   = MTop
+                     , mc_verify = True
+                     , mc_effect = DR_Dom
                      }
 
 {-# COMPLETE Blk #-}
@@ -371,21 +359,21 @@ instance Pretty Blk where
   pPrintPrec l p (Blk vs eqns e) = ppBlk l p vs eqns e
 
 instance Pretty MatchContext where
-  pPrint (MC b p fx) = parens (pPrint b <> pPrint p <> pp fx)
+  pPrint (MC { mc_blob = b, mc_verify = v, mc_effect = fx })
+    = parens (pPrint b <> pp_v v <> pp_fx fx)
     where
-      pp DR_Dom = empty
-      pp (DR_Rng Succeeds) = char 's'
-      pp (DR_Rng Decides)  = char 'd'
-      pp (DR_Rng Fails)    = char 'f'
-      pp (DR_Rng Iterates) = char 'i'
+      pp_fx DR_Dom = empty
+      pp_fx (DR_Rng Succeeds) = char 's'
+      pp_fx (DR_Rng Decides)  = char 'd'
+      pp_fx (DR_Rng Fails)    = char 'f'
+      pp_fx (DR_Rng Iterates) = char 'i'
+
+      pp_v True  = char 'v'
+      pp_v False = char 'x'
 
 instance Pretty Blob where
   pPrint MTop    = char 'o'
   pPrint MNested = char '⦁'   -- Nearest thing to \bullet
-
-instance Pretty Polarity where
-  pPrint Positive = char '+'
-  pPrint Negative = char '-'
 
 pPrintEffect :: Effect -> Doc
 pPrintEffect Iterates = empty
@@ -638,8 +626,6 @@ setJustMatching rc@(RC { rc_mode = mode })
 justMatching :: ReductionContext -> Bool
 justMatching (RC { rc_mode = RM { rm_just_matching = jm }}) = jm
 
-generateVCs :: ReductionContext -> Bool
-generateVCs (RC { rc_mode = RM { rm_generate_vcs = gvc } }) = gvc
 
 --------------------------------------------------------------------------------
 --
@@ -989,6 +975,8 @@ reduceExp cxt parent@(Blk _ _ body)
         find_recursive leftCF expr `orTry`
         find_rec_matches      expr
 
+    find_admin :: Exp -> Reduction Exp
+    -- These work even when (findMatching cxt)
     find_admin expr
       = case expr of
           Match mc x tm -> reduceMatch cxt x tm mc
@@ -1034,12 +1022,15 @@ reduceExp cxt parent@(Blk _ _ body)
       = RedNone
       | otherwise
       = case expr of
+          Dly e   -> find1 False Dly e
+--ToDo
+--          Chocice b1 b2 -> fmap (Lam x') (reduceBlock cxt' b')
           Lam x b -> fmap (Lam x') (reduceBlock cxt' b')
                   where
                     (cxt', x', b') = freshenLam cxt x b
           Iter ic b e -> fmap (\b' -> Iter ic b' e) (reduceBlock cxt b) `orTry`
                          find1 False (Iter ic b) e
-                               -- False: irrelevant because we neer fire choices
+                               -- False: irrelevant because we never fire choices
           _ -> RedNone
 
     find_verify expr
@@ -1453,22 +1444,6 @@ reduceMatch cxt x tm mc
               | otherwise
               -> mkDone "MColon2" $ matchTop cxt mc t :@ Var x
 
-{-
-        Rng t -> mkDone "Mcolon" $
-                 OfType (Var x) fx (matchTop cxt mc t)
-               where
-                 -- ToDo: this seems ad-hoc and smelly
-                 fx = case mc_effect mc of
-                        DR_Dom     -> Succeeds
-                        DR_Rng fx2 -> fx2
--}
-{-
-        Rng t -> case mc_polarity mc of
-                    Positive -> mkDone "MColon+" $ matchTop cxt mc t :@ Var x
-                    Negative -> mkDone "Mcolon-" $
-                                OfType (Var x) (mc_effect mc) (matchTop cxt mc t)
--}
-
         (i := t)   -> mkDone ("MDef " ++ show i) $ Var i :=: Match mc x t
         (i :-> t)  -> mkDone ("MArr " ++ show i) $ (equalsCirc cxt mc x (Var i)) :>
                                                    Match (mcNested mc) i t
@@ -1521,10 +1496,7 @@ reduceMatch cxt x tm mc
                     cxt' = cxt `addInScopeExis` tbs0
                     (y,w) = freshId2 (cxt `addInScopeExis` tbs0) ("y","w")
 
-        TOfType t1 fx t2 -> mkDone ("TOfType " ++ show fx) $
-                            OfType (matchTop cxt mc t1)
-                                   (fx `addDRContext` mc_effect mc)
-                                   (matchTop cxt mc t2)
+        TOfType t1 fx t2 -> matchOfType cxt mc x t1 fx t2
 
         Check fx t -> mkDone ("MCheck " ++ show fx) $
                       Var x :=: mkCheck fx (mkBlkE $ matchTop cxt mc (TBlock t))
@@ -1532,50 +1504,82 @@ reduceMatch cxt x tm mc
         Splice t -> reduceMatch cxt x t mc
                     -- See (AMP1) in Note [Desugaring ampersand]
 
+matchOfType :: ReductionContext -> MatchContext -> Ident -> Term -> Effect -> Term -> Reduction Exp
+matchOfType cxt mc x t1 fx t2
+ = case mc of
+     MC { mc_verify = False, mc_effect = DR_Dom }
+        -> mkDone ("TOfTypeXD " ++ show fx) $
+           Var x :=: (matchTop cxt mc t2 :@ matchTop cxt mc t1)
+
+     MC { mc_verify = False, mc_effect = DR_Rng fx_pushed }
+        -> mkDone ("TOfTypeXR " ++ show fx) $
+           OfType (Match mc x t1)
+                  (fx `intersectEffect` fx_pushed)
+                  (matchTop cxt mc t2)
+
+     MC { mc_verify = True, mc_effect = DR_Dom }
+        -> mkStep ("TOfTypeVD " ++ show fx) (mkExiFloat [y,t]) $
+           (Var y :=: matchTop cxt mc t1) :>
+           (Var t :=: matchTop cxt mc t2) :>
+           (mkCheck Succeeds (mkBlkE $ Var t :@ Var y)) :>
+           (OfType (Var y) fx (Var t))
+
+     MC { mc_verify = True, mc_effect = DR_Rng {} }
+        -> mkStep ("TOfTypeVR " ++ show fx) (mkExiFloat [y,t]) $
+           (Var y :=: matchTop cxt mc t1) :>
+           (Var t :=: matchTop cxt mc t2) :>
+           mkCheck Succeeds (mkBlkE $ Var t :@ Var y)
+  where
+    (y,t) = freshId2 cxt ("y","t")
 
 equalsCirc :: ReductionContext -> MatchContext -> Ident -> Exp -> Exp
-equalsCirc cxt mc x e
-  | DR_Rng {} <- mc_effect mc
-  , MNested   <- mc_blob mc
-  = OfType (Var x) Succeeds $
-           -- Why Succeeds?  See M2May25-1
-    Lam i (mkBlkE $ Var i :=: e)
-           -- Important that `e` is inside the lambda: M28Mar25-1
-  | otherwise
-  = Var x :=: e
-  where
-    i = freshId cxt "i"
+equalsCirc _cxt _mc x e = Var x :=: e
 
 matchFun :: ReductionContext -> Ident -> Term -> Effect -> Term -> MatchContext -> Reduction Exp
 --  x ~>mc function(at)<fx>{bt}
 matchFun cxt f at fx bt mc
   = mkDone "MFun" $ fun_verify `mkSeq` the_lambda
   where
+    blob = mc_blob mc
     (tbs_at, at', bt') = freshenTerm2 cxt at bt
     (u,p,q) = freshId3 (cxt `addInScopeExis` tbs_at) ("u", "p", "q")
 
-    -- Deal with effects
-    mc_dom = mcEffect DR_Dom      (mcNested mc)
-    mc_rng = mcEffect (DR_Rng fx) mc
+    -- Match context for the four sub-matches
+    mc_lam_dom = MC { mc_blob   = MNested
+                    , mc_effect = DR_Dom
+                    , mc_verify = False }
+
+    mc_lam_rng = MC { mc_blob   = blob
+                    , mc_effect = DR_Rng fx
+                    , mc_verify = False }
+
+    mc_ver_dom = MC { mc_blob   = MTop
+                    , mc_effect = DR_Dom
+                    , mc_verify = True }
+
+    mc_ver_rng = MC { mc_blob   = blob
+                    , mc_effect = DR_Rng fx
+                    , mc_verify = True }
 
     the_lambda = Lam u $
                  Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
-                 (Var p :=: Match mc_dom u at') :> rng_code
+                 (Var p :=: Match mc_lam_dom u at') :>
+                 wrap_code :> Match mc_lam_rng q (TBlock bt')
 
-    wrap_code = case mc_blob mc of
+    wrap_code = case blob of
                   MNested -> Var q :=: (Var f :@ Var p)
                   MTop    -> IntE 99999
-    rng_code = wrap_code :> Match mc_rng q (TBlock bt')
 
     -- Generate a verify{} if we are in GenerateVCs mode
-    fun_verify | generateVCs cxt = the_verify
-               | otherwise       = Arr []
+    fun_verify | mc_verify mc = the_verify
+               | otherwise    = Arr []
 
     -- verify(u){ u ~>(flip) at; check<fx>{ wrap; q~>(no-flip) bt } }
     the_verify = Verify (sing u) [] $
                  Blk tbs_at emptyHeap $
-                 Match (mcFlip mc_dom) u at' :>
-                 mkCheck fx (Blk (sing q) emptyHeap rng_code)
+                 Match mc_ver_dom u at' :>
+                 (mkCheck fx $ Blk (sing q) emptyHeap $
+                  wrap_code :> Match mc_ver_rng q (TBlock bt'))
 
 ---------------------------------------
 reduceIter :: ReductionContext -> IterCtx -> Blk -> Exp -> Reduction Exp
@@ -1696,6 +1700,8 @@ choiceFreeB (Blk _ _ e) = choiceFree e
 --------------------------------------------------------------------------------
 
 reduceOfType :: ReductionContext -> Exp -> Effect -> Exp -> Reduction Exp
+-- Inside verify:
+--    verify(R;A){ P[ e1 |>fx e2 ] }  -->   verify(R,sk;A){ exists z. z = e2[sk]; P[ z ] }
 reduceOfType cxt e1 fx e2
   | skolValue cxt e2  -- Only true inside verify{}
   , [sk, z] <- freshIds cxt ["sk", "z"]

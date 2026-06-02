@@ -683,11 +683,14 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
     --       see if e1 gets stuck
     -- It's quite different to, say, testeq(...){e1}{3}
     do { term <- mk_term tflags src1
-       ; let top_cxt = mkTopCxt tflags term
+       ; let top_cxt = mkTopCxt term
+
+             mc | assumeVerified tflags = mcAssumeVerified topMatchContext
+                | otherwise             = topMatchContext
 
              main_exp = -- EV.Verify S.empty [] $ mkBlkE $
                         EV.mkCheck Core.Succeeds  $
-                        mkBlkE $ EV.matchTop top_cxt topMatchContext term
+                        mkBlkE $ EV.matchTop top_cxt mc term
 
              main_blk = EV.mkBlkE main_exp
 
@@ -696,13 +699,16 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
   | otherwise
   = do { term1 <- mk_term tflags src1
        ; term2 <- mk_term tflags src2
-       ; let top_cxt = mkTopCxt tflags (term1 :>% term2)
+       ; let top_cxt = mkTopCxt (term1 :>% term2)
+
+             mc | assumeVerified tflags = mcAssumeVerified topMatchContext
+                | otherwise             = topMatchContext
 
              (r1,r2) = EV.freshIds2 top_cxt "r"
              rs :: S.Set EV.Ident = S.fromList [r1,r2]
 
-             main_exp = EV.Var r1 EV.:=: mk_all top_cxt term1 EV.:>
-                        EV.Var r2 EV.:=: mk_all top_cxt term2 EV.:>
+             main_exp = EV.Var r1 EV.:=: mk_all top_cxt mc term1 EV.:>
+                        EV.Var r2 EV.:=: mk_all top_cxt mc term2 EV.:>
                         -- EV.Verify S.empty [] $ mkBlkE $
                         EV.mkCheck Core.Succeeds  $
                         mkBlkE $ EV.Var r1 EV.:=: EV.Var r2
@@ -713,7 +719,7 @@ mkBlkToTest tflags (TestEvalEq _ src1 src2)
 
 mkBlkToTest tflags (TestVerify _ src)
   = do { term <- mk_term tflags src
-       ; let top_cxt = mkTopCxt tflags term
+       ; let top_cxt = mkTopCxt term
 
              -- check<succeeds>{ exists u. u ~> tm }
              check_exp = EV.mkCheck Core.Succeeds $ EV.mkBlkE $
@@ -727,8 +733,8 @@ mkBlkToTest tflags (TestVerify _ src)
 
 mkBlkToTest _tflags (TestDenSem {}) = error "TestDenSem"
 
-mkTopCxt :: TestFlags -> Term -> ReductionContext
-mkTopCxt tflags term
+mkTopCxt :: Term -> ReductionContext
+mkTopCxt term
   = EV.RC { rc_depth  = 0
           , rc_eqns   = EV.thePrelude
           , rc_exis   = prel_bndrs
@@ -741,7 +747,7 @@ mkTopCxt tflags term
     prel_bndrs :: S.Set EV.Ident
     prel_bndrs = S.fromList (map fst EV.thePrelude)
 
-    mode = RM { rm_generate_vcs = not (assumeVerified tflags)
+    mode = RM { rm_generate_vcs  = False
               , rm_just_matching = False }
 
 mk_term :: TestFlags -> SrcExpr -> IO EV.Term
@@ -750,10 +756,10 @@ mk_term tflags src = do { ess <- srcToEssential fe_flags src
   where
     fe_flags = testFlagsToFEFlags tflags
 
-mk_all :: ReductionContext -> EV.Term -> EV.Exp
+mk_all :: ReductionContext -> MatchContext -> EV.Term -> EV.Exp
 -- Returns all{exists u.  u ~~> block{t} }
-mk_all cxt t = EV.mkAll $ EV.mkBlkE $
-               EV.matchTop cxt topMatchContext $ EV.TBlock t
+mk_all cxt mc t = EV.mkAll $ EV.mkBlkE $
+                  EV.matchTop cxt mc $ EV.TBlock t
 
 ----------------------------------------------------------------
 --
