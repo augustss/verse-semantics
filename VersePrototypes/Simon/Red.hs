@@ -1438,7 +1438,6 @@ reduceMatch cxt x tm mc
                                 w = freshId cxt "w"
 
         Rng t | DR_Rng fx <- mc_effect mc
-              , MNested   <- mc_blob mc
               -> mkDone "Mcolon1" $
                  OfType (Var x) fx (matchTop cxt mc t)
               | otherwise
@@ -1555,7 +1554,7 @@ matchFun cxt f at fx bt mc
 
     mc_ver_dom = MC { mc_blob   = MTop
                     , mc_effect = DR_Dom
-                    , mc_verify = True }
+                    , mc_verify = False }
 
     mc_ver_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx
@@ -1776,7 +1775,7 @@ reduceVerifyApp cxt fun arg
   | Prm op <- fun
   , Just gv <- groundValue (rc_skols cxt) arg
   , not (isClosedGV gv)
-  = reduceVerifyOpGV cxt op gv
+  = reduceVerifyOpGV cxt op arg gv
 
   | Var f <- fun
   , f `S.member` rc_skols cxt
@@ -1796,19 +1795,23 @@ isClosedGV (GVLit {})  = True
 isClosedGV (GVArr gvs) = all isClosedGV gvs
 isClosedGV (GVTru gv)  = isClosedGV gv
 
-reduceVerifyOpGV :: ReductionContext -> PrimOp -> GroundVal -> Reduction Exp
-reduceVerifyOpGV _cxt op _gv
+reduceVerifyOpGV :: ReductionContext -> PrimOp -> Exp -> GroundVal -> Reduction Exp
+reduceVerifyOpGV _cxt op _arg _gv
   | primOpIsCheck op --  Do not skolemise ChkSucceeds etc
   =  RedNone
 
-reduceVerifyOpGV cxt op gv
+-- Unary operators
+-- verify(R;A){ P[     op[gv] ] } -> verify(R,r; A,r=op[gv]){ P[ r ] }
+-- verify(R;A){ P[ predop[gv] ] } -> verify(R; A,    op[gv] ){ P[ gv ] }
+--                                   verify(R; A,not(op[gv])){ P[ fail ] }
+reduceVerifyOpGV cxt op arg gv
   | Just arg_op <- isUnaryOp op
   , let check_args = mkArgCheck arg_op gv
   = VerStep (mkRuleName ("VUnaryOp" ++ show op)) $
     [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
     then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
-         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
+         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) arg ]
     else [ Res (FloatRigid (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
   where
     r = freshId cxt "r"
@@ -1818,7 +1821,7 @@ reduceVerifyOpGV cxt op gv
     stuck = Err (render (pPrint op <> brackets (pPrint gv)))
 
 -- Binary operators where the argument is a skolem
-reduceVerifyOpGV cxt op (GVVar r)
+reduceVerifyOpGV cxt op _ (GVVar r)
   | Just {} <- isBinOp op
   = VerStep (mkRuleName "VBinOp-Arr")
     [ Res (FloatRigid rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
@@ -1829,7 +1832,10 @@ reduceVerifyOpGV cxt op (GVVar r)
     eq_asm = A_GVEq r (GVArr [GVVar r1, GVVar r2])
 
 -- Binary operators where we can see both arguments
-reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
+-- verify(R;A){ P[     op[gv1,gv2] ] } -> verify(R,r; A,r=op[gv1,gv2]){ P[ r ] }
+-- verify(R;A){ P[ predop[gv1,gv2] ] } -> verify(R; A,    op[gv1,gv2] ){ P[ gv1 ] }
+--                                        verify(R; A,not(op[gv1,gv2])){ P[ fail ] }
+reduceVerifyOpGV cxt op (Arr [arg1,_arg2]) gv@(GVArr [gv1,gv2])
   | Just (arg1_op, arg2_op) <- isBinOp op
   , let check_args :: [FailableAssump]
         check_args = mkArgCheck arg1_op gv1 ++ mkArgCheck arg2_op gv2
@@ -1837,7 +1843,7 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
     [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
     if primOpCanFail op
     then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
-         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) (Arr []) ]
+         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) arg1 ]
     else [ Res (FloatRigid (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
   where
     r = freshId cxt "r"
@@ -1846,11 +1852,13 @@ reduceVerifyOpGV cxt op gv@(GVArr [gv1,gv2])
     stuck :: Exp
     stuck = Err (render (pPrint op <> brackets (pPrint gv)))
 
-reduceVerifyOpGV _cxt op gv = error ("reduceVerifyOp " ++ render (pPrint op $$ pPrint gv))
+reduceVerifyOpGV _cxt op arg _gv = error ("reduceVerifyOp " ++ render (pPrint op $$ pPrint arg))
 
 mkArgCheck :: PrimOp -> GroundVal -> [FailableAssump]
-mkArgCheck IsAny _  = []
-mkArgCheck op    gv = [A_RelOp op gv]
+mkArgCheck IsAny  _                  = []
+mkArgCheck IsInt  (GVLit (LInt {}))  = []
+mkArgCheck IsChar (GVLit (LChar {})) = []
+mkArgCheck op     gv                 = [A_RelOp op gv]
 
 --------------------------------------------------------------------------------
 --
