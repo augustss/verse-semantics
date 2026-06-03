@@ -43,7 +43,7 @@ import Data.Scientific (fromFloatDigits)
 import Control.Monad
 import qualified Data.Text as T
 
-toSrcExpr :: (L (P.Exp SimpleName)) -> Src.SrcExpr
+toSrcExpr :: L (P.Exp SimpleName) -> Src.SrcExpr
 toSrcExpr = expToSrcExpr . desugar
 
 expToSrcExpr :: L (R.Exp L Ident) -> Src.SrcExpr

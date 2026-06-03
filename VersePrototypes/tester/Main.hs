@@ -1211,11 +1211,9 @@ testFlags
        ; timRun <- OA.switch $
                    OA.long "tim-run" <>
                    OA.help "run a Tim test"
-
        ; timVerify <- OA.switch $
                       OA.long "tim-verify" <>
                       OA.help "verify Tim test"
-
        ; timOutput <- OA.switch $
                       OA.long "tim-output" <>
                       OA.help "display as a Tim test"

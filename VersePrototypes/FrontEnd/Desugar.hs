@@ -76,7 +76,7 @@ desugar flgs add_verification e_parsed
 srcToEssential :: Flags -> SrcExpr -> IO SrcEssential
 srcToEssential flags e_parsed
   = runD flags Fail $
-    do { _ <- traceDS "parsed" e_parsed
+    do { _ <- traceDS "Parsed" e_parsed
 
        -- Prepend prelude from
        --    verifyprelude.verse, mediumprelude.verse
