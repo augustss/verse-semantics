@@ -523,11 +523,11 @@ verify("T24Jul24-2", fail, tim=skip_acc) {f(x:int)<closed><decides>:type{x=10} :
 
 
 # Tim examples 8/9/2023
-#  These use 'assume' so they aren't real programs
-verify("T8Sep23-1", pass, broken) {f(x:int, y:int)<closed><succeeds> := {assume{x=z}; z:=x=y}}
+#  These use 'assume' so they aren't real programs, hence 'skip'
+verify("T8Sep23-1", pass, skip) {f(x:int, y:int)<closed><succeeds> := {assume{x=z}; z:=x=y}}
 verify("T8Sep23-1a", pass, broken) {f(x:int, y:int, g(z:int)<closed>:type{x=z})<closed><succeeds> := {g[z2]; z2:=x=y}}
-verify("T8Sep23-2", fail,tim=skip_acc) {f(x:int, y:int)<closed><succeeds> := {z:=x=y; assume{x=z}}}
-verify("T8Sep23-3", pass, broken) {f(x:int, y:int)<closed><succeeds> := exists z { assume{z = x}; z = x; x = y } }
+verify("T8Sep23-3", pass, skip) {f(x:int, y:int)<closed><succeeds> := exists z { assume{z = x}; z = x; x = y } }
+verify("T8Sep23-2", fail, skip, tim=skip_acc) {f(x:int, y:int)<closed><succeeds> := {z:=x=y; assume{x=z}}}
 
 verify("T24Sep24-1", pass,tim=skip_rej) { F()<closed>:type{1|2} = 1; X := F(); X = 1|2 }
 verify("T24Sep24-2", fail,tim=P00) { F()<closed>:type{1|2} = 1; X := F(); X = 1 }
