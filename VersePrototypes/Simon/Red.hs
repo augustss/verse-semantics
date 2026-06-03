@@ -1495,7 +1495,9 @@ reduceMatch cxt x tm mc
                     cxt' = cxt `addInScopeExis` tbs0
                     (y,w) = freshId2 (cxt `addInScopeExis` tbs0) ("y","w")
 
-        TOfType t1 fx t2 -> matchOfType cxt mc x t1 fx t2
+        TOfType t1 _fx t2 -> matchOfType cxt mc x t1 Succeeds t2
+          -- Hack: Ignoring the fx on |> in terms
+          -- The parser seems to always put <decides> there
 
         Check fx t -> mkDone ("MCheck " ++ show fx) $
                       Var x :=: mkCheck fx (mkBlkE $ matchTop cxt mc (TBlock t))
