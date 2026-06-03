@@ -1546,7 +1546,7 @@ matchFun cxt f at fx bt mc
     -- Match context for the four sub-matches
     mc_lam_dom = MC { mc_blob   = MNested
                     , mc_effect = DR_Dom
-                    , mc_verify = False }
+                    , mc_verify = True }
 
     mc_lam_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx
