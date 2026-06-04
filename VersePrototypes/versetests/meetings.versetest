@@ -2,6 +2,24 @@
 #     Add new meetings at the top
 #########################################
 
+# ------------ 4 June 2026 -------------
+testeq("M4Jun26-1", pass)
+  { if( (:function(x:=3)<closed>{5}) = (:function(x:=4)<closed>{5}))
+      then{1} else{99} }
+  {99}
+  # M2Jun26-1: this is the "excellent example" that show that we must
+  #            push a unificatino variable into both branches of a choice
+
+verify("M4Jun26-2", fail){ f()<decides>:int := 'c' }
+  # M4Jun26-1: reject because RHS is not an int. Tim agrees
+
+verify("M4Jun26-3", fail){ f()<decides> := {  x:int := 'c'; x } }
+  # M4Jun26-3:  should reject. 'c' is not int.  Tim agrees
+
+verify("M4Jun26-4", fail){ f()<succeeds> := {  x:int := 3; x=3 } }
+  # M4Jun26-4: should reject. verifier can't see that x=3.  Tim agrees
+
+
 # ------------ 2 May 2025 -------------
 verify("M2May25-1", pass){ f6a( p(x:int)<closed><decides>:=7 )<closed><succeeds> := p[3] }
   # -1: accept: despite p <decides>, because p is transparent
