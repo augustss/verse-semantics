@@ -53,7 +53,7 @@ solver s
 
 
 {- Note [Solver-Rules]
-
+~~~~~~~~~~~~~~~~~~~~~~
 Equality [s |- gv1 ~ gv2]
 
 -------------[eq-refl]
@@ -67,14 +67,8 @@ s |- gv1 ~ gv2
 ---------------[eq-symm]
 s |- gv2 ~ gv1
 
--}
-
-
-
-
-
-{- Note [Solver]
-~~~~~~~~~~~~~~~~
+Note [Solver]
+~~~~~~~~~~~~~
 The solver maintains a "union-find" (UF) data structure
 `s_uf` that tracks all the equivalences between ground
 values that can be proved from the *positive* assumptions
@@ -172,7 +166,8 @@ check s = firstJust
   :  checkArith s
   : (checkNeg s <$> s_neg s)
 
--- [c-lit], i.e. k, k' yield a contradiction if s |- k ~ k'
+-- See Note [Rules:Contradiction], rule [c-lit]
+-- i.e. k, k' yield a contradiction if s |- k ~ k'
 checkLits :: Solver -> Maybe UnsatReason
 checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing } <$> litGroups)
   where
@@ -203,13 +198,14 @@ checkTypes s
   | otherwise
   = Nothing
 
--- Can we derive !s, see Note [Rules:Contradiction]
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
+-- Can we derive !s?
+-- See Note [Rules:Contradiction], rules [c-eq-l], [c-eq-r], [c-op]
 
 -- [c-eq-*] not (x = ) yields a contradiction if s |- x ~ gv and x OR gv are primitive
-checkNeg s neg@(A_GVEq x gv)
-  | isEqual s (GVVar x) gv
-  , isPrim s (GVVar x) || isPrim s gv  -- See Note [Checking negated equalities]
+checkNeg s neg@(A_GVEq gv1 gv2)
+  | isEqual s gv1 gv2
+  , isPrim s gv1 || isPrim s gv2  -- See Note [Checking negated equalities]
   = Just (Contra neg)
   | otherwise
   = Nothing
@@ -258,50 +254,52 @@ isRelOpLit2 op l1 l2
 
 {- Note [Rules:Contradiction]
 
-Contradiction [!s]
-  where !s means "solver state s is a contradiction"
+*** Contradiction [!s] ***
+where !s means "solver state s is a contradiction"
 
-k1, k2 distinct literals in s   s |- k1 ~ k2
--------------------------------------------- [c-lit]
-!s
+  k1, k2 distinct literals in s   s |- k1 ~ k2
+  -------------------------------------------- [c-lit]
+  !s
 
-not (x = gv) in s    s |- x ~ gv     s |- x:prim
------------------------------------------------[c-eq-l]
-!s
+  not (x = gv) in s    s |- x ~ gv     s |- x:prim
+  -----------------------------------------------[c-eq-l]
+  !s
 
-not (x = gv) in s    s |- x ~ gv     s |- gv:prim
--------------------------------------------------[c-eq-r]
-!s
+  not (x = gv) in s    s |- x ~ gv     s |- gv:prim
+  -------------------------------------------------[c-eq-r]
+  !s
+
+NB: why (s |- gv:prim)?  See Note [Checking negated equalities]
+
+  not (op[gv]) in s   s |- op[gv]
+  -------------------------------- [c-op]
+  !s
 
 
-not (op[gv]) in s   s |- op[gv]
--------------------------------- [c-op]
-!s
+*** IsPrimitive [s |- gv : prim] ***
 
-IsPrimitive [s |- gv : prim]
+  s |- gv ~ l
+  --------------[p-lit]
+  s |- gv: prim
 
-s |- gv ~ l
---------------[p-lit]
-s |- gv: prim
+  s |- isPrim[gv1]  s |- gv1 ~ gv2
+  ---------------------------------[p-pred]
+  s |- gv2:prim
 
-s |- isPrim[gv1]  s |- gv1 ~ gv2
----------------------------------[p-pred]
-s |- gv2:prim
 
-Evaluates-To [s |- op[gv]
+*** Evaluates-To [s |- op[gv] ***
 
-s |- gv ~ l  and op1[l]
-------------------------[ev-op1]
-s |- op1[gv]
+  s |- gv ~ l  and op1[l]
+  ------------------------[ev-op1]
+  s |- op1[gv]
 
-s |- gv ~ l1    s |- gv2 ~ l2   op2[l1, l2]
-----------------------------------------------[ev-op2]
-s |- op1[gv]
+  s |- gv ~ l1    s |- gv2 ~ l2   op2[l1, l2]
+  ----------------------------------------------[ev-op2]
+  s |- op1[gv]
 
--}
 
-{- Note [Checking negated equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Checking negated equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the assumption not(r=r).  Is that enough to garantee un-satisfiablity.
 Currently we say no. Consider T29Jul24-2:
 
@@ -351,14 +349,14 @@ generateEqs s = -- ppTrace "generateEqs" (vcat [ text "pos" <+> pPrint (s_pos s)
                  evalDefs s ++
                  cseDefs s)
   where
-    pos = [MkEqual (GVVar x) y | A_GVEq x y <- s_pos s]
+    pos = [MkEqual x y | A_GVEq x y <- s_pos s]
 
     -- May 26: I think we need this to propagate tuple equalities
     tup_eqs   -- x=<a,b> x=<c,d>  =>   a=c,b=d
       = [ MkEqual a c
         | A_GVEq x (GVArr ab_s) <- s_pos s
         , cd_s <- s_tups s
-        , isEqual s (GVVar x) (GVArr cd_s)
+        , isEqual s x (GVArr cd_s)
         , length ab_s == length cd_s
         , (a,c) <- ab_s `zip` cd_s
         , a /= c ]
@@ -434,22 +432,27 @@ isEqual s = UF.equal (s_uf s)
 -- See Note [Checking negated equalities]
 ------------------------------------------------------------------------------------
 isPrim :: Solver -> GroundVal -> Bool
-isPrim s (GVVar x)  = isPrimV s x
+isPrim s (GVVar x)  = isPrimVar s x
 isPrim _ (GVLit _)  = True
 isPrim s (GVArr vs) = all (isPrim s) vs
    -- Recursion in GVArr: a common case is: r=<>, not(r=<>)
    -- and that is definitely contradictory.  Test is T26Jul24-13.
 isPrim s (GVTru v) = isPrim s v
 
-isPrimV :: Solver -> Ident -> Bool
-isPrimV s x = not $ null [() | A_RelOp op (GVVar y) <- s_pos s, isTyOp op, isEqual s (GVVar x) (GVVar y)]
+isPrimVar :: Solver -> Ident -> Bool
+isPrimVar s x
+  = any prim_type_test (s_pos s) ||
+    any eq_lit (s_lits s)
+  where
+    prim_type_test :: FailableAssump -> Bool
+    -- True if we see IsInt[y], where y~x
+    prim_type_test (A_RelOp op (GVVar y)) = primOpIsTypeTest op &&
+                                            isEqual s (GVVar x) (GVVar y)
+    prim_type_test _ = False
 
-isTyOp :: PrimOp -> Bool
-isTyOp IsInt  = True
-isTyOp IsChar = True
-isTyOp IsStr  = True
-isTyOp IsComp = True
-isTyOp _      = False
+    eq_lit :: Lit -> Bool
+    -- True if there is a literal such that k~x
+    eq_lit lit = isEqual s (GVVar x) (GVLit lit)
 
 ------------------------------------------------------------------------------------
 -- `isRel s op v` returns true if
@@ -642,7 +645,7 @@ arithEdges = go
     go False (A_RelOp Lt  (GVArr [gv1, gv2])) = arithLEq gv2 gv1
     go False (A_RelOp Gt  (GVArr [gv1, gv2])) = arithLEq gv1 gv2
     go False (A_RelOp GEq (GVArr [gv1, gv2])) = arithLt  gv1 gv2
-    go True  (A_GVEq  x   gv)                 = arithEq  (GVVar x) gv
+    go True  (A_GVEq  gv1  gv2)               = arithEq  gv1 gv2
     go _ _                                    = []
 
 primOpResultPred_maybe :: PrimOp -> Maybe PrimOp
@@ -731,13 +734,13 @@ instance Pretty Equality where
 _test4 :: [Assump]
 _test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
   where
-    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
-    r10_eq_0        = A_Pos (A_GVEq r10 zero)
+    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
+    r10_eq_0        = A_Pos (A_GVEq (GVVar r10) zero)
     r5_eq_0         = A_Pos (A_GVEq r5 zero)
-    r10_eq_add_r5_1 = A_PrimOp r10 (AO_Prim Add) (GVArr [GVVar r5, GVVar i1])
-    i1              = Bind.ident "$I1"
+    r10_eq_add_r5_1 = A_PrimOp r10 (AO_Prim Add) (GVArr [r5, i1])
+    i1              = GVVar (Bind.ident "$I1")
     r10             = Bind.ident "$R10"
-    r5              = Bind.ident "$R5"
+    r5              = GVVar (Bind.ident "$R5")
 
 -- >>> unsatAsms test3
 -- Just (Arith [GVVar $I1,GVLit 0,GVVar $R10])
@@ -745,10 +748,10 @@ _test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
 _test3 :: [Assump]
 _test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
   where
-    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
-    r10_eq_0        = A_Pos (A_GVEq r10 zero)
-    r10_eq_add_0_1  = A_PrimOp r10 (AO_Prim Add) (GVArr [zero, GVVar i1])
-    i1              = Bind.ident "$I1"
+    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
+    r10_eq_0        = A_Pos (A_GVEq (GVVar r10) zero)
+    r10_eq_add_0_1  = A_PrimOp r10 (AO_Prim Add) (GVArr [zero, i1])
+    i1              = GVVar (Bind.ident "$I1")
     r10             = Bind.ident "$R10"
 
 -- >>> unsatAsms test2
@@ -757,11 +760,11 @@ _test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
 _test2 :: [Assump]
 _test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
   where
-    i1_gt_0   = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    i1_gt_0   = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
     r10_eq_0  = A_Pos (A_GVEq r10 zero)
-    r10_eq_i1 = A_Pos (A_GVEq r10 (GVVar i1))
-    i1        = Bind.ident "$I1"
-    r10       = Bind.ident "$R10"
+    r10_eq_i1 = A_Pos (A_GVEq r10 i1)
+    i1        = GVVar (Bind.ident "$I1")
+    r10       = GVVar (Bind.ident "$R10")
 
 -- >>> unsatAsms test1
 -- Just (Arith [GVVar $I1,GVLit 0])
@@ -769,9 +772,9 @@ _test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
 _test1 :: [Assump]
 _test1 = [i1_gt_0, i1_eq_0]
   where
-    i1_gt_0 = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    i1_gt_0 = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
     i1_eq_0 = A_Pos (A_GVEq i1 zero)
-    i1      = Bind.ident "$I1"
+    i1      = GVVar (Bind.ident "$I1")
 
 
 -- >>> unsatAsms test0
@@ -792,4 +795,4 @@ _test00 = [i1_eq_10, i1_eq_20]
   where
     i1_eq_10 = A_Pos (A_GVEq i1 (GVLit (LInt 10)))
     i1_eq_20 = A_Pos (A_GVEq i1 (GVLit (LInt 20)))
-    i1       = Bind.ident "$I1"
+    i1       = GVVar (Bind.ident "$I1")

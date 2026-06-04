@@ -584,7 +584,7 @@ primOpIsTypeTest IsArr  = True
 primOpIsTypeTest IsMap  = True
 primOpIsTypeTest IsFun  = True
 primOpIsTypeTest IsType = True
-primOpIsTypeTest IsComp = True  -- ? Not really a type test
+primOpIsTypeTest IsComp = True
 primOpIsTypeTest _      = False
 
 isUnaryOp :: PrimOp -> Maybe PrimOp
@@ -609,6 +609,18 @@ isBinOp DotDot = Just (IsInt, IsInt)
 isBinOp ArrMap = Just (IsFun, IsArr)
 isBinOp _      = Nothing
 
+{-
+primOpCanFire :: PrimOp -> GroundVal -> Maybe [FailableAssump]
+primOpCanFire Add gv =  twoIntArgs gv
+primOpCanFire Sub gv =  twoIntArgs gv
+primOpCanFire Mul gv =  twoIntArgs gv
+primOpCanFire Div gv =  case gv of
+                           GVArr [a1,a2] -> Just [A_RelOp IsInt a1, A_RelOp IsInt a2
+                                                 , A
+
+twoIntArgs (GVArr [a1,a2]) = Just [A_RelOp IsInt a1, A_RelOp IsInt a2]
+twoIntArgs _               = Nothing
+-}
 
 --------------------------------------------------------------------------------
 --
@@ -684,9 +696,9 @@ data Assump
   deriving( Eq, Ord, Show )
 
 data FailableAssump
-  = A_GVEq  Ident  GroundVal   -- e.g. r=3
-  | A_RelOp PrimOp GroundVal   -- e.g. isInt$[r], or intGT$[r1,r2]
-                               -- A_RelOp invariant: (primOpCanFail op) is True
+  = A_GVEq  GroundVal GroundVal  -- e.g. r=3
+  | A_RelOp PrimOp GroundVal     -- e.g. isInt$[r], or intGT$[r1,r2]
+                                 -- A_RelOp invariant: (primOpCanFail op) is True
   deriving ( Eq, Ord, Show )
 
 data AssumpOp
@@ -706,7 +718,7 @@ instance Pretty Assump where
   pPrint (A_PrimOp i op gv) = pPrint i <+> text "=" <+> pPrint op <> brackets (pPrint gv)
 
 instance Pretty FailableAssump where
-  pPrint (A_GVEq i gv)      = pPrint i <+> text "="  <+> pPrint gv
+  pPrint (A_GVEq gv1 gv2)   = pPrint gv1 <+> text "="  <+> pPrint gv2
   pPrint (A_RelOp op gv)    = pPrint op <> brackets (pPrint gv)
 
 instance Pretty GroundVal where
@@ -1087,8 +1099,8 @@ instance Variables Expr where
   variables f (Iter _ e e0) = variables f (e, e0)
 
 instance Variables FailableAssump where
-  variables f (A_GVEq i gv)  = [i] `union` variables f gv
-  variables f (A_RelOp _ gv) =             variables f gv
+  variables f (A_GVEq gv1 gv2) = variables f gv1 `union` variables f gv2
+  variables f (A_RelOp _ gv)   = variables f gv
 
 instance Variables Assump where
   variables f (A_Pos a)           = variables f a
@@ -1299,8 +1311,8 @@ substAssump sub top_asm
     go (A_Pos a)          = A_Pos (goF a)
     go (A_Neg a)          = A_Neg (goF a)
     go (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
-    goF (A_GVEq x gv)     = A_GVEq   (lookupIdSubst sub x)    (substGV sub gv)
-    goF (A_RelOp op gv)   = A_RelOp                        op (substGV sub gv)
+    goF (A_GVEq gv1 gv2)  = A_GVEq   (substGV sub gv1) (substGV sub gv2)
+    goF (A_RelOp op gv)   = A_RelOp  op (substGV sub gv)
 
 substGV :: Subst Ident -> GroundVal -> GroundVal
 substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)

@@ -309,7 +309,7 @@ splitRules =
      guard (r `elem` all_rs)
      Just gv <- pure (groundValue all_rs v)
      labelArg (pPrint r <+> text "=" <+> pPrint v)
-     pure ( caseSplit rs (A_GVEq r gv) as ctx rest )
+     pure ( caseSplit rs (A_GVEq (GVVar r) gv) as ctx rest )
 
  <|>
   do label "SPLIT-OP"
@@ -375,7 +375,7 @@ splitRules =
      guard (r `elem` all_rs)
      let rs'  = take (length vs) (skolsNotIn all_rs)
          rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
-         asm  = A_GVEq r (GVArr (map GVVar rs'))
+         asm  = A_GVEq (GVVar r) (GVArr (map GVVar rs'))
      labelArg (pPrint asm)
      pure (caseSplit (rs ++ rs') asm as ctx rvs')
  <|>
@@ -386,7 +386,7 @@ splitRules =
       guard (r `elem` all_rs)
       let r'  = skolsNotIn all_rs !! 0
           rv' = (Var r' :=: v) :>: rest
-          asm    = A_GVEq r (GVTru (GVVar r'))
+          asm    = A_GVEq (GVVar r) (GVTru (GVVar r'))
       labelArg (pPrint asm)
       pure (caseSplit (rs ++ [r']) asm as ctx rv')
 

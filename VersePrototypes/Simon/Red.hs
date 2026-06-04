@@ -346,7 +346,7 @@ instance Pretty Exp where
     = text "iter" <> cat [parens (text (show ic)), braces (pPrintL l b1), braces (pPrintL l b2)]
   pPrintPrec l _ (Verify rs as e)
     = sep [ text "verify" <> parens (sep [ fsep (map pPrint (S.toList rs)) <> text ";"
-                                         , fsep (map pPrint as) ])
+                                         , fsep (punctuate comma $ map pPrint as) ])
           , nest 2 (braces (pPrintL l e)) ]
 
   pPrintPrec l p (OfType e1 fx e2)
@@ -1231,7 +1231,7 @@ skolemEquality (RC { rc_skols = skols, rc_vcxt = vcxt }) r v
   | Verifying {} <- vcxt
   , r `S.member` skols
   , Just gv <- groundValue skols v
-  = Just (A_GVEq r gv)
+  = Just (A_GVEq (GVVar r) gv)
   | otherwise
   = Nothing
 
@@ -1287,7 +1287,6 @@ reduceArithOp Sub (Arr [IntE i, IntE j]) = P_Done    $ IntE (i - j)
 reduceArithOp Mul (Arr [IntE i, IntE j]) = P_Done    $ IntE (i * j)
 reduceArithOp Div (Arr [IntE i, IntE j])
   | j /= 0                               = P_Done    $ IntE (i `div` j)
-  | otherwise                            = P_Failure
 
 reduceArithOp Neg (IntE i)               = P_Done $ IntE (- i)
 reduceArithOp Pls (IntE i)               = P_Done $ IntE i
@@ -1831,7 +1830,7 @@ reduceVerifyOpGV cxt op _ (GVVar r)
   where
     rs = S.fromList [r1,r2]
     (r1,r2) = freshIds2 cxt "r"
-    eq_asm = A_GVEq r (GVArr [GVVar r1, GVVar r2])
+    eq_asm = A_GVEq (GVVar r) (GVArr [GVVar r1, GVVar r2])
 
 -- Binary operators where we can see both arguments
 -- verify(R;A){ P[     op[gv1,gv2] ] } -> verify(R,r; A,r=op[gv1,gv2]){ P[ r ] }
