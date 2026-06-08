@@ -27,7 +27,7 @@ testeq("Arith1",pass) {3+4}                                 {7}
 testeq("Arith2",pass) {3-4}                                 {0-1}
 testeq("Arith3",pass) {3*4}                                 {12}
 testeq("Arith4",pass) {32/4}                                {8}
-testeq("Arith5",pass) {1/0}                                 {:false}
+testeq("Arith5",pass) {1/0}                                 {wrong}
 testeq("Arith6",pass) {-3}                                  {0-3}
 testeq("Arith7",pass) {+3}                                  {0+3}
 

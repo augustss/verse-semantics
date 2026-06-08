@@ -26,7 +26,9 @@ module Core.Expr
   , mkDef
 
     -- Assupmtions
-  , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
+  , GroundVal(..)
+  , Assump(..), PredAssump(..), FailableAssump(..), AssumpOp(..)
+  , notPred
 
     -- Rewriting
   , Context, isContext, (<@)
@@ -42,7 +44,7 @@ module Core.Expr
 
   -- Primops
   , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest, primOpIsCheck
-  , isUnaryOp, isBinOp
+  , isBinOp, isBinRelOp, primOpPreCond
   ) where
 
 import Prelude hiding( (<>) )
@@ -587,40 +589,69 @@ primOpIsTypeTest IsType = True
 primOpIsTypeTest IsComp = True
 primOpIsTypeTest _      = False
 
-isUnaryOp :: PrimOp -> Maybe PrimOp
--- Returns the type-testing primop for the argument
-isUnaryOp Pls                      = Just IsInt
-isUnaryOp Neg                      = Just IsInt
-isUnaryOp op | primOpIsTypeTest op = Just IsAny
-isUnaryOp ArrLen                   = Just IsArr
-isUnaryOp _                        = Nothing
+isBinOp :: PrimOp -> Bool
+isBinOp Add    = True
+isBinOp Sub    = True
+isBinOp Mul    = True
+isBinOp Div    = True
+isBinOp DotDot = True
+isBinOp ArrMap = True
+isBinOp op     = isBinRelOp op
 
-isBinOp :: PrimOp -> Maybe (PrimOp, PrimOp)
-isBinOp Gt     = Just (IsInt, IsInt)
-isBinOp Lt     = Just (IsInt, IsInt)
-isBinOp NEq    = Just (IsInt, IsInt)
-isBinOp GEq    = Just (IsInt, IsInt)
-isBinOp LEq    = Just (IsInt, IsInt)
-isBinOp Add    = Just (IsInt, IsInt)
-isBinOp Sub    = Just (IsInt, IsInt)
-isBinOp Mul    = Just (IsInt, IsInt)
-isBinOp Div    = Just (IsInt, IsInt)
-isBinOp DotDot = Just (IsInt, IsInt)
-isBinOp ArrMap = Just (IsFun, IsArr)
-isBinOp _      = Nothing
+isBinRelOp :: PrimOp -> Bool
+isBinRelOp Gt  = True
+isBinRelOp Lt  = True
+isBinRelOp NEq = True
+isBinRelOp GEq = True
+isBinRelOp LEq = True
+isBinRelOp _   = False
 
-{-
-primOpCanFire :: PrimOp -> GroundVal -> Maybe [FailableAssump]
-primOpCanFire Add gv =  twoIntArgs gv
-primOpCanFire Sub gv =  twoIntArgs gv
-primOpCanFire Mul gv =  twoIntArgs gv
-primOpCanFire Div gv =  case gv of
-                           GVArr [a1,a2] -> Just [A_RelOp IsInt a1, A_RelOp IsInt a2
-                                                 , A
+primOpPreCond :: PrimOp -> GroundVal -> Maybe [PredAssump]
+-- Returns a list of preconditions must hold before the primop can fire
+-- (e.g. isInt$[arg] or not(arg = 0)
 
-twoIntArgs (GVArr [a1,a2]) = Just [A_RelOp IsInt a1, A_RelOp IsInt a2]
-twoIntArgs _               = Nothing
--}
+primOpPreCond Pls    = unOpPreCond IsInt
+primOpPreCond Neg    = unOpPreCond IsInt
+primOpPreCond ArrLen = unOpPreCond IsArr
+primOpPreCond op | primOpIsTypeTest op = \_ -> Just []
+
+primOpPreCond Add =  binOpPreCond intIntPreCond
+primOpPreCond Sub =  binOpPreCond intIntPreCond
+primOpPreCond Mul =  binOpPreCond intIntPreCond
+primOpPreCond Div =  binOpPreCond divPreCond
+
+primOpPreCond DotDot =  binOpPreCond intIntPreCond
+primOpPreCond ArrMap =  binOpPreCond $ \a1 a2 ->
+                        mkTypeTest IsFun a1 ++ mkTypeTest IsArr a2
+
+primOpPreCond Gt  =  binOpPreCond intIntPreCond
+primOpPreCond Lt  =  binOpPreCond intIntPreCond
+primOpPreCond GEq =  binOpPreCond intIntPreCond
+primOpPreCond NEq =  binOpPreCond intIntPreCond
+primOpPreCond LEq =  binOpPreCond intIntPreCond
+
+primOpPreCond op = error ("primOpPreCond " ++ show op)
+
+unOpPreCond :: PrimOp -> GroundVal -> Maybe [PredAssump]
+unOpPreCond tt_op gv = Just [A_Pos (A_RelOp tt_op gv)]
+
+binOpPreCond :: (GroundVal -> GroundVal -> [PredAssump])
+             -> GroundVal -> Maybe [PredAssump]
+binOpPreCond pre (GVArr [a1,a2]) = Just (pre a1 a2)
+
+divPreCond :: GroundVal -> GroundVal -> [PredAssump]
+divPreCond a1 a2 = intIntPreCond a1 a2 ++
+                   [ A_Neg (A_GVEq a2 (GVLit (LInt 0))) ]
+
+intIntPreCond :: GroundVal -> GroundVal -> [PredAssump]
+intIntPreCond a1 a2 = mkTypeTest IsInt a1 ++ mkTypeTest IsInt a2
+
+mkTypeTest :: PrimOp -> GroundVal -> [PredAssump]
+mkTypeTest IsAny  _                  = []
+mkTypeTest IsInt  (GVLit (LInt {}))  = []
+mkTypeTest IsChar (GVLit (LChar {})) = []
+mkTypeTest IsArr  (GVArr {})         = []
+mkTypeTest op     gv                 = [A_Pos $ A_RelOp op gv]
 
 --------------------------------------------------------------------------------
 --
@@ -690,13 +721,17 @@ data GroundVal
   deriving( Eq, Ord, Show )
 
 data Assump
-  = A_Pos FailableAssump                 -- e.g r = <s,t>         or   r>s
-  | A_Neg FailableAssump                 -- e.g. not (r = <s,t>)  or   not (r>s)
+  = A_Pred PredAssump                    -- e.g r = <s,t> or  not(r>s)
   | A_PrimOp Ident AssumpOp GroundVal    -- e.g. r = op[v],  (primOpCanFail op) is False
   deriving( Eq, Ord, Show )
 
+data PredAssump
+  = A_Pos FailableAssump    -- e.g. r = <s,t>  or  r>s
+  | A_Neg FailableAssump    -- e.g. not(r = <s,t>) or not(r>s)
+  deriving( Eq, Ord, Show )
+
 data FailableAssump
-  = A_GVEq  GroundVal GroundVal  -- e.g. r=3
+  = A_GVEq  GroundVal GroundVal  -- e.g. r=3  or  r = <s,t>
   | A_RelOp PrimOp GroundVal     -- e.g. isInt$[r], or intGT$[r1,r2]
                                  -- A_RelOp invariant: (primOpCanFail op) is True
   deriving ( Eq, Ord, Show )
@@ -711,11 +746,14 @@ instance Pretty AssumpOp where
   pPrint (AO_Prim op) = pPrint op
 
 instance Pretty Assump where
-  pPrint (A_Pos a)          = pPrint a
-  pPrint (A_Neg a)          = text "not" <> parens (pPrint a)
+  pPrint (A_Pred p) = pPrint p
   pPrint (A_PrimOp i AO_Apply (GVArr [fun,arg]))
                             = pPrint i <+> text "=" <+> pPrint fun <> brackets (pPrint arg)
   pPrint (A_PrimOp i op gv) = pPrint i <+> text "=" <+> pPrint op <> brackets (pPrint gv)
+
+instance Pretty PredAssump where
+  pPrint (A_Pos a) = pPrint a
+  pPrint (A_Neg a) = text "not" <> parens (pPrint a)
 
 instance Pretty FailableAssump where
   pPrint (A_GVEq gv1 gv2)   = pPrint gv1 <+> text "="  <+> pPrint gv2
@@ -727,11 +765,9 @@ instance Pretty GroundVal where
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
   pPrint (GVTru gv)  = text "truth" <> braces (pPrint gv)
 
-isPosAssump :: Assump -> Bool
-isPosAssump (A_Pos {})    = True
-isPosAssump (A_PrimOp {}) = True
-isPosAssump (A_Neg {})    = False
-
+notPred :: PredAssump -> PredAssump
+notPred (A_Pos p) = A_Neg p
+notpred (A_Neg p) = A_Pos p
 
 --------------------------------------------------------------------------------
 --
@@ -1103,9 +1139,12 @@ instance Variables FailableAssump where
   variables f (A_RelOp _ gv)   = variables f gv
 
 instance Variables Assump where
+  variables f (A_Pred p)          = variables f p
+  variables f (A_PrimOp i _ gv)   = [i] `union` variables f gv
+
+instance Variables PredAssump where
   variables f (A_Pos a)           = variables f a
   variables f (A_Neg a)           = variables f a
-  variables f (A_PrimOp i _ gv)   = [i] `union` variables f gv
 
 instance Variables GroundVal where
   variables _f (GVVar i)   = [i]
@@ -1308,9 +1347,12 @@ substAssump sub top_asm
   | null sub  = top_asm      -- Short cut
   | otherwise = go  top_asm
   where
-    go (A_Pos a)          = A_Pos (goF a)
-    go (A_Neg a)          = A_Neg (goF a)
+    go (A_Pred p)         = A_Pred (goP p)
     go (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
+
+    goP (A_Pos a) = A_Pos (goF a)
+    goP (A_Neg a) = A_Neg (goF a)
+
     goF (A_GVEq gv1 gv2)  = A_GVEq   (substGV sub gv1) (substGV sub gv2)
     goF (A_RelOp op gv)   = A_RelOp  op (substGV sub gv)
 

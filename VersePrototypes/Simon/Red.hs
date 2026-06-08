@@ -30,9 +30,11 @@ import FrontEnd.Error
 import Core.Traced
 import Core.Solver( unsat )
 import Core.Expr as C ( Assump, Effect(..), Lit(..), PrimOp(..)
-                      , GroundVal(..), Assump(..), FailableAssump(..), AssumpOp(..)
+                      , GroundVal(..), Assump(..), FailableAssump(..)
+                      , PredAssump(..), AssumpOp(..)
                       , primOpIsCheck, primOpCanFail, substAssump
-                      , isUnaryOp, isBinOp, intersectEffect )
+                      , primOpPreCond, intersectEffect, notPred
+                      , isBinOp, isBinRelOp )
 import Core.Bind as C
 
 import Epic.Print hiding( mode )
@@ -594,7 +596,6 @@ data ReductionContext
 data ReductionMode
   = RM { rm_just_matching :: Bool   -- True <=> run only the 'match' rules, and
                                     --          recurse under lambda and iter
-       , rm_generate_vcs  :: Bool   -- Whether to generate verify{} conditions
        }
   deriving( Show )
 
@@ -868,7 +869,7 @@ initialBlk src
                  , rc_skols  = top_skols
                  , rc_vcxt   = NotVerifying
                  , rc_mode   = top_mode }
-    top_mode = RM { rm_generate_vcs = True, rm_just_matching = False }
+    top_mode = RM { rm_just_matching = False }
 
 mergeStep :: HasCallStack => Blk -> Result BlkFloats Exp -> Result BlkFloats Blk
 mergeStep (Blk is eqs _) (Res NoFloats res_e)
@@ -1160,8 +1161,8 @@ reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
   -- be bound by /any/ enclosing `verify`
   | Just asm <- skolemEquality cxt' x xv
   = VerStep (mkRuleName ("V" ++ rule_name))
-    [ Res (FloatRigid as [A_Pos asm]) v'
-    , Res (FloatRigid as [A_Neg asm]) Fail ]
+    [ Res (FloatRigid as [A_Pred $ A_Pos asm]) v'
+    , Res (FloatRigid as [A_Pred $ A_Neg asm]) Fail ]
   where
     rule_name = "PromoteT" ++ left_or_right ++ "(" ++ show x ++ ")"
 
@@ -1208,8 +1209,8 @@ reduceVarVal cxt left_or_right parent x (Val v)
 
   | Just asm <- skolemEquality cxt x v
   = VerStep (mkRuleName ("V" ++ rule_name ))
-     [ Res (FloatRigid S.empty [A_Pos asm]) v
-     , Res (FloatRigid S.empty [A_Neg asm]) Fail ]
+     [ Res (FloatRigid S.empty [A_Pred $ A_Pos asm]) v
+     , Res (FloatRigid S.empty [A_Pred $ A_Neg asm]) Fail ]
 
   | otherwise
   = RedNone
@@ -1547,7 +1548,7 @@ matchFun cxt f at fx bt mc
     -- Match context for the four sub-matches
     mc_lam_dom = MC { mc_blob   = MNested
                     , mc_effect = DR_Dom
-                    , mc_verify = True }
+                    , mc_verify = mc_verify mc }
 
     mc_lam_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx
@@ -1559,7 +1560,7 @@ matchFun cxt f at fx bt mc
 
     mc_ver_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx
-                    , mc_verify = True }
+                    , mc_verify = True } -- Here we know mc_verify mc = True
 
     the_lambda = Lam u $
                  Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
@@ -1570,7 +1571,7 @@ matchFun cxt f at fx bt mc
                   MNested -> Var q :=: (Var f :@ Var p)
                   MTop    -> IntE 99999
 
-    -- Generate a verify{} if we are in GenerateVCs mode
+    -- Generate a verify{} if `mc` says so
     fun_verify | mc_verify mc = the_verify
                | otherwise    = Arr []
 
@@ -1760,13 +1761,7 @@ reduceVerify cxt skols as blk
                Verifying outer_as _ -> outer_as ++ as'
 
     cxt' = cxt { rc_skols = rc_skols cxt `S.union` skols'
-               , rc_vcxt  = Verifying all_as S.empty
-               , rc_mode  = mode' }
-
-    -- ExecutionOnly: inside verify{}, just execute;
-    -- do not generate more verifies
-    mode = rc_mode cxt
-    mode' = mode { rm_generate_vcs = False }
+               , rc_vcxt  = Verifying all_as S.empty }
 
 reduceVerifyApp :: ReductionContext -> Exp -> Exp -> Reduction Exp
 reduceVerifyApp cxt fun arg
@@ -1801,65 +1796,49 @@ reduceVerifyOpGV _cxt op _arg _gv
   | primOpIsCheck op --  Do not skolemise ChkSucceeds etc
   =  RedNone
 
--- Unary operators
+-- Primitive operators
 -- verify(R;A){ P[     op[gv] ] } -> verify(R,r; A,r=op[gv]){ P[ r ] }
 -- verify(R;A){ P[ predop[gv] ] } -> verify(R; A,    op[gv] ){ P[ gv ] }
 --                                   verify(R; A,not(op[gv])){ P[ fail ] }
 reduceVerifyOpGV cxt op arg gv
-  | Just arg_op <- isUnaryOp op
-  , let check_args = mkArgCheck arg_op gv
+  | Just preds <- primOpPreCond op gv
+  , let pos_assumps = map A_Pred preds
   = VerStep (mkRuleName ("VUnaryOp" ++ show op)) $
-    [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
+    [ Res (FloatRigid S.empty [A_Pred (notPred p)]) stuck | p <- preds ] ++
     if primOpCanFail op
-    then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
-         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) arg ]
-    else [ Res (FloatRigid (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
+    then [ Res (FloatRigid S.empty  [A_Pred (A_Neg rel_op)])              Fail
+         , Res (FloatRigid S.empty  (A_Pred (A_Pos rel_op) : pos_assumps)) result   ]
+    else [ Res (FloatRigid (sing r) (bin_op                : pos_assumps)) (Var r)  ]
   where
     r = freshId cxt "r"
+
     rel_op = A_RelOp op gv
     bin_op = A_PrimOp r (AO_Prim op) gv
+
     stuck :: Exp
     stuck = Err (render (pPrint op <> brackets (pPrint gv)))
 
+    result :: Exp
+    result | isBinRelOp op = get_arg1 arg
+           | otherwise     = arg
+
+    -- get_arg1 is a bit horrible, but if primOpPreCond fires, and isBinOp,
+    -- then we know that gv must be GVArr, and hence arg is Arr.
+    get_arg1 (Arr [arg1,_]) = arg1
+    get_arg1 _ = error "reduceVerifyOpGV:get_arg1" (pPrint op <+> pPrint arg)
+
 -- Binary operators where the argument is a skolem
 reduceVerifyOpGV cxt op _ (GVVar r)
-  | Just {} <- isBinOp op
+  | isBinOp op
   = VerStep (mkRuleName "VBinOp-Arr")
-    [ Res (FloatRigid rs [A_Pos eq_asm]) (Arr [Var r1,Var r2])
-    , Res (FloatRigid rs [A_Neg eq_asm]) Fail ]
+    [ Res (FloatRigid rs [A_Pred $ A_Pos eq_asm]) (Arr [Var r1,Var r2])
+    , Res (FloatRigid rs [A_Pred $ A_Neg eq_asm]) Fail ]
   where
     rs = S.fromList [r1,r2]
     (r1,r2) = freshIds2 cxt "r"
     eq_asm = A_GVEq (GVVar r) (GVArr [GVVar r1, GVVar r2])
 
--- Binary operators where we can see both arguments
--- verify(R;A){ P[     op[gv1,gv2] ] } -> verify(R,r; A,r=op[gv1,gv2]){ P[ r ] }
--- verify(R;A){ P[ predop[gv1,gv2] ] } -> verify(R; A,    op[gv1,gv2] ){ P[ gv1 ] }
---                                        verify(R; A,not(op[gv1,gv2])){ P[ fail ] }
-reduceVerifyOpGV cxt op (Arr [arg1,_arg2]) gv@(GVArr [gv1,gv2])
-  | Just (arg1_op, arg2_op) <- isBinOp op
-  , let check_args :: [FailableAssump]
-        check_args = mkArgCheck arg1_op gv1 ++ mkArgCheck arg2_op gv2
-  = VerStep (mkRuleName ("VBinOp-" ++ show op)) $
-    [ Res (FloatRigid S.empty [A_Neg assump]) stuck | assump <- check_args ] ++
-    if primOpCanFail op
-    then [ Res (FloatRigid S.empty  [A_Neg rel_op]) Fail
-         , Res (FloatRigid S.empty  (A_Pos rel_op : map A_Pos check_args)) arg1 ]
-    else [ Res (FloatRigid (sing r) (bin_op       : map A_Pos check_args)) (Var r)  ]
-  where
-    r = freshId cxt "r"
-    rel_op = A_RelOp op gv
-    bin_op = A_PrimOp r (AO_Prim op) gv
-    stuck :: Exp
-    stuck = Err (render (pPrint op <> brackets (pPrint gv)))
-
 reduceVerifyOpGV _cxt op arg _gv = error ("reduceVerifyOp " ++ render (pPrint op $$ pPrint arg))
-
-mkArgCheck :: PrimOp -> GroundVal -> [FailableAssump]
-mkArgCheck IsAny  _                  = []
-mkArgCheck IsInt  (GVLit (LInt {}))  = []
-mkArgCheck IsChar (GVLit (LChar {})) = []
-mkArgCheck op     gv                 = [A_RelOp op gv]
 
 --------------------------------------------------------------------------------
 --

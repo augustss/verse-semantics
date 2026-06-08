@@ -524,8 +524,14 @@ mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new
                          , s_pos = pos, s_neg = neg, s_def = defs }
   where
     defs = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
-    pos  = [asm           | A_Pos asm                  <- asms ] ++ defs_result_asms
-    neg  = [asm           | A_Neg asm                  <- asms ]
+
+    preds :: [PredAssump]
+    preds = [ p | A_Pred p <- asms ]
+
+    pos,neg :: [FailableAssump]
+    pos  = [asm | A_Pos asm <- preds ] ++ defs_result_asms
+    neg  = [asm | A_Neg asm <- preds ]
+
     lits = concatMap groundLit    groundVals
     tups = concatMap assumpTuples groundVals
     groundVals = nubOrd (assumpGroundVal <$> (pos ++ neg))
@@ -734,9 +740,9 @@ instance Pretty Equality where
 _test4 :: [Assump]
 _test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
   where
-    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
-    r10_eq_0        = A_Pos (A_GVEq (GVVar r10) zero)
-    r5_eq_0         = A_Pos (A_GVEq r5 zero)
+    i1_gt_0         = A_Pred $ A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
+    r10_eq_0        = A_Pred $ A_Pos (A_GVEq (GVVar r10) zero)
+    r5_eq_0         = A_Pred $ A_Pos (A_GVEq r5 zero)
     r10_eq_add_r5_1 = A_PrimOp r10 (AO_Prim Add) (GVArr [r5, i1])
     i1              = GVVar (Bind.ident "$I1")
     r10             = Bind.ident "$R10"
@@ -748,8 +754,8 @@ _test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
 _test3 :: [Assump]
 _test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
   where
-    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
-    r10_eq_0        = A_Pos (A_GVEq (GVVar r10) zero)
+    i1_gt_0         = A_Pred $ A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
+    r10_eq_0        = A_Pred $ A_Pos (A_GVEq (GVVar r10) zero)
     r10_eq_add_0_1  = A_PrimOp r10 (AO_Prim Add) (GVArr [zero, i1])
     i1              = GVVar (Bind.ident "$I1")
     r10             = Bind.ident "$R10"
@@ -760,9 +766,9 @@ _test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
 _test2 :: [Assump]
 _test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
   where
-    i1_gt_0   = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
-    r10_eq_0  = A_Pos (A_GVEq r10 zero)
-    r10_eq_i1 = A_Pos (A_GVEq r10 i1)
+    i1_gt_0   = A_Pred $ A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
+    r10_eq_0  = A_Pred $ A_Pos (A_GVEq r10 zero)
+    r10_eq_i1 = A_Pred $ A_Pos (A_GVEq r10 i1)
     i1        = GVVar (Bind.ident "$I1")
     r10       = GVVar (Bind.ident "$R10")
 
@@ -772,8 +778,8 @@ _test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
 _test1 :: [Assump]
 _test1 = [i1_gt_0, i1_eq_0]
   where
-    i1_gt_0 = A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
-    i1_eq_0 = A_Pos (A_GVEq i1 zero)
+    i1_gt_0 = A_Pred $ A_Pos (A_RelOp Gt (GVArr [i1, zero]) )
+    i1_eq_0 = A_Pred $ A_Pos (A_GVEq i1 zero)
     i1      = GVVar (Bind.ident "$I1")
 
 
@@ -783,8 +789,8 @@ _test1 = [i1_gt_0, i1_eq_0]
 _test0 :: [Assump]
 _test0 = [i1_gt_zero, zero_gt_i1]
   where
-    i1_gt_zero  = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
-    zero_gt_i1  = A_Pos (A_RelOp Gt (GVArr [zero, GVVar i1]) )
+    i1_gt_zero  = A_Pred $ A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    zero_gt_i1  = A_Pred $ A_Pos (A_RelOp Gt (GVArr [zero, GVVar i1]) )
     i1          = Bind.ident "$I1"
 
 -- >>> unsatAsms test00
@@ -793,6 +799,6 @@ _test0 = [i1_gt_zero, zero_gt_i1]
 _test00 :: [Assump]
 _test00 = [i1_eq_10, i1_eq_20]
   where
-    i1_eq_10 = A_Pos (A_GVEq i1 (GVLit (LInt 10)))
-    i1_eq_20 = A_Pos (A_GVEq i1 (GVLit (LInt 20)))
+    i1_eq_10 = A_Pred $ A_Pos (A_GVEq i1 (GVLit (LInt 10)))
+    i1_eq_20 = A_Pred $ A_Pos (A_GVEq i1 (GVLit (LInt 20)))
     i1       = GVVar (Bind.ident "$I1")

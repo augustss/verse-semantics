@@ -361,8 +361,8 @@ splitRules =
          r_asm    = A_RelOp IsArr (GVVar r)
          n_asms   = [ A_RelOp IsInt (GVVar n)
                     , A_RelOp GEq (GVArr [GVVar n, GVLit (LInt 0)]) ]
-         neg_asms = [A_Neg r_asm]
-         pos_asms = A_PrimOp n (AO_Prim ArrLen) (GVVar r) : map A_Pos (r_asm:n_asms)
+         neg_asms = [A_Pred $ A_Neg r_asm]
+         pos_asms = A_PrimOp n (AO_Prim ArrLen) (GVVar r) : map (A_Pred . A_Pos) (r_asm:n_asms)
      labelArg (pPrint r)
      pure ( (Verify (bindList rs (neg_asms ++ as, ctx <@ Fail)))
            >>>
@@ -399,9 +399,9 @@ matchVerify e =
 
 caseSplit :: [Ident] -> FailableAssump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e
-  = Verify (bindList rs (A_Neg a : as, ctx <@ Fail))
+  = Verify (bindList rs (A_Pred (A_Neg a) : as, ctx <@ Fail))
     >>>
-    Verify (bindList rs (A_Pos a : as, ctx <@ e))
+    Verify (bindList rs (A_Pred (A_Pos a) : as, ctx <@ e))
 
 --------------------------------------------------------------------------------
 -- | Contexts ------------------------------------------------------------------

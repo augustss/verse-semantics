@@ -747,8 +747,7 @@ mkTopCxt term
     prel_bndrs :: S.Set EV.Ident
     prel_bndrs = S.fromList (map fst EV.thePrelude)
 
-    mode = RM { rm_generate_vcs  = False
-              , rm_just_matching = False }
+    mode = RM { rm_just_matching = False }
 
 mk_term :: TestFlags -> SrcExpr -> IO EV.Term
 mk_term tflags src = do { ess <- srcToEssential fe_flags src
