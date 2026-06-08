@@ -333,6 +333,15 @@
 
 %format iter (e) (a) (f) (g) = iterKW "(" e ")\{" a ";" f ";" g "\}"
 %format iter2 (k) (e) (z) = iterKW "(" k ")\{"e "\}\{" z "\}"
+%format block (e) = blockKW "\{" e "\}"
+%format blk (x) (hp) (e) = "\exists{}" x "\{" hp "\}." e
+%format delay (e) = delayKW "\{" e "\}"
+%format twiddle x w t = x  "\leadsto_{" w "}" t
+%format hbind x e = x "\!\shortleftarrow\!" e
+%format verifyflag = "\textsc{\bf \small v}"
+%format execflag = "\textsc{\bf \small x}"
+%format bbcirc = "\circ"
+%format bbblob = "\bullet"
 %format applyiter k (v) (e) = k "[" v "," e "]"
 
 %format splitKW = "\textbf{split}"
@@ -360,7 +369,8 @@
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
-%format block = "\textbf{block}"
+%format blockKW = "\textbf{block}"
+%format delayKW = "\textbf{delay}"
 %format orElse = "\textbf{orElse}"
 %format collect = "\textbf{collect}"
 %format apply = "\textbf{apply}"

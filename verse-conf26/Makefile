@@ -4,6 +4,7 @@ PAPER=verse-conf26
 PAPERTEX = $(PAPER).tex
 PAPERSRC = $(PAPERTEX) ../LaTex/calculus.fmt ../LaTex/verse-macros.tex \
            verse-conf26.tex \
+           rewrite-rules.tex \
            macros.tex \
            syntax.tex \
            densem.tex
