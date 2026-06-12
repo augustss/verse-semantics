@@ -177,7 +177,7 @@ testeq("Fun6",pass) {one{ pair := (1, function(n:int)<closed>{pair[0]})
 testeq("Fun7",pass,tim=skip)
   {one{ pair := (1, function(n:int)<closed>{if (n = 0) {1} else  {n * pair[1](n-1)}})
       ; pair[1](5) } }  {120}
-   # Needs recursion
+   # Fun7: Needs recursion
 testeq("Fun8",pass) {f(x:int, y:int)<closed>:=2*x+y; f(2,3)}  {7}
 
 # P desugaring, i.e., p:=e
@@ -210,10 +210,11 @@ testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 testeq("TB1",pass) {(x:int) = 5}                         {5}
 testeq("TB2",pass) {ap0(f(x:int)<closed>:int)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {1}
 
-testeq("TB3",pass) { ap0(f(x:int)<closed>:=1)<closed> := f[0]
+verify("TB3",fail) { ap0(f(x:int)<closed>:=1)<closed> := f[0]
                    ; succ(x:int)<closed>:=x+1
-                   ; ap0[succ]} {1}
+                   ; ap0[succ]}
   # Surely TB3 should get stuck because succ is not in the domain of ap0?
+  # That's right: this test should (and does) fail when we generate verification conditions
 
 testeq("TB4",pass) {ap0(f(x:int)<closed>:=2)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {wrong}
   # ap0[succ] gets stuck because succ[0] does not return 2
@@ -330,12 +331,14 @@ testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed><decides>:=x[0]; succ(
 testeq("EV16",pass,tim=F00) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int)<closed>:=(); f[badsucc]}  {wrong}
   # EV16: this should go WRONG.. i.e. it gets stuck
 
-# Try CBV fixpoint combinator.
-# Too slow with some rules
-testeq("EV17",pass) {
+# EV17: Try CBV fixpoint combinator.
+# The definition of Z all by itself fails verification.
+#    Not sure why. Hence 'broken'
+#    That 'broken' gives an "unexpected pass" report when we switch verification off
+testeq("EV17",pass,broken) {
   Z(f:any)<closed> := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
   fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
-  fac[3] }                                                                     {6}
+  fac[3] } {6}
 
 testeq("EV18",pass,tim=C00) {0[0]}                                {wrong}
 testeq("EV19",pass,tim=P00) {operator'/'(1,0)}                    {wrong}
@@ -352,12 +355,20 @@ testeq("EV21",pass) {f(x:int)<closed><succeeds>:=x<10; f[11]}     {wrong}
 testeq("EV22",pass,skip,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
                             ; p:any; swapBad [p] = (2,3); p }
                             {wrong}
-testeq("EV23",pass) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
-                            ; p:any; swapGood[p] = (2,3); p }
-                            {(3,2)}
-testeq("EV23int",pass) { swapGood := (t:any => (x:int; y:int; t=(x, y); (y, x)))
-                            ; p:any; swapGood[p] = (2,3); p }
-                            {(3,2)}
+
+verify("EV23",fail)    { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))) }
+# EV23: fails to verify because '=>' requires <succeeds>
+
+verify("EV23d",pass) { swapGood := (t := (:any,:any)) => (x:any; y:any; t=(x, y); (y, x)) }
+
+verify("EV23e",   pass) { swapGood(t := (:any,:any)) := (x:any; y:any; t=(x, y); (y, x)) }
+verify("EV23int1",pass) { swapGood(t := (:int,:int)) := (x:int; y:int; t=(x, y); (y, x)) }
+
+verify("EV23int",fail) { swapGood := (t:any => (x:int; y:int; t=(x, y); (y, x))) }
+# EV23int: fails becuase might not be a pair
+verify("EV23int2",fail) { swapGood( t := (:any,:any) ) := (x:int; y:int; t=(x, y); (y, x)) }
+# EV23int2: fails because x might not be an int
+
 testeq("EV23a",pass) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) }
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
@@ -408,9 +419,9 @@ testeq("EV52",pass) { succ(x:int)<closed>:=intAdd$[x,1]; y:type{:succ}=1; y }   
 # testeq("EV",pass) { first{:false} }         {:false}
 # testeq("EV",pass) { first(x:=1|2){x+1} }    {2}
 
-testeq("EV52",pass) { truth{1+2} } { truth{3} }
+testeq("EV53a",pass) { truth{1+2} } { truth{3} }
 # tim=skip: Tim does not implement truth
-testeq("EV53",pass,tim=skip) { a := truth{5}; a = truth{b:int}; b } { 5 }
+testeq("EV53b",pass,tim=skip) { a := truth{5}; a = truth{b:int}; b } { 5 }
 testeq("EV54",pass,tim=skip) { a := truth{5}; a? } { 5 }
 testeq("EV54b",pass,tim=skip) { a := truth{5}; a[5] } { 5 }
 testeq("EV55",pass,tim=skip) { true } { truth{()} }

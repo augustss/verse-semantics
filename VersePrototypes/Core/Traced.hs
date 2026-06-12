@@ -3,6 +3,7 @@
 module Core.Traced(
   Traced(..), TraceStep(..), tsPayload, setTsPayload, updTsPayload,
   Verbosity, verbosityAll,
+  Validity(..),
   getTerm, getTrace, traceLength, traceNormResult, traceSummary, appendTrace,
   start, (++>), loop, normalize,
   Fuel, lotsOfSteps,
@@ -12,6 +13,7 @@ module Core.Traced(
   PrettyBrief(..)
   ) where
 import Prelude hiding( (<>) )
+import qualified Prelude as SG ( (<>) )
 import Epic.Print
 
 --------------------------------------------------------------------------------
@@ -41,17 +43,18 @@ type Verbosity = Int
 data NormResult
   = NormOK        -- No rewrites apply
   | NormExpired   -- We ran out of fuel
-  | NormInvalid   -- A rewrite produced an invalid output
-                  -- according to the `valid` predicate
+  | NormInvalid Doc   -- A rewrite produced an invalid output
+                      -- according to the `valid` predicate
   deriving( Eq )
 
 instance Show NormResult where
-   show = showNormResult
+   show = render . showNormResult
 
-showNormResult :: NormResult -> String
-showNormResult NormOK      = "reached a normal form"
-showNormResult NormExpired = "ran out of fuel (Unexpected)"
-showNormResult NormInvalid = "reached an invalid expression -- yikes!"
+showNormResult :: NormResult -> Doc
+showNormResult NormOK          = text "reached a normal form"
+showNormResult NormExpired     = text "ran out of fuel (Unexpected)"
+showNormResult (NormInvalid d) = sep [ text "reached an invalid expression -- yikes!"
+                                     , nest 2 d ]
 
 -- Traced things are only identified by their top-level term
 instance Eq a => Eq (Traced a) where
@@ -116,7 +119,7 @@ lotsOfSteps :: Fuel
 lotsOfSteps = 10000
 
 normalize :: (a -> Maybe (TraceStep a))   -- How to take a step
-          -> (a -> Bool)                  -- Validity predicate
+          -> (a -> Validity)                  -- Validity predicate
           -> Fuel -> a -> Traced a
 -- `normalize` produces the steps lazily, so you can display earlier
 -- ones even if a later one crashes.
@@ -125,15 +128,25 @@ normalize step valid fuel orig_e
   where
     initial_step = TS{ ts_str = "Initial", ts_verb = 0, ts_payload = orig_e }
     go fuel_left e
-      | fuel_left == 0 = Done NormExpired
-      | not (valid e)  = Done NormInvalid
-      | otherwise      = case step e of
-                           Nothing -> Done NormOK
-                           Just ts -> Step ts (go (fuel_left-1) (ts_payload ts))
+      | fuel_left == 0       = Done NormExpired
+      | Invalid d <- valid e = Done (NormInvalid d)
+      | otherwise            = case step e of
+                                   Nothing -> Done NormOK
+                                   Just ts -> Step ts (go (fuel_left-1) (ts_payload ts))
 
 traceNormResult :: Traced a -> NormResult
 traceNormResult (Done nr)   = nr
 traceNormResult (Step _ ss) = traceNormResult ss
+
+data Validity = Valid | Invalid Doc
+
+instance Monoid Validity where
+  mempty = Valid
+
+instance Semigroup Validity where
+  Valid      <> x          = x
+  x          <> Valid      = x
+  Invalid as <> Invalid bs = Invalid (as $$ bs)
 
 --------------------------------------------------------------------------------
 --
@@ -193,7 +206,7 @@ pPrintTrace show_verb tr
   =  go 1 tr
   where
     go :: Int -> Traced a -> [Doc]
-    go _  (Done nr) = [ text "Done:" <+> text (showNormResult nr) ]
+    go _  (Done nr) = [ text "Done:" <+> showNormResult nr ]
 
     go n (Step step steps) = pp_item n step : go (n+1) steps
 

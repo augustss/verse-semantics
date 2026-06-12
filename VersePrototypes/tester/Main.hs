@@ -296,7 +296,7 @@ unexpectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
       _ -> Nothing
 
 outcomeIsInvalid :: TestRes -> Bool
-outcomeIsInvalid (TestRes { tr_outcome = TO_Abnormal NormInvalid _ }) = True
+outcomeIsInvalid (TestRes { tr_outcome = TO_Abnormal (NormInvalid {}) _ }) = True
 outcomeIsInvalid _ = False
 
 outcomeIsExcn :: TestRes -> Bool
@@ -507,8 +507,9 @@ showTestResult tflg test test_res
   | TS_Broken <- status
   = putStrLn $ test_herald ++ "Broken test now pass"
 
-  | TO_Abnormal NormInvalid _ <- outcome
-  = putStrLn $ test_herald ++ "Crash: rewrite yields invalid results"
+  | TO_Abnormal (NormInvalid d) _ <- outcome
+  = do { putStrLn $ test_herald ++ "Crash: rewrite yields invalid results"
+       ; putStrLn (render d) }
 
   | otherwise   -- TS_Normal
   = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what

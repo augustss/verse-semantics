@@ -28,9 +28,11 @@ import Data.List( (\\) )
 import Data.Set( Set )
 import qualified Data.Set as S
 
-import Core.Expr
+import Core.Expr as C
 import Core.Bind
 import Core.Traced
+
+import Epic.Print hiding( empty )   -- Clash with Control.Applicative.empty
 
 -----------------------------------------------------------------------------
 -- Rule type
@@ -208,7 +210,11 @@ normalizeExpr :: Rule Expr -> Fuel -> Expr
               -> (NormResult, Traced Expr)
 normalizeExpr rules fuel expr = (traceNormResult trace, trace)
   where
-    trace = normalize step valid fuel expr
+    is_valid :: C.Expr -> Validity
+    is_valid e | C.valid e = Valid
+               | otherwise = Invalid (text "Unknown reason: fix Core.Expr.valid")
+
+    trace = normalize step is_valid fuel expr
     step e = case run rules  (S.fromList (occurs e)) [] [] e of
                [] -> Nothing
                (e', lab, v) : _ -> Just (TS { ts_payload = e'

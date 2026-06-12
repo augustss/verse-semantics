@@ -2,6 +2,12 @@
 #     Add new meetings at the top
 #########################################
 
+
+# ------------ 12 June 2026 -------------
+
+verify("M12Jun26-1", pass) { type( t(x:any)<decides>:type{x} ) := t }
+# "M12Jun26-1: define the function `type`!
+
 # ------------ 4 June 2026 -------------
 testeq("M4Jun26-1", pass)
   { if( (:function(x:=3)<closed>{5}) = (:function(x:=4)<closed>{5}))

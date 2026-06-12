@@ -638,6 +638,7 @@ unOpPreCond tt_op gv = Just [A_Pos (A_RelOp tt_op gv)]
 binOpPreCond :: (GroundVal -> GroundVal -> [PredAssump])
              -> GroundVal -> Maybe [PredAssump]
 binOpPreCond pre (GVArr [a1,a2]) = Just (pre a1 a2)
+binOpPreCond _   _               = Nothing
 
 divPreCond :: GroundVal -> GroundVal -> [PredAssump]
 divPreCond a1 a2 = intIntPreCond a1 a2 ++
@@ -767,7 +768,7 @@ instance Pretty GroundVal where
 
 notPred :: PredAssump -> PredAssump
 notPred (A_Pos p) = A_Neg p
-notpred (A_Neg p) = A_Pos p
+notPred (A_Neg p) = A_Pos p
 
 --------------------------------------------------------------------------------
 --

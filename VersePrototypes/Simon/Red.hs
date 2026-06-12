@@ -18,6 +18,7 @@ module Red( Blk(Blk, BlkX), Exp(..), pattern Val, Term(..), Ident(..)
           , freshId, freshIds2, freshId4
           , freeVarsTerm
           , emptyHeap, mkCheck, mkAll
+          , validBlk
   ) where
 
 import Prelude hiding ((<>))
@@ -42,6 +43,7 @@ import Epic.List
 
 import Control.Arrow(second, (***))
 import qualified Data.List as L
+import qualified Data.Monoid as D
 import Data.Maybe
 import qualified Data.Set as S
 import Data.Set( Set )
@@ -137,9 +139,9 @@ data Exp
   | Fail                  -- fail
   | Exp :=: Exp           -- e1 = e2
   | Exp :@  Exp           -- e1[e2]
-  | Arr [Exp]             -- array{e1,...,e2}
-  | Tru Exp               -- truth{e}
-  | Map [(Gnd, Exp)]      -- map{...}
+  | Arr [Val]             -- array{v1,...,vn}
+  | Tru Val               -- truth{v}
+  | Map [(Gnd, Val)]      -- map{...}
 
   | Lam Ident Blk          -- \ x . e
   | Iter IterCtx Blk Exp   -- if/for
@@ -169,15 +171,15 @@ data MatchContext
        , mc_effect   :: DRContext }
   deriving(Eq,Ord,Show)
 
-data DRContext
-  = DR_Dom          -- In the domain of a function(at)<fx>{bt}
-  | DR_Rng Effect   -- In the range  of a function(at)<fx>{bt}, with effects <fx>
-  deriving(Eq,Ord,Show)
-
 data Blob
   = MTop     -- Written 'o' in the rules.  Do not generate f[x] in (MFun)
   | MNested  -- Written 'bullet' in the rules. Do generate f[x] in (MFun)
   deriving (Eq, Ord, Show)
+
+data DRContext  -- "DR" connotes "domain or range"
+  = DR_Dom          -- In the Domain of a function(at)<fx>{bt}
+  | DR_Rng Effect   -- In the Range  of a function(at)<fx>{bt}, with effects <fx>
+  deriving(Eq,Ord,Show)
 
 type Eqn = (Ident, Val)
 type Heap = [Eqn]  -- Invariant: all identifiers in the domain are distinct
@@ -190,6 +192,13 @@ isEmptyHeap [] = True
 isEmptyHeap _  = False
 
 matchTop :: ReductionContext -> MatchContext -> Term -> Exp
+
+-- Three (optional) short-cuts that avoid ever creating 'u'
+matchTop _ _ (TVar v) = Var v
+matchTop _ _ (TLit k) = Lit k
+matchTop _ _ (TPrm o) = Prm o
+
+-- This is the default
 matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
                     Match (mc { mc_blob = MTop, mc_effect = DR_Dom }) u t
   where
@@ -253,6 +262,24 @@ mkCheck Iterates blk = mkCrl blk
 
 mkAll :: Blk -> Exp
 mkAll b = Iter ALL b (Arr [])
+
+mkArr :: [Exp] -> Exp
+-- Does ANF if any of the argment arrays are non-empty
+mkArr es = mkCrl (Blk (S.fromList (map fst aux_binds))
+                      []
+                      (foldr mk_bind (Arr vs) aux_binds))
+  where
+    in_scope = S.unions $ map freeVars es
+    (aux_binds,vs) = foldr do_one ([], []) es
+    mk_bind (s,rhs) e = (Var s :=: rhs) :> e
+
+    do_one :: Exp -> ([(Ident,Exp)], [Val]) -> ([(Ident,Exp)], [Val])
+    -- The [(Ident,Exp)] are the auxiliary bindings
+    do_one (Val v) (binds, acc_vs) = (      binds, v    :acc_vs)
+    do_one e       (binds, acc_vs) = ((s,e):binds, Var s:acc_vs)
+      where
+        s = findFresh is_taken (mkName "s")
+        is_taken i = i `S.member` in_scope || any (\(j,_) -> i==j) binds
 
 --------------------------------------------------------------------------------
 --
@@ -446,6 +473,13 @@ getVal _ = Nothing
 isVal :: Exp -> Bool
 isVal e = isJust (getVal e)
 
+isAtomic :: Exp -> Bool
+isAtomic (Var {}) = True
+isAtomic (Lit {}) = True
+isAtomic (Arr []) = True
+isAtomic (Prm {}) = True
+isAtomic _ = False
+
 pattern Comp :: Exp -> Exp
 pattern Comp v <- (getComp -> Just v)
 
@@ -483,19 +517,6 @@ getGnd e@(Arr es) | Just _ <- mapM getGnd es = Just e
 getGnd e@(Tru e') | Just _ <- getGnd e' = Just e
 getGnd e@(Map kvs) | Just _ <- mapM (getGnd . snd) kvs = Just e
 getGnd _ = Nothing
-
-pattern ArrOrTruOrMap :: ([Exp] -> Exp) -> [Exp] -> Exp
-pattern ArrOrTruOrMap con vs <- (getArrOrTruOrMap -> Just (con, vs))
-
--- If the expression is Arr or Tru, return the constructor and the list of subparts.
--- For Tru we fake a list.  This way Arr and Tru can share code in some cases.
-getArrOrTruOrMap :: Exp -> Maybe ([Exp] -> Exp, [Exp])
-getArrOrTruOrMap (Arr es) = Just (Arr, es)
-getArrOrTruOrMap (Tru e)  = Just (Tru . (!!0), [e])
-getArrOrTruOrMap (Map kvs)= Just (Map . mk, ks ++ vs)
-  where (ks, vs) = unzip kvs
-        mk es = uncurry zip (splitAt (length kvs) es)
-getArrOrTruOrMap _ = Nothing
 
 -- Turn every kind of HNF into a trivial one
 root :: HNF -> HNF
@@ -674,9 +695,9 @@ orTry r1      _  = r1
 mapPayload :: (a -> b) -> [Result flt a] -> [Result flt b]
 mapPayload f rs = [ Res flt (f payload) | Res flt payload <- rs ]
 
-reductionFired :: Reduction a -> Maybe (Reduction a)
-reductionFired RedNone = Nothing
-reductionFired r       = Just r
+rednFired :: Reduction a -> Maybe (Reduction a)
+rednFired RedNone = Nothing
+rednFired r       = Just r
 
 mkExiFloat1 :: Ident -> BlkFloats
 -- Single existential only, no heap
@@ -735,7 +756,7 @@ mkName :: String -> Ident
 mkName s = Name s
 
 mkCons :: Exp -> Exp -> Exp  -- Array cons
-mkCons a as = Prm ArrCons :@ Arr [a, as]
+mkCons a as = Prm ArrCons :@ mkArr [a, as]
 
 mkCons2 :: ReductionContext -> Exp -> Exp -> Exp -> Exp
 -- cons2 = \xy. \xys. exists x y <xs,ys> = <cons x xs, cons y ys>
@@ -744,8 +765,8 @@ mkCons2 cxt x y xys
   = Crl $ Blk (S.fromList [xs,ys,ar]) emptyHeap $
     -- We need have the two Arr in this order, otherwise choices
     -- in the body of a 'for' will come in the wrong order.
-    (Var ar :=: Arr [ mkCons x (Var xs)
-                    , mkCons y (Var ys)]) :>
+    (Var ar :=: mkArr [ mkCons x (Var xs)
+                      , mkCons y (Var ys)]) :>
     (Arr [Var xs, Var ys] :=: xys) :>
     Var ar
   where
@@ -801,10 +822,10 @@ vx  = mkName "x"
 
 runTraced :: Fuel -> ReductionContext -> Blk -> Traced Blk
 runTraced fuel top_cxt top_blk
-  = normalize step valid fuel top_blk
+  = normalize step valid  fuel top_blk
   where
-    valid :: Blk -> Bool
-    valid _ = True
+    valid :: Blk -> Validity
+    valid = validBlk (getInScope top_cxt)
 
     step :: Blk -> Maybe (TraceStep Blk)
     step blk
@@ -980,13 +1001,6 @@ reduceExp cxt parent@(Blk _ _ body)
     -- These work even when (findMatching cxt)
     find_admin expr
       = case expr of
-          Match mc x tm -> reduceMatch cxt x tm mc
-
-          -- Floating a nested block {b}
-          Crl blk -> mkStep "FloatB" (FloatB is' eqs') e'
-            where
-              Blk is' eqs' e' = freshenBlk cxt blk
-
           -- Unification, structural
           Val v  :=: (e1 :>  e2) -> mkDone "Norm1" $ e1 :> (v :=: e2)
           Val v  :=: (e1 :=: e2) -> mkDone "Norm2" $ (v :=: e1) :> (v :=: e2)
@@ -994,6 +1008,25 @@ reduceExp cxt parent@(Blk _ _ body)
           (Val v :=: e1) :=: e2  -> mkDone "Norm4" $ (v :=: e1) :> (v :=: e2)
           (e1 :> e2) :> e3       -> mkDone "Norm5" $ e1 :> (e2 :> e3)
           Val{}  :>  e2          -> mkDone "Seq1" e2
+
+          -- Substitution
+          Var i | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
+                -> mkDone ("Subst " ++ show i) v
+
+          -- Promotion
+          -- We must try both ways round.  Here's a tricky case
+          --   exists x. ...if( exists y. ..x=y.. )...
+          -- We must fire (Promote2) on x=y
+          -- Hence we must fall through from the first to the second
+          Var x :=: e | Just redn <- rednFired $ reduceVarEq cxt "1" parent x e -> redn
+          e :=: Var x | Just redn <- rednFired $ reduceVarEq cxt "2" parent x e -> redn
+
+          Match mc x tm -> reduceMatch cxt x tm mc
+
+          -- Floating a nested block {b}
+          Crl blk -> mkStep "FloatB" (FloatB is' eqs') e'
+            where
+              Blk is' eqs' e' = freshenBlk cxt blk
 
           _ -> RedNone
 
@@ -1006,7 +1039,12 @@ reduceExp cxt parent@(Blk _ _ body)
            e1 :@  e2       -> find2 leftCF (:@)  e1 e2
            OfType e1 fx e2 -> find2 leftCF (\x y -> OfType x fx y) e1 e2 `orTry`
                               findOfTypeLam e1 fx e2
-           Arr es          -> findArr leftCF es
+
+           -- We need to look inside arrays to for the (Subst) rule to apply
+           -- e.g.  exists x{ x<-3 }. add[x,7]
+           -- We want to substitute 3 for x so that we can execute add[3,7]
+           -- Similarly (I believe) maps and truth-values
+           Arr vs          -> findArr leftCF vs
            Map kvs         -> findMap leftCF kvs
            Tru e           -> find1 leftCF Tru e
            _               -> RedNone
@@ -1018,17 +1056,21 @@ reduceExp cxt parent@(Blk _ _ body)
     findOfTypeLam _ _ _ = RedNone
 
 
+    -- `find_rec_matches` looks under lambda and delay to find
+    -- occurrences of `Match`, so it can rewrite them away
     find_rec_matches expr
       | not (justMatching cxt)
       = RedNone
-      | otherwise
+      | otherwise  -- We are just matching; look under lambda
       = case expr of
           Dly e   -> find1 False Dly e
 --ToDo
 --          Chocice b1 b2 -> fmap (Lam x') (reduceBlock cxt' b')
-          Lam x b -> fmap (Lam x') (reduceBlock cxt' b')
+          Lam x b -> fmap (Lam x') (reduceBlock cxt'' b')
                   where
                     (cxt', x', b') = freshenLam cxt x b
+                    cxt'' = cxt' { rc_vcxt = NotVerifying }
+
           Iter ic b e -> fmap (\b' -> Iter ic b' e) (reduceBlock cxt b) `orTry`
                          find1 False (Iter ic b) e
                                -- False: irrelevant because we never fire choices
@@ -1045,21 +1087,6 @@ reduceExp cxt parent@(Blk _ _ body)
       = RedNone
       | otherwise
       = case expr of
-        -- Substitution
-        Var i | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
-              -> mkDone ("Subst " ++ show i) v
-
-        -- Promotion
-        -- We must try both ways round.  Here's a tricky case
-        --   exists x. ...if( exists y. ..x=y.. )...
-        -- We must fire (Promote2) on x=y
-        -- Also: the guard is important; if `reduceVarVal` doesn't fire, we want to
-        -- fall through the "look at sub-expressions" code
-        HNFV v  :=: Var  x | Just redn <- reductionFired (reduceVarVal cxt "2" parent x v)
-                           -> redn
-        Var  x  :=: HNFV v | Just redn <- reductionFired (reduceVarVal cxt "1" parent x v)
-                           -> redn
-
         -- Primops
         Prm op :@ v  -> reducePrimOp op v
 
@@ -1067,9 +1094,12 @@ reduceExp cxt parent@(Blk _ _ body)
         Val v1 :=: Val v2 | v1 == v2 -> mkDone    "EqVal" v1
         Lit k1 :=: Lit k2 | k1 /= k2 -> mkFailure "EqValFail"
 
-        Val (Arr vs) :=: Arr es | length vs == length es   -> mkDone    "EqTup" $ Arr (zipWith (:=:) vs es)
-        Arr ds       :=: Arr es | length ds /= length es   -> mkFailure "EqTupFail"
-        Tru e1       :=: Tru e2                            -> mkDone    "EqTru" $ Tru (e1 :=: e2)
+        Arr vs :=: Arr ws
+          | length vs == length ws -> mkDone    "EqTup" $
+                                      mkSeqs (zipWith (:=:) vs ws) :> Arr vs
+          | otherwise              -> mkFailure "EqTupFail"
+
+        Tru v       :=: Tru w      -> mkDone    "EqTru" $ v :=: w :> Tru v
         Val (Map kvs1) :=: Map kvs2 | map fst kvs1 == map fst kvs2 ->
           mkDone "EqMap" $ Map (zipWith (\ (k1, v1) (_, e2) -> (k1, v1 :=: e2)) kvs1 kvs2)
         HNF h1       :=: HNF h2 | root h1 /= root h2       -> mkFailure "EqFail"
@@ -1088,9 +1118,9 @@ reduceExp cxt parent@(Blk _ _ body)
         -- a constant to proceed outside a failure context.
         Arr es :@ IntE i | 0 <= i' && i' < length es -> mkDone "ITup-k" (es !! i')
                                                      where i' = fromInteger i
-        Val (Arr es) :@ ei -> mkStep "ITup" (mkExiFloat1 x) $
-                              Var x :=: ei :>
-                              foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
+        Arr es :@ ei -> mkStep "ITup" (mkExiFloat1 x) $
+                        Var x :=: ei :>
+                        foldr alt Fail (zipWith (\ i e -> (Var x :=: IntE i) :> e) [0..] es)
           where
             x = freshId cxt "x"
             alt e1 e2 = mkBlkE e1 :|: mkBlkE e2
@@ -1125,13 +1155,13 @@ reduceExp cxt parent@(Blk _ _ body)
       = find1 leftCF (`c` e2) e1 `orTry`
         find1 (leftCF && choiceFree e1) (e1 `c`) e2
 
-    findArr :: Bool -> [Exp] -> Reduction Exp
+    findArr :: Bool -> [Val] -> Reduction Exp
     findArr _ []          = RedNone
-    findArr leftCF (e:es) = find1 leftCF k e `orTry`
-                            find1 (leftCF && choiceFree e) ks (Arr es)
+    findArr leftCF (v:vs) = find1 leftCF k v `orTry`
+                            find1 leftCF ks (Arr vs)
       where
-        k e'         = Arr (e':es)
-        ks (Arr es') = Arr (e:es')
+        k v'         = Arr (v':vs)
+        ks (Arr vs') = Arr (v:vs')
         ks e'        = error "findArr" (prettyShow e')
 
     findMap :: Bool -> [(Gnd,Exp)] -> Reduction Exp
@@ -1147,94 +1177,35 @@ reduceExp cxt parent@(Blk _ _ body)
         mk3 e'         = error "findMap" (prettyShow e')
 
 ------------------------------------
-reduceVarVal :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
+reduceVarEq :: ReductionContext -> String -> Blk -> Ident -> Val -> Reduction Exp
 
--- Tuple values
--- Deal with (x=<v1..vn>)   -->   (x=<x1,..xn>)    <x1=v1, ..,vn>
-reduceVarVal cxt left_or_right parent x (ArrOrTruOrMap con vs)
-  -- Try rule (PromoteT) to promote an existential `x`, where `x` is
-  -- bound by the /immediately-enclosing/ block, namely `parent`
-  | promotionOK parent x xv
-  =  mkStep rule_name (Promote as x xv) v'
+reduceVarEq rc@(RC { rc_vcxt = vcxt, rc_skols = skols }) left_or_right parent x e
+  | promotionOK rc parent x e
+  =  mkStep rule_name (Promote S.empty x e) e
 
-  -- Try rule (VPromoteT) to promote a skolem `x`, where `x` can
-  -- be bound by /any/ enclosing `verify`
-  | Just asm <- skolemEquality cxt' x xv
-  = VerStep (mkRuleName ("V" ++ rule_name))
-    [ Res (FloatRigid as [A_Pred $ A_Pos asm]) v'
-    , Res (FloatRigid as [A_Pred $ A_Neg asm]) Fail ]
-  where
-    rule_name = "PromoteT" ++ left_or_right ++ "(" ++ show x ++ ")"
-
-    prs :: [(Maybe Ident, Val)]
-    -- (Just a,  v)   for values v that should be A-normalised
-    -- (Nothing, v)   for other values e.g. 7
-    prs = zipWith mk_anf (freshIds cxt (repeat "a0")) vs
-    as = S.fromList [ a | (Just a, _) <- prs ]
-
-    mk_anf a av | do_anf av = (Just a,  av)
-                | otherwise = (Nothing, av)
-
-    xv = con (map get_a prs)   -- The ANF'd version of (Arr vs)
-    v' = con (map get_e prs)
-
-    get_a :: (Maybe Ident,Val) -> Exp
-    get_a (Just a,  _)  = Var a
-    get_a (Nothing, av) = av
-
-    get_e :: (Maybe Ident,Val) -> Exp
-    get_e (Just a,  av) = Var a :=: av
-    get_e (Nothing, av) = av
-
-    RC { rc_skols = skols } = cxt
-    cxt' = cxt { rc_skols = skols `S.union` as }
-
-    x_is_skol = x `S.member` skols
-
-    do_anf v | x_is_skol -- `x` is a skolem
-             = isNothing (groundValue skols v)
-             | otherwise -- `x` is an existential
-             = case v of
-                 Var {} -> False                      -- just a variable
-                 Val {} -> not (S.null (freeVars v))  -- open non-variable
-                 _      -> True                       -- not a value
-    -- ToDo: we'd like better:
-    --   x `S.member` occVars v
-    -- but we are worried about divergence for x=<1,<2,x>>
-
--- Deal with non-tuple var/val equalities (x=v) or (v=x)
-reduceVarVal cxt left_or_right parent x (Val v)
-  | promotionOK parent x v
-  =  mkStep rule_name (Promote S.empty x v) v
-
-  | Just asm <- skolemEquality cxt x v
+  | Verifying {} <- vcxt
+  , x `S.member` skols
+  , Just (new_skols, gv, v') <- groundValue2 rc e
+  , let asm = A_GVEq (GVVar x) gv
   = VerStep (mkRuleName ("V" ++ rule_name ))
-     [ Res (FloatRigid S.empty [A_Pred $ A_Pos asm]) v
-     , Res (FloatRigid S.empty [A_Pred $ A_Neg asm]) Fail ]
+     [ Res (FloatRigid new_skols [A_Pred $ A_Pos asm]) v'
+     , Res (FloatRigid new_skols [A_Pred $ A_Neg asm]) Fail ]
 
   | otherwise
   = RedNone
   where
     rule_name = "Promote"++left_or_right ++ "(" ++ show x ++ ")"
 
-reduceVarVal _ _ _ _ _ = RedNone
-
-promotionOK :: Blk -> Ident -> Val -> Bool
+promotionOK :: ReductionContext -> Blk -> Ident -> Exp -> Bool
 -- True if we can promote (var=val) into the heap for the parent block
-promotionOK (Blk locals leqns _) x v
-  =  x `S.member` locals                    -- Must be bound by the /immediately enclosing/ block
+-- Even when JustMatching we want to promote /atomic/ values which are just clutter
+promotionOK rc (Blk locals leqns _) x e
+  =  isVal e
+  && x `S.member` locals                    -- Must be bound by the /immediately enclosing/ block
                                             --   i.e. is "flexible"
   && x `S.notMember` dom leqns              -- x must not have an eqn
-  && occfvs v `S.disjoint` (sing x `S.union` dom leqns)    -- v must not have variables from eqns
-
-skolemEquality :: ReductionContext -> Ident -> Exp -> Maybe FailableAssump
-skolemEquality (RC { rc_skols = skols, rc_vcxt = vcxt }) r v
-  | Verifying {} <- vcxt
-  , r `S.member` skols
-  , Just gv <- groundValue skols v
-  = Just (A_GVEq (GVVar r) gv)
-  | otherwise
-  = Nothing
+  && occfvs e `S.disjoint` (sing x `S.union` dom leqns)    -- v must not have variables from eqns
+  && (not (justMatching rc) || isAtomic e)
 
 groundValue :: Set SkolIdent -> Exp -> Maybe GroundVal
 -- Like skolValue, but no lambdas
@@ -1243,6 +1214,45 @@ groundValue rs (Var v) | v `S.member` rs = Just (GVVar v)
 groundValue rs (Arr vs)                  = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
 groundValue rs (Tru v)                   = do { gv <- groundValue rs v; Just (GVTru gv) }
 groundValue _  _                         = Nothing
+
+groundValue2 :: ReductionContext -> Exp -> Maybe (Set SkolIdent, GroundVal, Exp)
+groundValue2 rc e
+  | Var v <- e
+  = if v `S.member` skols
+    then Just (S.empty, GVVar v, e)
+    else Nothing
+
+  | Just gv <- gv_maybe e
+  , let xs = S.toList (freeVars e `S.difference` skols)  -- Free existentials
+        rs = freshIds rc [ "r" | _ <- xs ]
+        prs = xs `zip` rs
+        ren = mkRenamings rc prs
+        binds = [ Var x :=: Var r | (x,r) <- prs ]
+  = if null xs   -- Very common case, e.g. literals
+    then Just (S.empty, gv, e)
+    else Just (S.fromList rs
+              , renameGV ren gv
+              , mkSeqs binds `mkSeq` rename ren e)
+
+  | otherwise
+  = Nothing
+  where
+    skols = rc_skols rc
+
+    gv_maybe :: Val -> Maybe GroundVal
+    gv_maybe (Lit l)  = Just (GVLit l)
+    gv_maybe (Var x)  = Just (GVVar x)
+    gv_maybe (Arr vs) = do { gvs <- mapM gv_maybe vs; Just (GVArr gvs) }
+    gv_maybe (Tru v)  = do { gv  <- gv_maybe v; Just (GVTru gv) }
+    gv_maybe _ = Nothing
+
+renameGV :: Renaming -> GroundVal -> GroundVal
+renameGV ren gv = go gv
+  where
+    go (GVLit l)     = GVLit l
+    go (GVVar x)     = GVVar (lookupRn x ren)
+    go (GVArr gvs)   = GVArr (map go gvs)
+    go (GVTru gv1)   = GVTru (go gv1)
 
 skolValue :: ReductionContext -> Exp -> Bool
 -- Returns True if
@@ -1352,7 +1362,7 @@ reduceArrOp IsMap v@(Map _) = P_Done v
 reduceArrOp IsMap HNF{}     = P_Failure
 
 reduceArrOp ArrMap (Arr [fun, Arr xs])
-  = P_Done (Arr (map (fun :@) xs))
+  = P_Done (mkArr (map (fun :@) xs))
 
 reduceArrOp ArrApp (Arr [a1,a2,res])
    | Arr as1 <- a1, Arr as2 <- a2
@@ -1451,10 +1461,12 @@ reduceMatch cxt x tm mc
         TMap kvs     -> matchMap cxt x kvs mc
         Fun at fx bt -> matchFun cxt x at fx bt mc
         TArr ts      -> matchTup cxt x ts mc
-        TTru t       -> mkStep "MTru" (mkExiFloat1 u) $
-                        (Var x :=: Tru (Var u)) :> Tru (Match mc u t)
+        TTru t       -> mkStep "MTru" (mkExiFloat [u,v]) $
+                        (Var x :=: Tru (Var u)) :>
+                        (Var v :=: Match mc u t) :>
+                        Tru (Var v)
                        where
-                        u = freshId cxt "u"
+                        (u,v) = freshId2 cxt ("u","v")
 
         If t0 t1 t2  -> mkDone "MIf" $
                         Iter IF (Blk tbs0 emptyHeap $
@@ -1577,8 +1589,8 @@ matchFun cxt f at fx bt mc
 
     -- verify(u){ u ~>(flip) at; check<fx>{ wrap; q~>(no-flip) bt } }
     the_verify = Verify (sing u) [] $
-                 Blk tbs_at emptyHeap $
-                 Match mc_ver_dom u at' :>
+                 Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
+                 (Var p :=: Match mc_ver_dom u at') :>
                  (mkCheck fx $ Blk (sing q) emptyHeap $
                   wrap_code :> Match mc_ver_rng q (TBlock bt'))
 
@@ -1616,41 +1628,48 @@ reduceIter cxt ic b1 e2
 ---------------------------------------
 matchTup :: ReductionContext -> Ident -> [Term] -> MatchContext -> Reduction Exp
 matchTup cxt x ts mc
-  = mkStep "MTup" (mkExiFloat fresh_xs) $
-    (Var x :=: appendArrs cxt2 (map mk_in segs)) :>
-    appendArrs cxt2 (map mk_out segs)
+  = mkStep "MTup" (mkExiFloat (fresh_xs ++ fresh_ys)) $
+    (Var x :=: appendArrs cxt3 (map mk_in segs)) :>
+    appendArrs cxt3 (map mk_out segs)
   where
-    mk_in :: Segment (Ident,Term) -> Exp
-    mk_in (STrue (y,_)) = Var y
-    mk_in (SFalse sprs) = Arr [ Var y | (y,_) <- sprs ]
+    mk_in :: Segment (Ident,Ident,Term) -> Exp
+    mk_in (STrue (xi,_,_)) = Var xi
+    mk_in (SFalse sprs)    = Arr [ Var xi | (xi,_,_) <- sprs ]
 
-    mk_out :: Segment (Ident,Term) -> Exp
-    mk_out (STrue (y,t)) = Match mc y t
-    mk_out (SFalse sprs) = Arr [ Match mc y t | (y,t) <- sprs ]
+    mk_out :: Segment (Ident,Ident,Term) -> Exp
+    mk_out (STrue (xi,_,t)) = Match mc xi t
+    mk_out (SFalse sprs) = mkSeqs [ Var yi :=: Match mc xi t | (xi,yi,t) <- sprs ]
+                           `mkSeq` Arr [ Var yi | (_,yi,_) <- sprs ]
 
     fresh_xs = freshIds cxt ["x" | _ <- ts]
-    cxt2 = cxt { rc_exis = rc_exis cxt `S.union` S.fromList fresh_xs }  -- Yuk
+    cxt2 = cxt `addInScopeExis` S.fromList fresh_xs
+    fresh_ys = freshIds cxt2 ["y" | _ <- ts]
+    cxt3 = cxt `addInScopeExis` S.fromList fresh_ys
 
-    segs :: [Segment (Ident,Term)]
-    segs = segments is_splice (fresh_xs `zip` ts)
+    segs :: [Segment (Ident,Ident,Term)]
+    segs = segments is_splice (zip3 fresh_xs fresh_ys ts)
 
-    is_splice (y, Splice t) = Just (y,t)
+    is_splice (xi, yi, Splice t) = Just (xi,yi,t)
     is_splice _             = Nothing
 
 data Segment a = STrue  a | SFalse [a]
 
 appendArrs :: ReductionContext -> [Exp] -> Exp
 -- appendArrs [a1, .., an] = a1 `ArrApp` a2 `ArrApp` ... an
+--
+-- We want   arrApp$[a1,a2,b2]
+--         ; arrApp$[y2,a3,b3]; ...
+--         ; arrApp[b(n-1),an,bn]
+--         ; bn
 appendArrs _   []      = Arr []
-appendArrs cxt (a1:as) = mkCrl $ Blk (S.fromList (map fst prs)) [] $
-                         foldl do_one a1 prs
+appendArrs cxt (a:as) = mkCrl $ Blk (S.fromList (map fst prs)) [] $
+                        go a prs
   where
-    do_one rest (r,a) = (Prm ArrApp :@ Arr [rest, a, Var r]) :> Var r
-
-    fresh_ids = freshIds cxt ["y" | _ <- as]
+    go a1 ((b2,a2):bas) = (Prm ArrApp :@ mkArr [a1, a2, Var b2]) :> go (Var b2) bas
+    go a1 []            = a1
 
     prs :: [(Ident,Exp)]
-    prs = fresh_ids `zip` as
+    prs = freshIds cxt ["b" | _ <- as] `zip` as
 
 segments :: (a-> Maybe a) -> [a] -> [Segment a]
 -- Split the list into chunks
@@ -1797,8 +1816,13 @@ reduceVerifyOpGV _cxt op _arg _gv
   =  RedNone
 
 -- Primitive operators
--- verify(R;A){ P[     op[gv] ] } -> verify(R,r; A,r=op[gv]){ P[ r ] }
--- verify(R;A){ P[ predop[gv] ] } -> verify(R; A,    op[gv] ){ P[ gv ] }
+-- verify(R;A){ P[     op[gv] ] } -> verify(R,r; A,r=op[gv],preconds(op,gv)){ P[ r ] }
+--                                   verify(R; A,not(precond1(op,gv))){ P[ stuck ] }
+--                                   verify(R; A,not(precond2(op,gv))){ P[ stuck ] }
+--
+-- verify(R;A){ P[ predop[gv] ] } -> verify(R; A,    op[gv], preconds(op,gv) ){ P[ gv ] }
+--                                   verify(R; A,not(precond1(op,gv))){ P[ stuck ] }
+--                                   verify(R; A,not(precond2(op,gv))){ P[ stuck ] }
 --                                   verify(R; A,not(op[gv])){ P[ fail ] }
 reduceVerifyOpGV cxt op arg gv
   | Just preds <- primOpPreCond op gv
@@ -2015,7 +2039,62 @@ termSize (TOfType t1 _ t2) = 1 + termSize t1 + termSize t2
 termSize (TTru t)          = 1 + termSize t
 termSize (TMap kvs)        = 1 + sum (map (termSize . fst) kvs) + sum (map (termSize . snd) kvs)
 
---------------------------------------------------------------------------------
+validBlk :: Set Ident -> Blk -> Validity
+validBlk in_scope (BlkX xs hp e)
+  = mconcat (map valid_eqn hp) D.<>
+    validExp in_scope' e
+  where
+    in_scope' = in_scope `S.union` xs
+    eqn_bndrs = S.fromList (map fst hp)
+
+    valid_eqn (x,rhs)
+      = validIdOcc eqn_bndrs x D.<>
+        check_rhs D.<>
+        validExp in_scope' rhs
+      where
+        check_rhs | S.null (occfvs rhs `S.intersection` eqn_bndrs)
+                  = Valid
+                  | otherwise
+                  = Invalid (text "Occurs check"
+                             <+> pPrint x <+> text "<-" <+> pPrint rhs)
+
+validExp :: Set Ident -> Exp -> Validity
+validExp in_scope e = go e
+  where
+    goB blk = validBlk in_scope blk
+
+    go :: Exp -> Validity
+    go (Var x)           = validIdOcc in_scope x
+    go Err{}             = mempty
+    go Lit{}             = mempty
+    go Prm{}             = mempty
+    go (Lam x b)         = validBlk (S.insert x in_scope) b
+    go (Dly e1)          = go e1
+    go (e1 :> e2)        = go e1 D.<> go e2
+    go (b1 :|: b2)       = goB b1 D.<> goB b2
+    go Fail              = mempty
+    go (e1 :=: e2)       = go e1 D.<> go e2
+    go (Match _ i _)     = validIdOcc in_scope i
+    go (e1 :@ e2)        = go e1 D.<> go e2
+    go (Arr vs)          = mconcat (map goV vs)
+    go (Iter _ b1 e2)    = goB b1 D.<> go e2
+    go (Crl b)           = goB b
+    go (Verify rs _as b) = validBlk (in_scope `S.union` rs) b
+                           -- ToDo: check 'as
+    go (OfType e1 _ e2)  = go e1 D.<> go e2
+    go (Tru v)           = goV v
+    go (Map kvs)         = mconcat [ go a D.<> goV b | (a,b) <- kvs ]
+
+    goV :: Val -> Validity
+    goV (HNFV e1) = go e1
+    goV e1        = Invalid (text "Not a value:" <+> pPrint e1)
+
+validIdOcc :: Set Ident -> Ident -> Validity
+validIdOcc in_scope x
+  | x `S.member` in_scope = Valid
+  | otherwise             = Invalid (quotes (pPrint x) <+> text "is not in scope")
+
+ --------------------------------------------------------------------------------
 --
 --             Renaming
 --
@@ -2038,6 +2117,9 @@ emptyRenaming cxt = RN { rn_in_scope = getInScope cxt, rn_subst = emptySubst }
 mkRenaming :: ReductionContext -> Ident -> Ident -> Renaming
 mkRenaming cxt x x' = RN { rn_in_scope = S.insert x' (getInScope cxt)
                          , rn_subst    = [(x,x')] }
+mkRenamings :: ReductionContext -> [(Ident,Ident)] -> Renaming
+mkRenamings cxt prs = RN { rn_in_scope = foldr (S.insert . snd) (getInScope cxt) prs
+                         , rn_subst    = prs }
 
 
 lookupRn :: Ident -> Renaming -> Ident
