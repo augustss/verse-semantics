@@ -431,7 +431,6 @@ ppr_eqn (i, d) = pPrint i <+> text "<-" <+> pPrint d
 --------------------------------------------------------------------------------
 
 type HNF = Exp
-type HNFV = Exp
 
 -- A HNF, i.e., a value, but not a variable
 pattern HNF :: Exp -> HNF
@@ -446,14 +445,6 @@ getHNF e@Tru{} = Just e
 getHNF e@Dly{} = Just e
 getHNF e@Map{} = Just e
 getHNF _ = Nothing
-
--- Like HNF, but also variables
-pattern HNFV :: Exp -> HNFV
-pattern HNFV e <- (getHNFV -> Just e)
-
-getHNFV :: Exp -> Maybe HNFV
-getHNFV e@Var{} = Just e
-getHNFV e = getHNF e
 
 pattern Val :: Exp -> Val
 pattern Val e <- (getVal -> Just e)
@@ -2086,7 +2077,8 @@ validExp in_scope e = go e
     go (Map kvs)         = mconcat [ go a D.<> goV b | (a,b) <- kvs ]
 
     goV :: Val -> Validity
-    goV (HNFV e1) = go e1
+    goV (Var x)   = validIdOcc in_scope x
+    goV (HNF e1)  = go e1
     goV e1        = Invalid (text "Not a value:" <+> pPrint e1)
 
 validIdOcc :: Set Ident -> Ident -> Validity
