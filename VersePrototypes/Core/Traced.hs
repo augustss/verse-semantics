@@ -2,6 +2,7 @@
 
 module Core.Traced(
   Traced(..), TraceStep(..), tsPayload, setTsPayload, updTsPayload,
+  pattern (:<--),
   Verbosity, verbosityAll,
   Validity(..),
   getTerm, getTrace, traceLength, traceNormResult, traceSummary, appendTrace,
