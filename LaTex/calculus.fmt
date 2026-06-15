@@ -57,7 +57,7 @@
 %format writes = "\textbf{writes}"
 %format allocs = "\textbf{allocs}"
 
-%format cons (x) (y) = "\textbf{cons}(" x "," y ")"
+%format cons (x) (y) = "\textbf{cons}[" x "," y "]"
 %format applyx a b = a "(" b ")"
 %format snoc = "\textbf{snoc}"
 %format len = "\textbf{length}"
@@ -66,7 +66,7 @@
 %format ^ = " "
 %format ^^ = "\hspace{0.1em}"
 
-%format subst (e) (x) (v)  = e "\{" v "/" x "\}"
+%format subst (e) (x) (v)  = e "[" v "/" x "]"
 %format substw (e) (x) (v) = e "\{\!\{" v "/" x "\}\!\}"
 
 %% --------------------------
@@ -334,8 +334,9 @@
 %format iter (e) (a) (f) (g) = iterKW "(" e ")\{" a ";" f ";" g "\}"
 %format iter2 (k) (e) (z) = iterKW "(" k ")\{"e "\}\{" z "\}"
 %format block (e) = blockKW "\{" e "\}"
-%format blk (x) (hp) (e) = "\exists{}" x "\{" hp "\}." e
+%format blk (x) (hp) (e) = "\exists{}" x "\{" hp "\}.\," e
 %format emptyheap = "\{\}"
+%format `without` = "\SETMINUS"
 %format delay (e) = delayKW "\{" e "\}"
 %format twiddle x w t = x  "\leadsto_{" w "}" t
 %format hbind x e = x "\!\shortleftarrow\!" e
@@ -344,7 +345,7 @@
 %format bbcirc = "\circ"
 %format bbblob = "\bullet"
 %format applyiter k (v) (e) = k "[" v "," e "]"
-%format choicefreeb (b) = "\mathsf{leftChoiceFree}(" b ")"
+%format leftchoicefree (c) = "\mathsf{leftChoiceFree}(" c ")"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
@@ -564,6 +565,7 @@
 %format w_2
 %format w_i
 %format w_n
+%format w_m
 
 %format G_0
 %format G_1
@@ -746,7 +748,8 @@
 %format K_1
 
 %% We combined S and C into one
-%format S = "C"
+%% Not now!
+%% %format S = "C"
 
 %format C_1
 %format C_2
