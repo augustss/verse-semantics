@@ -49,7 +49,7 @@ import Data.Text(unpack)
 import qualified Core.Expr as Core
 import Core.Rule hiding ( choices )
 import Core.Rules( runtimeRules )
-import Core.Traced(term)
+import Core.Traced(getTerm)
 import Epic.Print(prettyShow, display)
 --import Debug.Trace
 
@@ -323,7 +323,7 @@ evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Core.Expr)
 evalExpr tflg e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
   let (r, tr) = normalizeExpr (everywhere runtimeRules) steps ce
-      v = term tr
+      v = getTerm tr
       steps = 20000
   when (showTrace tflg) $ do
     putStrLn "Trace is:"
