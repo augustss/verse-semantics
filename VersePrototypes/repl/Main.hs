@@ -476,7 +476,7 @@ cEval
                         case res of
                           NormOK      -> text "Result = " <+> pPrint (Core.getTerm tr)
                           NormExpired -> text "Ran out of fuel"
-                          NormInvalid -> hang (text "Reached an invalid expression:") 2
+                          NormInvalid _ -> hang (text "Reached an invalid expression:") 2
                                          (pPrint (Core.getTerm tr))
        ; displayDoc eval_doc
 

@@ -335,7 +335,7 @@ evalExpr tflg e = do
     NormExpired -> do
       putStrLn "*** Ran out of fuel"
       return Nothing
-    NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
+    NormInvalid _ -> error $ "Invalid reduction result:\n" ++ prettyShow v
 
 data TestFlags = TestFlags
   { onlyTest       :: !(Maybe String)      -- run only this test
