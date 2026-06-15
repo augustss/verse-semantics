@@ -32,8 +32,19 @@ copyHook' prefix = do
       -- and there is a hook to copy.
 --      print (hook, ghook)
       copyFile hook ghook
+--      putStrLn "hook copied"
       return True        -- hook copied
-     else
+     else do
+--      putStrLn "hook not 1 copied"
       return False       -- could not copy hook
-   else
-    return True          -- hook already exists
+   else do
+--    putStrLn "hook exists"
+    fhook <- readFile hook
+    fghook <- readFile ghook
+    if fhook == fghook then
+      return True          -- hook already exists
+     else do
+      copyFile hook ghook
+--      putStrLn "hook copied"
+      return True        -- hook copied
+      
