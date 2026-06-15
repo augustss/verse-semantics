@@ -20,31 +20,29 @@ $$
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Variable sets}    & |X| & ::= & |{x_1, xdots, x_n}|  \hspace{1cm} (n \geq 0)\\
 
-      \text{Expressions} & |e| & ::= & |x| \vb |k| \vb |op| \vb  |arr (v_1, xdots, v_n)| \\
+      \text{Values} & v & ::= & |x| \vb hnf \\
+      \text{Head values} & \hnf & ::= & |k| \vb |r| \vb |op| \vb |arr (v_1, xdots, v_n)|
+                                      \vb |lam x e| \vb |delay e| \\
+
+      \text{Expressions} & |e| & ::= & |v| \\
          && \vb & |e_1 ; e_2| \vb |e_1 == e_2| \vb |e_1 choice e_2| \vb |fail| \\
          && \vb & |apply1N v_1 v_2| \\[1mm]
-         && \vb & |lam x e| \\
          && \vb & |iter2 ic e_1 e_2| \\
          && \vb & |block b| \vb |delay e| \\
          && \vb & |twiddle x wu t| \\[1mm]
          && \vb & |verify2 rs as e| \\
          && \vb & |oftypefx e_1 fx e_2| \\
+      \text{Blocks} & b & ::= & |blk X hp e| \\
+      \text{Heaps} & hp & ::= & |hbind x_1 v_1| \ldots, |hbind x_n v_n|  \hspace{1cm} (n \geq 0) \\
+\\
          & |wu| & ::= & |(bb,dr,vx)| \\
          & |bb| & ::= & |bbcirc| \vb |bbblob| \\
          & |dr| & ::= & |drdom| \vb |drrng fx| \\
          & |vx| & ::= & |verifyflag| \vb |execflag| \\
-      \text{Blocks} & b & ::= & |blk X hp e| \\
-      \text{Heaps} & hp & ::= & |hbind x_1 e_1| \ldots, |hbind x_n e_n|  \hspace{1cm} (n \geq 0) \\
-\\
-      \text{Values} & v & ::= & |k| \vb |r| \vb |op| \vb |arr (v_1, xdots, v_n)|
-                               \vb |lam x e| \vb |delay e| \\
-      \text{Head values} & \hnf & ::= & |k| \vb |r| \vb |op| \vb |arr (e_1, xdots, e_n)|
-                                      \vb |lam x e| \vb |delay e| \\
-
       \text{Iter combinators} & ic & ::= & |allKW| \vb |ifKW| \vb |forKW|  \\
       \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |fails|  \\
-
+\\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Skolem sets}    & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Ground values} & |gv| & ::= & |k| \vb |r| \vb |arr (gv_1, xdots, gv_n)| \\
@@ -54,10 +52,9 @@ $$
 \\ \\
 \begin{array}{lrcl}
   \text{Evaluation contexts}  & |C| & ::= & |hole| \vb |e == C| \vb |C == e|
-           \vb  |e ; C| \vb |C ; e| \\
-   && \vb & |apply1N e C| \vb |apply1N C e| \vb  |arr (e_1, xdots, C, xdots, e_n)|\\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == e; P| \vb |def x P|  \\
-                       &     & \vb & |iter (FC^[P]) e_2 e_3 e_4| \vb |check fx P| \\
+           \vb  |e ; C| \vb |C ; e| \vb  |apply1N e C| \vb |apply1N C e| \\
+  \text{Block contexts}  & |B| & ::= & |blk X hp hole| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb \text{...todo...} \\
 \end{array} \\
 \\
 
@@ -108,18 +105,46 @@ $
 \subsection{Structural rules}
 
 \begin{center}
-\frame{
-$\begin{array}{@@{\hskip0.5em} l r @@{\;\;}c@@{\;\;} l l@@{}}
-  \rulename{hp-alpha} & |blk (X,x) hp e| & \leftrightarrow
-      & |blk (X,y) (subst hp x y) (subst e x y)|  & \text{if |y| $\not\in$ |freevars (hp,e)|}\\
-  \rulename{lam-alpha} & |lam x e| & \leftrightarrow & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e|$} \\
-  \end{array}$}
+\frame{$
+\begin{array}{@@{\hskip0.5em} l r @@{\;\;}c@@{\;\;} l l@@{}}
+\rulename{hp-alpha} & |blk (X,x) hp e| & \leftrightarrow
+    & |blk (X,y) (subst hp x y) (subst e x y)|  & \text{if |y| $\not\in$ |freevars (hp,e)|}\\
+\rulename{lam-alpha} & |lam x e| & \leftrightarrow & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e|$} \\
+\\
+\rulename{seq}   & |v; e|              & \movesto & |e| \\
+\rulename{norm1} & |v == (e_1;e_2)|    & \movesto & |e_1; v == e_2| \\
+\rulename{norm2} & |v == (e_1 == e_2)| & \movesto & |v == e_1; v == e_2| \\
+\rulename{norm3} & |(e_1;e_2) == e_3|  & \movesto & |e_1; e_2 == e_3| \\
+\rulename{norm4} & |(v == e_1) == e_2| & \movesto & |v == e_1; v == e_2| \\
+\rulename{norm5} & |(e_1 ; e_2); e_3|  & \movesto & |e_1; (e_2 ; e_3)| \\
+\end{array}
+$} \\
+\captionof{figure}{Structural and normalisation rules}
 \end{center}
 
-\subsection{Normalisation rules}
+\subsection{Iteration and choice}
+
+\begin{center}
+\frame{$
+\begin{array}{l r @@{\;\;}c@@{\;\;} l l}
+\rulename{fail}     & |iter2 ic (B^[fail]) e| & \movesto & |e| \\
+\rulename{choice}   & |iter2 ic (B^[b_1 `choice` b_2]) e|
+  & \movesto &  |iter2 ic (B^[ block b_1 ]) (iter2 ic (B^[ block b_2 ]) e3)| \\
+  & & \multicolumn{2}{l}{\text{if |choicefreeb B|}} \\
+\\
+\rulename{if}   & |iter2 ifKW (B^[delay e_1]) e_2|
+   & \movesto &  |block (B^[e_1])| \\
+\rulename{for}  & |iter2 ifKW (B^[v]) e|
+    & \movesto & |block (blk x emptyheap (applyN cons2 ((arr x, B^[v]), e)))| \\
 
 
-\begin{figure}
+\end{array}
+$} \\
+\captionof{figure}{Iteration and choice}
+\end{center}
+
+
+\begin{figure}[h]
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Application}
@@ -159,17 +184,6 @@ $\begin{array}{@@{}l}
 \\ \\[-0.8em]
 
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
-\rulegroupname{Normalization}
-%\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
-%\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{seq-assoc} & |lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
-% \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
-% \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
-% \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
-\rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
-\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-float} & |l == def x e_1; e_2| & \movesto & |def x (l==e_1; e_2| & |x| \not\in |freevars e_2|\\
-\rulename{exi-push} &  |def x (l==e_1; e_2| & \movesto & |l == e_1; def x e_2| & |x| \not\in |freevars e_1|\\
 
 \rulegroupname{Choice}
 \rulename{fail} & |C^[fail]| & \movesto & |fail|

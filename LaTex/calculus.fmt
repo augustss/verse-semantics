@@ -183,7 +183,7 @@
 %format apply1Np (a) b = a^ "[\!" b "]"
 
 %% Function application with many arguments
-%format applyN a (b) = a "\langle" b "\rangle"
+%format applyN a (b) = a "[" b "]"
 
 %% ----------- End of Applications --------------
 
@@ -335,6 +335,7 @@
 %format iter2 (k) (e) (z) = iterKW "(" k ")\{"e "\}\{" z "\}"
 %format block (e) = blockKW "\{" e "\}"
 %format blk (x) (hp) (e) = "\exists{}" x "\{" hp "\}." e
+%format emptyheap = "\{\}"
 %format delay (e) = delayKW "\{" e "\}"
 %format twiddle x w t = x  "\leadsto_{" w "}" t
 %format hbind x e = x "\!\shortleftarrow\!" e
@@ -343,6 +344,7 @@
 %format bbcirc = "\circ"
 %format bbblob = "\bullet"
 %format applyiter k (v) (e) = k "[" v "," e "]"
+%format choicefreeb (b) = "\mathsf{leftChoiceFree}(" b ")"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
