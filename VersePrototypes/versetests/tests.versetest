@@ -175,7 +175,7 @@ testeq("Fun6",pass) {one{ pair := (1, function(n:int)<closed>{pair[0]})
 
 # tim=skip: hits a VERSE_ENSURE
 testeq("Fun7",pass,tim=skip)
-  {one{ pair := (1, function(n:int)<closed>{if (n = 0) {1} else  {n * pair[1](n-1)}})
+  {one{ pair := (1, function(n:int)<closed>{:int = if (n = 0) {1} else  {n * pair[1](n-1)}})
       ; pair[1](5) } }  {120}
    # Fun7: Needs recursion
 testeq("Fun8",pass) {f(x:int, y:int)<closed>:=2*x+y; f(2,3)}  {7}
