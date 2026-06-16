@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, DeriveFunctor, PatternSynonyms, ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 module FrontEnd.Desugar(
@@ -21,7 +21,7 @@ import Core.Expr  ( allPrimOps, primOpString )
 import Epic.Print
 
 -- General libraries
-import Data.Maybe( catMaybes )
+import Data.Maybe( catMaybes, fromMaybe )
 import Data.IORef
 import Data.List
 import qualified Data.Set as S
@@ -341,9 +341,15 @@ defn xs@(InfixOp _ (Op "&") _) e
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
+pattern OfTypeX :: SrcExpr -> Eff -> SrcExpr -> SrcExpr
+pattern OfTypeX e1 eff e2 <- OfType e1 (maybeToEff -> eff) e2
+  where OfTypeX e1 eff e2 = OfType e1 (Just eff) e2
+maybeToEff :: Maybe Eff -> Eff
+maybeToEff = fromMaybe effTop
+
 defn_ty :: SrcPat -> SrcExpr -> [EffString] -> SrcExpr -> DsM SrcExpr
 defn_ty p t fxs1 rhs
-  = defn p (OfType rhs (toEff effTop (fxs1 ++ fxs2)) t')
+  = defn p (OfTypeX rhs (toEff effTop (fxs1 ++ fxs2)) t')
      -- effSucceeds:   x:type := rhs  -->   x := rhs |><decides> ty
      --                See DSTY2 Fig 4
   where
@@ -819,12 +825,12 @@ essToMini flags orig_e = go_expr orig_e
                      ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
           PI i -> case cfxs of
                      DomCtxt     -> ApplyD <$> go_expr ty <*> pure (Variable i)
-                     RngCtxt fxs -> OfType (Variable i) fxs <$> go_expr ty
+                     RngCtxt fxs -> OfTypeX (Variable i) fxs <$> go_expr ty
                        -- See Note [Pushing down the effects]
 
     -- WOFTYPE: t1 |> t2
-    go kap@(WC { wc_fxs = cfxs }) (OfType t1 fxs2 t2)
-      = OfType <$> go (kap { wc_fxs = DomCtxt }) t1
+    go kap@(WC { wc_fxs = cfxs }) (OfTypeX t1 fxs2 t2)
+      = OfTypeX <$> go (kap { wc_fxs = DomCtxt }) t1
               -- Push the input into t1, but OfType deals with effects,
               -- so don't push RngCtxt into t1
                <*> pure fxs'
@@ -925,7 +931,7 @@ essToMini flags orig_e = go_expr orig_e
                     DomCtxt -> Unify (Variable i) <$> ds_e  -- See M20Dec24-3 for a simple example
                     RngCtxt _fxs -> do { e <- ds_e    -- See test `blame0` for a simple example
                                        ; v <- newIdent noLoc "i"
-                                       ; pure (OfType (Variable i) effSucceeds
+                                       ; pure (OfTypeX (Variable i) effSucceeds
                                                       (Lam v (Unify (Variable v) e))) }
     -- Experimental: try effSucceeds rather than `fx` in this OfType call
     -- Goal transparent higher-order functions behave better; see M2May25-*
@@ -997,7 +1003,7 @@ miniToCore add_verification e_top
     go md (All e)        = All <$> go_nt md e
 
     -- VOFTYPE-, VOFTYPE+X: (e1 |> e2)
-    go md@(dsm,xs) (OfType e1 fx e2)
+    go md@(dsm,xs) (OfTypeX e1 fx e2)
       = case dsm of
           MI       -> do_mi
           MX       -> do_mvmx

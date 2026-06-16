@@ -556,8 +556,9 @@ srcToTerm (F.DefineV x)          = srcToCoreIdent x := Rng (TVar (Name "any"))
 srcToTerm (F.DefineIE i e)       = srcToCoreIdent i :-> srcToTerm e
 srcToTerm (F.If3 e1 e2 e3)       = If (srcToTerm e1) (srcToTerm e2) (srcToTerm e3)
 srcToTerm (F.For2 e1 e2)         = For (srcToTerm e1) (srcToTerm e2)
-srcToTerm (F.OfType t1 fx t2)
-  | Just eff <- toCoreEff fx     = TOfType (srcToTerm t1) eff (srcToTerm t2)
+srcToTerm (F.OfType t1 mfx t2)
+  | let fx = fromMaybe F.effSucceeds mfx                 -- Missing effects turns into succeeds
+  ,  Just eff <- toCoreEff fx     = TOfType (srcToTerm t1) eff (srcToTerm t2)
 srcToTerm (F.One e)              = If (x := srcToTerm e) (TVar x) TFail
   where
     x = mkName "oneBinder"  -- Hack; hope this is not free in 'e'!
@@ -2083,7 +2084,7 @@ validExp in_scope e = go e
     goV :: Val -> Validity
     goV (Var x)   = validIdOcc in_scope x
     goV (HNF e1)  = go e1
-    goV e1        = Invalid (text "Not a value:" <+> pPrint e1)
+    goV e1        = Invalid (text "Not a value:" <+> pPrint e1 $$ pPrint (in_scope, e))
 
 validIdOcc :: Set Ident -> Ident -> Validity
 validIdOcc in_scope x

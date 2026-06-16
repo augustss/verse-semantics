@@ -140,8 +140,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Function Aperture SrcExpr Eff SrcBlk -- function(e)<eff>{e}
   | Relation          SrcExpr Eff SrcBlk -- relation(e)<eff>{e}
 
-  | OfType SrcExpr Eff SrcExpr       -- e |>{fx} t
-                                     -- Empty [Eff] means "all effects" (not none!)
+  | OfType SrcExpr (Maybe Eff) SrcExpr -- e |>{fx} t
+                                       -- Note: the effects might be missing
 
   | DefineIE Ident SrcExpr             -- i->t    Capture input
   | Where SrcBlk SrcExpr               -- e1 where e2
@@ -711,9 +711,9 @@ instance Pretty SrcExpr where
                          cat [ text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
 
-          OfType e fx t -> maybeParens (p>0) $
+          OfType e mfx t -> maybeParens (p>0) $
                           sep [ (ppr 1 e)
-                              , text "|>" <> pPrint fx <+> ppr 1 t ]
+                              , text "|>" <> maybe empty pPrint mfx <+> ppr 1 t ]
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
           Some e      -> text "some" <> parens (ppr 0 e)

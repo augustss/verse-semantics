@@ -240,7 +240,7 @@ expToSrcExpr l (R.Not e) = F.PrefixOp (preOp l "not") (lexp e)
 expToSrcExpr l (R.Verify e)    = F.Macro1 (macro l "verify") [] (lexp e)
 expToSrcExpr _ (R.Check eff e) = F.Check (refImplEffToSrcEff eff) (lexp e)
 expToSrcExpr _ (R.OfType e1 e2) = --F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
-           F.OfType (lexp e1) F.effTop (lexp e2)
+           F.OfType (lexp e1) Nothing (lexp e2)
 expToSrcExpr l (R.Assume e) = F.Macro1 (macro l "assume") [] (lexp e)
 -- expToSrcExpr l (R.Module e) = XXX
 -- expToSrcExpr l (R.Struct e) = XXX
