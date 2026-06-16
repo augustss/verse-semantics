@@ -15,31 +15,29 @@
 \begin{figure}[t]
 $$
 \begin{array}{l}
-  \begin{array}{lrcl@@{}}
+  \begin{array}{lrclr@@{}}
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-      \text{Variable sets}    & |X| & ::= & |{x_1, xdots, x_n}|  \hspace{1cm} (n \geq 0)\\
-
+      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Values} & v & ::= & |x| \vb hnf \\
       \text{Head values} & \hnf & ::= & |k| \vb |r| \vb |op| \vb |arr (v_1, xdots, v_n)|
-                                      \vb |lam x e| \vb |delay e| \\
+                                      \vb |lam x b| \vb |delay e| \\
 
       \text{Expressions} & |e| & ::= & |v| \vb |applyN e_1 e_2| \\
-         && \vb & |e_1 ; e_2| \vb |e_1 == e_2| \vb |e_1 choice e_2| \vb |fail| \\
-         && \vb & |iter2 ic e_1 e_2| \\
-         && \vb & |block b| \vb |delay e| \\
-         && \vb & |twiddle x wu t| \\[1mm]
+         && \vb & |e_1 ; e_2| \vb |e_1 == e_2| \vb |b_1 choice b_2| \vb |fail| \\
+         && \vb & |iter2 ic b e| \\
+         && \vb &  |twiddle x wu t| \vb |block b|  \\[1mm]
          && \vb & |verify2 rs as e| \\
          && \vb & |oftypefx e_1 fx e_2| \\
       \text{Blocks} & b & ::= & |blk X hp e| \\
-      \text{Heaps} & hp & ::= & |hbind x_1 v_1| \ldots, |hbind x_n v_n|  \hspace{1cm} (n \geq 0) \\
+      \text{Variable sets}    & |X| & ::= & |{x_1, xdots, x_n}|  & (n \geq 0)\\
+      \text{Heaps} & hp & ::= & |hbind x_1 v_1| \ldots, |hbind x_n v_n|  & (n \geq 0) \\
 \\
          & |wu| & ::= & |(bb,dr,vx)| \\
          & |bb| & ::= & |bbcirc| \vb |bbblob| \\
          & |dr| & ::= & |drdom| \vb |drrng fx| \\
          & |vx| & ::= & |verifyflag| \vb |execflag| \\
       \text{Iter combinators} & ic & ::= & |allKW| \vb |ifKW| \vb |forKW|  \\
-      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |fails|  \\
 \\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
@@ -56,20 +54,51 @@ $$
   \text{Substitution context} & |S| & ::= & |C^[V]| \vb |C^[B^[S] `choice` b ]|
            \vb |C^[b `choice` B^[S]]| \vb  |C^[ lam x (B^[S])]| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb \text{...todo...} \\
-\end{array} \\
-\\
+\end{array}
+\end{array}
+$$
+  \caption{Execution Core Syntax} \label{fig:vc-syntax}
+\end{figure}
 
-\mbox{\em Substitution and free variables} \\
+\subsection{Auxiliary functions}
+
+\begin{center}
+\frame{$
+\begin{array}{l}
+\\
 \begin{array}{ll}
   |subst e x v| & \text{Capture-avoiding substitution of |v| for |x| in |e|} \\
   \freevars{e} & \text{Free variables of $e$} \\
   \boundvars{S} & \text{Bound variables of a context $S$} \\
   \freevarsoutsidelambdas{v} & \text{Free variables outside lambdas in $v$}
 \end{array}
+\\ \\
+\begin{array}{r @@{\;\;}c@@{\;\;} l}
+|leftchoicefree(C)| & :: & |Bool| \\
+|leftchoicefree(hole)| & = & |True| \\
+|leftchoicefree(C == e)| & = & |leftchoicefree(C)| \\
+|leftchoicefree(C ; e)| & = & |leftchoicefree(C)| \\
+|leftchoicefree(e == C)| & = & |choicefree(e) && leftchoicefree(C)| \\
+|leftchoicefree(e ; C)| & = & |choicefree(e) && leftchoicefree(C)| \\
+|leftchoicefree(apply1N e C)| & = & |False| \\
+\\
+|choicefree(e)| & :: & |Bool| \\
+|choicefree(v)| & = & |True| \\
+|choicefree(e_1; e_2)| & = & |choicefree(e_1) && choicefree(e_2)| \\
+|choicefree(e_1 == e_2)| & = & |choicefree(e_1) && choicefree(e_2)| \\
+|choicefree(apply1N e_1 e_2)| & = & |choicefree(e_1) && choicefree(e_2)| \\
+|choicefree(fail)| & = & |True| \\
+|choicefree(b_1 `choice` b_2)| & = & |False| \\
+|choicefree(block (blk X hp e))| & = & |choicefree(e)| \\
+|choicefree(iter2 allKW b e)| & = & |True| \\
+|choicefree(iter2 ifKW b e)| & = & |False| \\
+|choicefree(iter2 forKW b e)| & = & |choicefree(e)|
 \end{array}
-     $$
-  \caption{Execution Core Syntax} \label{fig:vc-syntax}
-\end{figure}
+\end{array}
+$} \\
+\captionof{figure}{Auxiliary functions}
+\end{center}
+
 
 
 % -----------------------------------------------------
@@ -82,15 +111,14 @@ $$
 \renewcommand{\arraystretch}{1.1}
 \begin{center}
 \frame{$
-\begin{array}{l r @@{\;\;}c@@{\;\;} l l}
+\begin{array}{l r @@{\;\;}c@@{\;\;} ll}
 \\
 \rulename{subst} & |blk X (hp,hbind x v) (S^[x])|
   & \movesto & |blk X (hp,hbind x v) (S^[v])| &  \text{if $x \not\in \boundvars{S}$} \\
- \rulename{gc} & |blk (X,Y) hp e| & \movesto & |blk X (hp `without` Y) e| \\
- && \multicolumn{3}{r}{\text{if $Y \disjoint \freevars{\rng(hp \SETMINUS Y),e}$,
-                             $Y \not= \{\}$ }} \\
+ \rulename{gc} & |blk (X,Y) hp e| & \movesto & |blk X (hp `without` Y) e|
+   & \text{if $Y \disjoint \freevars{\rng(|hp `without` Y|),e}$, $Y \not= \{\}$ } \\
 \rulename{promote-l} & |blk (X,x) hp (C^[ x==v ])|
-  & \movesto & |blk (X,x) (subst hp x v, hbind x v) (C^[v]|) \\
+  & \movesto & \multicolumn{2}{@@{}l}{|blk (X,x) (subst hp x v, hbind x v) (C^[v])|} \\
   & & \multicolumn{3}{r}{\text{if $x \not\in \dom(hp)$,
         $\freevarsoutsidelambdas{v} \disjoint \dom(hp) \cup \{x\}$}} \\
 \rulename{promote-r} & |blk (X,x) hp (C^[ v==x ])|
@@ -102,6 +130,12 @@ $} \\
 \end{center}
 
 \begin{itemize}
+\item Given a heap binding |hbind x v|, rule \rulename{subst} substitutes |v| for
+  a \emph{single} occurrence of |x|.  The context |S| (see \Cref{fig:vc-syntax})
+  allows us to look deep in the term,
+  including under choices and lambdas.
+\item The \rulename{gc} rule allows us to garbage-collect a strongly-connected component of
+  possibly-recursive bindings in the heap.
 \item You might wonder if we could eliminate \rulename{promote-r} in
   favour of a \rulename{swap} rule that swaps |x=hnf| to |hnf=x|.  But
   we must also deal with |x=y| where |y| is bound locally and |x| is
@@ -130,6 +164,57 @@ $} \\
 \captionof{figure}{Unification rules}
 \end{center}
 
+\begin{itemize}
+\item There is no rule for |(lam x e_1) == (lam y e_2)| because the runtime can't test for equality of functions.
+\item Instead that equality is \emph{stuck}.  A stuck expression is our version of ``goes wrong at runtime''.  It should never happen; the verifier should reject such a program before we run it.
+\item So (slightly surprisingly) there no rule for |x==x| either, in case
+  |x| is bound to a lambda.  That equality is stuck until |x| gets a value.
+\end{itemize}
+
+% ---------------------------------------------------
+\subsection{Primitive operations}
+
+We just give a small representative selection here.
+
+\begin{center}
+\frame{$
+\begin{array}{l r @@{\;\;}c@@{\;\;} l l}
+    \\
+\rulename{add} & |applyN add (k_1,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{gt1} & |applyN gt (k_1,k_2)| & \movesto & |k_1| & \text{if $k_1>k_2$} \\
+\rulename{gt2} & |applyN gt (k_1,k_2)| & \movesto & |fail| & \text{if $k_1 \leq k_2$} \\
+\rulename{dotdot} & |applyN dotdot (k_1,k_2)|
+  & \movesto & |k_1 `choice` (k_1+1) `choice` xdots `choice` k_2| \\
+\\
+\end{array}
+$} \\
+\captionof{figure}{Primitive operation rules}
+\end{center}
+
+\begin{itemize}
+\item An ill-typed application, such as |applyN add (3,"wombat")| where the argument(s) are not integers, is just stuck.  Similarly for other primitive operators.
+\end{itemize}
+
+% ---------------------------------------------------
+\subsection{Beta reduction}
+
+\begin{center}
+\frame{$
+\begin{array}{l r @@{\;\;}c@@{\;\;} l l}
+    \\
+  \rulename{beta-l} & |apply1N (lam x b) e| & \movesto & |block (blk x () (x == e; block b))|
+        \hspace{5mm} \text{if $x \not\in \freevars{e}$} \\
+  \rulename{beta-t} & |apply1Np (arr (v_0,xdots,v_n)) e|
+  & \movesto & |block (blk x () (x==e; ((blk () () (x==0;v_0)) `choice` xdots `choice` (blk () () (x==n; v_n)))))| \\
+\\
+\end{array}
+$} \\
+\captionof{figure}{Primitive operation rules}
+\end{center}
+
+\begin{itemize}
+\item Note that \rulename{beta-t} does narrowing.
+\end{itemize}
 
 % ---------------------------------------------------
 \subsection{Structural and normalisation rules}
@@ -151,7 +236,7 @@ $} \\
 \\
 \rulename{float} & |blk X hx (C^[block (blk Y hy e)])|
                  & \movesto & |blk (X,Y) (hx,hy) (C^[e])| \\
-                 && \multicolumn{3}{r}{\text{if $X \disjoint Y$, $Y \not\in \freevars{C}$,
+                 && \multicolumn{3}{l}{\text{if $X \disjoint Y$, $Y \not\in \freevars{C}$,
                    $\freevarsoutsidelambdas{\rng(hy)} \disjoint X$}}
 \\
 \end{array}

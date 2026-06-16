@@ -179,8 +179,8 @@
 %format apply1np (a) (b) = a "(" b ")"
 
 %% Function application with 1 argument, without parenthesis
-%format apply1N a (b) = a^ "[\!" b "]"
-%format apply1Np (a) b = a^ "[\!" b "]"
+%format apply1N a (b) = a^ "[\hspace{-0.2mm}" b "]"
+%format apply1Np (a) b = a^ "[\hspace{-0.2mm}" b "]"
 
 %% Function application with many arguments
 %format applyN a (b) = a "[" b "]"
@@ -336,7 +336,7 @@
 %format block (e) = blockKW "\{" e "\}"
 %format blk (x) (hp) (e) = "\exists{}" x "\{" hp "\}.\," e
 %format emptyheap = "\{\}"
-%format `without` = "\SETMINUS"
+%format `without` = "\! \bbslash \!"
 %format delay (e) = delayKW "\{" e "\}"
 %format twiddle x w t = x  "\leadsto_{" w "}" t
 %format hbind x e = x "\!\shortleftarrow\!" e
@@ -346,6 +346,7 @@
 %format bbblob = "\bullet"
 %format applyiter k (v) (e) = k "[" v "," e "]"
 %format leftchoicefree (c) = "\mathsf{leftChoiceFree}(" c ")"
+%format choicefree (e) = "\mathsf{choiceFree}(" e ")"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
@@ -384,6 +385,7 @@
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"
+%format dotdot = "\textbf{dotdot}"
 %format pfun = "\mathit{pf}"
 %format ppred = "\mathit{pp}"
 %%%%format map = "\textbf{map}"
