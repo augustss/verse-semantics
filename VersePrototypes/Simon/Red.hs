@@ -792,11 +792,15 @@ thePrelude
                               (Prm IsArr :@ Var vp) :>
                               (Prm ArrMap :@ (Arr [Var vt, Var vp])))
 
-    -- ? = \t.\x. if (truth{y:any} = x) then truth{t[y]} else x=()
+    -- ? = \t.\x. if (truth{y:any} = x) then { z:=t[y]; truth{z}} else x=()
     , (mkName "prefix'?'"   , Lam vt $ mkBlkE $ Lam vx $ mkBlkE $
-                              let y = mkName "_y" in
-                              Iter IF (Blk (sing y) emptyHeap $ ((Tru (Var y) :=: Var vx) :> Dly (Tru (Var vt :@ Var y))))
-                                      (Var vx :=: Arr [])
+                              let y = mkName "_y"
+                                  z = mkName "_z" in
+                              Iter IF (Blk (S.fromList [y,z])
+                                           emptyHeap
+                                           ((Tru (Var y) :=: Var vx) :>                             -- condition
+                                             Dly ((Var z :=: (Var vt :@ Var y)) :> Tru (Var z) )))  -- then branch
+                                      (Var vx :=: Arr [])                                           -- else branch
       )
 
     ]
