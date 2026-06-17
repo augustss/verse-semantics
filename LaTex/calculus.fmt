@@ -57,7 +57,7 @@
 %format writes = "\textbf{writes}"
 %format allocs = "\textbf{allocs}"
 
-%format cons (x) (y) = "\textbf{cons}[" x "," y "]"
+%format cons (x) (y) = consKW "[" x "," y "]"
 %format applyx a b = a "(" b ")"
 %format snoc = "\textbf{snoc}"
 %format len = "\textbf{length}"
@@ -88,6 +88,10 @@
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DB (m) (j) (pi) (t)) = "{\mathcal B}_{" m "}\llbracket{}" t "\rrbracket{}" pi "\," j
 %format (De2 md (x))      = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
+
+%% "Mcirc" is a meta function for matching
+%% Mcirc w t  =  exists x. x ~>circ t
+%format (Mcirc w t)  = "{\mathcal D}_{" w "}\llbracket" t "\rrbracket"
 
 % ----------------------------------------------------
 % New desugaring, just does the wrapping part:
@@ -253,17 +257,10 @@
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"
-%%%format choice = "[ \! ]"
-%%%format `choice` = "\mathop{[ \! ]}"
 %format choice = "\rule[-0.1em]{0.15em}{0.75em}"
 %% 1mm is about 0.3em with the current font
 %format `choice` = "\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}"
 %format `uchoice` = "|\!|\!|"
-
-%% New version: tall | for BNF, fat | for choice
-%%format vbar = "\mathop{\bigm|}"
-%%format choice = "\boldsymbol{|}"
-%%format `choice` = "\mathop{\boldsymbol{|}}"
 
 %format hastype (x) (y) = x "\," hastypeKW "\," y
 %format hastypeKW = "{\bf hastype}"
@@ -281,6 +278,7 @@
 %% %format ok = "\textbf{ok}"
 %format ok = "\langle\rangle"
 
+%format `wherekw` = "\;\textbf{where}\;"
 %format succeed = "\textbf{succeed}"
 %format wront = "\wrong"
 %format do = "\textbf{do}"
@@ -338,7 +336,7 @@
 %format emptyheap = "\{\}"
 %format `without` = "\! \bbslash \!"
 %format delay (e) = delayKW "\{" e "\}"
-%format twiddle x w t = x  "\leadsto_{" w "}" t
+%format twiddle x w (t) = x  "\leadsto_{" w "}" t
 %format hbind x e = x "\!\shortleftarrow\!" e
 %format verifyflag = "\textsc{\bf \small v}"
 %format execflag = "\textsc{\bf \small x}"
@@ -384,6 +382,7 @@
 %format false = "\textbf{false}"
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
+%format consKW = "\textbf{cons}"
 %format add = "\textbf{add}"
 %format dotdot = "\textbf{dotdot}"
 %format pfun = "\mathit{pf}"

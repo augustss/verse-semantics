@@ -63,7 +63,7 @@ $$
 \subsection{Auxiliary functions}
 
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l}
 \\
 \begin{array}{ll}
@@ -106,13 +106,26 @@ $} \\
 % -----------------------------------------------------
 
 % ---------------------------------------------------
+\section{Rewrite rules}
+
+This section give the rewrite rules.  Some general observations.
+
+\begin{itemize}
+\item Many rules have a side condition like $x \not\in \freevars{e}$.  The idea is that
+  we silently use the alpha-renaming rules (\Cref{fig:alpha-rules}) to
+  make these side conditions hold.
+\item All rules are careful to keep non-value sub-expressions in the same order.
+  This only matters in the future when effects (including I/O) play a bigger role.
+  Example: the normalisation rules in \Cref{fig:normalisation-rules}.
+  
+\end{itemize}
+
 \subsection{Substitution and promotion}
 
 \renewcommand{\arraystretch}{1.1}
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} ll}
-\\
 \rulename{subst} & |blk X (hp,hbind x v) (S^[x])|
   & \movesto & |blk X (hp,hbind x v) (S^[v])| &  \text{if $x \not\in \boundvars{S}$} \\
  \rulename{gc} & |blk (X,Y) hp e| & \movesto & |blk X (hp `without` Y) e|
@@ -123,10 +136,10 @@ $} \\
         $\freevarsoutsidelambdas{v} \disjoint \dom(hp) \cup \{x\}$}} \\
 \rulename{promote-r} & |blk (X,x) hp (C^[ v==x ])|
   & \movesto & \text{...just like \rulename{promotel}} \\
-\\
 \end{array}
 $} \\
 \captionof{figure}{Structural and normalisation rules}
+  \label{fig:alpha-rules} \label{fig:normalisation-rules}
 \end{center}
 
 \begin{itemize}
@@ -147,9 +160,8 @@ $} \\
 \subsection{Unification}
 
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-  \\
 \rulename{eqk1} & |k == k| & \movesto & |k| \\
 \rulename{eqk2} & |k_1 == k_2| & \movesto & |fail| & \text{if $k_1 \not= k_2$} \\
 \rulename{eqtup1} & |arr(v_1, xdots, v_n) == arr(w_1,xdots,w_n)| & \movesto
@@ -158,7 +170,6 @@ $} \\
   & \text{if $n \not= m$ } \\
 \rulename{eqfail} & |hnf_1 == hnf_2| & \movesto
   & \multicolumn{2}{@@{}l}{|fail| \hspace{4mm} \text{if |hnf_1| and |hnf_2| have different root shapes}} \\
-\\
 \end{array}
 $} \\
 \captionof{figure}{Unification rules}
@@ -175,38 +186,35 @@ $} \\
 \subsection{Primitive operations}
 
 We just give a small representative selection here.
-
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-    \\
 \rulename{add} & |applyN add (k_1,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{gt1} & |applyN gt (k_1,k_2)| & \movesto & |k_1| & \text{if $k_1>k_2$} \\
 \rulename{gt2} & |applyN gt (k_1,k_2)| & \movesto & |fail| & \text{if $k_1 \leq k_2$} \\
+\rulename{isInt1} & |applyN isInt k| & \movesto & |k| & \text{if |k| is an integer} \\
+\rulename{isInt2} & |applyN isInt v| & \movesto & |fail| & \text{if |v| is not an integer} \\
+\rulename{cons} & |applyN consKW (v_0, arr(v_1,xdots,v_n))| & \movesto & |arr(v_0,v_1,xdots,v_n)| \\
 \rulename{dotdot} & |applyN dotdot (k_1,k_2)|
-  & \movesto & |k_1 `choice` (k_1+1) `choice` xdots `choice` k_2| \\
-\\
+  & \movesto & |k_1 `choice` (k_1+1) `choice` xdots `choice` k_2|
 \end{array}
-$} \\
+$}
 \captionof{figure}{Primitive operation rules}
 \end{center}
-
 \begin{itemize}
-\item An ill-typed application, such as |applyN add (3,"wombat")| where the argument(s) are not integers, is just stuck.  Similarly for other primitive operators.
+\item An ill-typed application, such as |applyN add (3,lam x x)| where the argument(s) are not integers, is just stuck.  Similarly for other primitive operators.
 \end{itemize}
 
 % ---------------------------------------------------
 \subsection{Beta reduction}
 
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-    \\
   \rulename{beta-l} & |apply1N (lam x b) e| & \movesto & |block (blk x () (x == e; block b))|
         \hspace{5mm} \text{if $x \not\in \freevars{e}$} \\
   \rulename{beta-t} & |apply1Np (arr (v_0,xdots,v_n)) e|
   & \movesto & |block (blk x () (x==e; ((blk () () (x==0;v_0)) `choice` xdots `choice` (blk () () (x==n; v_n)))))| \\
-\\
 \end{array}
 $} \\
 \captionof{figure}{Primitive operation rules}
@@ -214,15 +222,16 @@ $} \\
 
 \begin{itemize}
 \item Note that \rulename{beta-t} does narrowing.
+\item In \rulename{beta-t} the binding |x==e| is there to avoid duplicating |e|.
+\item The base case of \rulename{beta-t} for the empty tuple simply yields failure.
 \end{itemize}
 
 % ---------------------------------------------------
 \subsection{Structural and normalisation rules}
 
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-    \\
 \rulename{hp-alpha} & |blk (X,x) hp e| & \leftrightarrow
     & |blk (X,y) (subst hp x y) (subst e x y)|  & \text{if |y| $\not\in$ |freevars (hp,e)|}\\
 \rulename{lam-alpha} & |lam x e| & \leftrightarrow & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e|$} \\
@@ -238,7 +247,6 @@ $} \\
                  & \movesto & |blk (X,Y) (hx,hy) (C^[e])| \\
                  && \multicolumn{3}{l}{\text{if $X \disjoint Y$, $Y \not\in \freevars{C}$,
                    $\freevarsoutsidelambdas{\rng(hy)} \disjoint X$}}
-\\
 \end{array}
 $} \\
 \captionof{figure}{Structural and normalisation rules}
@@ -253,9 +261,8 @@ $} \\
 \subsection{Iteration and choice}
 
 \begin{center}
-\frame{$
+\fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-\\
 \rulename{fail}     & |iter2 ic (B^[C^[fail]]) e| & \movesto & |e| \\
 \rulename{choice}   & |iter2 ic (B^[C^[b_1 `choice` b_2]]) e|
     & \movesto &  |iterKW(ic)| \begin{array}[t]{@@{}l}
@@ -269,79 +276,75 @@ $} \\
 \rulename{all}  & |iter2 allKW (B^[v]) e|
     & \movesto & |cons (B^[v]) e| \\
 \rulename{for}  & |iter2 forKW (B^[v]) e|
-    & \movesto & |block (blk x () (applyN cons2 (arr (x, B^[v]), e))| \\
-\\
+    & \movesto & |block (blk x () (applyN cons2 (arr (x, B^[v]), e))|
 \end{array}
 $} \\
 \captionof{figure}{Iteration and choice}
 \end{center}
 
+% ---------------------------------------------------
+\subsection{Matching}
+
+\begin{center}
+\fbox{$
+\begin{array}{l}
+\begin{array}{l r @@{\;\;}c@@{\;\;} l l}
+\rulename{mwild} & |twiddle x w _| & \movesto & |x| \\
+\rulename{mval}  & |twiddle x w k| & \movesto & |x == k| \\
+\rulename{mval}  & |twiddle x w op| & \movesto & |x == op| \\
+\rulename{mvar}  & |twiddle x w y| & \movesto & |x==y| \\
+\rulename{mdef}  & |twiddle x w (y := t)| & \movesto & |y = (twiddle x w t)| \\
+% (MInput) 	y ~>w (x :-> t)	→ y = x; x ~>b t
+\rulename{mblock} & |twiddle x w (block t)| & \movesto & |block (blk (tbs(t)) () (twiddle x w t))| \\
+\rulename{mapp}  & |twiddle x w (apply1N t_1 t_2)| & \movesto
+  & |x = apply1N (Mcirc w t_1) (Mcirc w t_2)| \\
+\rulename{munif} & |twiddle x w (t_1=t_2)| & \movesto
+  & |(twiddle x w t_1) == (twiddle x w t_2)| \\
+\rulename{mchoice} & |twiddle x w (t_1 `choice` t_2)| & \movesto
+  & |(twiddle x w (block t_1)) `choice` (twiddle x w (block t_2))| \\
+\rulename{mfail} & |twiddle x w fail| & \movesto & |fail| \\
+\rulename{msemi} & |twiddle x w (t_1;t_2)| & \movesto & |Mcirc w t_1; twiddle x w t_2| \\
+\rulename{mwhere} & |twiddle x w (t_1 `wherekw` t_2)| & \movesto
+  & |blk y () (y == (twiddle x w t_1); Mcirc w t_2; y| \\
+\rulename{mtup} & |twiddle x w (array (t_1,xdots,t_n))| & \movesto
+% & → block (blk (x_1 xdots x_n, y_1 xdots y_n) (). x == arr (x_1,xdots,x_n);
+%     y_1 == (x_1~>൦t1; ...; yn=xn~>൦tn; <y1,..,yn>} \\
+\\
+% (MTru)       x ~>w tru{t} 		→ {∃x1,y2, x=tru{x1}; y1=x1~>൦t; tru{y1}
+% 
+% (MColon1) 	x ~>w :t	  	→ x ▷fx D(t,w)	if w=(⦁, R<fx>)
+% (MColon2) 	x ~>w :t	  	→ D(t,w)[x]		otherwise
+% (MOfType)	x ~>w (t1 ▷fx t2)	→ D(t1,w) ▷(fx ⋂ fx(w)) D(t2,w)
+% 
+% (MDef) 	y ~>w (x := t)	→ x = (y ~>b t)
+% (MInput) 	y ~>w (x :-> t)	→ y = x; x ~>b t
+% (MBlock)	x ~>w block{t}	→ {∃tbs(t){}. x ~>b t}
+% (MEnum)      x ~>w t1..t2     	→ ∃u1 u2. x = D(t1,w)..D(t2,w)
+% 
+% (MIf)        x ~>w if(t0){t1}else{t2}	→ iter(IF)(tbs(t0). (D(t0,w); delay{x ~>w block{t1}})
+%        {x ~>w block{t2}}
+% (MAll)		x ~> all{t}		→ x = iter(ALL){∃tbs(t0).E(t0,w)}{<>}
+% (MFor)       x ~>w for(t0){t1} 	→ ∃y. <x, y> = iter(FOR)(∃tbs(t0). D(t0,w); \i. i ~>൦ block{t1}}){<<>,<>>};
+\end{array}\\
+\\
+\text{where \;\; |Mcirc (_,_,v) t| = |blk x () (twiddle x (bbcirc,drdom,v) t)|}
+\end{array}
+$} \\
+\captionof{figure}{Iteration and choice}
+\end{center}
+
+\begin{itemize}
+\item In \rulename{mwhere} we are careful to keep |t_1| and |t_2| in the same order,
+  in case they have effects.
+\end{itemize}
 
 \begin{figure}[h]
-$\begin{array}{@@{}l}
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-\rulegroupname{Application}
-\rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
-\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
-\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
-\rulename{app-isint}        & |apply1 isInt k|   & \movesto & |k| &  \text{if $k$ is an integer} \\
-\rulename{app-isint-fail}      & |applyN isInt v|   & \movesto & |fail| &  \text{if $v$ is not an integer} \\
-\rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
-                                                  & \text{if $x \not\in \freevars{|v|}$} \\
-\rulename{app-tup0}        & |apply1 emptytup v| & \movesto & |fail| \\
-\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_nm1)) v| & \movesto &
-                            |(v == 0^^^ v_0) choice xdots choice (v == (n-1)^^^ v_nm1)| & n \geq 0
-\end{array}
-\\ \\[-0.8em]
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-\rulegroupname{Unification}
-  \rulename{u-lit}   & |k == k; e| & \movesto & |e| & \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
-       & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
-  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
-  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{u-swap} & |hnf == x; e| & \movesto & |x == hnf; e| \\
-\\[-0.8em]
-
-\rulegroupname{Substitution}
-
-\rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
-  & \text{if |blockedc (singleton x) C|, |((singleton x) `cup` boundvars C) `disjoint` freevars v|}  \\
-\rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
-  \hspace{4mm} \text{$|z| \in \freevars{|lam x e_1|}$}} \\
-%\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
-%  & \text{if |validc x emptyset C|, $x \not= y$}  \\
-% \rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
-% \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
-\end{array}
-\\ \\[-0.8em]
-
-\begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
-
-\rulegroupname{Choice}
-\rulename{fail} & |C^[fail]| & \movesto & |fail|
-    & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
-    \\[-0.8em]
-
-\rulegroupname{Iter}
-\rulename{iter-fail}    & |iter2 ic fail e_0| & \movesto & |e_0| \\
-\rulename{iter-value}   & |iter2 ic e e_0| & \movesto & |applyiter ic e e_0| \\
-\rulename{iter-choice}  & |iter2 ic (C^[e_1 `choice` e_2]) e_0| & \movesto &
-   |iter2 ic (C^[e_1]) (iter2 ic (C^[e_2]) e_0)| \\
-
-\end{array} \\
-\\[-0.8em]
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-\rulegroupname{Open Lambdas}
+$\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
   \rulename{u-olam}   & |olam z_1 v_1 == olam z_2 v_2; e| & \movesto & \multicolumn{2}{@@{}l}{|def z_3 (z_1 == olam z_3 v_2; z_2 == olam z_3 v_1); e|} \\
   \rulename{app-olam} & |apply1N (olam z v_1) v_2| & \movesto & |def x (x == apply1N z v_2; x == apply1N v_1 v_2; x| \\
   \rulename{exi-app} & |def z e| & \movesto &
   \multicolumn{2}{@@{}l}{|subst e z ((lam x (def y y)))| \hspace{5mm} \text{if |z| occurs in |e| only as |apply1N z v|}}
-\end{array}
-\\
-\text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
 \end{array}$
 
-\caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}
-\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\caption{Open lambdas (incomplete)} \label{fig:olam}
 \end{figure}
