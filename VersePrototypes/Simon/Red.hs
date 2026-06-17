@@ -764,6 +764,8 @@ mkCons2 cxt x y xys
   where
     (xs, ys, ar)  = freshId3 cxt ("xs", "ys", "ar")
 
+-- The definitions in thePrelude are not subject to the ~> transformations.
+-- So they should be in the correct form.  In particular, they should be ANFed.
 thePrelude :: [Eqn]
 thePrelude
   = [ (mkName "int",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :> Var vp)
