@@ -157,10 +157,10 @@ verify("Rec0a",pass,tim=skip_loop) { f(n:int)<closed>:int := f[n] }
 verify("Rec0b",pass) { f(n:int)<closed>:int := f[n-1] }
 verify("Rec0c",pass) { f(n:int)<closed>:int := if (n=0) then {0} else {f[n+1]} }
 verify("Rec1",pass) { sum(n:int)<closed>:int := if (n < 1) then { 0 } else { n + sum(n-1) } }
-verify("Rec2",pass) { sum(n:any)<closed>:int := if (0 < n) then { n + sum(n-1) } else { 0 } }
+verify("Rec2",fail) { sum(n:any)<closed>:int := if (0 < n) then { n + sum(n-1) } else { 0 } } # can't compare any
 verify("Rec3",pass) { sum(n:int)<closed>:int := if (0 < n) then { n + sum(n-1) } else { n } }
 verify("RecVal1",fail) { x:int := x; x }
-verify("RecVal2",pass,broken) { x:type{5} := x; x }
+verify("RecVal2",pass) { x:type{5} := x; x }
 verify("RecVal3",pass,broken) { x:type{1|2|3} := x; x }
 
 ### Higher-order functions
@@ -195,7 +195,7 @@ verify("HO15",fail,tim=P00) { gg(x:int)<closed> := (); foo(f(g(:int)<closed>:int
 verify("HO16",pass) { bar1(x:int)<closed>:type{_(:int)<closed>:char} := { (y:int) => {'m' } } }
 
 verify("HO17",fail,tim=V10) { bar2(x:int)<closed>:type{_(:int)<closed>:char} := { (y:int) => { 3  } } }
-  # HO17: REJECT the function returns an int not a string
+  # HO17: REJECT the function returns an int not a char
 
 verify("HO18",fail,tim=V10) { bar3(x:int)<closed>:type{_(:int)<closed>:char} := { (y:nat) => { 'a'} } }
   # HO18: REJECT the function only works on naturals but is supposed to work on ints
