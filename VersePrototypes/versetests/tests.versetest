@@ -148,9 +148,8 @@ testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,
 testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
 testeq("Splice5",pass,tim=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 testeq("Splice5a",pass,tim=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice6",pass,tim=skip){ f( ..(a:[]int), b:char )<closed> :=
-                             { (Length[a], b) }
-                      ; f[1,2,3,'f'] } {(3, 'f') }
+testeq("Splice6",pass,tim=skip){ f( ..(a:[]int), b:char )<closed> := { (Length[a], b) };
+                                 f[1,2,3,'f'] } {(3, 'f') }
 testeq("Splice7",pass){ f( a:int,b:int )<closed> := a; f(3,4) }{3}
 testeq("Splice8",pass,tim=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
 testeq("Splice9",pass,tim=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
