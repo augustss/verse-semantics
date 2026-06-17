@@ -50,14 +50,18 @@ $$
 \begin{array}{lrcl}
   \text{Evaluation contexts}  & |C| & ::= & |hole| \vb |e == C| \vb |C == e|
            \vb  |e ; C| \vb |C ; e| \vb  |applyN e C| \vb |applyN C e| \\
+ \text{Substitution contexts}  & |S| & ::= & |V| \vb |e == S| \vb |S == e|
+           \vb  |e ; S| \vb |S ; e| \vb  |applyN e S| \vb |applyN S e| \\
+     && \vb & |B^[S] `choice` b| \vb |b `choice` B^[S]| \\
+     && \vb & |iter2 ic (B^[S]) e| \vb |iter2 ic b S| \\
+  \text{Value contexts}  & |V| & ::= & |hole| \vb |arr(v_1,xdots,V,xdots v_n)|
+           \vb |lam x (B^[S])| \\
   \text{Block contexts}  & |B| & ::= & |blk X hp hole| \\
-  \text{Substitution context} & |S| & ::= & |C^[V]| \vb |C^[B^[S] `choice` b ]|
-           \vb |C^[b `choice` B^[S]]| \vb  |C^[ lam x (B^[S])]| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb \text{...todo...} \\
 \end{array}
 \end{array}
 $$
-  \caption{Execution Core Syntax} \label{fig:vc-syntax}
+  \caption{Core Verse Syntax} \label{fig:vc-syntax}
 \end{figure}
 
 \subsection{Auxiliary functions}
@@ -67,10 +71,11 @@ $$
 \begin{array}{l}
 \\
 \begin{array}{ll}
+  |termbinders t| & \text{Variables bound by Essential Verse term |t|} \\
   |subst e x v| & \text{Capture-avoiding substitution of |v| for |x| in |e|} \\
-  \freevars{e} & \text{Free variables of $e$} \\
-  \boundvars{S} & \text{Bound variables of a context $S$} \\
-  \freevarsoutsidelambdas{v} & \text{Free variables outside lambdas in $v$}
+  |freevars e| & \text{Free variables of expression |e|} \\
+  |boundvars S| & \text{Bound variables of a context $S$} \\
+  |freevarsoutsidelambdas v| & \text{Free variables outside lambdas in value |v|}
 \end{array}
 \\ \\
 \begin{array}{r @@{\;\;}c@@{\;\;} l}
@@ -294,8 +299,8 @@ $} \\
 \rulename{mval}  & |twiddle x w op| & \movesto & |x == op| \\
 \rulename{mvar}  & |twiddle x w y| & \movesto & |x==y| \\
 \rulename{mdef}  & |twiddle x w (y := t)| & \movesto & |y = (twiddle x w t)| \\
-% (MInput) 	y ~>w (x :-> t)	→ y = x; x ~>b t
-\rulename{mblock} & |twiddle x w (block t)| & \movesto & |block (blk (tbs(t)) () (twiddle x w t))| \\
+\rulename{minp}  & |twiddle x w (esssquig y t)| & \movesto & |y=x; twiddle x w t| \\
+\rulename{mblock} & |twiddle x w (block t)| & \movesto & |block (blk (termbinders  t) () (twiddle x w t))| \\
 \rulename{mapp}  & |twiddle x w (apply1N t_1 t_2)| & \movesto
   & |x = apply1N (Mcirc w t_1) (Mcirc w t_2)| \\
 \rulename{munif} & |twiddle x w (t_1=t_2)| & \movesto
@@ -305,7 +310,7 @@ $} \\
 \rulename{mfail} & |twiddle x w fail| & \movesto & |fail| \\
 \rulename{msemi} & |twiddle x w (t_1;t_2)| & \movesto & |Mcirc w t_1; twiddle x w t_2| \\
 \rulename{mwhere} & |twiddle x w (t_1 `wherekw` t_2)| & \movesto
-  & |blk y () (y == (twiddle x w t_1); Mcirc w t_2; y| \\
+  & |blk y () (y == (twiddle x w t_1); Mcirc w t_2; y)| \\
 \rulename{mtup} & |twiddle x w (array (t_1,xdots,t_n))| & \movesto
 % & → block (blk (x_1 xdots x_n, y_1 xdots y_n) (). x == arr (x_1,xdots,x_n);
 %     y_1 == (x_1~>൦t1; ...; yn=xn~>൦tn; <y1,..,yn>} \\
@@ -316,18 +321,19 @@ $} \\
 % (MColon2) 	x ~>w :t	  	→ D(t,w)[x]		otherwise
 % (MOfType)	x ~>w (t1 ▷fx t2)	→ D(t1,w) ▷(fx ⋂ fx(w)) D(t2,w)
 % 
-% (MDef) 	y ~>w (x := t)	→ x = (y ~>b t)
-% (MInput) 	y ~>w (x :-> t)	→ y = x; x ~>b t
-% (MBlock)	x ~>w block{t}	→ {∃tbs(t){}. x ~>b t}
-% (MEnum)      x ~>w t1..t2     	→ ∃u1 u2. x = D(t1,w)..D(t2,w)
-% 
-% (MIf)        x ~>w if(t0){t1}else{t2}	→ iter(IF)(tbs(t0). (D(t0,w); delay{x ~>w block{t1}})
-%        {x ~>w block{t2}}
-% (MAll)		x ~> all{t}		→ x = iter(ALL){∃tbs(t0).E(t0,w)}{<>}
+ \rulename{mif} & |twiddle x w (if3 t_0 t_1 t_2)| & \movesto
+  & |iterKW(ifKW)|
+      \begin{array}[t]{@@{}l}
+         \{ |blk (termbinders t_0) () (Mcirc w t_0; delay (twiddle x w (block t_1)))| \} \\
+         \{ |twiddle x w (block t_2)| \}
+      \end{array}
+     \\
+\rulename{mall} & |twiddle x w (all t)| & \movesto
+  & |x = iter2 allKW (blk (termbinders t) () (Mcirc w t)) emptytup| \\
 % (MFor)       x ~>w for(t0){t1} 	→ ∃y. <x, y> = iter(FOR)(∃tbs(t0). D(t0,w); \i. i ~>൦ block{t1}}){<<>,<>>};
 \end{array}\\
 \\
-\text{where \;\; |Mcirc (_,_,v) t| = |blk x () (twiddle x (bbcirc,drdom,v) t)|}
+\text{where \;\; |Mcirc (_,_,v) t| = |blk y () (twiddle y (bbcirc,drdom,v) t)|}
 \end{array}
 $} \\
 \captionof{figure}{Iteration and choice}

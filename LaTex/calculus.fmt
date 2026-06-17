@@ -162,7 +162,9 @@
 %format choicefreee (y) = "\mathsf{choicefree}_{\small e}(" y ")"
 %format skolval (xs) v = "\mathsf{skol}(" xs "," v ")"
 %format freevars (e) = "\mathsf{fvs}(" e ")"
+%format freevarsoutsidelambdas v = "\mathsf{fvsol}(" e ")"
 %format boundvars (e) = "\mathsf{bvs}(" e ")"
+%format termbinders (e) = "\mathsf{tbs}(" e ")"
 %format `delete` = "\setminus"
 %format (singleton (x)) = "\{" x "\}"
 
