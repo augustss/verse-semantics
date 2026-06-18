@@ -1,0 +1,9 @@
+ignore-project: False
+tests: True
+benchmarks: True
+documentation: False
+
+With-compiler: /home/augustss/.ghcup/ghc/9.12.4/bin/ghc-9.12.4
+
+package *
+  documentation: False
