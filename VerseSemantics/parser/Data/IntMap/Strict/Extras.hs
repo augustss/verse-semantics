@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Data.IntMap.Strict.Extras
   ( forWithKey_
   ) where
