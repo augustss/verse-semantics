@@ -1,0 +1,113 @@
+# Some tests for Tim's semantics
+testds("var",    pom, pass) {x=1}                                 {"{[{{u=v=x=1}}]}"}
+testds("arith1", pom, pass) {2}                                   {"{[{{u=v=2}}]}"}
+testds("arith2", pom, pass) {x:=1; x}                             {"{[{{u=v=1}}]}"}
+testds("arith3", pom, pass) {1+2}                                 {"{[{{u=v=3}}]}"}
+testds("arith3", pom, pass) {1-2}                                 {"{[{{u=v=3}}]}"}   # mod 4
+testds("arith4", pom, pass) {1*2}                                 {"{[{{u=v=2}}]}"}
+testds("arith5", pom, pass) {3/2}                                 {"{[{{u=v=1}}]}"}
+testds("arith6", pom, pass) {1/0}                                 {"{}"}
+testds("arith7", pom, pass) {3>3}                                 {"{}"}
+testds("arith8", pom, pass) {3>2}                                 {"{[{{u=v=3}}]}"}
+testds("tup1",   pom, pass) {array{1;2}}                          {"{[{{u=v=<1,2>}}]}"}
+testds("tup2",   pom, pass) {array{}}                             {"{[{{u=v=<>}}]}"}
+testds("choice1",pom, pass) {1|2}                                 {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("choice2",pom, pass) {(1=2)|2}                             {"{[{{u=v=2}}]}"}
+testds("exi1",   pom, pass) {x:any; x>0; x<3}                     {"{[{{u=v=1}} U {{u=v=2}}]}"}
+testds("if1",    pom, pass) {if(0){1}else{2}}                     {"{[{{u=v=1}}]}"}
+testds("if2",    pom, pass) {if(0=1){1}else{2}}                   {"{[{{u=v=2}}]}"}
+testds("if2b",   pom, pass) {if(fail){1}else{2}}                  {"{[{{u=v=2}}]}"}
+testds("if3",    pom, pass) {if(x:=1|2){x}else{3}}                {"{[{{u=v=1}}]}"}
+testds("if4",    pom, pass) {if(x:=1|2){x=2}else{3}}              {"{}"}
+testds("if5",    pom, pass) {if(0){1|2}else{3}}                   {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("if6",    pom, pass) {x:any; if(x=0){1}else{2}}            {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+testds("if7",    pom, pass) {x:any; if(x=0|3){1}else{2}}          {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+
+############### ifs
+# names prefixed with a 'T' originate in the doc:
+# https://docs.google.com/document/d/1C6d_02AgRjoiUsaLUm4mGaEdwEPnN8ucK3vsGeInJrs/
+testds("Tif1a",    pom, pass) {if(x:=1|2){x=2}else{3}}              {"{}"}
+testds("Tif1b",    pom, pass) {if(x:=1|2){x=1}else{3}}              {"{[{{u=v=1}}]}"}
+
+testds("Tif2-1",   pom, pass) {x:nat; x=1; if(x=1|2){x=2}else{3}}   {"{}"}
+testds("Tif2-2",   pom, pass) {x:nat; x=2; if(x=1|2){x=2}else{3}}   {"{[{{u=v=2}}]}"}
+testds("Tif2-3",   pom, pass) {x:nat; x=3; if(x=1|2){x=2}else{3}}   {"{[{{u=v=3}}]}"}
+
+# Tests -4 to -6 are same as -1 to -3, but with the unification of x later
+testds("Tif2-4",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=1; r}   {"{}"}
+testds("Tif2-5",   pom, pass) {x:nat; r:=if(x=1|2){x=2}else{3}; x=2; r}   {"{[{{u=v=2}}]}"}
+
+testds("Tif3",   pom, pass) {if(x:=1|2){x}else{fail}}              {"{[{{u=v=1}}]}"}
+testds("Tif4",   pom, pass) {if(x:=1|2){x | x}else{fail}}          {"{[{{u=v=1}},{{u=v=1}}]}"}
+
+# Note that in Tif5-1 the x is free, since the bindings in the choice do not escape the choice.
+testds("Tif5-1", pom, pass) {if( (x:=2)|(y:=1) ){x}else{fail}}       {"{[{{v=u,x=u}}]}"}
+testds("Tif5-2", pom, pass)         {x:nat; y:nat; if(x=7|y=3){x}else{fail}} {"{[{{u=v=3}}]}"}
+
+testds("Tif6-1", pom, pass) {x:int; if(x=1){1}else{0}; x=(2|1)}    {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+testds("Tif6-2", pom, pass) {x:int; if(x=2){1}else{0}; x=(2|1)}    {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+
+# The crucial thing here is that Tim1a and Tim1b have the same RHS.
+# Ditto Tim2a and Tim2b
+testds("Tim1a", pom, pass) {x:=1|2}          {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("Tim1b", pom, pass) {x:=1|2; x=1|||2} {"{[{{u=v=1}},{{u=v=2}}]}"}
+testds("Tim2a", pom, pass) {x:=1|||2}        {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+testds("Tim2b", pom, pass) {x:=1|||2; x=1|2} {"{[{{u=v=1}}],[{{u=v=2}}]}"}
+
+# using for{...} instead of all{...}
+testds("Tall1", pom, pass)  {for {(x:=1|2)}}           {"{[{{u=v=<1,2>}}]}"}
+testds("Tall2a", pom, pass) {for {(x:=1|2|3; x>0)}}    {"{[{{u=v=<1,2,3>}}]}"}
+testds("Tall2b", pom, pass) {for {(x:=1|2|3; x>1)}}    {"{[{{u=v=<2,3>}}]}"}
+testds("Tall3",  pom, pass) {for {(x=1;w=1) | (x=2;w=2)} }
+  {"{[{{u=v=<>,w/=1,w/=2}} U {{u=v=<>,w/=1,x/=2}} U {{u=v=<>,w/=2,x/=1}} U {{u=v=<>,x/=1,x/=2}}],[{{w=x=1,u=v=<1>}}],[{{w=x=2,u=v=<2>}}]}"}
+testds("Tall4a", pom, pass) {x:int; x=(2|1); for {(x=1) | (x=2)}}    {"{[{{u=v=<2>}},{{u=v=<1>}}]}"}
+testds("Tall4b", pom, pass) {x:int; a:=for {(x=1) | (x=2)}; x=(2|1); a}    {"{[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+testds("Tall5a", pom, pass) {for {x=1|2}}    {"{[{{u=v=<>,x/=1,x/=2}}],[{{x=1,u=v=<1>}}],[{{x=2,u=v=<2>}}]}"}
+testds("Tall5b", pom, pass) {x:int; for {(x=1) | (x=2)}}    {"{[{{u=v=<>}}],[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+testds("Tall6", pom, pass) {x:int; for {x=1|2}; x=2}    {"{[{{u=v=2}}]}"}
+# all7 technically allows 'n' to be unbounded
+testds("all7a", pom, pass) {n:int; n=3; for {x:=1..n}}    {"{[{{u=v=<1,2,3>}}]}"}
+testds("all7b", pom, pass) {n<3; m<3; for {x:=(1..n|1..m)}}    {"{[{{m=n=0,u=v=<>}}],[{{m=0,n=1,u=v=<1>}}],[{{m=0,n=2,u=v=<1,2>}}],[{{n=0,m=1,u=v=<1>}}],[{{m=n=1,u=v=<1,1>}}],[{{m=1,n=2,u=v=<1,2,1>}}],[{{n=0,m=2,u=v=<1,2>}}],[{{n=1,m=2,u=v=<1,1,2>}}],[{{m=n=2,u=v=<1,2,1,2>}}]}"}
+testds("all7c", pom, pass) {n:=3; for {x:=1..n}}    {"{[{{u=v=<1,2,3>}}]}"}
+
+testds("all8a", pom, pass)  {x:=(2|1); for {(x=1|2)}}           {"{[{{u=v=<2>}},{{u=v=<1>}}]}"}
+testds("all8b", pom, pass)  {r:=for{(x=1|2)}; x:=(2|1); r}      {"{[{{u=v=<1>}}],[{{u=v=<2>}}]}"}
+
+testds("apptup1",pom, pass) {a:=(1,2); a[0]}                      {"{[{{u=v=1}}]}"}
+testds("apptup2",pom, pass) {a:=(1,2); a[1]}                      {"{[{{u=v=2}}]}"}
+testds("apptup3",pom, pass) {a:=(1,2); a[3]}                      {"{}"}
+testds("apptup4",pom, pass) {i:nat; a:=(1,2); a[i]}               {"{[{{u=v=1}},{{u=v=2}}]}"}
+
+testds("range1", pom, pass) {a:=(1,2); :a}                        {"{[{{u=0,v=1}},{{u=1,v=2}}]}"}
+testds("inp1",   pom, pass) {x->y:=1; (x,y)}                      {"{[{{u=v=<1,1>}}]}"}
+testds("inp2",   pom, pass) {x->y:prefix'-'; (x,y)}               {"{[{{u=v=<0,0>}} U {{u=v=<1,3>}} U {{u=v=<2,2>}} U {{u=v=<3,1>}}]}"}
+
+testds("for1",   pom, pass) {for(0|0){1}}                         {"{[{{u=v=<1,1>}}]}"}
+testds("for2",   pom, pass) {for(x:=1|2){x}}                      {"{[{{u=v=<1,2>}}]}"}
+testds("for3",   pom, pass) {for(x:=1|2; y:=2|3){y-x}}            {"{[{{u=v=<1,2,0,1>}}]}"}
+# SLOW testds("for4",   pom, pass) {a:=(1,2); for(x:a){x+1}}             {"{[{{u=v=<2,3>}}]}"}
+testds("for5",   pom, pass) {a:=(1,2); for(i->x:a){i}}            {"{[{{u=v=<0,1>}}]}"}
+testds("for6",   pom, pass) {for(0|1){:prefix'-'}}                {"{[{{u=v=<0,0>}} U {{u=<0,1>,v=<0,3>}} U {{u=v=<0,2>}} U {{v=<0,1>,u=<0,3>}} U {{u=<1,0>,v=<3,0>}} U {{u=<1,1>,v=<3,3>}} U {{u=<1,2>,v=<3,2>}} U {{u=<1,3>,v=<3,1>}} U {{u=v=<2,0>}} U {{u=<2,1>,v=<2,3>}} U {{u=v=<2,2>}} U {{v=<2,1>,u=<2,3>}} U {{v=<1,0>,u=<3,0>}} U {{v=<1,3>,u=<3,1>}} U {{v=<1,2>,u=<3,2>}} U {{v=<1,1>,u=<3,3>}}]}"}
+## for7 uses tuples of tuples.  Not part of the Pom universe yet
+## testds("for7",   pom, pass) {for{a:nat; f:=(a,a+1); f[i:nat]=i*2; f}} {"{}"}
+# The test for8 is not the semantics we give in the latest version
+#testds("for8",   pom, pass) {for{0|||1}}                           {"{[{{u=v=<0>}}],[{{u=v=<1>}}]}"}
+
+## Function tests for pom-pom
+testds("fun1", ppo, pass) { function(1){2} }                      {"{[{{u=v=F({1->2})}}]}"}
+testds("fun2", ppo, pass) { function(fail){2} }                   {"{[{{u=v=F(empty)}}]}"} # XXX empty function
+testds("fun3", ppo, pass) { function(1){fail} }                   {"{}"}
+testds("fun4", ppo, pass) { function(x:int){x+1} }                {"{[{{u=v=F(succ)}}]}"}
+testds("fun5", ppo, pass) { function(x:prefix'-'){x} }            {"{[{{u=F(int),v=F(neg)}}]}"}
+testds("fun6", ppo, pass) { function(x:nat where x<2){x} }        {"{[{{u=v=F({0->0,1->1})}}]}"}
+testds("fun7", ppo, pass) { type{x:nat where x<2} }               {"{[{{u=v=F({0->0,1->1})}}]}"}
+testds("fun8", ppo, pass) { ltTwo:=type{x:nat where x<2}; :ltTwo} {"{[{{u=v=0}} U {{u=v=1}}]}"}
+testds("fun9a",ppo, pass){ function(y:type{x:nat where x<2}){y}} {"{[{{u=v=F({0->0,1->1})}}]}"}
+# fun9 is very slow
+testds("fun9", ppo, pass, skip) { ltTwo:=type{x:nat where x<2};
+                            function(y:ltTwo){y} }                {"{[{{u=v=F({0->0,1->1})}}]}"}
+testds("fun10",ppo, pass, broken) { x:=1; function(x){2} }                {"{[{{u=v=F({1->2})}}]}"}
+testds("fun11",ppo, pass) { function(1){x=2} }                    {"{[{{x=2,u=v=F({1->2})}}]}"}
+
+# what should this be?
+#testds("mfun1", pom, pass) { f:=((1,2) ||| (1,0)); f[0] }         {"{[{{u=v=1}}]}"}
