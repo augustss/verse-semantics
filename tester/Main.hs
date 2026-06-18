@@ -16,6 +16,7 @@ module Main(main) where
 import FrontEnd.CopyHook
 import FrontEnd.Flags   as FE
 import FrontEnd.Expr    as Src
+import FrontEnd.Desugar(runD, sDesugarExpr)
 
 import Red as EV    -- "EV" for "Essential verse evaluator"
 
@@ -534,35 +535,6 @@ showTestResult tflg test test_res
                       TestFail -> "success"
                       TestLoop -> "termination"
 
-testExprs :: Test -> (SrcExpr, SrcExpr)
-testExprs (TestVerify _ e)     = (e, Array [])
-testExprs (TestDenSem _ e1 e2) = (e1,e2)
-testExprs (TestEvalEq _ e1 e2) = (e1,e2)
-
-
--- | Equivalence on values (or stuck expressions)
--- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
-equivValue :: Core.Expr -> Maybe Core.Expr -> Bool
-equivValue e1 (Just e2) = Core.norm e1 == Core.norm e2
-equivValue e1 Nothing   = not (Core.isVal e1)
-
-{-
-srcToCore :: HasCallStack => FE.Flags -> Bool -> SrcExpr -> IO Core.Expr
-srcToCore flags add_verification e
-  = do { e1 :: SrcCore <- FE.desugar flags add_verification e
-       ; FE.convertToPrepdCore flags e1 }
--}
-
-mkFEFlags :: TestFlags -> Bool -> FE.Flags
-mkFEFlags tflg add_verification
-  = testFlagsToFEFlags tflg
-
-
-desugarForVerification :: Test -> Bool
-desugarForVerification TestEvalEq{}   = False
-desugarForVerification TestDenSem{}   = False
-desugarForVerification TestVerify{}   = True
-
 
 ----------------------------------------------------------------
 --
@@ -687,10 +659,14 @@ mkTopCxt term
     mode = RM { rm_just_matching = False }
 
 mk_term :: TestFlags -> SrcExpr -> IO EV.Term
-mk_term tflags src = undefineddo { ess <- sDesugarExpr src
+mk_term tflags src = do { ess <- srcToEssential fe_flags src
                         ; return (TBlock $ EV.srcToTerm ess) }
   where
     fe_flags = testFlagsToFEFlags tflags
+
+srcToEssential :: Flags -> SrcExpr -> IO SrcEssential
+srcToEssential flags e_parsed = runD flags Src.Fail $ sDesugarExpr e_parsed
+
 
 mk_all :: ReductionContext -> MatchContext -> EV.Term -> EV.Exp
 -- Returns all{exists u.  u ~~> block{t} }
