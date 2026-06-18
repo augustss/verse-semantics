@@ -12,7 +12,7 @@ import qualified Parser.Verse   as LP
 --import FrontEnd.Error
 
 
-import qualified Red as Simon (run)
+import qualified Red
 
 -- Epic libraries
 import Epic.Repl
@@ -178,10 +178,10 @@ theCommandSet = CommandSet
       , Cmd "delete  [NAME]"       "Remove the variable[s] [NAME0 NAME1]"  cClear
       , Cmd "read FILE"            "Parse a file"                          cRead
 
-      , Cmd "essential [EXPR]"  "Desugar [last] expression to Essential" (runGetterSrc getEssential)
+      , Cmd "essential [EXPR]"     "Desugar [last] expression to Essential" (runGetterSrc getEssential)
 
---      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
-      , Cmd "simon [EXPR]"         "Reduce [last] expression"              cSimon
+      , Cmd "red [EXPR]"           "Reduce [last] expression"                cRed
+      , Cmd "parse [EXPR]"         "Parse [last] expression"                 cParseLine
 
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
@@ -198,7 +198,7 @@ theCommandSet = CommandSet
       ]
 
   -- c_exec :: CmdRunner deals with a command not starting with colon
-  , c_exec = cParseLine
+  , c_exec = cRed
   , c_help   = helpMsg
   , c_greet  = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye    = "Bye!"
@@ -393,15 +393,15 @@ cEval
        ; return () }
 -}
 
-cSimon :: CmdRunner CState
-cSimon
+cRed :: CmdRunner CState
+cRed
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- return {- eSlsDesugar flags -} e_ess
-       ; let res = Simon.run e_ds
-       ; let den_sem = addHeader "Simon reduction" $ text $ show res
+       ; let res = Red.run e_ds
+       ; let den_sem = addHeader "Reduced" $ text $ show res
        ; if fQuiet flags then
            displayDoc $ text $ show res
          else
