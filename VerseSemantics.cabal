@@ -44,9 +44,8 @@ library verse-libs
                       FrontEnd.CopyHook
                       FrontEnd.Desugar
                       FrontEnd.Error
-                      FrontEnd.Flags
                       FrontEnd.Expr
-                      FrontEnd.ToCore
+                      FrontEnd.Flags
     build-depends:    QuickCheck,
 
 library reduction

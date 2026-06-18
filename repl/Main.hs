@@ -3,21 +3,10 @@
 module Main(main) where
 --import Debug.Trace
 
-{-
-import Core.Expr     as Core
-import Core.Rule     as Core
-import Core.Rules    as TRS2024
-import Core.Verifier as Verifier
-import Core.Traced   as Core
--}
-
 import FrontEnd.CopyHook
 import FrontEnd.Expr as Src
 import FrontEnd.Desugar
 import FrontEnd.Flags( Flags(..), defaultFlags )
-{-
-import FrontEnd.ToCore
--}
 
 import qualified Parser.Verse   as LP
 --import FrontEnd.Error

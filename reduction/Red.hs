@@ -25,7 +25,6 @@ import Prelude hiding ((<>))
 import Data.Graph(stronglyConnComp, SCC(..))
 
 import qualified FrontEnd.Expr as F
-import FrontEnd.ToCore( toCoreEff )
 import FrontEnd.Error
 
 import Core.Traced
@@ -587,6 +586,15 @@ srcToTerm e = error $ "srcToTerm: unimplemented " ++ show e
 
 srcToCoreIdent :: F.Ident -> Ident
 srcToCoreIdent (F.Ident _ s) = Name s
+
+toCoreEff :: F.Eff -> Maybe C.Effect
+-- ToDo: silently ignoring side effects for now
+toCoreEff (F.Eff { F.eff_card = card, F.eff_side = _side })
+  = case card of
+      F.CSucceeds -> Just C.Succeeds
+      F.CDecides  -> Just C.Decides
+      F.CFails    -> Just C.Fails
+      F.CIterates -> Just C.Iterates
 
 --------------------------------------------------------------------------------
 --
