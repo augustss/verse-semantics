@@ -1,0 +1,589 @@
+# Test types
+#  pass  evaluate the two expressions and expect them to be equal
+#  fail  evaluate the two expressions,
+#       they should be equal but currently the test fails
+#
+# Test Status
+#  broken  the test is broken, the reason is not recorded (yet)
+#  skip    skip this test
+#  normal  if test status is omitted then the status is parsed as normal
+#######################################################################
+##                            Format
+#
+# This file is legal verse code
+# Each function is provided by `VersePrototypes/Tester/Main.hs`
+# The format for each test is:
+# <tester-fun>(<name>,<test-type>,[test-status]) {<expr-to-run>}   {<expected-result>}
+# when <tester-fun> == testds the format becomes
+# testds(<name>,<densem-type>,<test-type>,[test-status]) <expr-to-run>}   {<expected-result>}
+########################################################################
+
+# Trivial tests
+testeq("EV1",pass) {2}                                   {2}
+testeq("EV2",pass) {x:=1; x}                             {1}
+
+# Arithmetic
+testeq("Arith1",pass) {3+4}                                 {7}
+testeq("Arith2",pass) {3-4}                                 {0-1}
+testeq("Arith3",pass) {3*4}                                 {12}
+testeq("Arith4",pass) {32/4}                                {8}
+testeq("Arith5",pass) {1/0}                                 {wrong}
+testeq("Arith6",pass) {-3}                                  {0-3}
+testeq("Arith7",pass) {+3}                                  {0+3}
+
+# Comparison
+testeq("Cmp1",pass) {3<4}                                 {3}
+testeq("Cmp2",pass) {3<3}                                 {:false}
+testeq("Cmp3",pass) {3<2}                                 {:false}
+testeq("Cmp4",pass) {3<=4}                                {3}
+testeq("Cmp5",pass) {3<=3}                                {3}
+testeq("Cmp6",pass) {3<=2}                                {:false}
+testeq("Cmp7",pass) {3>4}                                 {:false}
+testeq("Cmp8",pass) {3>3}                                 {:false}
+testeq("Cmp9",pass) {3>2}                                 {3}
+testeq("Cmp10",pass) {3>=4}                                {:false}
+testeq("Cmp11",pass) {3>=3}                                {3}
+testeq("Cmp12",pass) {3>=2}                                {3}
+testeq("Cmp13",pass) {3<>4}                                {3}
+testeq("Cmp14",pass) {3<>3}                                {:false}
+testeq("Cmp15",pass) {3<>2}                                {3}
+testeq("Cmp16",pass) {3=4}                                 {:false}
+testeq("Cmp17",pass) {3=3}                                 {3}
+testeq("Cmp18",pass) {3=2}                                 {:false}
+
+# Failing unifications
+# Values to consider: K, op, tuple, lambda
+# K
+testeq("Unif",pass) {1=2}                                 {:false}
+
+# Functions should not be unified, ever.
+# So comment out all unifications involving functions
+# no prefix'op'
+#testeq("Unif1",pass) {1=prefix'-'}            {:false}
+# tim=skip: runtime stalled
+testeq("Unif2",pass,tim=skip) {1=(1,2)}                             {:false}
+
+# ICFP rules gets stuck on any lambda comparison
+#testeq("Unif3",pass) {1=(x:any=>x)}                        {:false}
+
+# op
+#testeq("Unif4",pass) {prefix'-'=1}                         {:false}
+#testeq("Unif5",pass) {prefix'-'=prefix'+'}     {:false}
+#testeq("Unif6",pass) {prefix'-'=(1,2,3)}                   {:false}
+#testeq("Unif7",pass) {prefix'-'=(x:any=>x)}                {:false}
+
+# tuple
+testeq("Unif8",pass) {(1,2)=1}                             {:false}
+#testeq("Unif9",pass) {(1,2)=prefix'-'}        {:false}
+testeq("Unif10",pass) {(1,2)=(1,2,3)}                       {:false}
+#testeq("Unif11",pass) {(1,2)=(x:any=>x)}         {:false}
+
+# lambda
+#testeq("Unif12",pass) {(x:any=>x)=1}             {:false}
+#testeq("Unif13",pass) {(x:any=>x)=prefix'-'}                {:false}
+#testeq("Unif14",pass) {(x:any=>x)=(1,2,3)}                  {:false}
+#testeq("Unif15",pass) {(x:any=>x)=(x:any=>1)}               {:false}
+
+# Unification with equal values
+testeq("Unif16",pass) {1=1}                                 {1}
+
+# Not with POPL
+#testeq("Unif17",pass)
+#            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
+testeq("Unif18",pass) {(1,2)=(1,2)}                         {(1,2)}
+# tim=skip: functions cannot be compared
+# skip: function comparison gets stuck rather than failing
+testeq("Unif19",pass,skip,tim=skip) {(x:any=>x)=(x:any=>x)}       {:false}
+
+# If BIND is implemented in parallel, it may forget to substitute in the substitutions
+testeq("Unif20",pass) {x:any; y:any; x=y; y=1}  {1}
+testeq("Unif21",pass) {x:any; y:any; x=1; y=x}  {1}
+# skip: Unif22, Unif23 need alpha conversion
+# tim=skip: cycles rejected by the verifier
+testeq("Unif22",pass,skip,tim=skip) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
+# Needs alpha conversion
+# tim=skip: cycles rejected by the verifier
+testeq("Unif23",pass,skip,tim=skip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
+
+
+# Arrays
+testeq("Array1",pass){array{1;2;3}}                         {(1,2,3)}
+testeq("Array2",pass){array{}}                              {()}
+testeq("Array3",pass){Length(array{1;2;3})}                 {3}
+testeq("Array4",pass){Length(array{})}                      {0}
+# tim=skip: Tim doesn't allow this
+testeq("Array5",pass,tim=skip){Length(array{_;_})}                   {2}
+
+testeq("Array6",pass){x:=(1,2); y:=(1,3); one{x=y}}         {:false}
+testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
+# tim=skip: looks reasonable, but Tim rejects
+# Array8 is skipped as densem tests treat all as for1. See issue #
+testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+testeq("Array9",pass){ a := (0,1); all{ a[0] } }                   {array{0}}
+# skip: Array9x needs processing | on the top level
+testeq("Array9x",pass,skip){ a := (0,1); a[0] }                   {0}
+testeq("Array9y",pass){ a := (0,1); a(0) }                   {0}
+# Array9x: test does not pass when fail is not a unit of choice
+testeq("Array10",pass){ all{1..4} }                         {array{1,2,3,4} }
+testeq("Array10a",pass){ all{1|2} }                         {array{1,2} }
+testeq("Array10b",pass){ all{1} }                         {array{1} }
+testeq("Array11",pass){ for(1..4){7} }                      {array{7,7,7,7} }
+testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
+testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }
+# tim=skip: unsupported LHS
+testeq("Array14",pass,tim=skip) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq("Array15",pass) {Y := for( 1..3 ){ 1 } }             {array{1,1,1}}
+# tim=skip: runtime bug
+testeq("Array16",pass,tim=skip) {Y := all{for( 1..3 ){ 1|2 }}}       { array { array{1,1,1}, array{1,1,2}, array{1,2,1}
+                                                                    , array{1,2,2}, array{2,1,1}, array{2,1,2}
+                                                                    , array{2,2,1}, array{2,2,2} } }
+
+# Array expression splicing
+#  ...in expressions
+# tim=skip: Tim does not support splicing
+testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {(0,1,2,3)}
+testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {(0,1,2,3,1,2)}
+#  ...in patterns
+testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Splice5",pass,tim=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice5a",pass,tim=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice6",pass,tim=skip){ f( ..(a:[]int), b:char )<closed> := { (Length[a], b) };
+                                 f[1,2,3,'f'] } {(3, 'f') }
+testeq("Splice7",pass){ f( a:int,b:int )<closed> := a; f(3,4) }{3}
+testeq("Splice8",pass,tim=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
+testeq("Splice9",pass,tim=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
+
+#
+testeq("All1",pass) {all{:(1,2,3)}}                            {array{1,2,3}}
+testeq("All2",pass) {all{x:(1,2,3); x}}                        {array{1,2,3}}
+testeq("All3",pass) {all{x:= :(1,2,3); x}}                     {array{1,2,3}}
+testeq("All4",pass) {all{x:(1,2,3)}}                           {array{1,2,3}}
+
+# Functions
+testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
+verify("Fun2",fail){(x:any => y:any => x+2*y)[2][3]}
+testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
+testeq("Fun4",pass){function(x:int)<closed>{x+1}[2]}              {3}
+testeq("Fun5",pass){function(x:int)<closed>(y:int){x+2*y}[2][3]}  {8}
+# Function argument matching
+
+testeq("Fun6",pass) {one{ pair := (1, function(n:int)<closed>{pair[0]})
+                        ; pair[0]}}  {1}
+   # Needs recursion
+
+# tim=skip: hits a VERSE_ENSURE
+testeq("Fun7",pass,tim=skip)
+  {one{ pair := (1, function(n:int)<closed>{:int = if (n = 0) {1} else  {n * pair[1](n-1)}})
+      ; pair[1](5) } }  {120}
+   # Fun7: Needs recursion
+testeq("Fun8",pass) {f(x:int, y:int)<closed>:=2*x+y; f(2,3)}  {7}
+
+# P desugaring, i.e., p:=e
+testeq("Pat1",pass) {x:=1}                                {1}
+testeq("Pat2",pass) {x:=1; x}                             {1}
+# tim=skip: cannot compare functions
+testeq("Pat3",pass,tim=skip) {f(x:int)<closed>:=x+1; f[10]}                {(fn(x:int)<closed>{x+1})[10]}
+testeq("Pat4",pass) {f(x:int)<closed>(y:int)<closed>:=x*10+y; f[2][3]}    {23}
+testeq("Pat5",pass) {:int:=5}                             {5}       # LA is this even allowed
+# fail/wrong? testeq("Pat",pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
+testeq("Pat6",pass) {x:int:=1}                            {1}
+# fail/wrong? testeq("Pat",pass) {x:int:='a'}                          {:false}
+
+testeq("Pat7",pass) {succ(x:int)<closed>:=x+1; (y:succ):=1}       {2}   # XXX or 1?
+testeq("Pat8",pass) {succ(x:int)<closed>:=x+1; y:succ:=1; y}      {2}
+testeq("Pat9",pass) {succ(x:int)<closed>:int:=x+1; succ[5]}       {6}
+
+# XXX Not sure about these
+#testeq("Pat10",pass) {x? := 5; x}                          {array{5}}
+#testeq("Pat11",pass) {x? := 1/0; x}                        {array{}}
+# tim=skip: unsupported LHS
+testeq("Pat12",pass,tim=skip) {(x,y,z) := (1,2,3); (z,y,x)}           {(3,2,1)}
+# tim=skip: unsupported LHS
+testeq("Pat13",pass,tim=skip) {i->x := 2; (i, x)}                   {(2,2)}
+testeq("Pat14",pass) {f(x:int where y:=2*x)<closed>:=y; f[3]}      {6}
+testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
+
+
+# L desugaring, i.e., l:t
+testeq("TB1",pass) {(x:int) = 5}                         {5}
+testeq("TB2",pass) {ap0(f(x:int)<closed>:int)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {1}
+
+verify("TB3",fail) { ap0(f(x:int)<closed>:=1)<closed> := f[0]
+                   ; succ(x:int)<closed>:=x+1
+                   ; ap0[succ]}
+  # Surely TB3 should get stuck because succ is not in the domain of ap0?
+  # That's right: this test should (and does) fail when we generate verification conditions
+
+testeq("TB4",pass) {ap0(f(x:int)<closed>:=2)<closed> := f[0]; succ(x:int)<closed>:=x+1; ap0[succ]} {wrong}
+  # ap0[succ] gets stuck because succ[0] does not return 2
+testeq("TB5",pass) {ap(f()<closed>:int)<closed> := f[]; five()<closed>:=5; ap[five]} {5}
+
+# tim=skip: pointers
+testeq("TB6",pass, skip, tim=skip) {(p^ : int) := 2}                      {p:=new[int][2]}
+# tim=skip: pointers
+testeq("TB10",pass, skip, tim=skip) {p^[](:int):int}                      {0}
+  # TB6,TB10: no pointers yet
+
+# These crash, so comment them out
+#testeq("TB7",pass, broken) {x? : int}                            { x : ?int }
+#testeq("TB8",pass, broken) {x[] : int}                           { x : []int }
+  # TB7,8 are these legal?
+
+testeq("TB9",pass) {all{i->x:(3,4,5); (i, x)}}           {((0,3),(1,4),(2,5))}
+
+
+# For
+testeq("For1",pass) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
+testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
+testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
+testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
+testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
+
+testeq("For6",fail,skip) {upto(i:int, n:int)<closed> := { if (i > n) then :false else i | upto[i+1,n] };
+                     for(x:=upto[1,3]){x}}
+                     {(1,2,3)}    # skip, because rejected by the verifier
+  # For6: fail because `upto` <iterates>, and Verse does not allow that
+  #       Even in testeq, the runtime check discovers this; c.f. check2
+  # 'broken' because we no longer do a runtime check for cardinality
+  # We can't hope to verify this test either because the recursive function
+  #    has no return signature
+
+testeq("For6a",pass) {for(x:=1..3){x}}  {(1,2,3)}
+
+# tim=skip: runtime bug
+testeq("For7",pass,tim=skip)  {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
+testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
+
+# Skipping these since `f` is <iterates> and hence dodgy?
+# tim=skip: functions cannot iterate
+testeq("For9",pass, skip,tim=skip) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
+testeq("For10",pass, skip,tim=skip) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
+testeq("For11",pass, skip,tim=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+
+# Array access via choices
+testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
+testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
+testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
+
+testeq("let1",pass) { let(x:=1){x+2} } { 3 }
+# this test works, but gives an annoying warning
+#testeq("let2",pass) { let(x:=1){x+2}; x } { x }
+# shadowing doesn't really work, so this crashes
+#testeq("let3",pass) { y:=0; let(x:=1){y:=x+2}; y } { 0 }
+
+# Joachim's tests
+# Check that BIND removes _one_ unification only
+# tim=skip: cannot compare functions
+# skip: JB1, JB2, JB4 need alpha conversion to work.
+testeq("JB1",pass,skip,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
+testeq("JB2",pass,skip,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
+testeq("JB3",pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
+testeq("JB4",pass,skip,tim=skip) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
+
+# "Dom1": Unification in the domain
+testeq("Dom1",pass) {f9( x := 3|4)<closed>:int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
+
+# Recursion
+testeq("TRec1",pass)
+            {f(n:int)<closed>:int := if (n = 0) then 1 else f(n-1); f(1)}  {1}
+testeq("TRec2",pass)
+            {fac(n:int)<closed>:int := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
+
+# SLOW with PLDI; needs 'for'
+# testeq("TRec3",pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
+#            odd(n:int)  := if (n = 0)  {0} else  {even(n-1)};
+#           for(x := 0|1|2|3)  {(even(x), odd(x))}
+#            }
+#            {((1,0), (0,1), (1,0), (0,1))}
+
+
+# Non-retractions as types
+testeq("Type1",pass) {succ(n:int)<closed> := n + 1; a:succ := 2; a}  {3}
+testeq("Type2",pass) {succ(n:int)<closed> := n + 1;
+            f(m:succ)<closed> := m;
+            f(5)
+            }
+            {6}
+
+# Evaluation in if
+testeq("TIf1",pass) {if(y:int; y=1) { 42 } else { 23 }} {42}
+testeq("TIF2",pass) {if(y:int; y=1) { y  } else { 23 }}  {1}
+
+# Random collection
+testeq("EV10a",pass) {succ(x:int)<closed>:=x+1; f(a:succ)<closed> := a; f[3]} {4}
+testeq("EV10b",pass) {succ(x:int)<closed>:=x+1; f(a := :succ)<closed> := a; f[3]} {4}
+testeq("EV10c",pass) {succ(x:int)<closed>:=x+1; f(a:=if (0) then :int else :succ)<closed>:=a; f[3]} {3}
+testeq("EV10d",pass) {succ(x:int)<closed>:=x+1; f(a:=if (:false) then :int else :succ)<closed>:=a; f[3]} {4}
+
+testeq("EV10",pass) {succ(x:int)<closed>:=x+1; f(c:int, a:=if(c=0)then :int else :succ)<closed>:=a;
+                    (f(0,0),f(1,0))} {(0,1)}
+   # c:int, then depending on c, we either get a:int or a:succ
+
+testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[0]}}     {1}
+testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
+testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
+testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
+
+# These are very slow with alternative rules
+testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed><decides>:=x[0]; succ(x:int)<closed>:=x+1; f[succ]}   {1}
+testeq("EV16",pass,tim=F00) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int)<closed>:=(); f[badsucc]}  {wrong}
+  # EV16: this should go WRONG.. i.e. it gets stuck
+
+# EV17: Try CBV fixpoint combinator.
+# The definition of Z all by itself fails verification.
+#    Not sure why. Hence 'broken'
+#    That 'broken' gives an "unexpected pass" report when we switch verification off
+# Skip this test.  It's not clear that Z can be given a valid type.
+testeq("EV17",pass,skip) {
+  Z(f:any)<closed> := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
+  fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
+  fac[3] } {6}
+
+testeq("EV18",pass,tim=C00) {0[0]}                                {wrong}
+testeq("EV19",pass,tim=P00) {operator'/'(1,0)}                    {wrong}
+
+verify("EV20",fail) {f(x:int)<closed><succeeds>:=x<10}
+  # EV20 Fails under verification -- and it should!
+
+testeq("EV20a",pass) {f(x:int)<closed><decides>:=x<10; f[3]}      {3}
+
+
+testeq("EV21",pass) {f(x:int)<closed><succeeds>:=x<10; f[11]}     {wrong}
+
+# skip: EV22 uses bad
+testeq("EV22",pass,skip,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
+                            ; p:any; swapBad [p] = (2,3); p }
+                            {wrong}
+
+verify("EV23",fail)    { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))) }
+# EV23: fails to verify because '=>' requires <succeeds>
+
+verify("EV23d",pass) { swapGood := (t := (:any,:any)) => (x:any; y:any; t=(x, y); (y, x)) }
+
+verify("EV23e",   pass) { swapGood(t := (:any,:any)) := (x:any; y:any; t=(x, y); (y, x)) }
+verify("EV23int1",pass) { swapGood(t := (:int,:int)) := (x:int; y:int; t=(x, y); (y, x)) }
+
+verify("EV23int",fail) { swapGood := (t:any => (x:int; y:int; t=(x, y); (y, x))) }
+# EV23int: fails becuase might not be a pair
+verify("EV23int2",fail) { swapGood( t := (:any,:any) ) := (x:int; y:int; t=(x, y); (y, x)) }
+# EV23int2: fails because x might not be an int
+
+testeq("EV23a",pass) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) }
+                             ; p:any; swapGood[p] = (2,3); p }
+                             {(3,2)}
+
+# tim=skip: Tim does not allow this.  Bug?
+verify("EV23b",pass,tim=A00)
+   { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
+
+verify("EV23c",pass,tim=skip) { swapGood(t:any)<closed><decides> := { x:any; y:any; t=(x, y); (y, x) } }
+
+# Confluence: Need local substitution, hence 'fail'
+testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
+testeq("EV24a",fail) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}} {23}
+
+# Various combinations ';', '=', and application.
+testeq("EV30",pass) { (1=1) = (1=1) }         {1}
+testeq("EV31",pass) { (1=1) = (2;1) }         {1}
+testeq("EV32",pass) { (1=1) = ( +1) }         {1}
+testeq("EV33",pass) { (2;1) = (1=1) }         {1}
+testeq("EV34",pass) { (2;1) = (2;1) }         {1}
+testeq("EV35",pass) { (2;1) = ( +1) }         {1}
+testeq("EV36",pass) { ( +1) = (1=1) }         {1}
+testeq("EV37",pass) { ( +1) = (2;1) }         {1}
+testeq("EV38",pass) { ( +1) = ( +1) }         {1}
+testeq("EV39",pass) { (1=1) ; (1=1) }         {1}
+testeq("EV40",pass) { (1=1) ; (2;1) }         {1}
+testeq("EV41",pass) { (1=1) ; ( +1) }         {1}
+testeq("EV42",pass) { (2;1) ; (1=1) }         {1}
+testeq("EV43",pass) { (2;1) ; (2;1) }         {1}
+testeq("EV44",pass) { (2;1) ; ( +1) }         {1}
+testeq("EV45",pass) { ( +1) ; (1=1) }         {1}
+testeq("EV46",pass) { ( +1) ; (2;1) }         {1}
+testeq("EV47",pass) { ( +1) ; ( +1) }         {1}
+# Cannot have = in the function part, it is WRONG
+testeq("EV48",pass) {       + (1=1) }         {1}
+testeq("EV49",pass) {       + (2;1) }         {1}
+testeq("EV50",pass) {       + ( +1) }         {1}
+
+# EV51a should faile because intAdd[x,1] might fail if x:any
+verify("EV51a",fail) { succ(x:any)<closed>:=intAdd$[x,1]}
+
+testeq("EV51",pass) { succ(x:int)<closed>:=intAdd$[x,1]; y:succ       =1; y }     { 2 }
+testeq("EV52",pass) { succ(x:int)<closed>:=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
+
+# --- What is first?
+# testeq("EV",pass) { first{1} }              {1}
+# testeq("EV",pass) { first{1|2} }            {1}
+# testeq("EV",pass) { first{:false} }         {:false}
+# testeq("EV",pass) { first(x:=1|2){x+1} }    {2}
+
+testeq("EV53a",pass) { truth{1+2} } { truth{3} }
+# tim=skip: Tim does not implement truth
+testeq("EV53b",pass,tim=skip) { a := truth{5}; a = truth{b:int}; b } { 5 }
+testeq("EV54",pass,tim=skip) { a := truth{5}; a? } { 5 }
+testeq("EV54b",pass,tim=skip) { a := truth{5}; a[5] } { 5 }
+testeq("EV55",pass,tim=skip) { true } { truth{()} }
+testeq("EV56",pass,tim=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
+                    { array{(), truth{5}, (), truth{1} } }
+# tim=skip: Tim is not happy with this. Bug?
+testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
+testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) { 1 } else { 0 } } { 1 }
+testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) { 1 } else { 0 } } { 0 }
+testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) { 1 } else { 0 } } { 0 }
+testeq("EV61",pass,tim=skip) { a := option{   }; if (a?) then { 1 } else { 0 } } { 0 }
+testeq("EV62",pass,tim=skip) { a := option{1  }; if (a?) then { 1 } else { 0 } } { 1 }
+
+testeq("AndyExe12", pass)
+                    { exists A B { B = all{ exists C D { C = all{ (A = 1) | (D = 0) }
+                                                       ; D = 1; C } }
+                                 ; A = 1; B } }
+                    { array{array{1}} }
+
+# tim=skip: seems to hang Tim's verifier
+testeq("AndyExe17", pass, tim=skip)
+                    { exists F {
+                        F = function(A:any)<closed>{ all{ (A = true; true) | (A = false; F(true)) } };
+                        exists X Y {
+                          Y = F(X);
+                          X = false;
+                          Y } } }
+                    { array{array{truth{array{}}}} }
+
+testeq("AndyExe17a", pass, tim=skip)
+                    { F := function(A:int)<closed>{ all{ (A = 1; 1) | (A = 0; F[1]) } };
+		      F[0] }
+                    { array{array{1}} }
+
+testeq("AndyExe19", pass)
+                    { exists Y Z { Y = all { 0 = Z }; Z = 0; Y } }
+                    { array{0} }
+
+# replacing 'for(1){1|2}' with 'array{1|2}' makes it pass.
+# tim=skip: runtime bug
+testeq("AndyChoice4", pass, tim=skip)
+                    { all { Y := for(1) {1|2};
+                            Z := 4|5;
+                            X := 1;
+                            (X, Y, Z)
+                          }
+                    }
+                    { array{ (1, array{1}, 4), (1, array{1}, 5), (1, array{2}, 4), (1, array{2}, 5) } }
+
+testeq("temp1", pass, tim=skip)
+                    { all { Y := (array{1} | array{2});
+                            Z := 4|5;
+                            X := 1;
+                            (X, Y, Z)
+                          }
+                    }
+                    { array{ (1, array{1}, 4), (1, array{1}, 5), (1, array{2}, 4), (1, array{2}, 5) } }
+testeq("temp2", pass, tim=skip)
+                    { all{ for(1){ 1|2 } }
+                    }
+                    { array{ array{1}, array{2} } }
+
+testeq("temp3", pass, tim=skip)
+                    { all { Y := for(1) {1|2};
+                            Z := 4|5;
+                            (Y, Z)
+                          }
+                    }
+                    { array{ (array{1}, 4), (array{1}, 5), (array{2}, 4), (array{2}, 5) } }
+
+testeq("AndyExe29", pass)
+                    {
+                      exists X Y {
+                        Y = all {
+                          exists I {
+                            X[I]
+                          }
+                        };
+                        X = ();
+                        Y
+                      }
+                    }
+                    { array{} }
+testeq("AndyExe73",pass) { Y := if (X = 1) then 1 else 2; X := 3; Y } { 2 }
+
+testeq("AndyChoice3",pass) {
+    all {
+      Y := if (X = 1) { 1|2 } else { 3 };
+      Z := 4|5;
+      X := 1;
+      (X, Y, Z)
+    }
+  }
+  { ( (1, 1, 4)
+    , (1, 1, 5)
+    , (1, 2, 4)
+    , (1, 2, 5) )
+  }
+
+testeq("Ampersand1", pass){ f ( x&y : int )<closed> := { x + y }; f[2,3] } { 5 }
+testeq("Ampersand2", pass){ f ( x&y : int, q:int )<closed> := { (q, x + y) }; f[2,3,7]} { (7,5) }
+testeq("Ampersand3", pass){ (x&y) := 4; x+y } { 8 }
+testeq("Ampersand4", pass){ f ( x&y&z : int )<closed> := { x + y + z }; f[2,3,4] } { 9 }
+
+testeq("fundom1", pass) { f(x:=1|2,y:=3|4)<closed>:=x+y; all{ i->x:f; i } }
+                        { ((1,3), (1,4), (2, 3), (2, 4)) }
+testeq("fundom1a", pass) { f(x:=1|2,y:=3|4)<closed>:=x+y; all{ :f } }
+                        { (4,5,5,6) }
+# fundom2 should fail.  The domain is not allowed to have extra iterates.
+verify("fundom2", fail) { f(x:=1|2 where y:=3|4)<closed>:=x+y; all{ :f } }
+
+# tests for check
+testeq("check1", pass){ check<fails>{ 3=4 } } {3=4}
+testeq("check2", fail){ check<fails>{ 33 } } { 33 }
+   # check2: depends on whether the runtime desugaring of check<fx>{e} is
+   #           check<fx>{e} or just e
+
+testeq("check3", fail){ check<fails>{ 33 | 44 } } { 33 }
+testeq("check4", pass){ check<decides>{ 3=4 } } {3=4}
+testeq("check5", pass){ check<decides>{ 33 } } { 33 }
+testeq("check6", fail){ check<decides>{ 33 | 44 } } { 33 }
+testeq("check7", fail){ check<succeeds>{ 3=4 } } {3=4}
+   # See check2
+
+testeq("check8", pass,){ check<succeeds>{ 33 } } { 33 }
+testeq("check9", fail){ check<succeeds>{ 33 | 44 } } { 33 }
+
+# tests for information flow regarding choice
+testeq("choice1", pass){ all{ y:=if(x>3){5}else{7}; (11|22); x:=2; y } } {(7,7)}
+testeq("choice2", pass){ all{ f[]; y:=if(x>3){5}else{7}; (11|22); x:=2; f()<closed>:={8}; y } } {(7,7)}
+testeq("choice3", fail){ all{ y:=if(x>3){5}else{7}; (11|22); x:=(2|4); y } } {(7,5,7,5)}
+  # choice3: gets stuck, because the choices can't expand over the 'if'
+testeq("choice4", pass){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; f(8|9)<closed>:={55}; y } } {(7,7,7,7)}
+
+# tests for top-level exis used in functions
+testeq("run-exitop1", pass){ x:int; f()<closed> := {x}; x=3; f[] } { 3 }
+testeq("run-exitop2", pass){ x:int; f()<closed>:int := {x}; x=3; f[] } { 3 }
+testeq("run-exitop3", pass){ x:int; f()<closed> := {x}; f[]=3; f[] } { 3 }
+
+verify("verify-exitop4", fail){ x:int; f()<closed>:int := {x} }
+testeq("run-exitop4", fail, skip){ x:int; f()<closed>:int := {x}; f[]=3; f[] } { 3 }
+   # skip, because rejected by the verifier
+   # Den-sem of f is empty, something wrong
+   # Fail because f itself doesn't verify
+
+testeq("for-wrap1", pass) { f(xs := for(1|2){:prefix'-'}):=xs; f[1,2] } { (-1,-2) }
+
+
+#####
+# tests extracted from meetings.versetest
+testeq("M8Apr25-1", pass){ succ(x:int)<closed>:int := x+1
+                         ; h->f:=function(:int)<closed>{:int}
+                         ; h=succ
+                         ; f[3] } { 4 }
+testeq("jan1", pass){ (f(x:int)<closed><succeeds>:= x); y:int; f[y]=3} {3}
+testeq("M9Aug24-1", pass){ foo(x:any)<closed><decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+testeq("M5Aug24-1", pass, tim=skip_rej ) { G(X:int)<closed>:void = if (X = 2) then G(2); G[7] } {()}
+testeq("M5Aug24-2", loop, tim=skip_rej ) { G(X:int)<closed>:void = if (X = 2) then G(2); G[2] } {7}
+testeq("S1Aug24-4", pass) { f(x:int)<decides><closed> := x=3
+                          ; all{ exists a { f[a] } } } { array{3} }
+testeq("M28Jul24-1", loop, tim=skip_rej ) { F(X:int)<closed><decides>:void = if (X = 2) then fail
+                             ; Y := all{(F[1]; G[1]) | (G[2]; F[2])}
+                             ; G(X:int)<closed>:void = if (X = 2) then G(2)
+                             ; Y } { array{1} }
+testeq("T29Jul24-1", pass ){ f( all{1} )<closed> := 0; f[ array{1} ] = 0 } {0}

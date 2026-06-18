@@ -22,6 +22,7 @@ common general-libs
                       haskeline,
                       megaparsec,
                       mtl,
+                      optparse-applicative,
                       pretty,
                       scientific,
                       text,
@@ -105,11 +106,19 @@ executable repl
     import:           general-libs
 
     hs-source-dirs:   repl
-    build-depends:    optparse-applicative,
-                      reduction,
+    build-depends:    reduction,
                       verse-libs,
                       verse-parser,
 
     main-is:          Main.hs
 
+executable tester
+     import:           general-libs
+     hs-source-dirs:   tester
+     build-depends:    parser-combinators,
+                       reduction,
+                       uniplate,
+                       verse-libs,
+                       verse-parser,
 
+     main-is:          Main.hs
