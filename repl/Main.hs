@@ -98,7 +98,6 @@ runFile _flg _sys _ddesugar fn = do
 
 data MainFlags = MainFlags
   { mf_wslbug      :: !Bool
-  , mf_preludeName :: !String
   , mf_desugar     :: !Bool
   , mf_simplify    :: !Bool
   , mf_fileNames   :: ![FilePath]          -- input files
@@ -109,12 +108,6 @@ mainFlags = MainFlags
   <$> OA.switch
       ( OA.long "wsl"
       <> OA.help "Add extra NL to compensate for WSL bug" )
-  <*> OA.strOption
-      ( OA.long "prelude"
-      <> OA.short 'p'
-      <> OA.metavar "NAME"
-      <> OA.value "miniprelude"
-      <> OA.help "Use built in prelude NAME" )
   <*> OA.switch
       ( OA.long "ddesugar"
       <> OA.help "Debug - show desugared" )

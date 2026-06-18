@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ApplicativeDo #-}
@@ -65,7 +66,6 @@ import Language.Verse.Exp
   , pattern PostfixDollar
   , pattern If
   , pattern IfThen
-  , pattern IfElse
   , pattern For
   , pattern ExpSpecs
   , pattern Pat
@@ -79,7 +79,7 @@ import Language.Verse.Exp
 import Language.Verse.Exp qualified as Parse
 import Language.Verse.Rewrite.Exp as Exp
 
-import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error, (-))
+import Prelude (Maybe (..), Show (..), String, (==), (+), ($!), error, (-), undefined)
 
 -- TODO: in general this module needs:
 -- - a bunch of cleanup. Many cases can be handled recursively rather than directly
@@ -546,6 +546,7 @@ rewriteDef pat rhs = case extract pat of
             res <- rewriteDef x y
             rest <- go xs ys
             return $ (res <$ x) : rest
+          go _ _ = undefined
 
     List <$> splice_zip es rhss
   InfixColon (extract -> stripSpecs -> (Invoke p e_domain, specs)) e_range -> do

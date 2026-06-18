@@ -4,7 +4,6 @@ module FrontEnd.Flags(
    defaultFlags, showFlags,
  ) where
 
-import FrontEnd.Expr
 --import FrontEnd.Prelude( PreludeName, findPrelude, defaultPrelude )
 import Core.Traced     ( Verbosity )
 
