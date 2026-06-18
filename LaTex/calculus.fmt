@@ -230,7 +230,7 @@
 %format dollar = "\$"
 %format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\{" b "\}"
 %format forb (a) b = "\textbf{for}(" a ")\{" b "\}"
-%format for1 (a) = "\textbf{for}(" a ")"
+%format for1 (a) = "\textbf{for}\{" a "\}"
 
 %format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
 

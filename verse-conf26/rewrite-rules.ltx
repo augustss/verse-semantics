@@ -281,7 +281,7 @@ $} \\
 \rulename{all}  & |iter2 allKW (B^[v]) e|
     & \movesto & |cons (B^[v]) e| \\
 \rulename{for}  & |iter2 forKW (B^[v]) e|
-    & \movesto & |block (blk x () (applyN cons2 (arr (x, B^[v]), e))|
+    & \movesto & |block (blk x () (applyN cons2 (arr (x, B^[v]), e)))|
 \end{array}
 $} \\
 \captionof{figure}{Iteration and choice}
@@ -292,27 +292,31 @@ $} \\
 
 \begin{center}
 \fbox{$
-\begin{array}{l}
-\begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-\rulename{mwild} & |twiddle x w _| & \movesto & |x| \\
-\rulename{mval}  & |twiddle x w k| & \movesto & |x == k| \\
-\rulename{mval}  & |twiddle x w op| & \movesto & |x == op| \\
-\rulename{mvar}  & |twiddle x w y| & \movesto & |x==y| \\
-\rulename{mdef}  & |twiddle x w (y := t)| & \movesto & |y = (twiddle x w t)| \\
-\rulename{minp}  & |twiddle x w (esssquig y t)| & \movesto & |y=x; twiddle x w t| \\
-\rulename{mblock} & |twiddle x w (block t)| & \movesto & |block (blk (termbinders  t) () (twiddle x w t))| \\
-\rulename{mapp}  & |twiddle x w (apply1N t_1 t_2)| & \movesto
-  & |x = apply1N (Mcirc w t_1) (Mcirc w t_2)| \\
-\rulename{munif} & |twiddle x w (t_1=t_2)| & \movesto
-  & |(twiddle x w t_1) == (twiddle x w t_2)| \\
-\rulename{mchoice} & |twiddle x w (t_1 `choice` t_2)| & \movesto
-  & |(twiddle x w (block t_1)) `choice` (twiddle x w (block t_2))| \\
-\rulename{mfail} & |twiddle x w fail| & \movesto & |fail| \\
-\rulename{msemi} & |twiddle x w (t_1;t_2)| & \movesto & |Mcirc w t_1; twiddle x w t_2| \\
-\rulename{mwhere} & |twiddle x w (t_1 `wherekw` t_2)| & \movesto
-  & |blk y () (y == (twiddle x w t_1); Mcirc w t_2; y)| \\
-\rulename{mtup} & |twiddle x w (array (t_1,xdots,t_n))| & \movesto
-% & → block (blk (x_1 xdots x_n, y_1 xdots y_n) (). x == arr (x_1,xdots,x_n);
+\begin{array}{@@{\,}l}
+\begin{array}{@@{}l @@{} r @@{\;\;}c@@{\;\;} l l}
+\rulename{mwild} & |twiddle u w _| & \movesto & |u| \\
+\rulename{mval}  & |twiddle u w k| & \movesto & |u == k| \\
+\rulename{mval}  & |twiddle u w op| & \movesto & |u == op| \\
+\rulename{mvar}  & |twiddle u w y| & \movesto & |u==y| \\
+\rulename{mdef}  & |twiddle u w (x := t)| & \movesto & |x = (twiddle u w t)| \\
+\rulename{minp}  & |twiddle u w (esssquig x t)| & \movesto & |x=u; twiddle u w t| \\
+\rulename{mblock} & |twiddle u w (block t)| & \movesto & |block (blk (termbinders  t) () (twiddle u w t))| \\
+\rulename{mapp}  & |twiddle u w (apply1N t_1 t_2)| & \movesto
+  & |u = apply1N (Mcirc w t_1) (Mcirc w t_2)| \\
+\rulename{munif} & |twiddle u w (t_1=t_2)| & \movesto
+  & |(twiddle u w t_1) == (twiddle u w t_2)| \\
+\rulename{mchoice} & |twiddle u w (t_1 `choice` t_2)| & \movesto
+  & |(twiddle u w (block t_1)) `choice` (twiddle u w (block t_2))| \\
+\rulename{mfail} & |twiddle u w fail| & \movesto & |fail| \\
+\rulename{msemi} & |twiddle u w (t_1;t_2)| & \movesto & |Mcirc w t_1; twiddle u w t_2| \\
+\rulename{mwhere} & |twiddle u w (t_1 `wherekw` t_2)| & \movesto
+  & |blk y () (y == (twiddle u w t_1); Mcirc w t_2; y)| \\
+\rulename{mtup} & |twiddle u w (array (t_1,xdots,t_n))| & \movesto
+& |blockKW| \{ \begin{array}[t]{@@{}l}
+    | defKW u_1 xdots u_n, y_1 xdots y_n| \{\}.\; |u == arr (u_1,xdots,u_n);|\\
+    |y_1=(twiddle u_1 w t_1); xdots; y_n=(twiddle u_n w t_n);| \\
+    |arr(y_1,xdots,y_n)| \}
+    \end{array}
 %     y_1 == (x_1~>൦t1; ...; yn=xn~>൦tn; <y1,..,yn>} \\
 \\
 % (MTru)       x ~>w tru{t} 		→ {∃x1,y2, x=tru{x1}; y1=x1~>൦t; tru{y1}
@@ -321,28 +325,54 @@ $} \\
 % (MColon2) 	x ~>w :t	  	→ D(t,w)[x]		otherwise
 % (MOfType)	x ~>w (t1 ▷fx t2)	→ D(t1,w) ▷(fx ⋂ fx(w)) D(t2,w)
 % 
- \rulename{mif} & |twiddle x w (if3 t_0 t_1 t_2)| & \movesto
+\multicolumn{2}{@@{}l}{\rulename{mif} \hfill |twiddle u w (if3 t_0 t_1 t_2)|} & \movesto
   & |iterKW(ifKW)|
       \begin{array}[t]{@@{}l}
-         \{ |blk (termbinders t_0) () (Mcirc w t_0; delay (twiddle x w (block t_1)))| \} \\
-         \{ |twiddle x w (block t_2)| \}
+         \{ |blk (termbinders t_0) () (Mcirc w t_0; delay (twiddle u w (block t_1)))| \} \\
+         \{ |twiddle u w (block t_2)| \}
       \end{array}
      \\
-\rulename{mall} & |twiddle x w (all t)| & \movesto
-  & |x = iter2 allKW (blk (termbinders t) () (Mcirc w t)) emptytup| \\
-% (MFor)       x ~>w for(t0){t1} 	→ ∃y. <x, y> = iter(FOR)(∃tbs(t0). D(t0,w); \i. i ~>൦ block{t1}}){<<>,<>>};
+\rulename{mall} & |twiddle u w (for1 t)| & \movesto
+  & |u = iter2 allKW (blk (termbinders t) () (Mcirc w t)) emptytup| \\
+\rulename{mfor} & |twiddle u w (fordo t_0 t_1)| & \movesto &
+  \begin{array}[t]{@@{}l}
+    |blockKW| \{ |defKW| y \{\}. \\
+    \;\; |arr (u, y) == iterKW (forKW)|
+    \begin{array}[t]{@@{}l}
+        \{ |blk (termbinders t_0) ()
+                 (Mcirc w t_0; lam u' (twiddle u' w (block t_1)))| \} \\
+        \{ |arr(emptytup, emptytup) };| \\
+     \end{array} \\
+     \;\; |y| \}
+   \end{array}
+\\
 \end{array}\\
 \\
-\text{where \;\; |Mcirc (_,_,v) t| = |blk y () (twiddle y (bbcirc,drdom,v) t)|}
+\text{where \;\; |Mcirc (_,_,v) t| = |blk u () (twiddle u (bbcirc,drdom,v) t)|}
 \end{array}
 $} \\
-\captionof{figure}{Iteration and choice}
+\captionof{figure}{Matching: most cases}
 \end{center}
 
 \begin{itemize}
 \item In \rulename{mwhere} we are careful to keep |t_1| and |t_2| in the same order,
   in case they have effects.
 \end{itemize}
+
+\subsection{Matching functions}
+
+\begin{center}
+\fbox{$
+\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
+%  \rulename{mfun} & |twiddle h w (functionOCX q at fx bt)| & \movesto
+ \rulename{mfun} & |twiddle h w (functionP at bt)| & \movesto
+  &  |lam u (blk (p,q,termbinders at) ()
+        p == (twiddle u w at); q == apply1N h p; twiddle q w (block bt))|\\
+\end{array}
+$} \\
+\captionof{figure}{Matching functions}
+\end{center}
+
 
 \begin{figure}[h]
 $\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
