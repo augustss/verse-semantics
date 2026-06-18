@@ -1700,6 +1700,7 @@ choiceFree (e1 :=: e2) = choiceFree e1 && choiceFree e2
 choiceFree (Match _ _ _) = False         -- force ~> to happen
 choiceFree (e1 :@ e2) = choiceFree e1 && choiceFree e2
 choiceFree (Arr es) = and (map choiceFree es)
+choiceFree (Iter IF _ _) = False   -- could do better
 choiceFree (Iter ALL _ _) = True
 choiceFree (Iter FOR _ e) = choiceFree e
 choiceFree (Crl b) = choiceFreeB b
