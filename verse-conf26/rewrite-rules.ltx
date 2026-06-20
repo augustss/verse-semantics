@@ -27,7 +27,7 @@ $$
          && \vb & |e_1 ; e_2| \vb |e_1 == e_2| \vb |b_1 choice b_2| \vb |fail| \\
          && \vb & |iter2 ic b e| \\
          && \vb &  |twiddle x wu t| \vb |block b|  \\[1mm]
-         && \vb & |verify2 rs as e| \\
+         && \vb & |verify2 rs as b| \\
          && \vb & |oftypefx e_1 fx e_2| \\
       \text{Blocks} & b & ::= & |blk X hp e| \\
       \text{Variable sets}    & |X| & ::= & |{x_1, xdots, x_n}|  & (n \geq 0)\\
@@ -57,7 +57,6 @@ $$
   \text{Value contexts}  & |V| & ::= & |hole| \vb |arr(v_1,xdots,V,xdots v_n)|
            \vb |lam x (B^[S])| \\
   \text{Block contexts}  & |B| & ::= & |blk X hp hole| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb \text{...todo...} \\
 \end{array}
 \end{array}
 $$
@@ -296,7 +295,7 @@ $} \\
 \begin{array}{@@{}l @@{} r @@{\;\;}c@@{\;\;} l l}
 \rulename{mwild} & |twiddle u w _| & \movesto & |u| \\
 \rulename{mval}  & |twiddle u w k| & \movesto & |u == k| \\
-\rulename{mval}  & |twiddle u w op| & \movesto & |u == op| \\
+\rulename{mop}  & |twiddle u w op| & \movesto & |u == op| \\
 \rulename{mvar}  & |twiddle u w y| & \movesto & |u==y| \\
 \rulename{mdef}  & |twiddle u w (x := t)| & \movesto & |x = (twiddle u w t)| \\
 \rulename{minp}  & |twiddle u w (esssquig x t)| & \movesto & |x=u; twiddle u w t| \\
@@ -321,7 +320,7 @@ $} \\
 \\
 % (MTru)       x ~>w tru{t} 		→ {∃x1,y2, x=tru{x1}; y1=x1~>൦t; tru{y1}
 % 
-% (MColon1) 	x ~>w :t	  	→ x ▷fx D(t,w)	if w=(⦁, R<fx>)
+\rulename{mcolon1} & |twiddle x w (:t)|	 & \movesto & |apply1N (Mcirc w t) x| \\
 % (MColon2) 	x ~>w :t	  	→ D(t,w)[x]		otherwise
 % (MOfType)	x ~>w (t1 ▷fx t2)	→ D(t1,w) ▷(fx ⋂ fx(w)) D(t2,w)
 % 
@@ -363,15 +362,87 @@ $} \\
 
 \begin{center}
 \fbox{$
+\begin{array}{@@{}l}
 \begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
 %  \rulename{mfun} & |twiddle h w (functionOCX q at fx bt)| & \movesto
  \rulename{mfun} & |twiddle h w (functionP at bt)| & \movesto
-  &  |lam u (blk (p,q,termbinders at) ()
-        p == (twiddle u w at); q == apply1N h p; twiddle q w (block bt))|\\
+  &  \lambda u.\; \exists p,q,|termbinders at|\{\}.
+      \begin{array}[t]{l}
+      |p == (twiddle u w at);| \\
+      |Wcirc w (q == apply1N h p);| \\
+      |twiddle q w (block bt)|
+      \end{array} \\
+\end{array} \\
+\text{where}\;
+\begin{array}[t]{rcll}
+  |Wcirc (bbcirc,_,_) e| & = & |emptytup| \\
+  |Wcirc (bbblob,_,_) e| & = & |e| \\
+\end{array}
 \end{array}
 $} \\
 \captionof{figure}{Matching functions}
 \end{center}
+
+
+\subsection{Verification rules}
+
+
+\begin{center}
+\fbox{$
+\begin{array}{@@{}l}
+
+\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
+  \text{Proof contexts}  & P & ::= & |blk X hp Q| \\
+  & |Q| & ::= & |hole| \vb |e == Q| \vb |Q == e|
+           \vb  |e ; Q| \vb |Q ; e| \vb  |applyN e Q| \vb |applyN Q e|
+    \vb & |iter2 ic Q e|
+\end{array} \\
+\\
+\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
+  \rulename{moftype} & |twiddle u w (oftype t_1 t_2)|
+  & \movesto & |u == apply1N (Mcirc w t_1) (Mcirc w t_2)| & \text{if |w = (b, execflag, drdom)|} \\
+  && \movesto & |oftypefx ((twiddle u w t_1)) fx (Mcirc w t_2)| & \text{if |w = (b, execflag, drrng fx)|} \\
+  && \movesto & |block (blk (y,t) () (y == Mcirc w t_1; t == Mcirc w t_2;
+                 check succeeds (apply1N t y); oftypefx y fx t))|
+       & \text{if |w = (b, verifyflag, drdom)|} \\
+\end{array} \\
+\\
+
+\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
+\rulename{solver} & |verify2 rs as b| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
+  \rulename{v-val} & |verify2 rs as (P^[v])|      & \movesto & |tup ()| & \\
+  \rulename{v-choice} & |verify2 rs as (P^[e_1 choice e_2])|      & \movesto & |verify2 rs as (P^[e_1]) ; verify2 rs as (P^[e_2])| & \\
+  \rulename{v-fail} & |verify2 rs as (P^[fail])|    & \movesto & |tup ()| & \\[1mm]
+  \rulename{v-skol}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
+  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
+  &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\
+ \rulename{split-val} & |verify2 rs as (P^[r==gv; e])| & \movesto &
+    |verify2 rs (as, r==gv) (P^[ e ]);| \\
+    &&& |verify2 rs (as, noteq r gv) (P^[ fail ])|\\[1mm]
+  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv])| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
+    &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
+    &&& \text{if $r \not\in R$} \\[1mm]
+ \rulename{split-tup} & |verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|
+     & \movesto & |verifyKW|
+           \begin{array}[t]{@@{}l}
+             |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
+             |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
+           \end{array}\\
+    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ fail ])| \\
+ \rulename{split-app} & |verify2 (rs) as (P^[apply1N f gv])| & \movesto &
+          |verify2 (rs,r) (as, r = applyN AP (f,gv)) (P^[ r ]);| \\
+    &&& \text{if $f \in R, r \not\in R$} \\
+ \rulename{split-appf} & |verify2 (rs) as (P^[apply1N f (lam x e)])| & \movesto &
+          |verify2 (rs,r) as (P^[ r ]);| \\
+    &&& \text{if $f \in R, r \not\in R$} \\
+\end{array}\\
+\end{array}
+$} \\
+\captionof{figure}{Verfication rules}
+\end{center}
+
+
 
 
 \begin{figure}[h]
