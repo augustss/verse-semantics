@@ -423,6 +423,7 @@
 %% functionOC has open/closed subscript
 %format functionOC (oc) (x) (rhs) = functionKW "(" x ")\langle" oc "\rangle \{" rhs "\}"
 %format functionOCX (oc) (x) (fx) (rhs) = functionKW "(" x ")\langle" oc "\rangle\langle" fx "\rangle\{" rhs "\}"
+%format functionX (x) (fx) (rhs) = functionKW "(" x ")\langle" fx "\rangle\{" rhs "\}"
 %format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
 %format lamOCv (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".\begin{array}[t]{@{}l} (" t1 ") \\ \{" t2 "\} \end{array}"
 

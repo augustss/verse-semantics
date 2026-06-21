@@ -390,12 +390,45 @@ $} \\
 \begin{center}
 \fbox{$
 \begin{array}{@@{}l}
+\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
+%  \rulename{mfun} & |twiddle h w (functionOCX q at fx bt)| & \movesto
+  \rulename{mfun} & \multicolumn{3}{l}{|twiddle h w (functionX at fx bt)|} \\
+  && \movesto
+ & \begin{array}[t]{@@{}l}
+     |verifyKW|(u;)\{\exists |p,q,termbinders at|\{\}.\,
+     \begin{array}[t]{@@{}l}
+      |p == (twiddle u w at);| \\
+      |Wcirc w (q == apply1N h p);| \\
+      |check fx (twiddle q w (block bt))|\}
+     \end{array}
+     \\
+     \lambda u.\; \exists p,q,|termbinders at|\{\}.
+      \begin{array}[t]{l}
+      |p == (twiddle u w at);| \\
+      |Wcirc w (q == apply1N h p);| \\
+      |twiddle q w (block bt)|
+      \end{array} \\
+   \end{array}
+\end{array} \\
+\text{where}\;
+\begin{array}[t]{rcll}
+  |Wcirc (bbcirc,_,_) e| & = & |emptytup| \\
+  |Wcirc (bbblob,_,_) e| & = & |e| \\
+\end{array}
+\end{array}
+$} \\
+\captionof{figure}{Matching functions with verification}
+\end{center}
+
+\begin{center}
+\fbox{$
+\begin{array}{@@{}l}
 
 \begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
   \text{Proof contexts}  & P & ::= & |blk X hp Q| \\
   & |Q| & ::= & |hole| \vb |e == Q| \vb |Q == e|
            \vb  |e ; Q| \vb |Q ; e| \vb  |applyN e Q| \vb |applyN Q e|
-    \vb & |iter2 ic Q e|
+    \vb |iter2 ic Q e|
 \end{array} \\
 \\
 \begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
@@ -409,13 +442,10 @@ $} \\
 \\
 
 \begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
-\rulename{solver} & |verify2 rs as b| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
-  \rulename{v-val} & |verify2 rs as (P^[v])|      & \movesto & |tup ()| & \\
-  \rulename{v-choice} & |verify2 rs as (P^[e_1 choice e_2])|      & \movesto & |verify2 rs as (P^[e_1]) ; verify2 rs as (P^[e_2])| & \\
-  \rulename{v-fail} & |verify2 rs as (P^[fail])|    & \movesto & |tup ()| & \\[1mm]
-  \rulename{v-skol}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
-  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
-  &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\
+ \rulename{solver} & |verify2 rs as b| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
+ \rulename{v-val} & |verify2 rs as (B^[v])|      & \movesto & |tup ()| & \\
+ \rulename{v-choice} & |verify2 rs as (P^[e_1 choice e_2])|      & \movesto & |verify2 rs as (P^[e_1]) ; verify2 rs as (P^[e_2])| & \\
+ \rulename{v-fail} & |verify2 rs as (P^[fail])|    & \movesto & |tup ()| & \\[1mm]
  \rulename{split-val} & |verify2 rs as (P^[r==gv; e])| & \movesto &
     |verify2 rs (as, r==gv) (P^[ e ]);| \\
     &&& |verify2 rs (as, noteq r gv) (P^[ fail ])|\\[1mm]
@@ -436,6 +466,9 @@ $} \\
  \rulename{split-appf} & |verify2 (rs) as (P^[apply1N f (lam x e)])| & \movesto &
           |verify2 (rs,r) as (P^[ r ]);| \\
     &&& \text{if $f \in R, r \not\in R$} \\
+  \rulename{v-skol}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
+  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
+  &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\
 \end{array}\\
 \end{array}
 $} \\
