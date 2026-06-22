@@ -21,7 +21,6 @@ data Flags = Flags
   , fTraceDesugar   :: !Bool   -- Used for 'tester', not 'repl'
   , fTraceEval      :: !Bool
   , fTraceVerbosity :: !Verbosity
---  , fPrelude        :: !(PreludeName, SrcExpr)
   , fReportError    :: !ReportError
   , fKeepIf         :: !Bool
   , fAllAsIter      :: !Bool
@@ -29,6 +28,7 @@ data Flags = Flags
                                -- i.e. without using "\bullet"
   , fUseLibParser   :: !Bool
   , fQuiet          :: !Bool   -- be less verbose
+  , fMatchFirst     :: !Bool   -- use match rules first
   }
   deriving (Show)
 
@@ -45,15 +45,15 @@ defaultFlags = Flags
   , fNoLambdaIf     = False
   , fVerify         = False
   , fTraceDesugar   = True
-  , fTraceEval      = True
+  , fTraceEval      = False
   , fTraceVerbosity = 2
---  , fPrelude        = either error id $ findPrelude defaultPrelude
   , fReportError    = ErrWarning
   , fKeepIf         = False
   , fAllAsIter      = False
   , fDsUniform      = False
   , fUseLibParser   = False
   , fQuiet          = False
+  , fMatchFirst     = False
   }
 
 data ReportError = ErrError | ErrWarning | ErrNone

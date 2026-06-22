@@ -8,7 +8,7 @@
 
 
 module Red( Blk(Blk, BlkX), Exp(..), pattern Val, Term(..), Ident(..)
-          , matchTop, topMatchContext
+          , matchTop, topMatchContext, initialBlk
           , ReductionContext(..), ReductionMode(..), setJustMatching
           , VerificationContext(..)
           , MatchContext, mcAssumeVerified
@@ -828,14 +828,14 @@ vx  = mkName "x"
 
 runTraced :: Fuel -> ReductionContext -> Blk -> Traced Blk
 runTraced fuel top_cxt top_blk
-  = normalize step valid  fuel top_blk
+  = normalize step valid fuel top_blk
   where
     valid :: Blk -> Validity
     valid = validBlk (getInScope top_cxt)
 
     step :: Blk -> Maybe (TraceStep Blk)
     step blk
-      | Blk _ _ Fail <- blk   -- Fail will return RedStep; check for naked
+      | isBlkFail blk         -- Fail will return RedStep; check for naked
       = Nothing               -- failure here to avoid an infinite loop
       | otherwise
       = case reduceBlock top_cxt blk of
@@ -846,7 +846,21 @@ runTraced fuel top_cxt top_blk
              -> -- ppTrace ("------ runTraced: " ++ rule_nm ++ " ----------------")
                 --        (pPrint blk' $$ text "") $
                 Just $ mkTraceStep rule_nm blk'
-          red -> error ("runTraced" ++ show red)
+          -- Allow top level choices.  This cannot happen in a real program, but is useful for the REPL
+          RedStep _ rs | let bs = [ b' | Res NoFloats b' <- rs ], length rs == length bs
+                                      -> let blk' = choices $ filter (not . isBlkFail) $ map norm bs
+                                         in  if blk == blk' then
+                                                 Nothing   -- avoid getting stuck in a loop doing this over and over
+                                             else
+                                                 Just $ mkTraceStep (RNM ["Top-choice"]) blk'
+                                                
+          red -> error ("error: runTraced " ++ prettyShow red)
+    -- normalize a Blk
+    norm = getTerm . normalize step valid (fuel-1)
+    isBlkFail (Blk _ _ Fail) = True
+    isBlkFail _ = False
+    choices [] = mkBlkE Fail
+    choices bs = foldr1 (\ x y -> mkBlkE (x :|: y)) bs
 
 
 mkTraceStep :: RuleName -> Blk -> TraceStep Blk
