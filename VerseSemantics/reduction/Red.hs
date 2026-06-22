@@ -78,7 +78,8 @@ lookupVerbosity :: String -> Verbosity
 lookupVerbosity s
   = go verbosityTable
   where
-    go [] = 0  -- Default to showing everything
+    go [] = 1  -- Default to showing everything
+               -- But leaving 0 free to suppress everything
     go ((prefix,v):tbl) | prefix `isPrefixOf` s = v
                         | otherwise             = go tbl
 
@@ -1600,7 +1601,7 @@ matchFun cxt f at fx bt mc
 
     mc_ver_dom = MC { mc_blob   = MTop
                     , mc_effect = DR_Dom
-                    , mc_verify = False }
+                    , mc_verify = True }  -- Here we know mc_verify mc = True
 
     mc_ver_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx

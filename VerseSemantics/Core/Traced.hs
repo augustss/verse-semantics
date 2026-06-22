@@ -203,6 +203,8 @@ class Pretty a => PrettyBrief a where
    pPrintBrief :: a -> Doc
 
 pPrintTrace :: forall a. PrettyBrief a => Verbosity -> Traced a -> [Doc]
+-- The pretty-printer for traces
+-- It takes a verbosity level to control which steps are abbreviated
 pPrintTrace show_verb tr
   =  go 1 tr
   where

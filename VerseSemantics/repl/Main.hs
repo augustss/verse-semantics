@@ -188,7 +188,7 @@ theCommandSet = CommandSet
   -- c_exec :: CmdRunner deals with a command not starting with colon
   , c_exec = cRed
   , c_help   = helpMsg
-  , c_greet  = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
+  , c_greet  = "Verse read-eval-print loop.\nUse :help for help, and :quit to quit."
   , c_bye    = "Bye!"
   , c_prompt = "> "
   , c_state  = CState { cs_lastExpr = Nothing
@@ -204,14 +204,9 @@ theCommandSet = CommandSet
 
 helpMsg :: String
 helpMsg = "\
-\Enter an EXPR to parse or a command.\n\
+\Enter an expression to evaluated, or a command starting with ':'.\n\
+\Type ':' to see all the commands.\n\
 \Many commands operate on the last printed expression.\n\
-\Try\n\
-\  > 1+2\n\
-\  > :mini\n\
-\  > :core\n\
-\  > :eval\n\
-\\n\
 \Commands (can be abbreviated):\
 \"
 
