@@ -3,7 +3,7 @@
 module Main(main) where
 --import Debug.Trace
 
-import FrontEnd.CopyHook
+import Core.Traced(getTerm, displayTraceV)
 import FrontEnd.Expr as Src
 import FrontEnd.Desugar
 import FrontEnd.Flags( Flags(..), defaultFlags )
@@ -40,7 +40,6 @@ import qualified Data.ByteString.Char8 as B
 
 main :: IO ()
 main = do
-  copyHook
   main_flags :: MainFlags <- mainArgs
   let cs1 = c_state theCommandSet
 
@@ -145,7 +144,8 @@ addHeader s doc
 
 updateLastExpr :: CState -> SrcExpr -> IO CState
 updateLastExpr s e
-  = do { display e
+  = do { when (not (fQuiet (cs_flags s))) $
+           display e
        ; pure s{ cs_lastExpr = Just e } }
 
 getInputExpr :: (SrcExpr -> CState -> IO CState) -> CmdRunner CState
@@ -183,18 +183,6 @@ theCommandSet = CommandSet
       , Cmd "red [EXPR]"           "Reduce [last] expression"                cRed
       , Cmd "parse [EXPR]"         "Parse [last] expression"                 cParseLine
 
-          -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
-
---       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
-
---      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
-
---      , Cmd "pcore EXPR"           "parse core expression"                 cPcore
---      , Cmd "pdesugar [EXPR]"      "Desugar [last] expression pretty"      cPDesugar
---      , Cmd "pvdesugar [EXPR]"     "Desugar (for verification) [last] expression pretty"      cPDesugarVerify
---      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
---      , Cmd "preprocess"           "Preprocess for rule set"                 cPreprocess
---      , Cmd "rules [NAME]"         "Select rule system"                    cRules
       ]
 
   -- c_exec :: CmdRunner deals with a command not starting with colon
@@ -247,6 +235,7 @@ cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (cs_flags s) then "on" else "off"
   putStr $ concatMap f flagTable
   printf "  %-12s= %d\n" "steps" (fRewriteSteps (cs_flags s))
+  printf "  %-12s= %d\n" "verbosity" (fTraceVerbosity (cs_flags s))
   pure s
 
 -- Set fRewriteSteps
@@ -256,6 +245,10 @@ cSet True l s | Just l' <- stripPrefix "steps=" l
 
 -- Set fTraceVerbosity
 cSet True l s | Just l' <- stripPrefix "verbosity=" l
+              , Just n <- readMaybe l'
+  = pure $ s{ cs_flags = (cs_flags s){fTraceVerbosity = n} }
+-- Set fTraceVerbosity
+cSet True l s | Just l' <- stripPrefix "trace-verbosity=" l
               , Just n <- readMaybe l'
   = pure $ s{ cs_flags = (cs_flags s){fTraceVerbosity = n} }
 
@@ -270,15 +263,8 @@ flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
 flagTable =
   [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
   ,("trace-eval",  (fTraceEval,    \ b s -> s{fTraceEval=b}))
-  ,("ds-uniform",  (fDsUniform,    \ b s -> s{fDsUniform=b}))
   ,("quiet",       (fQuiet,        \ b s -> s{fQuiet=b}))
---  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
---  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
---  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
---  ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
---  ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
---  ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
---  ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
+  ,("match-first", (fMatchFirst,   \ b s -> s{fMatchFirst=b}))
   ]
 
 --------------------------------------------------------
@@ -359,58 +345,37 @@ runGetter err_result getter
 
 getEssential :: Flags -> SrcExpr -> DsM SrcEssential
 getEssential flg e_parsed
-  = do { e_prel <- return {-addPrelude-} e_parsed
-       ; e_ess  <- sDesugarExpr e_prel
+  = do { e_ess  <- sDesugarExpr e_parsed
        ; when (not $ fQuiet flg) $
            printWithHdr "Essential" (pPrint e_ess)
        ; return e_ess }
-
-{-
-cEval :: CmdRunner CState
-cEval
-  = getInputExpr $ \e s ->
-    tryIt (\_ -> pure s) (\_ -> pure s) $
-    do { let flags = cs_flags s
-       ; prepd_core <- runD flags Core.Fail (getCore flags e)
-       ; let rules | fVerify flags = everywhere verificationRules
-                   | otherwise     = everywhere runtimeRules
-       ; let (res, tr) = Core.normalizeExpr rules (fRewriteSteps flags) prepd_core
-
-       ; let eval_doc = addHeader "Evaluate" $
-                        case res of
-                          NormOK      -> text "Result = " <+> pPrint (Core.getTerm tr)
-                          NormExpired -> text "Ran out of fuel"
-                          NormInvalid _ -> hang (text "Reached an invalid expression:") 2
-                                         (pPrint (Core.getTerm tr))
-       ; displayDoc eval_doc
-
-       ; when (fTraceEval flags) $ do
-           let trace_doc = addHeader "Evaluation trace"
-                           $ vcat
-                           $ pPrintTrace (fTraceVerbosity flags) tr
-           displayDoc trace_doc
-
-       ; return () }
--}
 
 cRed :: CmdRunner CState
 cRed
   = getInputExpr $ \e s ->
     tryIt (\_ -> pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
-       ; e_ess <- runD flags undefined $ getEssential flags e
-       ; e_ds <- return {- eSlsDesugar flags -} e_ess
-       ; let res = Red.run e_ds
-       ; let den_sem = addHeader "Reduced" $ text $ show res
+       ; e_ds <- runD flags undefined $ getEssential flags e
+       ; -- XXX setJustMatching
+       ; let (top_cxt, top_blk) = Red.initialBlk e_ds
+       ; m_blk <-
+           if fMatchFirst flags then do
+             let { tr_mtch = Red.runTraced (fRewriteSteps flags) (Red.setJustMatching top_cxt) top_blk }
+             displayDoc $ addHeader "Match reduction trace" $ text ""
+             displayTraceV (fTraceVerbosity flags) tr_mtch
+             return $ getTerm tr_mtch
+           else
+             return top_blk
+       ; let tr_res = Red.runTraced (fRewriteSteps flags) top_cxt m_blk
+             res = getTerm tr_res
+             res_string = prettyShow res
+       ; when (fTraceEval flags) $ do
+           displayDoc $ addHeader "Reduction trace" $ text ""
+           displayTraceV (fTraceVerbosity flags) tr_res
        ; if fQuiet flags then
-           displayDoc $ text $ show res
+           displayDoc $ text res_string
          else
-           displayDoc den_sem
-{-
-       ; let resU = Pom.denU e_ds
-       ; let den_semU = addHeader "Pom Den-sem, with empties" $ text $ show resU
-       ; displayDoc den_semU
--}
+           displayDoc $ addHeader "Reduced" $ text res_string
        ; return () }
 
 --------------------------------------------------------
@@ -459,178 +424,6 @@ cClear xs s = pure s{ cs_variables = HM.filterWithKey go (cs_variables s) }
   where
     to_remove = words xs
     go k _    = k `notElem` to_remove
-
-{-
-cDefine :: CmdRunner CState
-cDefine =
-  withLastExpr $ \ e s -> do
-    let !e' = asSrcExpr e
-    pure  s{ cs_definitions = cs_definitions s ++ [e'] }
-
-cClear :: CmdRunner CState
-cClear _ s = pure s{ cs_definitions = [] }
-
-cDisplay :: CmdRunner CState
-cDisplay _ s = do
-  let (prel, _) = fPrelude (cs_flags s)
-  putStrLn "prelude:"; display prel
-  putStrLn "definitions:"
-  mapM_ display $ cs_definitions s
-  pure s
--}
-
---------------------------------------------------------
---
---         Evaluation and verification
---
---------------------------------------------------------
-
-{-
-cEval :: CmdRunner CState
-cEval
-  = withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $
-    do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let core_expr, prepd_expr :: Core.Expr
-             core_expr  = asCore e
-             prepd_expr = prep core_expr
-       ; putStrLn (prettyShow prepd_expr)
-
-       ; putStrLn ("\n\n------- Evaluate ---------")
-       ; let eval_it = normalize (fEvalSteps (cs_flags s)) (everywhere TRS2024.runtimeRules)
-
-       ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
-
-       ; pure (RulesCore core_result) }
-
-
-cVerify :: CmdRunner CState
-cVerify
-  = withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $
-    do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let verify_it = normalize (fEvalSteps (cs_flags s))
-                              (everywhere Verifier.verificationRules)
-       ; let core_expr, prepd_expr :: Core.Expr
-             core_expr  = asCore e
-             prepd_expr = prep core_expr
-       ; putStrLn (prettyShow prepd_expr)
-
-       ; putStrLn ("\n\n------- Verify ---------")
-       ; e' <- showEvalResult (fTraceVerify $ cs_flags s) "Verification" (verify_it prepd_expr)
-
-       ; pure (RulesCore e') }
-
-
-showEvalResult :: Bool -> String -> (NormResult, Traced Core.Expr) -> IO Core.Expr
-showEvalResult False _ (_, (e' :<-- _))
-  = do { putStrLn (prettyShow e')
-       ; return e' }
-showEvalResult _ what (res, tr@(e' :<-- _))
-  = do { putStrLn (what ++ " " ++ showNormResult res)
-       ; display tr
-       ; return e' }
-
-
-cTransform :: Bool                    -- True <=> display the result
-           -> (SomeExpr -> SomeExpr)  -- How to transform
-           -> CmdRunner CState
-cTransform display_result tr =
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $ do
-    do { e' <- evaluate (tr e)
-       ; when display_result $ display e'
-       ; pure e' }
-
-
-cPcore :: CmdRunner CState
-cPcore line s =
-  tryIt (pure s) (updateLastExpr s) $ do
-    let prog = parseDie (Desugared <$> pCoreFile) "<interactive>" line
-    display prog
-    pure prog
-
-
-cPDesugar :: CmdRunner CState
-cPDesugar c s = do
-  let flg = (flags s){ fSimplify = True, fSplit = False, fAssumeVerified = True, fKeepIf = True,
-                       fPrelude = either error id $ findPrelude "miniprelude" }
-  putStrLn $ "Desugar for execution, prettyfied: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform True (Desugared . dropDollar . desugar flg . asSrcExpr) c s
-
-cDesugarVerify :: CmdRunner CState
-cDesugarVerify c s = do
-  let aflg = flags s
-      -- This is a hack to avoid the default prelude for verification.
-      prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
-      flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
-  putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform True (Desugared . desugar flg . asSrcExpr) c s
-
-cPDesugarVerify :: CmdRunner CState
-cPDesugarVerify c s = do
-  let aflg = flags s
-      -- This is a hack to avoid the default prelude for verification.
-      prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
-      flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel, fSimplify = True }
-  putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform True (Desugared . dropDollar . desugar flg . asSrcExpr) c s
-
-cPreprocess :: CmdRunner CState
-cPreprocess c s = cTransform True (Desugared . pre . asCore (flags s)) c s
-  where pre = trsToCore . preProcess sys (ruleEnv sys) . coreToTrs
-        sys = esystem s
-
-systemDescr :: ESystem -> String
-systemDescr s = sname s ++ ": " ++ description s
-
-
-isVerifyPrelude :: (PreludeName, SrcExpr) -> Bool
-isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
-
-cVerify :: CmdRunner CState
-cVerify = do
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (\ _ -> pure s) $ do
-      let sys  = verifier
-          aflg = flags s
-          flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
-          prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
-          e1  = asCore flg e
-          e2  = coreToTrs e1
-          e' = (if True then wrapAssert else id) $ preProcess sys (ruleEnv sys) e2
-      putStrLn $ "Verify: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-      putStrLn $ "Desugared:\n" ++ prettyShow e'
-      let (done, trc) = verify sys e'
-      when (fTraceVerify flg) $ do
-        let trc' = filterTrace (displayRules sys) trc
-        putStrLn "Verification trace:"
-        putStrLn $ unlines $ showTrace trc'
-      if done then
-        putStrLn "Verified"
-       else do
-        putStrLn "Not verified, residual term:"
-        display $ snd $ head $ toList trc
-      pure ()
-
-
-cRules :: CmdRunner CState
-cRules "" s = do putStrLn ("rules: " ++ systemDescr (esystem s)); pure s
-cRules line s =
-  case findSystem line of
-    Left msg -> do putStrLn msg; pure s
-    Right sys -> do
-      putStrLn $ "Selected=" ++ systemDescr sys
-      pure s{ esystem = sys,
-              flags = adjustFlags sys (flags s) }
-
-cDefEval :: CmdRunner CState
-cDefEval c s = do
-  let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
-      flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
-  cTransform True (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asSrcExpr) c s
-
--}
 
 --------------------------------------------------------
 --
