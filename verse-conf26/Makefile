@@ -7,6 +7,7 @@ PAPERSRC = $(PAPERTEX) ../LaTex/calculus.fmt ../LaTex/verse-macros.tex \
            rewrite-rules.tex \
            macros.tex \
            syntax.tex \
+           timbda.tex \
            densem.tex
 
 $(PAPER).pdf: $(PAPERSRC)

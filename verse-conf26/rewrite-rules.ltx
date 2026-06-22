@@ -16,11 +16,14 @@
 $$
 \begin{array}{l}
   \begin{array}{lrclr@@{}}
-      \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
+\text{Literals} & |ki| & ::= & \textit{Integer literals} \\
+                & |ks| & ::= & \textit{String literals} \\
+                & |op| & ::= & \textit{Primitive operations} \\
+                & |k| & ::= & |op| \vb |ki| \vb |ks| \vb |xdots| \\
+      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb |xdots| \\
       \text{Values} & v & ::= & |x| \vb hnf \\
-      \text{Head values} & \hnf & ::= & |k| \vb |r| \vb |op| \vb |arr (v_1, xdots, v_n)|
+      \text{Head values} & \hnf & ::= & |k| \vb |r| \vb |arr (v_1, xdots, v_n)|
                                       \vb |lam x b| \vb |delay e| \\
 
       \text{Expressions} & |e| & ::= & |v| \vb |applyN e_1 e_2| \\
@@ -193,14 +196,14 @@ We just give a small representative selection here.
 \begin{center}
 \fbox{$
 \begin{array}{l r @@{\;\;}c@@{\;\;} l l}
-\rulename{add} & |applyN add (k_1,k_2)| & \movesto & |k_1+k_2| \\
-\rulename{gt1} & |applyN gt (k_1,k_2)| & \movesto & |k_1| & \text{if $k_1>k_2$} \\
-\rulename{gt2} & |applyN gt (k_1,k_2)| & \movesto & |fail| & \text{if $k_1 \leq k_2$} \\
-\rulename{isInt1} & |applyN isInt k| & \movesto & |k| & \text{if |k| is an integer} \\
+\rulename{add} & |applyN add (ki_1,ki_2)| & \movesto & |ki_1+ki_2| \\
+\rulename{gt1} & |applyN gt (ki_1,ki_2)| & \movesto & |ki_1| & \text{if $ki_1>ki_2$} \\
+\rulename{gt2} & |applyN gt (ki_1,ki_2)| & \movesto & |fail| & \text{if $ki_1 \leq ki_2$} \\
+\rulename{isInt1} & |applyN isInt ki| & \movesto & |ki| & \text{(|ki| is an integer)} \\
 \rulename{isInt2} & |applyN isInt v| & \movesto & |fail| & \text{if |v| is not an integer} \\
 \rulename{cons} & |applyN consKW (v_0, arr(v_1,xdots,v_n))| & \movesto & |arr(v_0,v_1,xdots,v_n)| \\
-\rulename{dotdot} & |applyN dotdot (k_1,k_2)|
-  & \movesto & |k_1 `choice` (k_1+1) `choice` xdots `choice` k_2|
+\rulename{dotdot} & |applyN dotdot (ki_1,ki_2)|
+  & \movesto & |ki_1 `choice` (ki_1+1) `choice` xdots `choice` ki_2|
 \end{array}
 $}
 \captionof{figure}{Primitive operation rules}
@@ -294,8 +297,7 @@ $} \\
 \begin{array}{@@{\,}l}
 \begin{array}{@@{}l @@{} r @@{\;\;}c@@{\;\;} l l}
 \rulename{mwild} & |twiddle u w _| & \movesto & |u| \\
-\rulename{mval}  & |twiddle u w k| & \movesto & |u == k| \\
-\rulename{mop}  & |twiddle u w op| & \movesto & |u == op| \\
+\rulename{mlit}  & |twiddle u w k| & \movesto & |u == k| \\
 \rulename{mvar}  & |twiddle u w y| & \movesto & |u==y| \\
 \rulename{mdef}  & |twiddle u w (x := t)| & \movesto & |x = (twiddle u w t)| \\
 \rulename{minp}  & |twiddle u w (esssquig x t)| & \movesto & |x=u; twiddle u w t| \\

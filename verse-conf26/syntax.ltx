@@ -215,13 +215,14 @@ $$
 \begin{array}{lrcll}
 \text{Variables} &  |x,y,f| &     \\
 
-\text{Constants} & |k| & ::= & \textit{integer constants} \\
-                 &     & \vb & \textit{string constants} \\
+\text{Literals} & |ki| & ::= & \textit{Integer literals} \\
+                & |ks| & ::= & \textit{String literals} \\
+                & |op| & ::= & \textit{Primitive operations} \\
+                & |k| & ::= & |op| \vb |ki| \vb |ks| \vb |xdots| \\
 \\
 \text{Terms} &  |t| & ::= & |x|                        & \text{Variable} \\
 &      & \vb & |_|                        & \text{Underscore} \\
 &      & \vb & |k|                        & \text{Constant} \\
-&      & \vb & |o|                        & \text{Primops} \\
 &      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
 &      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
 &      & \vb & |t_1 where t_2|             & \text{Reverse sequencing} \\

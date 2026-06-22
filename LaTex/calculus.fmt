@@ -557,6 +557,10 @@
 %format k_2
 %format k_3
 
+%format ki_1
+%format ki_2
+%format ki_3
+
 %format a_0
 %format a_1
 %format a_2
@@ -908,3 +912,12 @@
 
 %% <fx> brackets
 %format (fxb (fx)) = "\langle" fx "\rangle"
+
+%% ----------------------------
+%%         Denotational semantics
+%% ----------------------------
+
+%format (DsT (t))  = "{\mathcal T}\llbracket" t "\rrbracket{}"
+%format (DsE (t))  = "{\mathcal E}\llbracket" t "\rrbracket{}"
+%format rho = "\rho"
+%format PI  = "PI"

@@ -1,0 +1,42 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+% -------------------------------------------------------------
+%               Simply typed lambda calculus
+% -------------------------------------------------------------
+
+\subsection{Simply typed lambda calculus}
+
+\begin{center}
+\fbox{$
+\begin{array}{l}
+\\
+\begin{array}{rcl}
+ |t| & ::= & |Int| \vb |t_1 -> t_2| \\
+ |e| & ::= & k \vb op \vb x \vb e_1\;e_2 \vb |lam ((x:t)) e|
+\end{array}
+\\ \\
+\begin{array}{r @@{\;\;}c@@{\;\;} l}
+  \PI & ::& Set(A) \rightarrow Set(A \times B) \rightarrow Set(A \rightarrow B) \\
+  \PI(A,R) & = & \{ f \vb f \subseteq R, \; isFunction(f), \; dom(f)=A \} \\
+\\
+  |DsT t| & :: & |Set| \\
+  |DsT Int rho| & = & \Z \\
+  |DsT (t_1 -> t_2) rho| & = & \PI(|DsT t_1|,\; |DsT t_1| \times |DsT t_2|)  \\
+  \\
+
+  |DsE e| & :: & |Env -> Set| \\
+  |DsE k rho| & = & \{ k \} \\
+  |DsE x rho| & = & |rho^(x)| \\
+  |DsE (e_1 e_2) rho| & = &  \{ b \vb f \in |DsE e1 rho|, \; a \in |DsE e2 rho|,\; (a,b) \in f \} \\
+  |DsE (lam ((x:t)) e) rho| & = &  \PI(A, \; \{ (a,b) \vb a \in A,\; b \in |DsE e (ρ^[x := a])| \} \\
+  && \text{where $A = |DsT t|$}
+\end{array}
+\end{array}
+$} \\
+\captionof{figure}{Auxiliary functions}
+\end{center}
+
