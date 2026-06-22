@@ -776,12 +776,18 @@ mkCons2 cxt x y xys
 -- So they should be in the correct form.  In particular, they should be ANFed.
 thePrelude :: [Eqn]
 thePrelude
-  = [ (mkName "int",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :> Var vp)
+  = [ -- Type-test primops
+      -- These MUST be visibly partial identity functions, so that we can solve
+      --      exists xy. y=int[x]; y=3
+      -- That is why int[x] turns into  isInt[x]; x
+      (mkName "int",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :> Var vp)
     , (mkName "char",         Lam vp  $ mkBlkE $ Prm IsChar :@ (Var vp) :> Var vp)
+    , (mkName "comparable",   Lam vp  $ mkBlkE $ Prm IsComp :@ (Var vp) :> Var vp)
+--  , (mkName "string",       Lam vp  $ mkBlkE $ Prm IsStr :@ (Var vp) :> Var vp)
+
+    -- Type definitions as lambdas
     , (mkName "nat",          Lam vp  $ mkBlkE $ Prm IsInt :@ (Var vp) :>
                                                  Prm GEq :@ Arr [Var vp, IntE 0])
---  , (mkName "string",       Lam vp  $ mkBlkE $ Prm IsStr :@ (Var vp) :> Var vp)
-    , (mkName "comparable",   Lam vp  $ mkBlkE $ Prm IsComp :@ (Var vp) :> Var vp)
     , (mkName "any",          Lam vp  $ mkBlkE $ Var vp)
     , (mkName "void",         Lam vp  $ mkBlkE $ Arr [])
     , (mkName "Length",       Prm ArrLen)
@@ -898,7 +904,13 @@ initialBlk src
   = (top_cxt, top_blk)
   where
     term = srcToTerm src
+
+    -- top_skols: treat any completely-free variables as uninterpreted constants (skolems).
+    --            We must put them in `rc_skols` to avoid assertion errors.
     top_skols   = freeVarsTerm term `S.difference` init_locals
+
+
+    -- init_locals/thePrelude: add the Prelude
     init_locals = termBndrs term `S.union` S.fromList (map fst thePrelude)
 
     top_blk = Blk init_locals thePrelude
@@ -1851,26 +1863,29 @@ reduceVerifyOpGV cxt op arg gv
   = VerStep (mkRuleName ("VUnaryOp" ++ show op)) $
     [ Res (FloatRigid S.empty [A_Pred (notPred p)]) stuck | p <- preds ] ++
     if primOpCanFail op
-    then [ Res (FloatRigid S.empty  [A_Pred (A_Neg rel_op)])              Fail
-         , Res (FloatRigid S.empty  (A_Pred (A_Pos rel_op) : pos_assumps)) result   ]
-    else [ Res (FloatRigid (sing r) (bin_op                : pos_assumps)) (Var r)  ]
-  where
-    r = freshId cxt "r"
+    then [ Res (FloatRigid S.empty  [A_Pred (A_Neg rel_op)])               Fail
+         , Res (FloatRigid S.empty  (A_Pred (A_Pos rel_op) : pos_assumps)) rel_result   ]
+    else [ Res (FloatRigid (sing r) (bin_op_assump         : pos_assumps)) (Var r)  ]
+   where
+     r = freshId cxt "r"
 
-    rel_op = A_RelOp op gv
-    bin_op = A_PrimOp r (AO_Prim op) gv
+     rel_op :: FailableAssump  -- Used for failable ops like (>)
+     rel_op = A_RelOp op gv
 
-    stuck :: Exp
-    stuck = Err (render (pPrint op <> brackets (pPrint gv)))
+     bin_op_assump :: Assump   -- Used for non-failing ops like (+)
+     bin_op_assump = A_PrimOp r (AO_Prim op) gv
 
-    result :: Exp
-    result | isBinRelOp op = get_arg1 arg
-           | otherwise     = arg
+     stuck :: Exp
+     stuck = Err (render (pPrint op <> brackets (pPrint gv)))
 
-    -- get_arg1 is a bit horrible, but if primOpPreCond fires, and isBinOp,
-    -- then we know that gv must be GVArr, and hence arg is Arr.
-    get_arg1 (Arr [arg1,_]) = arg1
-    get_arg1 _ = error "reduceVerifyOpGV:get_arg1" (pPrint op <+> pPrint arg)
+     rel_result :: Exp
+     rel_result | isBinRelOp op = get_arg1 arg
+                | otherwise     = arg
+
+     -- get_arg1 is a bit horrible, but if primOpPreCond fires, and isBinOp,
+     -- then we know that gv must be GVArr, and hence arg is Arr.
+     get_arg1 (Arr [arg1,_]) = arg1
+     get_arg1 _ = error "reduceVerifyOpGV:get_arg1" (pPrint op <+> pPrint arg)
 
 -- Binary operators where the argument is a skolem
 reduceVerifyOpGV cxt op _ (GVVar r)
