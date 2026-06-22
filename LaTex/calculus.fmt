@@ -919,5 +919,9 @@
 
 %format (DsT (t))  = "{\mathcal T}\llbracket" t "\rrbracket{}"
 %format (DsE (t))  = "{\mathcal E}\llbracket" t "\rrbracket{}"
+%format (DsG (t))  = "{\mathcal G}\llbracket" t "\rrbracket{}"
+
 %format rho = "\rho"
 %format PI  = "PI"
+%format Gamma = "\Gamma"
+%format proves  = "\vdash"

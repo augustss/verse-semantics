@@ -37,6 +37,61 @@
 \end{array}
 \end{array}
 $} \\
+
+NOTES:
+\begin{itemize}
+\item
+ $|DsT t_1| \times |DsT t_2|$ is a set-theoretic product of two sets.
+\item
+ $isFunction(f)$ holds when $f$ is a set of tuples, and for every $(x,y_1)\in f$ and $(x,y_2)\in f$, we have $y_1 = y_2$.
+\end{itemize}
+
+\subsection{Simply typed lambda calculus in Martin-L\"of Type Theory}
+
+
+\fbox{$
+\begin{array}{l}
+\\
+\begin{array}{rcl}
+ |t| & ::= & |Int| \vb |t_1 -> t_2| \\
+ |e| & ::= & k \vb op \vb x \vb e_1\;e_2 \vb |lam ((x:t)) e| \\
+ |Gamma| & ::= & |emp| \vb |Gamma|, x : t 
+\end{array}
+\\ \\
+\begin{array}{r @@{\;\;}c@@{\;\;} l}
+\\
+  |DsT t| & :: & Type \\
+  |DsT Int rho| & = & \Z \\
+  |DsT (t_1 -> t_2) rho| & = & \Pi (x:|DsT t_1|).|DsT t_2|  \\
+  \\
+  |DsG Gamma| & :: & |dom(Gamma)| \rightarrow Type \\
+  |DsG emp| & = & \emptyset \\
+  |DsG Gamma,x : t| & = & |DsG Gamma|, x :: |DsT t|\\
+  \\ 
+  |DsE (Gamma proves e : t)| & :: & |DsG Gamma| \rightarrow |DsT t| \\
+  |DsE (Gamma proves k : Int) rho| & = &  k  \\
+  |DsE (Gamma proves x : t) rho| & = & |rho^(x)| \\
+  |DsE (Gamma proves (e_1 e_2) : t) rho| & = &  (|DsE (Gamma proves e_1 : t_1 -> t) rho|)
+                                                (|DsE (Gamma proves e_2 : t_1) rho|) \\
+  && \text{where $|Gamma proves e_1 : t_1 -> t|$ and $|Gamma proves e_2 : t_1|$} \\
+  |DsE (Gamma proves (lambda (x:t_1) dot e) : t_1 -> t_2) rho| & = & 
+     \ a \in |DsT t_1| \mapsto |DsE (Gamma, x:t_1 proves e : t_2) (rho^[x := a])| \\
+
+\end{array}
+\end{array}
+$} \\
+
+Notes:
+\begin{itemize}
+\item This interpretation is only defined for well-typed terms.
+\item More standard to use nat instead of |Int|.
+\item $\Pi x:A.B$ is MLTT dependent function type.
+\item $x \in A \mapsto a$ is a MLTT function.
+\item The interpretation of a context $\Gamma$ is type. This operation computes the type of $\rho$, a finite map from the variables in the domain of the context to values 
+in $|DsT (Gamma x)|$. In the abstraction case, we extend this finite map with a new binding for the variable $x$. In the variable case, we retrieve value of $x$ from the map---this must be total because we know that $x \in |dom Gamma|$.
+
+\end{itemize}
+
 \captionof{figure}{Auxiliary functions}
 \end{center}
 
