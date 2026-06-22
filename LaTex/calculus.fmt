@@ -572,6 +572,8 @@
 %format w_0
 %format w_1
 %format w_2
+%format w_3
+%format w_4
 %format w_i
 %format w_n
 %format w_m

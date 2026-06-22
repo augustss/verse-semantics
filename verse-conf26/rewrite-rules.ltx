@@ -393,30 +393,54 @@ $} \\
 \fbox{$
 \begin{array}{@@{}l}
 \begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
-%  \rulename{mfun} & |twiddle h w (functionOCX q at fx bt)| & \movesto
-  \rulename{mfun} & \multicolumn{3}{l}{|twiddle h w (functionX at fx bt)|} \\
-  && \movesto
+  \rulename{mfun} & |twiddle h w (functionX at fx bt)|
+  & \movesto
  & \begin{array}[t]{@@{}l}
      |verifyKW|(u;)\{\exists |p,q,termbinders at|\{\}.\,
      \begin{array}[t]{@@{}l}
-      |p == (twiddle u w at);| \\
-      |Wcirc w (q == apply1N h p);| \\
-      |check fx (twiddle q w (block bt))|\}
+      |p == (twiddle u w_1 at);| \\
+      |Wcirc bb (q == apply1N h p);| \\
+      |check fx (twiddle q w_2 (block bt))|\}
      \end{array}
      \\
      \lambda u.\; \exists p,q,|termbinders at|\{\}.
       \begin{array}[t]{l}
-      |p == (twiddle u w at);| \\
-      |Wcirc w (q == apply1N h p);| \\
-      |twiddle q w (block bt)|
+      |p == (twiddle u w_3 at);| \\
+      |Wcirc bb (q == apply1N h p);| \\
+      |twiddle q w_4 (block bt)|
       \end{array} \\
-   \end{array}
-\end{array} \\
-\text{where}\;
-\begin{array}[t]{rcll}
-  |Wcirc (bbcirc,_,_) e| & = & |emptytup| \\
-  |Wcirc (bbblob,_,_) e| & = & |e| \\
+   \end{array} \\
+&& \text{where} \\
+&& \multicolumn{3}{l}{\begin{array}[t]{rcll}
+  |(bb,dr,vx)| & = & w\\
+  w_1 & = & |(bbcirc,drdom,verifyflag)| \\
+  w_2 & = & |(bb,drrng fx,verifyflag)| \\
+  w_3 & = & |(bbblob,drdom,vx)| \\
+  w_4 & = & |(bbblob,drrng fx,execflag)| \\
+  |Wcirc bbcirc e| & = & |emptytup| \\
+  |Wcirc bbblob  e| & = & |e| \\
+\end{array}} \\
 \end{array}
+\\ \\
+
+\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
+  \rulename{moftype} & |twiddle u w (oftype t_1 t_2)|
+  & \movesto & |u == apply1N (Mcirc w t_1) (Mcirc w t_2)| & \text{if |w = (b, execflag, drdom)|} \\
+  && \movesto & |oftypefx ((twiddle u w t_1)) fx (Mcirc w t_2)| & \text{if |w = (b, execflag, drrng fx)|} \\
+  && \movesto & |blockKW| \{ \exists y,t \{\}.\; \begin{array}[t]{@@{}l}
+                 |y == Mcirc w t_1; t == Mcirc w t_2;| \\
+                 |check succeeds (apply1N t y); oftype y t))| \}
+                 \end{array}
+       & \text{if |w = (b, verifyflag, drdom)|} \\
+  && \movesto & |blockKW| \{ \exists y,t \{\}.\; \begin{array}[t]{@@{}l}
+                 |y == Mcirc w t_1; t == Mcirc w t_2;| \\
+                 |check succeeds (apply1N t y)| \}
+                 \end{array}
+       & \text{if |w = (b, verifyflag, drrng _)|} \\
+\\
+  \rulename{oftype} & |oftypefx e_1 fx e_2| & \movesto & |apply1N e_2 e_1| & \text{Outside |verifyKW|} \\
+\end{array} \\
+
 \end{array}
 $} \\
 \captionof{figure}{Matching functions with verification}
@@ -431,15 +455,6 @@ $} \\
   & |Q| & ::= & |hole| \vb |e == Q| \vb |Q == e|
            \vb  |e ; Q| \vb |Q ; e| \vb  |applyN e Q| \vb |applyN Q e|
     \vb |iter2 ic Q e|
-\end{array} \\
-\\
-\begin{array}{@@{}l r @@{\;\;}c@@{\;\;} l l}
-  \rulename{moftype} & |twiddle u w (oftype t_1 t_2)|
-  & \movesto & |u == apply1N (Mcirc w t_1) (Mcirc w t_2)| & \text{if |w = (b, execflag, drdom)|} \\
-  && \movesto & |oftypefx ((twiddle u w t_1)) fx (Mcirc w t_2)| & \text{if |w = (b, execflag, drrng fx)|} \\
-  && \movesto & |block (blk (y,t) () (y == Mcirc w t_1; t == Mcirc w t_2;
-                 check succeeds (apply1N t y); oftypefx y fx t))|
-       & \text{if |w = (b, verifyflag, drdom)|} \\
 \end{array} \\
 \\
 
@@ -468,9 +483,10 @@ $} \\
  \rulename{split-appf} & |verify2 (rs) as (P^[apply1N f (lam x e)])| & \movesto &
           |verify2 (rs,r) as (P^[ r ]);| \\
     &&& \text{if $f \in R, r \not\in R$} \\
-  \rulename{v-skol}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
-  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
-  &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\
+  \rulename{v-some} & |verify2 rs as (P^[oftypefx e_1 fx e_2])| & \movesto
+  & |verify2 (rs,r) as (def x (x = apply1N e_2 r; P^[x]))|; & \text{if |fx| can succeed} \\
+  &&& |verify2 rs as (def x (x = apply1N e_2 r; P^[fail]))|; & \text{if |fx| can fail} \\
+  &&& \text{if $|r| \notin |rs|$ and |freevars v `disjoint` boundvars P|} \\
 \end{array}\\
 \end{array}
 $} \\
