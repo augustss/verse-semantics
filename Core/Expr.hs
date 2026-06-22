@@ -516,12 +516,12 @@ primOpString IsStr    = "isStr$"
 primOpString IsChar   = "isChar$"
 primOpString IsArr    = "isArr$"
 primOpString IsMap    = "isMap$"
-primOpString IsComp   = "isComp$"
+primOpString IsComp   = "isComp$"      -- Type `comparable`
 primOpString IsTru    = "isTru$"
 primOpString IsFun    = "isFun$"
-primOpString IsGround = "isGround$"
-primOpString IsAny    = "isAny$"
-primOpString IsType   = "isType$"
+primOpString IsGround = "isGround$"    -- ??  Unused I think
+primOpString IsAny    = "isAny$"       -- Unused primop; just the identity functions
+primOpString IsType   = "isType$"      -- Unused primop? Isn't this a defined function?
 
 primOpString MkMap    = "mkMap$"
 
@@ -613,6 +613,8 @@ primOpPreCond :: PrimOp -> GroundVal -> Maybe [PredAssump]
 primOpPreCond Pls    = unOpPreCond IsInt
 primOpPreCond Neg    = unOpPreCond IsInt
 primOpPreCond ArrLen = unOpPreCond IsArr
+
+-- Type-tests have an unrestricted domain
 primOpPreCond op | primOpIsTypeTest op = \_ -> Just []
 
 primOpPreCond Add =  binOpPreCond intIntPreCond
