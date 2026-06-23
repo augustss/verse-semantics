@@ -2375,4 +2375,3 @@ findFresh bad orig_id@(Name s)
          | otherwise  = new_id
          where
            new_id = Name (prefix ++ show n)
-
