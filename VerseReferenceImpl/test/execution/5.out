@@ -1,8 +1,0 @@
-(false, truth{false}, false)
-(false, truth{false}, truth{false})
-(false, false, false)
-(false, false, truth{false})
-(truth{false}, truth{false}, false)
-(truth{false}, truth{false}, truth{false})
-(truth{false}, false, false)
-(truth{false}, false, truth{false})

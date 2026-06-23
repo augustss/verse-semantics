@@ -1,4 +1,0 @@
-# Copyright Epic Games, Inc. All Rights Reserved.
-some1 := function (exists X). X = false|truth{1};
-Y:some1;
-if (X := Y?) {X} else {2}
