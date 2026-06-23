@@ -1,7 +1,0 @@
-ignore-project: False
-tests: True
-benchmarks: True
-documentation: False
-
-package *
-  documentation: False

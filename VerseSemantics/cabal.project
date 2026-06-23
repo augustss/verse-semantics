@@ -1,8 +1,0 @@
-packages: .
-
--- build tests by default
-tests: True
-test-show-details: streaming
-
-library-profiling: False
-executable-profiling: False
