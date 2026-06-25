@@ -83,20 +83,21 @@ There are two repositories:
 The public repo is acutally a [git "subtree"](https://www.atlassian.com/git/tutorials/git-subtree) of the private repo.
 Specifically, the public repo exposes the `VerseSemantics/` directory of the private repo.
 
+The following instructions are for the Epic team only, not users of the public repo.
+
 ## Push to private repo
 
-If you make changes in the `VerseSemantics/` directory and do a
+If you make changes in the `VerseSemantics/` directory of the private repo, and do a
 ```
   git push
 ```
-the change will go to the private repo (i.e. `verse-paper`), just as before.
-Nothing has changed.
+the change will go (only) to the private repo (i.e. `verse-paper`), just as before.
 
 
 ## Push to public repo
 To push the changes to the public repo you need to do the following
 ```
-  cd <the verse-paper directory>
+  cd <root of private repo>
   git subtree push --prefix=VerseSemantics git@github.com:augustss/verse-semantics.git main
 ```
 
@@ -104,6 +105,6 @@ To push the changes to the public repo you need to do the following
 ## Pull from public repo
 To pull changes from the public repo you need to do the following
 ```
-  cd <the verse-paper directory>
+  cd <root of private repo>
   git subtree pull --prefix=VerseSemantics git@github.com:augustss/verse-semantics.git main --squash
 ```
