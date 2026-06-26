@@ -79,6 +79,7 @@ verify("T27",pass) { g(x:int)<closed>:int := x }
 # tim=skip: T28: Tim does not accept
 verify("T28",pass,tim=skip_rej) { g(x:any)<closed>:int := { if (int[x]) then 10 else 20 } }
 verify("T29",fail,tim=P00) { g(x:any)<closed>:int := { if (int(x)) then 10 else 20 } }
+   # T29: should fail because int(x) uses round parens
 verify("T30",pass) { suc(a:int)<closed>:int := {a + 1} ; g(x:int)<closed>:int := { suc(x) } }
 # tim=skip: T31: Tim does not accept
 verify("T31",pass,tim=skip_rej) { foo(x:any)<closed>:int := if (int[x]) then { x } else { 0 } }

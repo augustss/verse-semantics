@@ -166,9 +166,15 @@ data Blk = BlkX (Set Ident) Heap Exp
 
 data MatchContext
   = MC { mc_blob     :: Blob
-       , mc_verify   :: Bool  -- True <=> generate verification
-                              --          constraints for definitions
+       , mc_verify   :: MCVerify
        , mc_effect   :: DRContext }
+  deriving(Eq,Ord,Show)
+
+data MCVerify
+  = MC_InsideVerify  -- We are matching inside a verify{}
+                     -- Do not generate a verify{} for a function
+
+  | MC_OutsideVerify -- We are matching outside a verify
   deriving(Eq,Ord,Show)
 
 data Blob
@@ -205,14 +211,14 @@ matchTop cxt mc t = Crl $ Blk (sing u) emptyHeap $
     u = freshId cxt "u"
 
 mcAssumeVerified :: MatchContext -> MatchContext
-mcAssumeVerified mc = mc { mc_verify = False }
+mcAssumeVerified mc = mc { mc_verify = MC_InsideVerify }
 
 mcNested :: MatchContext -> MatchContext
 mcNested mc = mc { mc_blob = MNested }
 
 topMatchContext :: MatchContext
 topMatchContext = MC { mc_blob   = MTop
-                     , mc_verify = True
+                     , mc_verify = MC_OutsideVerify
                      , mc_effect = DR_Dom
                      }
 
@@ -255,9 +261,9 @@ mkSeqs [e]    = e
 mkSeqs (e:es) = e `mkSeq` mkSeqs es
 
 mkCheck :: Effect -> Blk -> Exp
-mkCheck Fails    blk = Prm ChkFails    :@ Iter ALL blk (Arr [])
-mkCheck Succeeds blk = Prm ChkSucceeds :@ Iter ALL blk (Arr [])
-mkCheck Decides  blk = Prm ChkDecides  :@ Iter ALL blk (Arr [])
+mkCheck Fails    blk = Prm ChkFails    :@ mkAll blk
+mkCheck Succeeds blk = Prm ChkSucceeds :@ mkAll blk
+mkCheck Decides  blk = Prm ChkDecides  :@ mkAll blk
 mkCheck Iterates blk = mkCrl blk
 
 mkAll :: Blk -> Exp
@@ -397,8 +403,8 @@ instance Pretty MatchContext where
       pp_fx (DR_Rng Fails)    = char 'f'
       pp_fx (DR_Rng Iterates) = char 'i'
 
-      pp_v True  = char 'v'
-      pp_v False = char 'x'
+      pp_v MC_InsideVerify  = char 'v'
+      pp_v MC_OutsideVerify = char 'x'
 
 instance Pretty Blob where
   pPrint MTop    = char 'o'
@@ -1053,6 +1059,8 @@ reduceExp cxt parent@(Blk _ _ body)
                 -> mkDone ("Subst " ++ show i) v         -- substitute atomic things
 
           -- Promotion
+          -- We like this in the admin rules, which happen for JustMatching, to get
+          -- rid of trivial clutter.  But we can't run it in NoPromotion settings
           -- We must try both ways round.  Here's a tricky case
           --   exists x. ...if( exists y. ..x=y.. )...
           -- We must fire (Promote2) on x=y
@@ -1088,6 +1096,7 @@ reduceExp cxt parent@(Blk _ _ body)
            Tru e           -> find1 leftCF Tru e
            _               -> RedNone
 
+    -- ToDo: explain what is going on her
     findOfTypeLam e1 fx (Lam x b)
        = fmap (\b'' -> OfType e1 fx (Lam x' b'')) (reduceBlock cxt' b')
        where
@@ -1558,24 +1567,24 @@ reduceMatch cxt x tm mc
 matchOfType :: ReductionContext -> MatchContext -> Ident -> Term -> Effect -> Term -> Reduction Exp
 matchOfType cxt mc x t1 fx t2
  = case mc of
-     MC { mc_verify = False, mc_effect = DR_Dom }
+     MC { mc_verify = MC_OutsideVerify, mc_effect = DR_Dom }
         -> mkDone ("TOfTypeXD " ++ show fx) $
            Var x :=: (matchTop cxt mc t2 :@ matchTop cxt mc t1)
 
-     MC { mc_verify = False, mc_effect = DR_Rng fx_pushed }
+     MC { mc_verify = MC_OutsideVerify, mc_effect = DR_Rng fx_pushed }
         -> mkDone ("TOfTypeXR " ++ show fx) $
            OfType (Match mc x t1)
                   (fx `intersectEffect` fx_pushed)
                   (matchTop cxt mc t2)
 
-     MC { mc_verify = True, mc_effect = DR_Dom }
+     MC { mc_verify = MC_InsideVerify, mc_effect = DR_Dom }
         -> mkStep ("TOfTypeVD " ++ show fx) (mkExiFloat [y,t]) $
            (Var y :=: matchTop cxt mc t1) :>
            (Var t :=: matchTop cxt mc t2) :>
            (mkCheck Succeeds (mkBlkE $ Var t :@ Var y)) :>
            (OfType (Var y) fx (Var t))
 
-     MC { mc_verify = True, mc_effect = DR_Rng {} }
+     MC { mc_verify = MC_InsideVerify, mc_effect = DR_Rng {} }
         -> mkStep ("TOfTypeVR " ++ show fx) (mkExiFloat [y,t]) $
            (Var y :=: matchTop cxt mc t1) :>
            (Var t :=: matchTop cxt mc t2) :>
@@ -1602,15 +1611,15 @@ matchFun cxt f at fx bt mc
 
     mc_lam_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx
-                    , mc_verify = False }
+                    , mc_verify = mc_verify mc }
 
     mc_ver_dom = MC { mc_blob   = MTop
                     , mc_effect = DR_Dom
-                    , mc_verify = True }  -- Here we know mc_verify mc = True
+                    , mc_verify = MC_InsideVerify }
 
     mc_ver_rng = MC { mc_blob   = blob
                     , mc_effect = DR_Rng fx
-                    , mc_verify = True } -- Here we know mc_verify mc = True
+                    , mc_verify = MC_InsideVerify }
 
     the_lambda = Lam u $
                  Blk (S.fromList [p,q] `S.union` tbs_at) emptyHeap $
@@ -1622,8 +1631,9 @@ matchFun cxt f at fx bt mc
                   MTop    -> IntE 99999
 
     -- Generate a verify{} if `mc` says so
-    fun_verify | mc_verify mc = the_verify
-               | otherwise    = Arr []
+    fun_verify = case mc_verify mc of
+                   MC_InsideVerify  -> Arr []
+                   MC_OutsideVerify -> the_verify
 
     -- verify(u){ u ~>(flip) at; check<fx>{ wrap; q~>(no-flip) bt } }
     the_verify = Verify (sing u) [] $
