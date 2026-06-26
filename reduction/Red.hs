@@ -860,7 +860,7 @@ runTraced fuel top_cxt top_blk
                                                  Nothing   -- avoid getting stuck in a loop doing this over and over
                                              else
                                                  Just $ mkTraceStep (RNM ["Top-choice"]) blk'
-                                                
+
           red -> error ("error: runTraced " ++ prettyShow red)
     -- normalize a Blk
     norm = getTerm . normalize step valid (fuel-1)
@@ -1024,11 +1024,16 @@ reduceExp cxt parent@(Blk _ _ body)
  where
     find :: Bool -> Exp -> Reduction Exp
     find leftCF expr  -- leftCF means that the context to the left of the find is choice free
+      | justMatching cxt
+      = find_admin            expr `orTry`
+        find_recursive leftCF expr `orTry`
+        find_rec_matches      expr
+
+      | otherwise
       = find_step      leftCF expr `orTry`
         find_verify           expr `orTry`
         find_admin            expr `orTry`
-        find_recursive leftCF expr `orTry`
-        find_rec_matches      expr
+        find_recursive leftCF expr
 
     find_admin :: Exp -> Reduction Exp
     -- These work even when (findMatching cxt)
@@ -1044,7 +1049,8 @@ reduceExp cxt parent@(Blk _ _ body)
 
           -- Substitution
           Var i | Just v <- lookup i (rc_eqns cxt)  -- Includes leqns
-                -> mkDone ("Subst " ++ show i) v
+                , not (justMatching cxt) || isAtomic v   -- When just-matching, only
+                -> mkDone ("Subst " ++ show i) v         -- substitute atomic things
 
           -- Promotion
           -- We must try both ways round.  Here's a tricky case
@@ -1092,9 +1098,6 @@ reduceExp cxt parent@(Blk _ _ body)
     -- `find_rec_matches` looks under lambda and delay to find
     -- occurrences of `Match`, so it can rewrite them away
     find_rec_matches expr
-      | not (justMatching cxt)
-      = RedNone
-      | otherwise  -- We are just matching; look under lambda
       = case expr of
           Dly e   -> find1 False Dly e
 --ToDo
@@ -1107,6 +1110,11 @@ reduceExp cxt parent@(Blk _ _ body)
           Iter ic b e -> fmap (\b' -> Iter ic b' e) (reduceBlock cxt b) `orTry`
                          find1 False (Iter ic b) e
                                -- False: irrelevant because we never fire choices
+
+          Verify is as b -> fmap (Verify is as) (reduceBlock cxt' b)
+             where
+               cxt' = cxt `addInScopeSkols` is
+
           _ -> RedNone
 
     find_verify expr
@@ -1116,9 +1124,6 @@ reduceExp cxt parent@(Blk _ _ body)
            _                 -> RedNone
 
     find_step leftCF expr
-      | justMatching cxt
-      = RedNone
-      | otherwise
       = case expr of
         -- Primops
         Prm op :@ v  -> reducePrimOp op v
@@ -1480,11 +1485,11 @@ reduceMatch cxt x tm mc
                              where
                                 w = freshId cxt "w"
 
-        Rng t | DR_Rng fx <- mc_effect mc
-              -> mkDone "Mcolon1" $
-                 OfType (Var x) fx (matchTop cxt mc t)
-              | otherwise
-              -> mkDone "MColon2" $ matchTop cxt mc t :@ Var x
+        Rng t -> case mc_effect mc of
+                   DR_Rng fx -> mkDone "Mcolon1" $
+                                OfType (Var x) fx (matchTop cxt mc t)
+                   DR_Dom    -> mkDone "MColon2" $
+                                matchTop cxt mc t :@ Var x
 
         (i := t)   -> mkDone ("MDef " ++ show i) $ Var i :=: Match mc x t
         (i :-> t)  -> mkDone ("MArr " ++ show i) $ (equalsCirc cxt mc x (Var i)) :>
