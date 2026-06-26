@@ -94,11 +94,17 @@ If you make changes in the `VerseSemantics/` directory of the private repo, and 
 the change will go (only) to the private repo (i.e. `verse-paper`), just as before.
 
 
+# Public repo
+
+## Initialize it
+git remote add verse-semantics git@github.com:augustss/verse-semantics.git
+git fetch verse-semantics
+
 ## Push to public repo
 To push the changes to the public repo you need to do the following
 ```
   cd <root of private repo>
-  git subtree push --prefix=VerseSemantics git@github.com:augustss/verse-semantics.git main
+  git subtree push --prefix=VerseSemantics verse-semantics main
 ```
 
 
@@ -106,5 +112,5 @@ To push the changes to the public repo you need to do the following
 To pull changes from the public repo you need to do the following
 ```
   cd <root of private repo>
-  git subtree pull --prefix=VerseSemantics git@github.com:augustss/verse-semantics.git main --squash
+  git subtree pull --prefix=VerseSemantics verse-semantics main --squash
 ```
